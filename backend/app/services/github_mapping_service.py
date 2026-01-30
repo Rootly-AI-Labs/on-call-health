@@ -5,7 +5,7 @@ Separates stable mapping data (email -> username) from dynamic activity data (co
 Implements intelligent caching to optimize performance and reduce API calls.
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
 from sqlalchemy.orm import Session
 
@@ -156,12 +156,18 @@ class GitHubMappingService:
         """Check if failed mapping should be retried."""
         if mapping.mapping_successful:
             return False
-        age_hours = (datetime.utcnow() - mapping.created_at).total_seconds() / 3600
+        # Ensure timezone-aware comparison
+        now = datetime.now(timezone.utc)
+        created_at = mapping.created_at.replace(tzinfo=timezone.utc) if mapping.created_at.tzinfo is None else mapping.created_at
+        age_hours = (now - created_at).total_seconds() / 3600
         return age_hours >= self.FAILED_RETRY_HOURS
-    
+
     def _get_mapping_age_days(self, mapping) -> float:
         """Get age of mapping in days."""
-        return (datetime.utcnow() - mapping.created_at).total_seconds() / 86400
+        # Ensure timezone-aware comparison
+        now = datetime.now(timezone.utc)
+        created_at = mapping.created_at.replace(tzinfo=timezone.utc) if mapping.created_at.tzinfo is None else mapping.created_at
+        return (now - created_at).total_seconds() / 86400
     
     async def _refresh_activity_data(
         self, 
@@ -274,7 +280,7 @@ class GitHubMappingService:
         recent_mappings = self.db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == user_id,
             IntegrationMapping.target_platform == "github",
-            IntegrationMapping.created_at >= datetime.utcnow() - timedelta(days=30)
+            IntegrationMapping.created_at >= datetime.now(timezone.utc) - timedelta(days=30)
         ).all()
         
         stats = {
