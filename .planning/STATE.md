@@ -61,6 +61,24 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 **Files Modified:**
 - `backend/app/core/rate_limiting.py` - Extended with per-API-key rate limiting
 
+### 2026-01-31 - Plan 02-02 Complete
+
+**Actions Taken:**
+1. Added `extract_api_key_header` function to extract X-API-Key from MCP context
+2. Added `require_user_api_key` function with two-phase validation (SHA-256 + Argon2)
+3. JWT tokens rejected with helpful error message guiding to X-API-Key
+4. Wired all 5 MCP tool handlers to use require_user_api_key
+5. Preserved require_user function for backward compatibility
+
+**Commits:**
+- `7d890aa7` - feat(02-02): add extract_api_key_header function for MCP context
+- `0894b08a` - feat(02-02): add require_user_api_key function for MCP authentication
+- `28543ed2` - feat(02-02): wire MCP tool handlers to API key authentication
+
+**Files Modified:**
+- `backend/app/mcp/auth.py` - Added extract_api_key_header and require_user_api_key (+95 lines)
+- `backend/app/mcp/server.py` - Updated all 5 tool handlers to use require_user_api_key
+
 ### 2026-01-31 - Plan 02-01 Complete
 
 **Actions Taken:**
@@ -168,6 +186,9 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 | New session in background task | Thread safety for BackgroundTasks | 02-01 |
 | API key ID highest priority in rate limit key | Each key gets independent bucket | 02-03 |
 | Independent buckets per key | Different keys for same user get separate limits | 02-03 |
+| MCP endpoints API-key-only | Per CONTEXT.md, JWT rejected with guidance | 02-02 |
+| require_user preserved | Backward compatibility for non-MCP uses | 02-02 |
+| Sync Argon2 in MCP | MCP handlers are async but verify_api_key is sync-safe | 02-02 |
 
 ---
 
@@ -197,6 +218,8 @@ None - greenfield feature
 **Modified:**
 - `backend/app/models/user.py` - Added api_keys relationship (01-01)
 - `backend/app/models/__init__.py` - Export APIKey (01-01)
+- `backend/app/mcp/auth.py` - Added API key auth for MCP (02-02)
+- `backend/app/mcp/server.py` - Wired to API key auth (02-02)
 - `backend/app/core/rate_limiting.py` - Per-key rate limiting (02-03)
 
 **Created:**
