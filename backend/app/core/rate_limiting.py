@@ -109,25 +109,33 @@ def test_redis_connection(storage_uri: str) -> bool:
 
 def get_rate_limit_key(request: Request) -> str:
     """
-    Generate rate limit key based on user context.
-    Priority: authenticated user > IP address
+    Generate rate limit key based on authentication context.
+
+    Priority (per CONTEXT.md):
+    1. API key ID - each key gets independent 100 req/min bucket
+    2. Authenticated user ID - for JWT-authenticated requests
+    3. IP address - fallback for unauthenticated requests
     """
     try:
-        # Try to get authenticated user ID from JWT token
+        # Priority 1: Check for API key ID (set by get_current_user_from_api_key dependency)
+        if hasattr(request.state, "api_key_id") and request.state.api_key_id:
+            return f"api_key:{request.state.api_key_id}"
+
+        # Priority 2: Try to get authenticated user ID from JWT token
         auth_header = request.headers.get("authorization")
         if auth_header and auth_header.startswith("Bearer "):
             # We'll enhance this to extract user ID from JWT if needed
             # For now, using IP address as fallback is secure
             pass
-            
-        # Check if user info is available in request state
-        if hasattr(request.state, "user_id"):
+
+        # Priority 2b: Check if user info is available in request state
+        if hasattr(request.state, "user_id") and request.state.user_id:
             return f"user:{request.state.user_id}"
-            
+
     except Exception:
         pass
-    
-    # Defensive fallback to IP address with type checking
+
+    # Priority 3: Defensive fallback to IP address with type checking
     try:
         # Ensure request is the correct type before calling get_remote_address
         if hasattr(request, 'client') and hasattr(request.client, 'host'):
