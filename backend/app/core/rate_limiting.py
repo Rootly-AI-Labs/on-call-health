@@ -26,6 +26,9 @@ RATE_LIMITS = {
     "account_delete": "3/hour",          # Account deletion attempts (very strict)
     "admin_api_key": "5/minute",          # Admin API key attempts (strict to prevent brute force)
 
+    # MCP API key endpoints - per-key rate limiting
+    "api_key_mcp": "100/minute",          # Per API key limit for MCP endpoints
+
     # Analysis endpoints - moderate limits
     "analysis_create": "3/minute",       # Create new analysis
     "analysis_get": "100/minute",        # View analysis results
