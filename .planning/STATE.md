@@ -2,8 +2,8 @@
 
 **Project:** API Key Management for On-Call Health
 **Milestone:** v1.0 - MVP Launch
-**Updated:** 2026-01-31
-**Status:** 🟢 Phase 2 Complete
+**Updated:** 2026-01-30
+**Status:** 🟡 Phase 3 In Progress
 
 ## Current State
 
@@ -12,17 +12,17 @@
 ```
 Phase 1: Database Model   [████████████████████]  100%  (4/4 plans)
 Phase 2: Auth Middleware  [████████████████████]  100%  (4/4 plans)
-Phase 3: API Endpoints    [░░░░░░░░░░░░░░░░░░░░]   0%
+Phase 3: API Endpoints    [██████████░░░░░░░░░░]   50%  (1/2 plans)
 Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░░░░]   0%
 ```
 
-**Overall Project Progress:** 8/12 plans completed (67%)
+**Overall Project Progress:** 9/12 plans completed (75%)
 
 ### Active Phase
 
-**Current:** Phase 2 - Authentication Middleware Integration COMPLETE
-**Plan:** 02-04-PLAN.md COMPLETE
-**Next:** Phase 3 - API Endpoints
+**Current:** Phase 3 - API Endpoints
+**Plan:** 03-01-PLAN.md COMPLETE
+**Next:** 03-02-PLAN.md (Integration Tests)
 **Blocking:** None
 
 ### Phase Status
@@ -31,7 +31,7 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 |-------|--------|-------|-----------|----------|
 | Phase 1: Database Model | 🟢 Complete | 4 | 4/4 | 100% |
 | Phase 2: Auth Middleware | 🟢 Complete | 4 | 4/4 | 100% |
-| Phase 3: API Endpoints | 🔵 Not Started | TBD | 0/TBD | 0% |
+| Phase 3: API Endpoints | 🟡 In Progress | 2 | 1/2 | 50% |
 | Phase 4: Frontend UI | 🔵 Not Started | TBD | 0/TBD | 0% |
 
 **Status Legend:**
@@ -43,6 +43,26 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 ---
 
 ## Recent Activity
+
+### 2026-01-30 - Plan 03-01 Complete
+
+**Actions Taken:**
+1. Created api_keys.py with POST, GET, DELETE endpoints
+2. Implemented JWT-only authentication via get_current_active_user
+3. Applied rate limiting decorators (integration_create, integration_get, integration_update)
+4. Added Pydantic v2 validators for name and expires_at fields
+5. Registered router in main.py with prefix="/api"
+6. All 528 existing tests pass with no regressions
+
+**Commits:**
+- `eba598e3` - feat(03-01): create API key CRUD endpoints
+- `7ff3f8a9` - feat(03-01): register API key router in main.py
+
+**Files Created:**
+- `backend/app/api/endpoints/api_keys.py` - API key CRUD endpoints (152 lines)
+
+**Files Modified:**
+- `backend/app/main.py` - Added api_keys router registration
 
 ### 2026-01-31 - Plan 02-04 Complete
 
@@ -211,6 +231,8 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 | Sync Argon2 in MCP | MCP handlers are async but verify_api_key is sync-safe | 02-02 |
 | Mock database in unit tests | Avoid test database dependency | 02-04 |
 | Test all error paths | Comprehensive edge case coverage | 02-04 |
+| Rate limiter Request parameter | slowapi requires explicit request: Request param | 03-01 |
+| Pydantic body param naming | Use 'body' not 'request' to avoid FastAPI Request collision | 03-01 |
 
 ---
 
@@ -244,6 +266,7 @@ None - greenfield feature
 - `backend/app/mcp/server.py` - Wired to API key auth (02-02)
 - `backend/app/core/rate_limiting.py` - Per-key rate limiting (02-03)
 - `backend/tests/test_mcp_server.py` - Updated to mock require_user_api_key (02-04)
+- `backend/app/main.py` - Added api_keys router registration (03-01)
 
 **Created:**
 - `backend/app/models/api_key.py` - APIKey model (01-01)
@@ -253,27 +276,28 @@ None - greenfield feature
 - `backend/app/auth/api_key_auth.py` - API key authentication dependency (02-01)
 - `backend/tests/test_api_key_auth.py` - FastAPI auth dependency tests (02-04)
 - `backend/tests/test_mcp_api_key_auth.py` - MCP auth tests (02-04)
+- `backend/app/api/endpoints/api_keys.py` - API key CRUD endpoints (03-01)
 
 ---
 
 ## Next Actions
 
-### Immediate (Next Phase)
-1. Plan Phase 3 - API Endpoints for CRUD operations
+### Immediate (Next Plan)
+1. Execute 03-02-PLAN.md - Integration tests for API key endpoints
 
 ### Upcoming Phases
-- Phase 3: API endpoints for CRUD operations
+- Phase 3: Complete integration tests (03-02)
 - Phase 4: Frontend UI components and routing
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-01-31T00:27:50Z
-**Stopped at:** Completed 02-04-PLAN.md (Phase 2 Complete)
-**Resume file:** None - ready for Phase 3 planning
+**Last session:** 2026-01-30T20:53:00Z
+**Stopped at:** Completed 03-01-PLAN.md
+**Resume file:** None - ready for 03-02 execution
 
 ---
 
-*Last Updated: 2026-01-31*
-*Next Update: After Phase 3 planning*
+*Last Updated: 2026-01-30*
+*Next Update: After 03-02 execution*
