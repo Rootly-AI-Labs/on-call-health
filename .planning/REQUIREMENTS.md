@@ -14,7 +14,6 @@ Requirements for token-based authentication feature. Each maps to roadmap phases
 - [ ] **AUTH-03**: Token validation executes during setup to verify token works
 - [ ] **AUTH-04**: Clear error messages display when token validation fails
 - [ ] **AUTH-05**: Visual status indicators show connection state (connected, validating, error)
-- [ ] **AUTH-06**: Security warning displays about token permissions before user enters token
 
 ### Token Management
 
@@ -42,6 +41,7 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ### Authentication Setup
 
+- **AUTH-06**: Security warning displays about token permissions before user enters token
 - **AUTH-07**: Permission scope preview displays before connection (show what data token can access)
 - **AUTH-08**: Duplicate token detection warns user if same token is used in multiple integrations
 
@@ -73,29 +73,30 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | TBD | Pending |
-| AUTH-02 | TBD | Pending |
-| AUTH-03 | TBD | Pending |
-| AUTH-04 | TBD | Pending |
-| AUTH-05 | TBD | Pending |
-| AUTH-06 | TBD | Pending |
-| TOKEN-01 | TBD | Pending |
-| TOKEN-02 | TBD | Pending |
-| TOKEN-03 | TBD | Pending |
-| UX-01 | TBD | Pending |
-| UX-02 | TBD | Pending |
-| UX-03 | TBD | Pending |
-| UX-04 | TBD | Pending |
-| UX-05 | TBD | Pending |
-| UX-06 | TBD | Pending |
-| SWITCH-01 | TBD | Pending |
-| SWITCH-02 | TBD | Pending |
+| AUTH-01 | Phase 3 | Pending |
+| AUTH-02 | Phase 4 | Pending |
+| AUTH-03 | Phase 2 | Pending |
+| AUTH-04 | Phase 2 | Pending |
+| AUTH-05 | Phase 2 | Pending |
+| TOKEN-01 | Phase 1 | Pending |
+| TOKEN-02 | Phase 1 | Pending |
+| TOKEN-03 | Phase 1 | Pending |
+| UX-01 | Phase 3, Phase 4 | Pending |
+| UX-02 | Phase 3 | Pending |
+| UX-03 | Phase 4 | Pending |
+| UX-04 | Phase 5 | Pending |
+| UX-05 | Phase 3 | Pending |
+| UX-06 | Phase 4 | Pending |
+| SWITCH-01 | Phase 5 | Pending |
+| SWITCH-02 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 17 total
-- Mapped to phases: 0 (pending roadmap creation)
-- Unmapped: 17 ⚠️
+- v1 requirements: 16 total
+- Mapped to phases: 16 (100% coverage)
+- Unmapped: 0
+
+**Note:** UX-01 appears in both Phase 3 (Jira) and Phase 4 (Linear) as it applies to both platforms. Each phase implements its platform-specific version.
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-01-30 after initial definition*
+*Last updated: 2026-01-31 after roadmap creation*
