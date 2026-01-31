@@ -91,8 +91,8 @@ export function OrganizationManagementDialog({
 
   const dialogContentBody = (
     <>
-      {/* Role descriptions */}
-      <div className={asInlineView ? "px-0 py-3 bg-purple-100 rounded-lg mb-6" : "mt-4 px-4 py-3 bg-purple-100 rounded-lg"}>
+      {/* Role descriptions with padding */}
+      <div className={asInlineView ? "px-6 py-3 bg-purple-100 rounded-lg mb-6 mx-6 mt-6" : "mt-4 px-4 py-3 bg-purple-100 rounded-lg"}>
           <div className="space-y-1.5 text-xs">
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-neutral-900 min-w-[80px]">Admin</span>
@@ -108,7 +108,7 @@ export function OrganizationManagementDialog({
         <div className="space-y-6">
           {/* Invite New Member Section - Only visible to admins */}
           {(userInfo?.role === 'admin') && (
-            <div className="p-6 border rounded-lg bg-white">
+            <div className={asInlineView ? "p-6 border rounded-lg bg-white mx-6" : "p-6 border rounded-lg bg-white"}>
               <div className="flex items-start space-x-4">
                 <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                   <Mail className="w-5 h-5 text-purple-600" />
@@ -181,7 +181,7 @@ export function OrganizationManagementDialog({
             <div className="space-y-6">
               {/* Search Bar - above members table */}
               {orgMembers.length > 0 && (
-                <div className="mb-4">
+                <div className={asInlineView ? "px-6 mb-4" : "mb-4"}>
                   <div className="relative max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                     <Input
@@ -228,43 +228,14 @@ export function OrganizationManagementDialog({
                               <span className="text-sm text-neutral-600">{member.email}</span>
                             </td>
                             <td className="py-4 px-6">
-                              {member.status === 'pending' ? (
-                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
-                                  Pending
-                                </span>
-                              ) : (
-                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                                  Active
-                                </span>
-                              )}
+                              <span className="text-sm text-neutral-600">
+                                {member.status === 'pending' ? 'Pending' : 'Active'}
+                              </span>
                             </td>
                             <td className="py-4 px-6">
-                              {member.status === 'pending' ? (
-                                <span className="text-xs text-neutral-500 capitalize">
-                                  {member.role?.replace('_', ' ') || 'member'}
-                                </span>
-                              ) : member.is_current_user ? (
-                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800 capitalize">
-                                  {member.role?.replace('_', ' ') || 'member'}
-                                </span>
-                              ) : (
-                                <div className="relative group">
-                                  <select
-                                    value={member.role || 'member'}
-                                    onChange={(e) => onRoleChange(member.id as number, e.target.value)}
-                                    className="text-xs px-2 py-1 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white disabled:opacity-60 disabled:cursor-not-allowed"
-                                    disabled={userInfo?.role !== 'admin'}
-                                  >
-                                    <option value="member">Member</option>
-                                    <option value="admin">Admin</option>
-                                  </select>
-                                  {userInfo?.role !== 'admin' && (
-                                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-neutral-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                                      Only admins can change roles
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                              <span className="text-sm text-neutral-900 capitalize">
+                                {member.role?.replace('_', ' ') || 'member'}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -357,14 +328,14 @@ export function OrganizationManagementDialog({
 
               {/* Empty State - No results from search */}
               {filteredMembers.length === 0 && orgMembers.length > 0 && (
-                <div className="text-center py-8 text-neutral-500">
+                <div className={asInlineView ? "px-6 text-center py-8 text-neutral-500" : "text-center py-8 text-neutral-500"}>
                   <p>No members found matching your search</p>
                 </div>
               )}
 
               {/* Empty State - No members at all */}
               {!loadingOrgData && orgMembers.length === 0 && pendingInvitations.length === 0 && (
-                <div className="text-center py-8 text-neutral-500">
+                <div className={asInlineView ? "px-6 text-center py-8 text-neutral-500" : "text-center py-8 text-neutral-500"}>
                   <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No organization members or pending invitations found</p>
                   <p className="text-sm mt-1">Start by inviting team members above</p>
@@ -391,9 +362,9 @@ export function OrganizationManagementDialog({
   if (asInlineView) {
     return (
       <>
-        {/* Header */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold">
+        {/* Header with padding and border */}
+        <div className="p-6 border-b border-neutral-200">
+          <h2 className="text-xl font-semibold text-neutral-900">
             {title}
           </h2>
           <p className="text-sm text-neutral-600 mt-1">

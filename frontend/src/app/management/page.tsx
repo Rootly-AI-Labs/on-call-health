@@ -844,7 +844,7 @@ function TeamPageContent() {
                 </>
               ) : (
                 // Team View - Team Management
-                <div className="p-6">
+                <>
                   <OrganizationManagementDialog
                     open={true}
                     onOpenChange={() => {}}
@@ -864,7 +864,7 @@ function TeamPageContent() {
                     title="Team Management"
                     subtitle="Add team members, assign roles, manage access permissions, and control who can view and edit team data"
                   />
-                </div>
+                </>
               )}
             </div>
           )}
