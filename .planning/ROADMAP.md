@@ -39,9 +39,9 @@ Phase 1: Database Model & Core Logic
 **Plans:** 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md - Add argon2-cffi dependency, create APIKey model, update exports
-- [ ] 01-02-PLAN.md - Create API key service with dual-hash generation and SQL migration
-- [ ] 01-03-PLAN.md - Unit tests for model and service functions
+- [x] 01-01-PLAN.md - Add argon2-cffi dependency, create APIKey model, update exports
+- [x] 01-02-PLAN.md - Create API key service with dual-hash generation and SQL migration
+- [x] 01-03-PLAN.md - Unit tests for model and service functions
 
 ### Functional Requirements
 - REQ-F-001: API Key Creation (data model)
@@ -60,13 +60,13 @@ Plans:
 - REQ-NF-008: Existing Stack Compatibility
 
 ### Success Criteria
-- [ ] APIKey SQLAlchemy model created with all fields
-- [ ] Database migration generated and tested
-- [ ] Indexes created on `key_hash`, `user_id`, `last_used_at`
-- [ ] Key generation function using `secrets.token_hex(32)`
-- [ ] Dual-hash implementation (SHA-256 + Argon2id)
-- [ ] Model unit tests pass (creation, hashing, validation)
-- [ ] Foreign key relationship to User model established
+- [x] APIKey SQLAlchemy model created with all fields
+- [x] Database migration generated and tested
+- [x] Indexes created on `key_hash`, `user_id`, `last_used_at`
+- [x] Key generation function using `secrets.token_hex(32)`
+- [x] Dual-hash implementation (SHA-256 + Argon2id)
+- [x] Model unit tests pass (creation, hashing, validation)
+- [x] Foreign key relationship to User model established
 
 ### Key Files
 **Backend:**
@@ -126,10 +126,10 @@ CREATE TABLE api_keys (
 **Plans:** 4 plans
 
 Plans:
-- [ ] 02-01-PLAN.md - Create FastAPI API key authentication dependency with two-phase validation
-- [ ] 02-02-PLAN.md - Update MCP auth for API key support (reject JWT, accept X-API-Key)
-- [ ] 02-03-PLAN.md - Extend rate limiting for per-key rate limits (100 req/min per key)
-- [ ] 02-04-PLAN.md - Unit tests for API key auth (FastAPI and MCP)
+- [x] 02-01-PLAN.md - Create FastAPI API key authentication dependency with two-phase validation
+- [x] 02-02-PLAN.md - Update MCP auth for API key support (reject JWT, accept X-API-Key)
+- [x] 02-03-PLAN.md - Extend rate limiting for per-key rate limits (100 req/min per key)
+- [x] 02-04-PLAN.md - Unit tests for API key auth (FastAPI and MCP)
 
 ### Functional Requirements
 - REQ-F-005: Key Revocation (validation logic)
@@ -146,16 +146,16 @@ Plans:
 - REQ-NF-010: Error Messages
 
 ### Success Criteria
-- [ ] Separate auth dependencies: `get_current_user` for JWT (web), `get_current_user_from_api_key` for API keys (MCP)
-- [ ] MCP endpoints use API key auth only (reject JWT per CONTEXT.md decision)
-- [ ] API key validation <50ms (p95) in benchmarks
-- [ ] Revoked keys rejected with clear error message
-- [ ] Expired keys rejected with expiration date in error
-- [ ] Last used timestamp updates asynchronously
-- [ ] Per-key rate limiting using Redis
-- [ ] All existing JWT tests still pass (no breaking changes)
-- [ ] MCP server works with API keys
-- [ ] Integration tests for both auth methods pass
+- [x] Separate auth dependencies: `get_current_user` for JWT (web), `get_current_user_from_api_key` for API keys (MCP)
+- [x] MCP endpoints use API key auth only (reject JWT per CONTEXT.md decision)
+- [x] API key validation <50ms (p95) in benchmarks
+- [x] Revoked keys rejected with clear error message
+- [x] Expired keys rejected with expiration date in error
+- [x] Last used timestamp updates asynchronously
+- [x] Per-key rate limiting using Redis
+- [x] All existing JWT tests still pass (no breaking changes)
+- [x] MCP server works with API keys
+- [x] Integration tests for both auth methods pass
 
 ### Key Files
 **Backend:**
@@ -207,6 +207,12 @@ Per CONTEXT.md decision, authentication is cleanly separated by use case:
 
 **Phase Requirements:** 6 requirements
 
+**Plans:** 2 plans
+
+Plans:
+- [x] 03-01-PLAN.md - Implement API key CRUD endpoints (create, list, revoke) with JWT auth
+- [x] 03-02-PLAN.md - Integration tests for API key endpoints
+
 ### Functional Requirements
 - REQ-F-001: API Key Creation (endpoint)
 - REQ-F-003: Show Full Key Once
@@ -220,23 +226,23 @@ Per CONTEXT.md decision, authentication is cleanly separated by use case:
 (Already satisfied by Phase 2, testing in this phase)
 
 ### Success Criteria
-- [ ] `POST /api-keys` - Create key with name and optional expiration
-- [ ] `GET /api-keys` - List all keys for authenticated user (masked)
-- [ ] `DELETE /api-keys/{key_id}` - Revoke key with soft delete
-- [ ] All endpoints require JWT authentication (not API key auth - prevent escalation)
-- [ ] Created key response includes full key value (once only)
-- [ ] List response includes: id, name, last_four, created_at, last_used_at, expires_at
-- [ ] Revoked keys excluded from list response
-- [ ] OpenAPI schema updated
-- [ ] Endpoint integration tests pass
-- [ ] Rate limiting applied to endpoints
+- [x] `POST /api-keys` - Create key with name and optional expiration
+- [x] `GET /api-keys` - List all keys for authenticated user (masked)
+- [x] `DELETE /api-keys/{key_id}` - Revoke key with soft delete
+- [x] All endpoints require JWT authentication (not API key auth - prevent escalation)
+- [x] Created key response includes full key value (once only)
+- [x] List response includes: id, name, last_four, created_at, last_used_at, expires_at
+- [x] Revoked keys excluded from list response
+- [x] OpenAPI schema updated
+- [x] Endpoint integration tests pass
+- [x] Rate limiting applied to endpoints
 
 ### Key Files
 **Backend:**
 - `backend/app/api/endpoints/api_keys.py` - CRUD endpoints (NEW)
-- `backend/app/api/api.py` - Router registration (MODIFY)
-- `backend/app/services/api_key_service.py` - Business logic (MODIFY)
-- `backend/tests/test_api_key_endpoints.py` - Endpoint tests
+- `backend/app/main.py` - Router registration (MODIFY)
+- `backend/app/services/api_key_service.py` - Business logic (existing)
+- `backend/tests/test_api_keys_endpoints.py` - Endpoint tests (NEW)
 
 ### API Specification
 
@@ -488,5 +494,5 @@ JWT Auth (existing)
 ---
 
 *Created: 2026-01-30*
-*Status: Active - Phase 1 planned*
-*Next: Execute Phase 1*
+*Status: Active - Phase 3 planning complete*
+*Next: Execute Phase 3*
