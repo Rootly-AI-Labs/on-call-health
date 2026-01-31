@@ -223,6 +223,10 @@ def admin_rate_limit(endpoint_type: str = "admin_api_key"):
     """Rate limiter for admin API key protected endpoints (strict to prevent brute force)."""
     return limiter.limit(RATE_LIMITS.get(endpoint_type, "5/minute"))
 
+def mcp_rate_limit(endpoint_type: str = "api_key_mcp"):
+    """Rate limiter for MCP API key endpoints (100 req/min per key)."""
+    return limiter.limit(RATE_LIMITS.get(endpoint_type, "100/minute"))
+
 # Rate limiting bypass for testing/development
 def bypass_rate_limiting() -> bool:
     """Check if rate limiting should be bypassed."""
