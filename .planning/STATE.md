@@ -11,18 +11,18 @@
 
 ```
 Phase 1: Database Model   [████████████████████]  100%  (4/4 plans)
-Phase 2: Auth Middleware  [█████░░░░░░░░░░░░░░░]   25%  (1/4 plans)
+Phase 2: Auth Middleware  [██████████░░░░░░░░░░]   50%  (2/4 plans)
 Phase 3: API Endpoints    [░░░░░░░░░░░░░░░░░░░░]   0%
 Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░░░░]   0%
 ```
 
-**Overall Project Progress:** 5/12 plans completed (42%)
+**Overall Project Progress:** 6/12 plans completed (50%)
 
 ### Active Phase
 
 **Current:** Phase 2 - Authentication Middleware Integration
-**Plan:** 02-01-PLAN.md COMPLETE
-**Next:** 02-02-PLAN.md
+**Plan:** 02-03-PLAN.md COMPLETE
+**Next:** 02-04-PLAN.md
 **Blocking:** None
 
 ### Phase Status
@@ -30,7 +30,7 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 | Phase | Status | Plans | Completed | Progress |
 |-------|--------|-------|-----------|----------|
 | Phase 1: Database Model | 🟢 Complete | 4 | 4/4 | 100% |
-| Phase 2: Auth Middleware | 🟡 In Progress | 4 | 1/4 | 25% |
+| Phase 2: Auth Middleware | 🟡 In Progress | 4 | 2/4 | 50% |
 | Phase 3: API Endpoints | 🔵 Not Started | TBD | 0/TBD | 0% |
 | Phase 4: Frontend UI | 🔵 Not Started | TBD | 0/TBD | 0% |
 
@@ -43,6 +43,23 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 ---
 
 ## Recent Activity
+
+### 2026-01-31 - Plan 02-03 Complete
+
+**Actions Taken:**
+1. Added "api_key_mcp": "100/minute" rate limit to RATE_LIMITS dict
+2. Extended get_rate_limit_key to check request.state.api_key_id first (Priority 1)
+3. Returns "api_key:{id}" format for per-key rate limiting
+4. Added mcp_rate_limit() decorator function following existing pattern
+5. Existing JWT and IP-based rate limiting unchanged
+
+**Commits:**
+- `917288cf` - feat(02-03): add api_key_mcp rate limit configuration
+- `27cd7d79` - feat(02-03): extend get_rate_limit_key for API key detection
+- `137ea0df` - feat(02-03): add mcp_rate_limit decorator function
+
+**Files Modified:**
+- `backend/app/core/rate_limiting.py` - Extended with per-API-key rate limiting
 
 ### 2026-01-31 - Plan 02-01 Complete
 
@@ -149,6 +166,8 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 | request.state for api_key_id | Pass auth context to rate limiting | 02-01 |
 | Raw SQL UPDATE for last_used_at | Efficiency over ORM pattern | 02-01 |
 | New session in background task | Thread safety for BackgroundTasks | 02-01 |
+| API key ID highest priority in rate limit key | Each key gets independent bucket | 02-03 |
+| Independent buckets per key | Different keys for same user get separate limits | 02-03 |
 
 ---
 
@@ -178,6 +197,7 @@ None - greenfield feature
 **Modified:**
 - `backend/app/models/user.py` - Added api_keys relationship (01-01)
 - `backend/app/models/__init__.py` - Export APIKey (01-01)
+- `backend/app/core/rate_limiting.py` - Per-key rate limiting (02-03)
 
 **Created:**
 - `backend/app/models/api_key.py` - APIKey model (01-01)
@@ -187,19 +207,16 @@ None - greenfield feature
 - `backend/app/auth/api_key_auth.py` - API key authentication dependency (02-01)
 
 **To Modify (Future):**
-- `backend/app/core/rate_limiting.py` - Per-key rate limiting (02-02)
-- `backend/app/mcp/auth.py` - Accept API keys (02-03)
+- `backend/app/mcp/auth.py` - Accept API keys (02-04 or Phase 3)
 
 ---
 
 ## Next Actions
 
 ### Immediate (Next Plan)
-1. Execute 02-02-PLAN.md (Per-key rate limiting)
+1. Execute 02-04-PLAN.md (Authentication middleware tests)
 
 ### This Phase (Phase 2 Remaining)
-- 02-02: Per-key rate limiting
-- 02-03: MCP integration
 - 02-04: Authentication middleware tests
 
 ### Upcoming Phases
@@ -210,8 +227,8 @@ None - greenfield feature
 
 ## Session Continuity
 
-**Last session:** 2026-01-31T00:14:03Z
-**Stopped at:** Completed 02-01-PLAN.md
+**Last session:** 2026-01-31T00:17:26Z
+**Stopped at:** Completed 02-03-PLAN.md
 **Resume file:** None - ready for next plan
 
 ---
