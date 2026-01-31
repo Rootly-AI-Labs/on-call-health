@@ -43,6 +43,7 @@ backend/.env
 !README.md
 !frontend/README.md
 !DATABASE_MIGRATION_COMPARISON.md
+!.planning/**/*.md
 
 # IDEs
 .vscode/
