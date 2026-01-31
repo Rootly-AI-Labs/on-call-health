@@ -2,8 +2,8 @@
 
 **Project:** API Key Management for On-Call Health
 **Milestone:** v1.0 - MVP Launch
-**Updated:** 2026-01-30
-**Status:** 🟡 Phase 3 In Progress
+**Updated:** 2026-01-31
+**Status:** 🟢 Phase 3 Complete
 
 ## Current State
 
@@ -12,17 +12,17 @@
 ```
 Phase 1: Database Model   [████████████████████]  100%  (4/4 plans)
 Phase 2: Auth Middleware  [████████████████████]  100%  (4/4 plans)
-Phase 3: API Endpoints    [██████████░░░░░░░░░░]   50%  (1/2 plans)
+Phase 3: API Endpoints    [████████████████████]  100%  (2/2 plans)
 Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░░░░]   0%
 ```
 
-**Overall Project Progress:** 9/12 plans completed (75%)
+**Overall Project Progress:** 10/12 plans completed (83%)
 
 ### Active Phase
 
-**Current:** Phase 3 - API Endpoints
-**Plan:** 03-01-PLAN.md COMPLETE
-**Next:** 03-02-PLAN.md (Integration Tests)
+**Current:** Phase 3 - API Endpoints COMPLETE
+**Plan:** 03-02-PLAN.md COMPLETE
+**Next:** Phase 4 - Frontend UI
 **Blocking:** None
 
 ### Phase Status
@@ -31,7 +31,7 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 |-------|--------|-------|-----------|----------|
 | Phase 1: Database Model | 🟢 Complete | 4 | 4/4 | 100% |
 | Phase 2: Auth Middleware | 🟢 Complete | 4 | 4/4 | 100% |
-| Phase 3: API Endpoints | 🟡 In Progress | 2 | 1/2 | 50% |
+| Phase 3: API Endpoints | 🟢 Complete | 2 | 2/2 | 100% |
 | Phase 4: Frontend UI | 🔵 Not Started | TBD | 0/TBD | 0% |
 
 **Status Legend:**
@@ -43,6 +43,39 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 ---
 
 ## Recent Activity
+
+### 2026-01-31 - Phase 3 Verified
+
+**Phase Verification:**
+- Status: PASSED (12/12 must-haves verified)
+- All endpoints verified against must_haves from plans
+- All tests passing (98 total API key tests)
+- VERIFICATION.md created with detailed report
+- Ready for Phase 4
+
+### 2026-01-31 - Plan 03-02 Complete
+
+**Actions Taken:**
+1. Created test_api_keys_endpoints.py with 21 integration tests
+2. Covered all 3 endpoints (POST, GET, DELETE) with TestClient
+3. Tests verify JWT authentication required (401 without token)
+4. Tests verify Pydantic validation errors (422 for invalid input)
+5. Tests verify business logic errors (400, 404)
+6. Tests verify success responses (201, 200, 204)
+7. All 549 tests pass with no regressions
+
+**Commits:**
+- `05eb27e4` - test(03-02): integration tests for API key endpoints
+
+**Files Created:**
+- `backend/tests/test_api_keys_endpoints.py` - Integration tests (386 lines, 21 tests)
+
+**Test Totals:**
+- test_api_key_model.py: 36 tests
+- test_api_key_auth.py: 18 tests
+- test_mcp_api_key_auth.py: 23 tests
+- test_api_keys_endpoints.py: 21 tests
+- **Total API key tests: 98**
 
 ### 2026-01-30 - Plan 03-01 Complete
 
@@ -233,6 +266,8 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 | Test all error paths | Comprehensive edge case coverage | 02-04 |
 | Rate limiter Request parameter | slowapi requires explicit request: Request param | 03-01 |
 | Pydantic body param naming | Use 'body' not 'request' to avoid FastAPI Request collision | 03-01 |
+| TestClient with dependency overrides | FastAPI's recommended integration test pattern | 03-02 |
+| Router prefix alignment | Mount at /api to match main.py and avoid path doubling | 03-02 |
 
 ---
 
@@ -277,27 +312,30 @@ None - greenfield feature
 - `backend/tests/test_api_key_auth.py` - FastAPI auth dependency tests (02-04)
 - `backend/tests/test_mcp_api_key_auth.py` - MCP auth tests (02-04)
 - `backend/app/api/endpoints/api_keys.py` - API key CRUD endpoints (03-01)
+- `backend/tests/test_api_keys_endpoints.py` - Endpoint integration tests (03-02)
 
 ---
 
 ## Next Actions
 
-### Immediate (Next Plan)
-1. Execute 03-02-PLAN.md - Integration tests for API key endpoints
+### Immediate (Next Phase)
+1. Execute Phase 4 - Frontend UI
 
 ### Upcoming Phases
-- Phase 3: Complete integration tests (03-02)
 - Phase 4: Frontend UI components and routing
+  - API key management page
+  - Create/revoke UI flows
+  - Settings integration
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-01-30T20:53:00Z
-**Stopped at:** Completed 03-01-PLAN.md
-**Resume file:** None - ready for 03-02 execution
+**Last session:** 2026-01-31T02:03:00Z
+**Stopped at:** Completed 03-02-PLAN.md (Phase 3 Complete)
+**Resume file:** None - ready for Phase 4 execution
 
 ---
 
-*Last Updated: 2026-01-30*
-*Next Update: After 03-02 execution*
+*Last Updated: 2026-01-31*
+*Next Update: After Phase 4 planning/execution*
