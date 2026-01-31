@@ -716,7 +716,6 @@ function TeamPageContent() {
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Name</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">On-Call Status</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Role</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Integrations</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700"></th>
                         </tr>
@@ -761,9 +760,6 @@ function TeamPageContent() {
                                     Inactive
                                   </Badge>
                                 )}
-                              </td>
-                              <td className="py-4 px-6">
-                                <span className="text-sm text-neutral-900">Member</span>
                               </td>
                               <td className="py-4 px-6">
                                 <div className="flex items-center gap-2">

@@ -207,7 +207,6 @@ export function OrganizationManagementDialog({
                         <tr className="border-b border-neutral-200 bg-neutral-50">
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Name</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Status</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Role</th>
                         </tr>
                       </thead>
@@ -226,11 +225,6 @@ export function OrganizationManagementDialog({
                             </td>
                             <td className="py-4 px-6">
                               <span className="text-sm text-neutral-600">{member.email}</span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span className="text-sm text-neutral-600">
-                                {member.status === 'pending' ? 'Pending' : 'Active'}
-                              </span>
                             </td>
                             <td className="py-4 px-6">
                               <span className="text-sm text-neutral-900 capitalize">
