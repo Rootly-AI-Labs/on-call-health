@@ -227,9 +227,20 @@ export function OrganizationManagementDialog({
                               <span className="text-sm text-neutral-600">{member.email}</span>
                             </td>
                             <td className="py-4 px-6">
-                              <span className="text-sm text-neutral-900 capitalize">
-                                {member.role?.replace('_', ' ') || 'member'}
-                              </span>
+                              {userInfo?.role === 'admin' && !member.is_current_user ? (
+                                <select
+                                  value={member.role || 'member'}
+                                  onChange={(e) => onRoleChange(member.id as number, e.target.value)}
+                                  className="text-sm px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                >
+                                  <option value="member">Member</option>
+                                  <option value="admin">Admin</option>
+                                </select>
+                              ) : (
+                                <span className="text-sm text-neutral-900 capitalize">
+                                  {member.role?.replace('_', ' ') || 'member'}
+                                </span>
+                              )}
                             </td>
                           </tr>
                         ))}
