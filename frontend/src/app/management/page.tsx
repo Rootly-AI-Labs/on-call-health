@@ -167,6 +167,16 @@ function TeamPageContent() {
     fetchIntegrations()
   }, [searchParams])
 
+  // Handle view parameter from URL
+  useEffect(() => {
+    const viewParam = searchParams.get("view")
+    if (viewParam === "team") {
+      setViewMode("company")
+    } else if (viewParam === "organization") {
+      setViewMode("organization")
+    }
+  }, [searchParams])
+
   // Load connected integration statuses
   useEffect(() => {
     const fetchConnectedIntegrations = async () => {
