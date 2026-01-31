@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from sqlalchemy.orm import Session
 
 from app.api.endpoints.analysis import run_analysis_task
-from app.mcp.auth import require_user
+from app.mcp.auth import require_user_api_key
 from app.mcp.serializers import (
     serialize_datetime,
     serialize_github_integration,
@@ -100,7 +100,7 @@ async def analysis_start(
     """Start a new burnout analysis."""
     db = _get_db()
     try:
-        user = require_user(ctx, db)
+        user = require_user_api_key(ctx, db)
         integration = _get_integration_for_user(db, user.id, integration_id)
 
         analysis = Analysis(
@@ -145,7 +145,7 @@ async def analysis_status(ctx: Any, analysis_id: int) -> Dict[str, Any]:
     """Get the status of an analysis."""
     db = _get_db()
     try:
-        user = require_user(ctx, db)
+        user = require_user_api_key(ctx, db)
         analysis = db.query(Analysis).filter(
             Analysis.id == analysis_id,
             Analysis.user_id == user.id,
@@ -183,7 +183,7 @@ async def analysis_results(ctx: Any, analysis_id: int) -> Dict[str, Any]:
     """Get full results for a completed analysis."""
     db = _get_db()
     try:
-        user = require_user(ctx, db)
+        user = require_user_api_key(ctx, db)
         analysis = db.query(Analysis).filter(
             Analysis.id == analysis_id,
             Analysis.user_id == user.id,
@@ -202,7 +202,7 @@ async def analysis_current(ctx: Any) -> Dict[str, Any]:
     """Get the most recent analysis for the current user."""
     db = _get_db()
     try:
-        user = require_user(ctx, db)
+        user = require_user_api_key(ctx, db)
         analysis = (
             db.query(Analysis)
             .filter(Analysis.user_id == user.id)
@@ -228,7 +228,7 @@ async def integrations_list(ctx: Any) -> Dict[str, Any]:
     """List connected integrations for the current user."""
     db = _get_db()
     try:
-        user = require_user(ctx, db)
+        user = require_user_api_key(ctx, db)
         rootly = (
             db.query(RootlyIntegration)
             .filter(RootlyIntegration.user_id == user.id)
