@@ -2,35 +2,35 @@
 
 **Project:** API Key Management for On-Call Health
 **Milestone:** v1.0 - MVP Launch
-**Updated:** 2026-01-30
-**Status:** 🟡 Phase 1 In Progress
+**Updated:** 2026-01-31
+**Status:** 🟡 Phase 2 In Progress
 
 ## Current State
 
 ### Progress Overview
 
 ```
-Phase 1: Database Model   [███████████████░░░░░]  75%  (3/4 plans)
-Phase 2: Auth Middleware  [░░░░░░░░░░░░░░░░░░░░]   0%
+Phase 1: Database Model   [████████████████████]  100%  (4/4 plans)
+Phase 2: Auth Middleware  [█████░░░░░░░░░░░░░░░]   25%  (1/4 plans)
 Phase 3: API Endpoints    [░░░░░░░░░░░░░░░░░░░░]   0%
 Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░░░░]   0%
 ```
 
-**Overall Project Progress:** 3/12 plans completed (25%)
+**Overall Project Progress:** 5/12 plans completed (42%)
 
 ### Active Phase
 
-**Current:** Phase 1 - Database Model & Core Logic
-**Plan:** 01-03-PLAN.md COMPLETE
-**Next:** 01-04-PLAN.md (if exists) or Phase 2
+**Current:** Phase 2 - Authentication Middleware Integration
+**Plan:** 02-01-PLAN.md COMPLETE
+**Next:** 02-02-PLAN.md
 **Blocking:** None
 
 ### Phase Status
 
 | Phase | Status | Plans | Completed | Progress |
 |-------|--------|-------|-----------|----------|
-| Phase 1: Database Model | 🟡 In Progress | 4 | 3/4 | 75% |
-| Phase 2: Auth Middleware | 🔵 Not Started | TBD | 0/TBD | 0% |
+| Phase 1: Database Model | 🟢 Complete | 4 | 4/4 | 100% |
+| Phase 2: Auth Middleware | 🟡 In Progress | 4 | 1/4 | 25% |
 | Phase 3: API Endpoints | 🔵 Not Started | TBD | 0/TBD | 0% |
 | Phase 4: Frontend UI | 🔵 Not Started | TBD | 0/TBD | 0% |
 
@@ -43,6 +43,23 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 ---
 
 ## Recent Activity
+
+### 2026-01-31 - Plan 02-01 Complete
+
+**Actions Taken:**
+1. Created `api_key_auth.py` with FastAPI dependency for API key authentication
+2. Implemented two-phase validation (SHA-256 lookup + Argon2 verification)
+3. Argon2 runs in asyncio.to_thread to avoid blocking event loop
+4. Specific error messages for revoked and expired keys
+5. JWT rejection returns 400 with helpful message
+6. Background task updates last_used_at without blocking response
+7. Stored api_key_id in request.state for rate limiting
+
+**Commits:**
+- `22e460a6` - feat(02-01): create API key authentication dependency
+
+**Files Created:**
+- `backend/app/auth/api_key_auth.py` - API key authentication dependency (174 lines)
 
 ### 2026-01-30 - Plan 01-03 Complete
 
@@ -128,6 +145,10 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 | Partial unique index on (user_id, name) | Allow name reuse after revocation | 01-02 |
 | Pytest class-based test organization | Matches existing test patterns | 01-03 |
 | Direct model instantiation for tests | No database dependency needed | 01-03 |
+| JWT rejection returns 400 (not 401) | Clear auth method separation | 02-01 |
+| request.state for api_key_id | Pass auth context to rate limiting | 02-01 |
+| Raw SQL UPDATE for last_used_at | Efficiency over ORM pattern | 02-01 |
+| New session in background task | Thread safety for BackgroundTasks | 02-01 |
 
 ---
 
@@ -159,28 +180,29 @@ None - greenfield feature
 - `backend/app/models/__init__.py` - Export APIKey (01-01)
 
 **Created:**
+- `backend/app/models/api_key.py` - APIKey model (01-01)
 - `backend/app/services/api_key_service.py` - API key generation/verification (01-02)
 - `backend/migrations/2026_01_30_add_api_keys.sql` - Database migration (01-02)
 - `backend/tests/test_api_key_model.py` - Unit tests (01-03)
+- `backend/app/auth/api_key_auth.py` - API key authentication dependency (02-01)
 
 **To Modify (Future):**
-- `backend/app/auth/dependencies.py` - Unified auth (Phase 2)
-- `backend/app/mcp/auth.py` - Accept API keys (Phase 2)
+- `backend/app/core/rate_limiting.py` - Per-key rate limiting (02-02)
+- `backend/app/mcp/auth.py` - Accept API keys (02-03)
 
 ---
 
 ## Next Actions
 
 ### Immediate (Next Plan)
-1. Check if 01-04-PLAN.md exists
-2. If yes, execute it
-3. If no, Phase 1 is complete, proceed to Phase 2
+1. Execute 02-02-PLAN.md (Per-key rate limiting)
 
-### This Phase (Phase 1 Remaining)
-- 01-04: TBD (if exists)
+### This Phase (Phase 2 Remaining)
+- 02-02: Per-key rate limiting
+- 02-03: MCP integration
+- 02-04: Authentication middleware tests
 
 ### Upcoming Phases
-- Phase 2: Unified auth dependency, per-key rate limiting, MCP integration
 - Phase 3: API endpoints for CRUD operations
 - Phase 4: Frontend UI components and routing
 
@@ -188,11 +210,11 @@ None - greenfield feature
 
 ## Session Continuity
 
-**Last session:** 2026-01-30T23:27:50Z
-**Stopped at:** Completed 01-03-PLAN.md
+**Last session:** 2026-01-31T00:14:03Z
+**Stopped at:** Completed 02-01-PLAN.md
 **Resume file:** None - ready for next plan
 
 ---
 
-*Last Updated: 2026-01-30*
+*Last Updated: 2026-01-31*
 *Next Update: After next plan execution*
