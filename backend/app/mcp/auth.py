@@ -71,6 +71,31 @@ def extract_bearer_token(ctx: Any) -> Optional[str]:
     return None
 
 
+def extract_api_key_header(ctx: Any) -> Optional[str]:
+    """Extract X-API-Key header from various MCP context shapes."""
+    # Try request_headers
+    headers = getattr(ctx, "request_headers", None)
+    key = _get_header(headers, "X-API-Key")
+    if key:
+        return _normalize_header_value(key)
+
+    # Try headers
+    headers = getattr(ctx, "headers", None)
+    key = _get_header(headers, "X-API-Key")
+    if key:
+        return _normalize_header_value(key)
+
+    # Try request.headers
+    request = getattr(ctx, "request", None)
+    if request is not None:
+        req_headers = getattr(request, "headers", None)
+        key = _get_header(req_headers, "X-API-Key")
+        if key:
+            return _normalize_header_value(key)
+
+    return None
+
+
 def get_user_from_token(token: str, db: Session) -> User:
     payload = decode_access_token(token)
     if payload is None:
