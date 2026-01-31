@@ -123,6 +123,14 @@ CREATE TABLE api_keys (
 
 **Phase Requirements:** 6 requirements
 
+**Plans:** 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md - Create FastAPI API key authentication dependency with two-phase validation
+- [ ] 02-02-PLAN.md - Update MCP auth for API key support (reject JWT, accept X-API-Key)
+- [ ] 02-03-PLAN.md - Extend rate limiting for per-key rate limits (100 req/min per key)
+- [ ] 02-04-PLAN.md - Unit tests for API key auth (FastAPI and MCP)
+
 ### Functional Requirements
 - REQ-F-005: Key Revocation (validation logic)
 - REQ-F-014: Dual Authentication Support
@@ -138,8 +146,8 @@ CREATE TABLE api_keys (
 - REQ-NF-010: Error Messages
 
 ### Success Criteria
-- [ ] Unified `get_current_user` dependency supports both JWT and API keys
-- [ ] Precedence order: JWT header -> Cookie -> API Key header
+- [ ] Separate auth dependencies: `get_current_user` for JWT (web), `get_current_user_from_api_key` for API keys (MCP)
+- [ ] MCP endpoints use API key auth only (reject JWT per CONTEXT.md decision)
 - [ ] API key validation <50ms (p95) in benchmarks
 - [ ] Revoked keys rejected with clear error message
 - [ ] Expired keys rejected with expiration date in error
@@ -151,36 +159,26 @@ CREATE TABLE api_keys (
 
 ### Key Files
 **Backend:**
-- `backend/app/auth/dependencies.py` - Unified `get_current_user` (MODIFY)
-- `backend/app/services/api_key_auth_service.py` - API key validation logic
-- `backend/app/core/rate_limiting.py` - Per-key rate limiter (MODIFY)
+- `backend/app/auth/api_key_auth.py` - API key FastAPI dependency (NEW)
 - `backend/app/mcp/auth.py` - MCP auth updated for API keys (MODIFY)
-- `backend/tests/test_api_key_auth.py` - Auth integration tests
-- `backend/tests/test_dual_auth.py` - JWT + API key compatibility tests
+- `backend/app/mcp/server.py` - MCP tool handlers wired to API key auth (MODIFY)
+- `backend/app/core/rate_limiting.py` - Per-key rate limiter (MODIFY)
+- `backend/tests/test_api_key_auth.py` - FastAPI API key auth tests (NEW)
+- `backend/tests/test_mcp_api_key_auth.py` - MCP API key auth tests (NEW)
 
-### Authentication Flow
-```python
-async def get_current_user(
-    authorization: str = Header(None),
-    token: str = Cookie(None),
-    db: Session = Depends(get_db)
-) -> User:
-    # 1. Try JWT from Authorization header
-    if authorization and authorization.startswith("Bearer "):
-        token_value = authorization[7:]
-        if looks_like_jwt(token_value):
-            return await validate_jwt(token_value, db)
+### Authentication Architecture
+Per CONTEXT.md decision, authentication is cleanly separated by use case:
 
-    # 2. Try JWT from Cookie
-    if token:
-        return await validate_jwt(token, db)
+**Web Endpoints (JWT-only):**
+- Use existing `get_current_user` dependency
+- Checks Authorization header (Bearer JWT) and httpOnly cookies
+- No API key support - web endpoints remain unchanged
 
-    # 3. Try API Key from Authorization header
-    if authorization and authorization.startswith("Bearer och_live_"):
-        return await validate_api_key(authorization[7:], db)
-
-    raise HTTPException(401, "Authentication required")
-```
+**MCP Endpoints (API-key-only):**
+- Use new `get_current_user_from_api_key` dependency (FastAPI)
+- Use new `require_user_api_key` function (MCP context)
+- Checks X-API-Key header
+- Rejects JWT tokens with helpful error message
 
 ### Technical Notes
 - Use `hmac.compare_digest()` for timing-safe hash comparison
