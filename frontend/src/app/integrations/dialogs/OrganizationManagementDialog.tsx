@@ -89,7 +89,7 @@ export function OrganizationManagementDialog({
   const startIndex = (currentPage - 1) * TEAM_MEMBERS_PER_PAGE
   const paginatedMembers = filteredMembers.slice(startIndex, startIndex + TEAM_MEMBERS_PER_PAGE)
 
-  const DialogContentBody = () => (
+  const dialogContentBody = (
     <>
       {/* Role descriptions */}
       <div className={asInlineView ? "px-0 py-3 bg-purple-100 rounded-lg mb-6" : "mt-4 px-4 py-3 bg-purple-100 rounded-lg"}>
@@ -402,7 +402,7 @@ export function OrganizationManagementDialog({
         </div>
 
         {/* Content */}
-        <DialogContentBody />
+        {dialogContentBody}
       </>
     )
   }
@@ -421,7 +421,7 @@ export function OrganizationManagementDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <DialogContentBody />
+        {dialogContentBody}
       </DialogContent>
     </Dialog>
   )

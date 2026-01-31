@@ -28,7 +28,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  RefreshCw,
   Search,
   Pencil,
   CheckCircle,
@@ -82,7 +81,6 @@ function TeamPageContent() {
   // Team members state
   const [syncedUsers, setSyncedUsers] = useState<SyncedUser[]>([])
   const [loadingSyncedUsers, setLoadingSyncedUsers] = useState(false)
-  const [refreshingOnCall, setRefreshingOnCall] = useState(false)
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("")
@@ -396,40 +394,6 @@ function TeamPageContent() {
     }
   }
 
-  // Refresh on-call status for users
-  const refreshOnCallStatus = async () => {
-    if (!selectedOrganization) return
-
-    setRefreshingOnCall(true)
-    const authToken = localStorage.getItem("auth_token")
-    if (!authToken) {
-      toast.error("Please log in")
-      setRefreshingOnCall(false)
-      return
-    }
-
-    try {
-      const response = await fetch(
-        `${API_BASE}/rootly/integrations/${selectedOrganization}/refresh-oncall`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${authToken}` },
-        }
-      )
-
-      if (response.ok) {
-        await fetchSyncedUsers(false, false, true)
-        toast.success("On-call status refreshed")
-      } else {
-        toast.error("Failed to refresh on-call status")
-      }
-    } catch (error) {
-      console.error("Error refreshing on-call status:", error)
-      toast.error("Error refreshing on-call status")
-    } finally {
-      setRefreshingOnCall(false)
-    }
-  }
 
   // Open mapping drawer
   const openMappingDrawer = (user: any) => {
@@ -644,14 +608,6 @@ function TeamPageContent() {
                           className="bg-purple-700 hover:bg-purple-800"
                         >
                           Sync Now
-                        </Button>
-                        <Button
-                          onClick={refreshOnCallStatus}
-                          disabled={refreshingOnCall || !hasPrimaryIntegration}
-                          variant="outline"
-                        >
-                          <RefreshCw className={`w-4 h-4 mr-2 ${refreshingOnCall ? 'animate-spin' : ''}`} />
-                          Refresh On-Call
                         </Button>
                       </div>
                     </div>
