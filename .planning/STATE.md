@@ -2,8 +2,8 @@
 
 **Project:** API Key Management for On-Call Health
 **Milestone:** v1.0 - MVP Launch
-**Updated:** 2026-01-31
-**Status:** 🟢 Phase 3 Complete
+**Updated:** 2026-02-01
+**Status:** 🟡 Phase 4 In Progress
 
 ## Current State
 
@@ -13,16 +13,16 @@
 Phase 1: Database Model   [████████████████████]  100%  (4/4 plans)
 Phase 2: Auth Middleware  [████████████████████]  100%  (4/4 plans)
 Phase 3: API Endpoints    [████████████████████]  100%  (2/2 plans)
-Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░░░░]   0%
+Phase 4: Frontend UI      [██████░░░░░░░░░░░░░░]   33%  (1/3 plans)
 ```
 
-**Overall Project Progress:** 10/12 plans completed (83%)
+**Overall Project Progress:** 11/13 plans completed (85%)
 
 ### Active Phase
 
-**Current:** Phase 3 - API Endpoints COMPLETE
-**Plan:** 03-02-PLAN.md COMPLETE
-**Next:** Phase 4 - Frontend UI
+**Current:** Phase 4 - Frontend UI In Progress
+**Plan:** 04-01-PLAN.md COMPLETE
+**Next:** 04-02-PLAN.md (Create Key Dialog)
 **Blocking:** None
 
 ### Phase Status
@@ -32,7 +32,7 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 | Phase 1: Database Model | 🟢 Complete | 4 | 4/4 | 100% |
 | Phase 2: Auth Middleware | 🟢 Complete | 4 | 4/4 | 100% |
 | Phase 3: API Endpoints | 🟢 Complete | 2 | 2/2 | 100% |
-| Phase 4: Frontend UI | 🔵 Not Started | TBD | 0/TBD | 0% |
+| Phase 4: Frontend UI | 🟡 In Progress | 3 | 1/3 | 33% |
 
 **Status Legend:**
 - 🔵 Not Started
@@ -43,6 +43,27 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 ---
 
 ## Recent Activity
+
+### 2026-02-01 - Plan 04-01 Complete
+
+**Actions Taken:**
+1. Created TypeScript types for API key entities (ApiKey, CreateApiKeyRequest, CreateApiKeyResponse)
+2. Created useApiKeys hook with fetchKeys, createKey, revokeKey functions
+3. Created API Keys page scaffold at /dashboard/api-keys with loading, error, and empty states
+4. Added "API Keys" menu item in TopPanel user dropdown
+
+**Commits:**
+- `a811f94f` - feat(04-01): create TypeScript types for API keys
+- `69c2905f` - feat(04-01): create data fetching hook for API keys
+- `0397814a` - feat(04-01): create API Keys page scaffold and navigation
+
+**Files Created:**
+- `frontend/src/types/apiKey.ts` - TypeScript interfaces (26 lines)
+- `frontend/src/hooks/useApiKeys.ts` - Data fetching hook (100 lines)
+- `frontend/src/app/dashboard/api-keys/page.tsx` - Page scaffold (85 lines)
+
+**Files Modified:**
+- `frontend/src/components/TopPanel.tsx` - Added API Keys menu item
 
 ### 2026-01-31 - Phase 3 Verified
 
@@ -268,6 +289,8 @@ Phase 4: Frontend UI      [░░░░░░░░░░░░░░░░░�
 | Pydantic body param naming | Use 'body' not 'request' to avoid FastAPI Request collision | 03-01 |
 | TestClient with dependency overrides | FastAPI's recommended integration test pattern | 03-02 |
 | Router prefix alignment | Mount at /api to match main.py and avoid path doubling | 03-02 |
+| API Keys nav in user dropdown | Keeps top nav clean, groups with account settings | 04-01 |
+| sonner toast for notifications | Matches existing codebase pattern | 04-01 |
 
 ---
 
@@ -313,29 +336,33 @@ None - greenfield feature
 - `backend/tests/test_mcp_api_key_auth.py` - MCP auth tests (02-04)
 - `backend/app/api/endpoints/api_keys.py` - API key CRUD endpoints (03-01)
 - `backend/tests/test_api_keys_endpoints.py` - Endpoint integration tests (03-02)
+- `frontend/src/types/apiKey.ts` - TypeScript types (04-01)
+- `frontend/src/hooks/useApiKeys.ts` - Data fetching hook (04-01)
+- `frontend/src/app/dashboard/api-keys/page.tsx` - API Keys page scaffold (04-01)
+
+**Modified (Frontend):**
+- `frontend/src/components/TopPanel.tsx` - Added API Keys menu item (04-01)
 
 ---
 
 ## Next Actions
 
-### Immediate (Next Phase)
-1. Execute Phase 4 - Frontend UI
+### Immediate (Next Plan)
+1. Execute 04-02-PLAN.md (Create Key Dialog)
 
-### Upcoming Phases
-- Phase 4: Frontend UI components and routing
-  - API key management page
-  - Create/revoke UI flows
-  - Settings integration
+### Upcoming Plans
+- 04-02: Create Key Dialog with form and show-once key display
+- 04-03: Key List and Revoke Dialog components
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-01-31T02:03:00Z
-**Stopped at:** Completed 03-02-PLAN.md (Phase 3 Complete)
-**Resume file:** None - ready for Phase 4 execution
+**Last session:** 2026-02-01T08:17:00Z
+**Stopped at:** Completed 04-01-PLAN.md
+**Resume file:** None - ready for 04-02-PLAN.md
 
 ---
 
-*Last Updated: 2026-01-31*
-*Next Update: After Phase 4 planning/execution*
+*Last Updated: 2026-02-01*
+*Next Update: After 04-02 execution*
