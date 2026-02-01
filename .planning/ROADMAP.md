@@ -46,10 +46,13 @@ Plans:
   3. Clear error messages display for validation failures (network, authentication, permissions)
   4. Visual status indicators show connection state (validating, connected, error)
   5. Validation uses existing IntegrationValidator service patterns
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] TBD after phase planning
+- [ ] 02-01-PLAN.md — Backend validation endpoints for Jira and Linear
+- [ ] 02-02-PLAN.md — Notification service and validation tests
+- [ ] 02-03-PLAN.md — Frontend validation hooks and status indicators
+- [ ] 02-04-PLAN.md — Cache configuration and end-to-end verification
 
 ### Phase 3: Jira Token Integration
 **Goal**: Users can connect Jira integration using API token (alternative to OAuth)
@@ -103,7 +106,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Backend Foundation | 2/2 | Complete | 2026-02-01 |
-| 2. Validation Infrastructure | 0/TBD | Not started | - |
+| 2. Validation Infrastructure | 0/4 | Not started | - |
 | 3. Jira Token Integration | 0/TBD | Not started | - |
 | 4. Linear Token Integration | 0/TBD | Not started | - |
 | 5. User Experience | 0/TBD | Not started | - |
