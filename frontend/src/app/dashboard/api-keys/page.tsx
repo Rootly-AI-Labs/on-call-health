@@ -6,14 +6,24 @@ import { Button } from "@/components/ui/button"
 import { useApiKeys } from "@/hooks/useApiKeys"
 import { CreateKeyDialog } from "@/components/api-keys/CreateKeyDialog"
 import { KeyCreatedDialog } from "@/components/api-keys/KeyCreatedDialog"
-import { CreateApiKeyResponse } from "@/types/apiKey"
+import { ApiKeyList } from "@/components/api-keys/ApiKeyList"
+import { RevokeKeyDialog } from "@/components/api-keys/RevokeKeyDialog"
+import { ApiKey, CreateApiKeyResponse } from "@/types/apiKey"
 
 export default function ApiKeysPage() {
-  const { keys, loading, error, createKey } = useApiKeys()
+  const { keys, loading, error, createKey, revokeKey } = useApiKeys()
+
+  // Create flow state
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [createdKey, setCreatedKey] = useState<CreateApiKeyResponse | null>(null)
 
+  // Revoke flow state
+  const [showRevokeDialog, setShowRevokeDialog] = useState(false)
+  const [keyToRevoke, setKeyToRevoke] = useState<ApiKey | null>(null)
+  const [isRevoking, setIsRevoking] = useState(false)
+
+  // Create handlers
   const handleKeyCreated = (response: CreateApiKeyResponse) => {
     setCreatedKey(response)
     setShowSuccessDialog(true)
@@ -22,6 +32,32 @@ export default function ApiKeysPage() {
   const handleSuccessDialogClose = () => {
     setShowSuccessDialog(false)
     setCreatedKey(null)
+  }
+
+  // Revoke handlers
+  const handleRevokeClick = (key: ApiKey) => {
+    setKeyToRevoke(key)
+    setShowRevokeDialog(true)
+  }
+
+  const handleRevokeCancel = () => {
+    setShowRevokeDialog(false)
+    setKeyToRevoke(null)
+  }
+
+  const handleConfirmRevoke = async () => {
+    if (!keyToRevoke) return
+
+    setIsRevoking(true)
+    try {
+      const success = await revokeKey(keyToRevoke.id)
+      if (success) {
+        setShowRevokeDialog(false)
+        setKeyToRevoke(null)
+      }
+    } finally {
+      setIsRevoking(false)
+    }
   }
 
   return (
@@ -74,12 +110,7 @@ export default function ApiKeysPage() {
               </Button>
             </div>
           ) : (
-            <div className="p-4">
-              {/* Key list placeholder - will be implemented in Plan 03 */}
-              <p className="text-neutral-600">
-                {keys.length} API key{keys.length !== 1 ? "s" : ""} found.
-              </p>
-            </div>
+            <ApiKeyList keys={keys} onRevokeClick={handleRevokeClick} />
           )}
         </div>
 
@@ -105,6 +136,20 @@ export default function ApiKeysPage() {
         open={showSuccessDialog}
         onOpenChange={handleSuccessDialogClose}
         createdKey={createdKey}
+      />
+
+      {/* Revoke Confirmation Dialog */}
+      <RevokeKeyDialog
+        open={showRevokeDialog}
+        onOpenChange={(open) => {
+          if (!open && !isRevoking) {
+            handleRevokeCancel()
+          }
+        }}
+        keyToRevoke={keyToRevoke}
+        isRevoking={isRevoking}
+        onConfirmRevoke={handleConfirmRevoke}
+        onCancel={handleRevokeCancel}
       />
     </div>
   )
