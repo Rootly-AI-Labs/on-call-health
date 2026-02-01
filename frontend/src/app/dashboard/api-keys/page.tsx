@@ -4,10 +4,25 @@ import { useState } from "react"
 import { Key, Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useApiKeys } from "@/hooks/useApiKeys"
+import { CreateKeyDialog } from "@/components/api-keys/CreateKeyDialog"
+import { KeyCreatedDialog } from "@/components/api-keys/KeyCreatedDialog"
+import { CreateApiKeyResponse } from "@/types/apiKey"
 
 export default function ApiKeysPage() {
-  const { keys, loading, error } = useApiKeys()
+  const { keys, loading, error, createKey } = useApiKeys()
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [createdKey, setCreatedKey] = useState<CreateApiKeyResponse | null>(null)
+
+  const handleKeyCreated = (response: CreateApiKeyResponse) => {
+    setCreatedKey(response)
+    setShowSuccessDialog(true)
+  }
+
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false)
+    setCreatedKey(null)
+  }
 
   return (
     <div className="min-h-screen bg-neutral-100">
@@ -77,7 +92,20 @@ export default function ApiKeysPage() {
         </div>
       </div>
 
-      {/* Create dialog placeholder - will be implemented in Plan 02 */}
+      {/* Create Key Dialog */}
+      <CreateKeyDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onCreateKey={createKey}
+        onKeyCreated={handleKeyCreated}
+      />
+
+      {/* Key Created Success Dialog */}
+      <KeyCreatedDialog
+        open={showSuccessDialog}
+        onOpenChange={handleSuccessDialogClose}
+        createdKey={createdKey}
+      />
     </div>
   )
 }
