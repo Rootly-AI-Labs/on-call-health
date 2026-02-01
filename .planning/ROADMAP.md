@@ -30,10 +30,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. TokenManager service provides get_valid_token() abstraction hiding OAuth refresh logic from API clients
   4. Integration models expose is_oauth, is_manual, and supports_refresh properties
   5. Encryption parity verified by security tests (no plaintext tokens)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] TBD after phase planning
+- [ ] 01-01-PLAN.md — Create TokenManager service with get_valid_token() abstraction
+- [ ] 01-02-PLAN.md — Security tests for token encryption parity
 
 ### Phase 2: Validation Infrastructure
 **Goal**: Build type-aware token validation system that handles OAuth refresh and manual token virtual expiration
@@ -97,11 +98,11 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Backend Foundation | 0/TBD | Not started | - |
+| 1. Backend Foundation | 0/2 | Ready to execute | - |
 | 2. Validation Infrastructure | 0/TBD | Not started | - |
 | 3. Jira Token Integration | 0/TBD | Not started | - |
 | 4. Linear Token Integration | 0/TBD | Not started | - |
