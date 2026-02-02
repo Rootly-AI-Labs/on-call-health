@@ -395,11 +395,19 @@ class UserSyncService:
                 break
             except IntegrityError as e:
                 self.db.rollback()
-                if 'uq_user_correlation_user_email' in str(e.orig):
+                error_str = str(e.orig)
+                # Check for any of the UserCorrelation unique constraint violations
+                is_duplicate_key = any(constraint in error_str for constraint in [
+                    'uq_user_correlation_user_email',  # Old constraint (being removed)
+                    'uq_user_correlation_org_email_null_user',  # New: multi-tenant mode
+                    'uq_user_correlation_user_email_not_null'  # New: personal mode
+                ])
+
+                if is_duplicate_key:
                     if attempt < max_retries - 1:
                         logger.warning(
                             f"Duplicate key violation on commit (attempt {attempt+1}/{max_retries}). "
-                            f"Retrying after concurrent insert..."
+                            f"Retrying after concurrent insert... Error: {error_str}"
                         )
                         continue
                     else:
