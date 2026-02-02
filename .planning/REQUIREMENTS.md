@@ -156,12 +156,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-03 | Phase 10 | Pending |
 | DOCS-04 | Phase 10 | Pending |
 | DOCS-05 | Phase 10 | Pending |
+| DOCS-06 | Phase 10 | Pending |
+| AWS-01 | Phase 11 | Pending |
+| AWS-02 | Phase 11 | Pending |
+| AWS-03 | Phase 11 | Pending |
+| AWS-04 | Phase 11 | Pending |
+| AWS-05 | Phase 11 | Pending |
+| AWS-06 | Phase 11 | Pending |
+| AWS-07 | Phase 11 | Pending |
+| AWS-08 | Phase 11 | Pending |
+| AWS-09 | Phase 11 | Pending |
+| AWS-10 | Phase 11 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 33 total
-- Mapped to phases: 33
+- v1.1 requirements: 44 total
+- Mapped to phases: 44
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after roadmap creation*
+*Last updated: 2026-02-02 after roadmap revision (added AWS deployment)*
