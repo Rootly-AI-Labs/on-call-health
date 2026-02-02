@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 
 // Load environment variables from .env.test file
-dotenv.config({ path: '.env.test' });
+dotenv.config();
 
 /**
  * See https://playwright.dev/docs/test-configuration.
