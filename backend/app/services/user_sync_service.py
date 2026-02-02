@@ -691,9 +691,26 @@ class UserSyncService:
 
             if survey_periods:
                 # Ensure keep_record has an ID before using it as FK reference
+                # NOTE: flush() does NOT expose data to concurrent transactions in READ COMMITTED isolation.
+                # It only synchronizes SQLAlchemy's session with the current transaction's state.
+                # Other transactions remain isolated until commit(), where unique constraints enforce atomicity.
                 if keep_record.id is None:
-                    self.db.flush()
-                    logger.info(f"    💾 Flushed keep_record to get ID: {keep_record.id}")
+                    try:
+                        self.db.flush()
+                        # Verify ID was actually assigned
+                        if keep_record.id is None:
+                            raise ValueError(
+                                f"Failed to assign ID to keep_record after flush for {email}. "
+                                f"This indicates a database constraint violation or connection issue."
+                            )
+                        logger.info(f"    💾 Flushed keep_record to get ID: {keep_record.id}")
+                    except Exception as flush_error:
+                        logger.error(
+                            f"    ❌ Failed to flush keep_record for {email}: {flush_error}. "
+                            f"Cannot safely merge duplicates without valid ID."
+                        )
+                        # Re-raise to prevent FK updates with NULL ID
+                        raise
 
                 logger.info(f"    🔗 Updating {len(survey_periods)} survey_periods to reference ID={keep_record.id}")
                 for period in survey_periods:
