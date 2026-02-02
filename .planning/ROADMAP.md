@@ -315,9 +315,9 @@ Response: 204 No Content
 **Plans:** 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md - Page scaffold, navigation link, TypeScript types, data fetching hook
-- [ ] 04-02-PLAN.md - Create Key Dialog and Key Created Success Dialog
-- [ ] 04-03-PLAN.md - API Key List and Revoke Key Dialog with human verification
+- [x] 04-01-PLAN.md - Page scaffold, navigation link, TypeScript types, data fetching hook
+- [x] 04-02-PLAN.md - Create Key Dialog and Key Created Success Dialog
+- [x] 04-03-PLAN.md - API Key List and Revoke Key Dialog with human verification
 
 ### Functional Requirements
 - REQ-F-003: Show Full Key Once (UI)
