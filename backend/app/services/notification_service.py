@@ -529,6 +529,66 @@ class NotificationService:
         self.db.commit()
         return notification
 
+    def create_token_validation_failure_notification(
+        self,
+        user: User,
+        provider: str,
+        error_type: str,
+        error_message: str,
+    ) -> Optional[UserNotification]:
+        """Create notification when a token fails validation post-setup.
+
+        Args:
+            user: The user whose token failed validation
+            provider: 'jira' or 'linear'
+            error_type: Error category (authentication, permissions, network)
+            error_message: Human-readable error message (must NOT contain token)
+
+        Returns:
+            Created notification or None if user not found
+        """
+        if not user:
+            return None
+
+        provider_name = provider.capitalize()
+
+        # Map error types to user-friendly titles
+        title_map = {
+            "authentication": f"{provider_name} Token Invalid",
+            "permissions": f"{provider_name} Token Permissions Issue",
+            "network": f"{provider_name} Connection Failed",
+            "format": f"{provider_name} Token Format Error",
+        }
+
+        title = title_map.get(error_type, f"{provider_name} Integration Issue")
+
+        # Build message with actionable guidance
+        message = f"{error_message} Please update your {provider_name} integration to restore data collection."
+
+        notification = UserNotification(
+            user_id=user.id,
+            organization_id=user.organization_id,
+            type="integration",
+            title=title,
+            message=message,
+            priority="high",
+            metadata={
+                "provider": provider,
+                "error_type": error_type,
+                "action_url": "/integrations"
+            }
+        )
+
+        self.db.add(notification)
+        self.db.commit()
+        self.db.refresh(notification)
+
+        logger.info(
+            f"Created token validation failure notification for user={user.id}, provider={provider}"
+        )
+
+        return notification
+
     def cleanup_expired_notifications(self):
         """Clean up expired notifications."""
         expired = self.db.query(UserNotification).filter(
