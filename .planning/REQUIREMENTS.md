@@ -56,13 +56,27 @@ Requirements for MCP server distribution milestone. Each maps to roadmap phases.
 - [ ] **INFRA-04**: Graceful connection cleanup on client disconnect
 - [ ] **INFRA-05**: Logging for connection events (connect, disconnect, errors)
 
+### AWS Deployment
+
+- [ ] **AWS-01**: Dockerfile for containerizing MCP server SSE endpoint
+- [ ] **AWS-02**: Multi-stage Docker build for optimized image size
+- [ ] **AWS-03**: Docker image pushed to AWS ECR (Elastic Container Registry)
+- [ ] **AWS-04**: ECS task definition with environment variables (API_KEY, BASE_URL)
+- [ ] **AWS-05**: ECS service deployment (Fargate or EC2)
+- [ ] **AWS-06**: Application Load Balancer with health check routing
+- [ ] **AWS-07**: Auto-scaling configuration based on CPU/connection count
+- [ ] **AWS-08**: Domain name configuration (mcp.oncallhealth.com or similar)
+- [ ] **AWS-09**: SSL/TLS certificate (ACM) for HTTPS
+- [ ] **AWS-10**: Infrastructure-as-Code (Terraform or CloudFormation)
+
 ### Documentation
 
 - [ ] **DOCS-01**: SSE endpoint usage guide (Claude Desktop config)
 - [ ] **DOCS-02**: PyPI/uvx installation guide
 - [ ] **DOCS-03**: Environment variable reference
 - [ ] **DOCS-04**: Migration notice for users on stdio+direct-DB mode (breaking change)
-- [ ] **DOCS-05**: Deployment guide for hosting SSE endpoint
+- [ ] **DOCS-05**: Deployment guide for hosting SSE endpoint on AWS
+- [ ] **DOCS-06**: Docker build and deployment instructions
 
 ## Future Requirements
 
@@ -78,7 +92,7 @@ Deferred to later milestones.
 ### Observability
 
 - **FUTURE-05**: Detailed connection lifecycle metrics
-- **FUTURE-06**: Request tracing across MCP → REST API → backend
+- **FUTURE-06**: Request tracing across MCP -> REST API -> backend
 - **FUTURE-07**: Alerting for connection pool exhaustion
 
 ## Out of Scope
@@ -103,13 +117,51 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (To be filled by roadmapper) | | |
+| CLIENT-01 | Phase 5 | Pending |
+| CLIENT-02 | Phase 5 | Pending |
+| CLIENT-03 | Phase 5 | Pending |
+| CLIENT-04 | Phase 5 | Pending |
+| CLIENT-05 | Phase 5 | Pending |
+| CLIENT-06 | Phase 5 | Pending |
+| CLIENT-07 | Phase 5 | Pending |
+| CLIENT-08 | Phase 5 | Pending |
+| TOOLS-01 | Phase 6 | Pending |
+| TOOLS-02 | Phase 6 | Pending |
+| TOOLS-03 | Phase 6 | Pending |
+| TOOLS-04 | Phase 6 | Pending |
+| TOOLS-05 | Phase 6 | Pending |
+| TOOLS-06 | Phase 6 | Pending |
+| TOOLS-07 | Phase 6 | Pending |
+| TOOLS-08 | Phase 6 | Pending |
+| TRANS-01 | Phase 7 | Pending |
+| TRANS-02 | Phase 7 | Pending |
+| TRANS-03 | Phase 7 | Pending |
+| TRANS-04 | Phase 7 | Pending |
+| TRANS-05 | Phase 7 | Pending |
+| TRANS-06 | Phase 7 | Pending |
+| PYPI-01 | Phase 8 | Pending |
+| PYPI-02 | Phase 8 | Pending |
+| PYPI-03 | Phase 8 | Pending |
+| PYPI-04 | Phase 8 | Pending |
+| PYPI-05 | Phase 8 | Pending |
+| PYPI-06 | Phase 8 | Pending |
+| PYPI-07 | Phase 8 | Pending |
+| INFRA-01 | Phase 9 | Pending |
+| INFRA-02 | Phase 9 | Pending |
+| INFRA-03 | Phase 9 | Pending |
+| INFRA-04 | Phase 9 | Pending |
+| INFRA-05 | Phase 9 | Pending |
+| DOCS-01 | Phase 10 | Pending |
+| DOCS-02 | Phase 10 | Pending |
+| DOCS-03 | Phase 10 | Pending |
+| DOCS-04 | Phase 10 | Pending |
+| DOCS-05 | Phase 10 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 33 total
-- Mapped to phases: (pending)
-- Unmapped: (pending)
+- Mapped to phases: 33
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after initial definition*
+*Last updated: 2026-02-02 after roadmap creation*
