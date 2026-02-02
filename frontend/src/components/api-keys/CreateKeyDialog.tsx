@@ -139,9 +139,6 @@ export function CreateKeyDialog({
             {nameError && (
               <p className="mt-1 text-sm text-red-600">{nameError}</p>
             )}
-            <p className="mt-1 text-xs text-neutral-500">
-              A descriptive name to identify this key (e.g., the application using it)
-            </p>
           </div>
 
           {/* Expiration selection */}
