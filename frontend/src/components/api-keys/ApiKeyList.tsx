@@ -75,7 +75,7 @@ export function ApiKeyList({ keys, onRevokeClick }: ApiKeyListProps) {
                 {/* Masked Key */}
                 <div className="col-span-3">
                   <code className="font-mono text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-700">
-                    och_live_****{key.last_four}
+                    {key.masked_key}
                   </code>
                 </div>
 

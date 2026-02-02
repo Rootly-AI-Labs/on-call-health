@@ -62,7 +62,7 @@ export function RevokeKeyDialog({
                 <p>
                   <span className="font-medium text-neutral-700">Key:</span>{" "}
                   <code className="font-mono text-xs bg-neutral-200 px-1.5 py-0.5 rounded">
-                    och_live_****{keyToRevoke.last_four}
+                    {keyToRevoke.masked_key}
                   </code>
                 </p>
               </div>

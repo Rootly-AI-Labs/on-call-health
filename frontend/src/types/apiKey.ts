@@ -1,7 +1,7 @@
 export interface ApiKey {
   id: number
   name: string
-  last_four: string
+  masked_key: string
   created_at: string
   last_used_at: string | null
   expires_at: string | null
