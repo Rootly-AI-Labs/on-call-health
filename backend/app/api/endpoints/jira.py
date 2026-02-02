@@ -391,6 +391,58 @@ async def get_jira_status(
     return response
 
 
+@router.post("/validate-token")
+async def validate_jira_token(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Validate a Jira API token before saving to database.
+
+    Request body:
+        token: str - The Jira Personal Access Token
+        site_url: str - The Jira site URL (e.g., https://company.atlassian.net)
+
+    Returns:
+        valid: bool - Whether the token is valid
+        error: str | None - Error message if invalid
+        error_type: str | None - Error category (authentication, permissions, network, format)
+        help_url: str | None - Link to documentation
+        action: str | None - Suggested next step
+        user_info: dict | None - User display name, email if valid
+    """
+    body = await request.json()
+    token = body.get("token")
+    site_url = body.get("site_url")
+
+    if not token:
+        return {
+            "valid": False,
+            "error": "Token is required",
+            "error_type": "format"
+        }
+
+    if not site_url:
+        return {
+            "valid": False,
+            "error": "Jira site URL is required",
+            "error_type": "site_url"
+        }
+
+    validator = IntegrationValidator(db)
+    result = await validator.validate_manual_token(
+        provider="jira",
+        token=token,
+        site_url=site_url
+    )
+
+    logger.info(
+        f"[Jira] Token validation for user={current_user.id}: valid={result.get('valid')}"
+    )
+
+    return result
+
+
 @router.get("/workspaces")
 async def list_jira_workspaces(
     current_user: User = Depends(get_current_user),

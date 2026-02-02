@@ -428,6 +428,48 @@ async def get_linear_status(
     return response
 
 
+@router.post("/validate-token")
+async def validate_linear_token(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Validate a Linear API key before saving to database.
+
+    Request body:
+        token: str - The Linear Personal API Key
+
+    Returns:
+        valid: bool - Whether the token is valid
+        error: str | None - Error message if invalid
+        error_type: str | None - Error category (authentication, permissions, network, format)
+        help_url: str | None - Link to documentation
+        action: str | None - Suggested next step
+        user_info: dict | None - User display name, email if valid
+    """
+    body = await request.json()
+    token = body.get("token")
+
+    if not token:
+        return {
+            "valid": False,
+            "error": "API key is required",
+            "error_type": "format"
+        }
+
+    validator = IntegrationValidator(db)
+    result = await validator.validate_manual_token(
+        provider="linear",
+        token=token
+    )
+
+    logger.info(
+        f"[Linear] Token validation for user={current_user.id}: valid={result.get('valid')}"
+    )
+
+    return result
+
+
 # -------------------------------
 # Teams
 # -------------------------------
