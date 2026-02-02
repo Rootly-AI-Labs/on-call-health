@@ -682,6 +682,11 @@ class UserSyncService:
             ).all()
 
             if survey_periods:
+                # Ensure keep_record has an ID before using it as FK reference
+                if keep_record.id is None:
+                    self.db.flush()
+                    logger.info(f"    💾 Flushed keep_record to get ID: {keep_record.id}")
+
                 logger.info(f"    🔗 Updating {len(survey_periods)} survey_periods to reference ID={keep_record.id}")
                 for period in survey_periods:
                     period.user_correlation_id = keep_record.id
