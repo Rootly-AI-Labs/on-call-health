@@ -35,6 +35,21 @@ MCP clients and automation tools can authenticate reliably without JWT token exp
 - Requirements archive: `.planning/milestones/v1.0-REQUIREMENTS.md`
 - Audit report: `.planning/milestones/v1.0-MILESTONE-AUDIT.md`
 
+## Current Milestone: v1.1 MCP Distribution
+
+**Goal:** Enable zero-installation MCP server access via SSE-hosted endpoint and PyPI distribution, replacing direct database access with REST API calls.
+
+**Target features:**
+- SSE transport endpoint at `https://mcp.oncallhealth.com/sse` (or similar)
+- REST API client layer (calls oncallhealth.ai APIs instead of direct DB)
+- PyPI package `on-call-health-mcp` for self-hosted users
+- Rate limiting and connection limits for hosted SSE
+- Documentation for both deployment methods (SSE hosted + PyPI/uvx)
+
+**Architecture shift:**
+- **Before (v1.0)**: MCP server → stdio transport → direct database access
+- **After (v1.1)**: MCP server → SSE/stdio transport → REST API calls → oncallhealth.ai
+
 ## Requirements
 
 ### Validated
@@ -143,4 +158,4 @@ MCP clients and automation tools can authenticate reliably without JWT token exp
 
 ---
 
-*Last updated: 2026-02-03 after v1.0 milestone completion*
+*Last updated: 2026-02-02 after starting v1.1 milestone*
