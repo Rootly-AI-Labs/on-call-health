@@ -11,7 +11,7 @@ const ROOTLY_API_KEY = process.env.E2E_ROOTLY_API_KEY;
 const GITHUB_TOKEN = process.env.E2E_GITHUB_TOKEN;
 const PAGERDUTY_API_KEY = process.env.E2E_PAGERDUTY_API_KEY;
 const DEFAULT_TIMEOUT = 30000;
-const SYNC_TIMEOUT = 120000;
+const SYNC_TIMEOUT = 180000; // Increased from 120s to 180s for slower browsers (Firefox)
 
 test.describe('Team Management - Critical Flows', () => {
   test.beforeEach(async ({ page }) => {
@@ -58,9 +58,10 @@ test.describe('Team Management - Critical Flows', () => {
       const drawer = page.locator('[role="dialog"], aside, [class*="drawer"], [class*="sheet"]').filter({ hasText: /team members/i }).first();
       await expect(drawer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
-      // Click the Sync Members button inside the drawer to open confirmation modal
+      // Wait for drawer content to load (button text stabilizes from "Loading..." to "Sync Members")
       const syncButton = drawer.locator('button', { hasText: /sync members/i }).first();
-      await expect(syncButton).toBeVisible();
+      await syncButton.waitFor({ state: 'visible', timeout: 15000 });
+      await expect(syncButton).toBeEnabled({ timeout: 5000 });
       await syncButton.click();
 
       // Wait for confirmation modal and click "Sync Now"
@@ -84,7 +85,12 @@ test.describe('Team Management - Critical Flows', () => {
       await page.locator('button', { hasText: /sync members/i }).first().click();
       const drawer = page.locator('[role="dialog"], aside, [class*="drawer"], [class*="sheet"]').filter({ hasText: /team members/i }).first();
       await expect(drawer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
-      await drawer.locator('button', { hasText: /sync members/i }).first().click();
+
+      // Wait for drawer content to load (button text stabilizes from "Loading..." to "Sync Members")
+      const syncButton = drawer.locator('button', { hasText: /sync members/i }).first();
+      await syncButton.waitFor({ state: 'visible', timeout: 15000 });
+      await expect(syncButton).toBeEnabled({ timeout: 5000 });
+      await syncButton.click();
 
       // Click Sync Now in modal
       const modal = page.locator('[role="dialog"]').filter({ hasText: /sync.*team members/i }).last();
@@ -118,7 +124,12 @@ test.describe('Team Management - Critical Flows', () => {
       await page.locator('button', { hasText: /sync members/i }).first().click();
       const drawer = page.locator('[role="dialog"], aside, [class*="drawer"], [class*="sheet"]').filter({ hasText: /team members/i }).first();
       await expect(drawer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
-      await drawer.locator('button', { hasText: /sync members/i }).first().click();
+
+      // Wait for drawer content to load (button text stabilizes from "Loading..." to "Sync Members")
+      const syncButton = drawer.locator('button', { hasText: /sync members/i }).first();
+      await syncButton.waitFor({ state: 'visible', timeout: 15000 });
+      await expect(syncButton).toBeEnabled({ timeout: 5000 });
+      await syncButton.click();
 
       // Click Sync Now in modal
       const modal = page.locator('[role="dialog"]').filter({ hasText: /sync.*team members/i }).last();
@@ -205,7 +216,12 @@ test.describe('Team Management - Critical Flows', () => {
       await page.locator('button', { hasText: /sync members/i }).first().click();
       const drawer = page.locator('[role="dialog"], aside, [class*="drawer"], [class*="sheet"]').filter({ hasText: /team members/i }).first();
       await expect(drawer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
-      await drawer.locator('button', { hasText: /sync members/i }).first().click();
+
+      // Wait for drawer content to load (button text stabilizes from "Loading..." to "Sync Members")
+      const syncButton = drawer.locator('button', { hasText: /sync members/i }).first();
+      await syncButton.waitFor({ state: 'visible', timeout: 15000 });
+      await expect(syncButton).toBeEnabled({ timeout: 5000 });
+      await syncButton.click();
 
       // Click Sync Now in modal
       const modal = page.locator('[role="dialog"]').filter({ hasText: /sync.*team members/i }).last();
@@ -232,7 +248,12 @@ test.describe('Team Management - Critical Flows', () => {
       await page.locator('button', { hasText: /sync members/i }).first().click();
       const drawer = page.locator('[role="dialog"], aside, [class*="drawer"], [class*="sheet"]').filter({ hasText: /team members/i }).first();
       await expect(drawer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
-      await drawer.locator('button', { hasText: /sync members/i }).first().click();
+
+      // Wait for drawer content to load (button text stabilizes from "Loading..." to "Sync Members")
+      const syncButton = drawer.locator('button', { hasText: /sync members/i }).first();
+      await syncButton.waitFor({ state: 'visible', timeout: 15000 });
+      await expect(syncButton).toBeEnabled({ timeout: 5000 });
+      await syncButton.click();
 
       // Click Sync Now in modal
       const modal = page.locator('[role="dialog"]').filter({ hasText: /sync.*team members/i }).last();
@@ -539,7 +560,12 @@ test.describe('Team Management - Critical Flows', () => {
       await page.locator('button', { hasText: /sync members/i }).first().click();
       let drawer = page.locator('[role="dialog"], aside, [class*="drawer"], [class*="sheet"]').filter({ hasText: /team members/i }).first();
       await expect(drawer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
-      await drawer.locator('button', { hasText: /sync members/i }).first().click();
+
+      // Wait for drawer content to load (button text stabilizes from "Loading..." to "Sync Members")
+      let syncButton = drawer.locator('button', { hasText: /sync members/i }).first();
+      await syncButton.waitFor({ state: 'visible', timeout: 15000 });
+      await expect(syncButton).toBeEnabled({ timeout: 5000 });
+      await syncButton.click();
 
       // Click Sync Now in modal
       let modal = page.locator('[role="dialog"]').filter({ hasText: /sync.*team members/i }).last();
@@ -569,7 +595,12 @@ test.describe('Team Management - Critical Flows', () => {
       await page.locator('button', { hasText: /sync members/i }).first().click();
       drawer = page.locator('[role="dialog"], aside, [class*="drawer"], [class*="sheet"]').filter({ hasText: /team members/i }).first();
       await expect(drawer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
-      await drawer.locator('button', { hasText: /sync members/i }).first().click();
+
+      // Wait for drawer content to load (button text stabilizes from "Loading..." to "Sync Members")
+      syncButton = drawer.locator('button', { hasText: /sync members/i }).first();
+      await syncButton.waitFor({ state: 'visible', timeout: 15000 });
+      await expect(syncButton).toBeEnabled({ timeout: 5000 });
+      await syncButton.click();
 
       // Click Sync Now in modal
       modal = page.locator('[role="dialog"]').filter({ hasText: /sync.*team members/i }).last();
@@ -611,7 +642,12 @@ test.describe('Team Management - Critical Flows', () => {
       await page.locator('button', { hasText: /sync members/i }).first().click();
       const drawer = page.locator('[role="dialog"], aside, [class*="drawer"], [class*="sheet"]').filter({ hasText: /team members/i }).first();
       await expect(drawer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
-      await drawer.locator('button', { hasText: /sync members/i }).first().click();
+
+      // Wait for drawer content to load (button text stabilizes from "Loading..." to "Sync Members")
+      const syncButton = drawer.locator('button', { hasText: /sync members/i }).first();
+      await syncButton.waitFor({ state: 'visible', timeout: 15000 });
+      await expect(syncButton).toBeEnabled({ timeout: 5000 });
+      await syncButton.click();
 
       // Click Sync Now in modal
       const modal = page.locator('[role="dialog"]').filter({ hasText: /sync.*team members/i }).last();
@@ -643,7 +679,12 @@ test.describe('Team Management - Critical Flows', () => {
       await page.locator('button', { hasText: /sync members/i }).first().click();
       const drawer = page.locator('[role="dialog"], aside, [class*="drawer"], [class*="sheet"]').filter({ hasText: /team members/i }).first();
       await expect(drawer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
-      await drawer.locator('button', { hasText: /sync members/i }).first().click();
+
+      // Wait for drawer content to load (button text stabilizes from "Loading..." to "Sync Members")
+      const syncButton = drawer.locator('button', { hasText: /sync members/i }).first();
+      await syncButton.waitFor({ state: 'visible', timeout: 15000 });
+      await expect(syncButton).toBeEnabled({ timeout: 5000 });
+      await syncButton.click();
 
       // Click Sync Now in modal
       const modal = page.locator('[role="dialog"]').filter({ hasText: /sync.*team members/i }).last();
