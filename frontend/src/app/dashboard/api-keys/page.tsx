@@ -71,7 +71,7 @@ export default function ApiKeysPage() {
               API Keys
             </h1>
             <p className="text-sm text-neutral-600 mt-1">
-              Manage API keys for programmatic access to MCP endpoints
+              Manage API keys for programmatic access to REST API and MCP endpoints
             </p>
           </div>
           <Button
