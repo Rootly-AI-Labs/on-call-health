@@ -16,7 +16,7 @@ import { NotificationDrawer } from "@/components/notifications"
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog"
 import { TeamManagementDialog } from "@/components/TeamManagementDialog"
 import { useGettingStarted } from "@/contexts/GettingStartedContext"
-import { LogOut, BookOpen, HelpCircle, Settings, Users, FileText, MessageSquareMore } from "lucide-react"
+import { LogOut, BookOpen, HelpCircle, Settings, Users, FileText, MessageSquareMore, Key } from "lucide-react"
 
 interface UserInfo {
   name: string
@@ -196,6 +196,16 @@ export function TopPanel() {
                   >
                     <Settings className="w-4 h-4 mr-2" />
                     Account Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      router.push("/dashboard/api-keys")
+                      setIsDropdownOpen(false)
+                    }}
+                    className="cursor-pointer focus:bg-purple-100 focus:text-purple-900"
+                  >
+                    <Key className="w-4 h-4 mr-2" />
+                    API Keys
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
