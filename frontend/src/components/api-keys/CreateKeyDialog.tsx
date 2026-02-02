@@ -31,11 +31,12 @@ type ExpirationPreset = {
 }
 
 const EXPIRATION_PRESETS: ExpirationPreset[] = [
-  { label: "No expiration", value: null },
+  { label: "7 days", value: "7days", getValue: () => addDays(new Date(), 7) },
   { label: "30 days", value: "30days", getValue: () => addDays(new Date(), 30) },
+  { label: "60 days", value: "60days", getValue: () => addDays(new Date(), 60) },
   { label: "90 days", value: "90days", getValue: () => addDays(new Date(), 90) },
-  { label: "1 year", value: "1year", getValue: () => addYears(new Date(), 1) },
   { label: "Custom", value: "custom" },
+  { label: "No expiration", value: null },
 ]
 
 export function CreateKeyDialog({
