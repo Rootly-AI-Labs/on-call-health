@@ -346,6 +346,18 @@ async def get_jira_status(
     token_valid = validation_result.get("valid", False) if validation_result else False
     token_error = validation_result.get("error") if validation_result and not token_valid else None
 
+    # Trigger notification on validation failure
+    if not token_valid and token_error:
+        from ...services.notification_service import NotificationService
+        notification_service = NotificationService(db)
+        error_type = validation_result.get("error_type", "authentication")
+        notification_service.create_token_validation_failure_notification(
+            user=current_user,
+            provider="jira",
+            error_type=error_type,
+            error_message=token_error
+        )
+
     workspace_mapping = None
     if current_user.organization_id:
         # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
