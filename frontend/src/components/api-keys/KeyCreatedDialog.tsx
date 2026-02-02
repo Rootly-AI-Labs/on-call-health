@@ -104,15 +104,6 @@ export function KeyCreatedDialog({
               <p><strong>Expires:</strong> {new Date(createdKey.expires_at).toLocaleDateString()}</p>
             )}
           </div>
-
-          {/* Usage hint */}
-          <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-lg">
-            <p className="text-sm text-neutral-700 font-medium mb-1">Usage</p>
-            <p className="text-xs text-neutral-600">
-              Include this key in the <code className="px-1 py-0.5 bg-neutral-200 rounded">X-API-Key</code> header
-              when making requests to REST API and MCP endpoints.
-            </p>
-          </div>
         </div>
 
         <DialogFooter>
