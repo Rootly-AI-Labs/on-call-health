@@ -312,6 +312,13 @@ Response: 204 No Content
 
 **Phase Requirements:** 8 requirements
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md - Page scaffold, navigation link, TypeScript types, data fetching hook
+- [ ] 04-02-PLAN.md - Create Key Dialog and Key Created Success Dialog
+- [ ] 04-03-PLAN.md - API Key List and Revoke Key Dialog with human verification
+
 ### Functional Requirements
 - REQ-F-003: Show Full Key Once (UI)
 - REQ-F-004: Copy-to-Clipboard (UI button)
@@ -346,13 +353,13 @@ Response: 204 No Content
 ### Key Files
 **Frontend:**
 - `frontend/src/app/dashboard/api-keys/page.tsx` - Main page (NEW)
-- `frontend/src/components/ApiKeyCreateModal.tsx` - Creation modal (NEW)
-- `frontend/src/components/ApiKeySuccessModal.tsx` - Show-once modal (NEW)
-- `frontend/src/components/ApiKeyList.tsx` - List table (NEW)
-- `frontend/src/components/ApiKeyRevokeDialog.tsx` - Confirm dialog (NEW)
+- `frontend/src/components/api-keys/CreateKeyDialog.tsx` - Creation modal (NEW)
+- `frontend/src/components/api-keys/KeyCreatedDialog.tsx` - Show-once modal (NEW)
+- `frontend/src/components/api-keys/ApiKeyList.tsx` - List table (NEW)
+- `frontend/src/components/api-keys/RevokeKeyDialog.tsx` - Confirm dialog (NEW)
 - `frontend/src/hooks/useApiKeys.ts` - Data fetching hook (NEW)
 - `frontend/src/types/apiKey.ts` - TypeScript types (NEW)
-- `frontend/src/app/dashboard/layout.tsx` - Add navigation link (MODIFY)
+- `frontend/src/components/TopPanel.tsx` - Add navigation link (MODIFY)
 
 ### UI Components
 
@@ -494,5 +501,5 @@ JWT Auth (existing)
 ---
 
 *Created: 2026-01-30*
-*Status: Active - Phase 3 planning complete*
-*Next: Execute Phase 3*
+*Status: Active - Phase 4 planning complete*
+*Next: Execute Phase 4*
