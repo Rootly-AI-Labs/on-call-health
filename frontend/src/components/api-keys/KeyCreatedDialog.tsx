@@ -67,6 +67,14 @@ export function KeyCreatedDialog({
             </div>
           </div>
 
+          {/* Key details */}
+          <div className="text-sm text-neutral-600 space-y-1">
+            <p><strong>Name:</strong> {createdKey.name}</p>
+            {createdKey.expires_at && (
+              <p><strong>Expires:</strong> {new Date(createdKey.expires_at).toLocaleDateString()}</p>
+            )}
+          </div>
+
           {/* Key display */}
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1.5">
@@ -95,14 +103,6 @@ export function KeyCreatedDialog({
                 )}
               </Button>
             </div>
-          </div>
-
-          {/* Key details */}
-          <div className="text-sm text-neutral-600 space-y-1">
-            <p><strong>Name:</strong> {createdKey.name}</p>
-            {createdKey.expires_at && (
-              <p><strong>Expires:</strong> {new Date(createdKey.expires_at).toLocaleDateString()}</p>
-            )}
           </div>
         </div>
 
