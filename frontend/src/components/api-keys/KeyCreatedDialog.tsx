@@ -110,7 +110,7 @@ export function KeyCreatedDialog({
             <p className="text-sm text-neutral-700 font-medium mb-1">Usage</p>
             <p className="text-xs text-neutral-600">
               Include this key in the <code className="px-1 py-0.5 bg-neutral-200 rounded">X-API-Key</code> header
-              when making requests to MCP endpoints.
+              when making requests to REST API and MCP endpoints.
             </p>
           </div>
         </div>
