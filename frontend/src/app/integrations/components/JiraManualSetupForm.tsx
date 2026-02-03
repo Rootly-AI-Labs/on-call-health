@@ -64,36 +64,30 @@ export function JiraManualSetupForm({ form, onSave, onClose }: JiraManualSetupFo
     const hasValidInputs = tokenValue && tokenValue.trim() && siteUrlValue && siteUrlValue.trim() && emailValue && emailValue.trim();
     const shouldSave = hasValidInputs && isConnected && userInfo && !isSaving && !saveAttempted.current;
 
-    if (shouldSave) {
-      saveAttempted.current = true;
-      handleAutoSave();
+    if (!shouldSave) {
+      return;
     }
-  }, [isConnected, userInfo, isSaving]);
 
-  const handleAutoSave = async () => {
+    saveAttempted.current = true;
     setIsSaving(true);
-    try {
-      const success = await onSave({
-        token: tokenValue,
-        siteUrl: siteUrlValue,
-        email: emailValue,
-        userInfo,
-      });
 
-      if (success) {
-        toast.success("Jira connected!", { duration: 3000 });
-        onClose();
-      } else {
-        // Save failed, allow retry
+    onSave({ token: tokenValue, siteUrl: siteUrlValue, email: emailValue, userInfo })
+      .then((success) => {
+        if (success) {
+          toast.success("Jira connected!", { duration: 3000 });
+          onClose();
+        } else {
+          saveAttempted.current = false;
+        }
+      })
+      .catch(() => {
+        toast.error("Failed to save integration");
         saveAttempted.current = false;
-      }
-    } catch (error) {
-      toast.error("Failed to save integration");
-      saveAttempted.current = false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
+      })
+      .finally(() => {
+        setIsSaving(false);
+      });
+  }, [isConnected, userInfo, isSaving, tokenValue, siteUrlValue, emailValue, onSave, onClose]);
 
   return (
     <Card className="border-blue-200 max-w-2xl mx-auto">

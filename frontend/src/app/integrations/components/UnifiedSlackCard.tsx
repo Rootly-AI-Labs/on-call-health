@@ -187,24 +187,13 @@ export function UnifiedSlackCard({
     }
   }
 
-  const handleFeatureToggle = async (feature: 'survey', enabled: boolean) => {
-    // Show confirmation when disabling survey
-    if (feature === 'survey' && !enabled) {
-      setShowSurveyDisableConfirm(true)
-      return
-    }
-
-    await performFeatureToggle(feature, enabled)
-  }
-
-  const performFeatureToggle = async (feature: 'survey', enabled: boolean) => {
+  const toggleSurveyFeature = async (enabled: boolean) => {
     const backendUrl = API_BASE
 
-    try {
-      // Optimistically update UI
-      setSurveyEnabled(enabled)
+    // Optimistically update UI
+    setSurveyEnabled(enabled)
 
-      // Call backend API to persist the change
+    try {
       const response = await fetch(`${backendUrl}/integrations/slack/features/toggle`, {
         method: 'POST',
         headers: {
@@ -212,7 +201,7 @@ export function UnifiedSlackCard({
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
         body: JSON.stringify({
-          feature,
+          feature: 'survey',
           enabled
         })
       })
@@ -221,21 +210,24 @@ export function UnifiedSlackCard({
         throw new Error('Failed to toggle feature')
       }
 
-      const data = await response.json()
       toast.success(`Survey Delivery ${enabled ? 'enabled' : 'disabled'}`)
 
-      // Reload Slack status to ensure UI is in sync with backend
       if (loadSlackStatus) {
-        await loadSlackStatus(true) // Force refresh to bypass cache
+        await loadSlackStatus(true)
       }
     } catch (error) {
       console.error('Error toggling feature:', error)
-
-      // Revert optimistic update on error
       setSurveyEnabled(!enabled)
-
       toast.error(`Failed to ${enabled ? 'enable' : 'disable'} Survey Delivery`)
     }
+  }
+
+  const handleSurveyToggle = (enabled: boolean) => {
+    if (!enabled) {
+      setShowSurveyDisableConfirm(true)
+      return
+    }
+    toggleSurveyFeature(enabled)
   }
 
   if (loadingSlack) {
@@ -414,7 +406,7 @@ export function UnifiedSlackCard({
                   <Switch
                     id="survey-toggle"
                     checked={surveyEnabled}
-                    onCheckedChange={(checked) => handleFeatureToggle('survey', checked)}
+                    onCheckedChange={handleSurveyToggle}
                     className="ml-4"
                   />
                 </div>
@@ -497,9 +489,9 @@ export function UnifiedSlackCard({
             </Button>
             <Button
               variant="destructive"
-              onClick={async () => {
+              onClick={() => {
                 setShowSurveyDisableConfirm(false)
-                await performFeatureToggle('survey', false)
+                toggleSurveyFeature(false)
               }}
             >
               Disable Surveys

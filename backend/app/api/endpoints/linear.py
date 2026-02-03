@@ -675,7 +675,6 @@ async def connect_linear_manual(
             if not bg_org_id:
                 return
 
-            # Re-fetch integration with fresh session
             bg_integration = bg_db.query(LinearIntegration).filter(
                 LinearIntegration.user_id == bg_user_id
             ).first()
@@ -683,21 +682,9 @@ async def connect_linear_manual(
                 return
 
             bg_token = await _get_valid_token(bg_integration, bg_db)
-
-            # Fetch all Linear users with pagination
-            all_users = []
-            cursor = None
-            for _ in range(20):  # Max pages
-                result = await linear_integration_oauth.get_users(bg_token, first=100, after=cursor)
-                nodes = result.get("nodes", [])
-                all_users.extend(nodes)
-                page_info = result.get("pageInfo", {})
-                if not page_info.get("hasNextPage"):
-                    break
-                cursor = page_info.get("endCursor")
-
-            # Sync active users to UserCorrelation
+            all_users = await _fetch_all_linear_users(bg_token)
             active_users = [u for u in all_users if u.get("active", True)]
+
             synced = 0
             for linear_user in active_users:
                 linear_id = linear_user.get("id")
@@ -1019,27 +1006,8 @@ async def sync_linear_users(
 
     access_token = await _get_valid_token(integration, db)
 
-    # Fetch all users with pagination
-    all_users = []
-    cursor = None
-    max_pages = 20
-
-    for _ in range(max_pages):
-        result = await linear_integration_oauth.get_users(
-            access_token,
-            first=100,
-            after=cursor,
-        )
-
-        nodes = result.get("nodes", [])
-        all_users.extend(nodes)
-
-        page_info = result.get("pageInfo", {})
-        if not page_info.get("hasNextPage"):
-            break
-        cursor = page_info.get("endCursor")
-
-    # Filter active users
+    # Fetch all users
+    all_users = await _fetch_all_linear_users(access_token)
     active_users = [u for u in all_users if u.get("active", True)]
 
     matched = 0
@@ -1257,6 +1225,37 @@ def _priority_to_name(priority: int) -> str:
     return mapping.get(priority, "Unknown")
 
 
+async def _fetch_all_linear_users(access_token: str, max_pages: int = 20) -> List[Dict[str, Any]]:
+    """Fetch all Linear users with pagination.
+
+    Args:
+        access_token: Valid Linear API token
+        max_pages: Maximum pages to fetch (default 20, 100 users per page)
+
+    Returns:
+        List of all user dictionaries from Linear API
+    """
+    all_users = []
+    cursor = None
+
+    for _ in range(max_pages):
+        result = await linear_integration_oauth.get_users(
+            access_token,
+            first=100,
+            after=cursor,
+        )
+
+        nodes = result.get("nodes", [])
+        all_users.extend(nodes)
+
+        page_info = result.get("pageInfo", {})
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+
+    return all_users
+
+
 # -------------------------------
 # Linear Users (for dropdown)
 # -------------------------------
@@ -1284,26 +1283,7 @@ async def get_linear_users(
             )
 
         access_token = await _get_valid_token(integration, db)
-
-        # Fetch all users with pagination
-        all_users = []
-        cursor = None
-        max_pages = 20
-
-        for _ in range(max_pages):
-            result = await linear_integration_oauth.get_users(
-                access_token,
-                first=100,
-                after=cursor,
-            )
-
-            nodes = result.get("nodes", [])
-            all_users.extend(nodes)
-
-            page_info = result.get("pageInfo", {})
-            if not page_info.get("hasNextPage"):
-                break
-            cursor = page_info.get("endCursor")
+        all_users = await _fetch_all_linear_users(access_token)
 
         # Filter to valid users with id and name
         valid_users = [
@@ -1547,26 +1527,7 @@ async def get_unmapped_linear_users(
             )
 
         access_token = await _get_valid_token(integration, db)
-
-        # Fetch all Linear users
-        all_users = []
-        cursor = None
-        max_pages = 20
-
-        for _ in range(max_pages):
-            result = await linear_integration_oauth.get_users(
-                access_token,
-                first=100,
-                after=cursor,
-            )
-
-            nodes = result.get("nodes", [])
-            all_users.extend(nodes)
-
-            page_info = result.get("pageInfo", {})
-            if not page_info.get("hasNextPage"):
-                break
-            cursor = page_info.get("endCursor")
+        all_users = await _fetch_all_linear_users(access_token)
 
         # Get all mapped Linear user IDs
         mapped_ids = set()
