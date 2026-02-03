@@ -841,6 +841,7 @@ class IntegrationValidator:
 
         Makes a GET request to /api/3/myself endpoint to verify token is valid.
         Automatically refreshes OAuth tokens if they are expired.
+        For manual tokens, uses Basic auth with the direct site URL.
         """
         try:
             integration = self.db.query(JiraIntegration).filter(
@@ -851,7 +852,7 @@ class IntegrationValidator:
                 return None
 
             try:
-                # Get valid token (refreshing if needed)
+                # Get valid token (refreshing if needed for OAuth)
                 token = await self._get_valid_jira_token(integration)
             except Exception as token_error:
                 logger.error(f"Failed to get Jira token for user {user_id}: {token_error}")
@@ -859,11 +860,34 @@ class IntegrationValidator:
                     "Jira token refresh failed. Please reconnect your Jira integration."
                 )
 
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/json"
-            }
-            url = f"https://api.atlassian.com/ex/jira/{integration.jira_cloud_id}/rest/api/3/myself"
+            # Manual tokens use Basic auth with direct site URL
+            if integration.token_source == "manual":
+                import base64
+                # For manual tokens, we need the email for Basic auth
+                if not integration.jira_email:
+                    logger.error(f"Jira manual token missing email for user {user_id}")
+                    return self._error_response(
+                        "Jira integration missing email. Please reconnect."
+                    )
+                credentials = base64.b64encode(
+                    f"{integration.jira_email}:{token}".encode()
+                ).decode()
+                headers = {
+                    "Authorization": f"Basic {credentials}",
+                    "Accept": "application/json"
+                }
+                # Use direct site URL for manual tokens
+                site_url = integration.jira_site_url
+                if not site_url.startswith("https://"):
+                    site_url = f"https://{site_url}"
+                url = f"{site_url}/rest/api/3/myself"
+            else:
+                # OAuth tokens use Bearer auth with cloud API URL
+                headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/json"
+                }
+                url = f"https://api.atlassian.com/ex/jira/{integration.jira_cloud_id}/rest/api/3/myself"
 
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
