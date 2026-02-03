@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** MCP clients and automation tools can authenticate reliably without JWT token expiration or session coupling.
-**Current focus:** Phase 9 - Infrastructure (Complete)
+**Current focus:** Phase 10 - Documentation (In Progress)
 
 ## Current Position
 
-Phase: 9 of 11 (Infrastructure)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-02-03 - Completed 09-02-PLAN.md (Graceful Cleanup and Structured Logging)
+Phase: 10 of 11 (Documentation)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-03 - Completed 10-01-PLAN.md (SSE Guide, Env Reference, PyPI v1.1 Context)
 
-Progress: [########--] 82% (v1.0 complete, Phase 5-9 complete)
+Progress: [########=-] 86% (v1.0 complete, Phase 5-10 plan 1 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18 (v1.0 + Phase 5 + Phase 6 + Phase 7 + Phase 8 + Phase 9)
-- Average duration: ~7min (Phase 5-9)
+- Total plans completed: 19 (v1.0 + Phase 5 + Phase 6 + Phase 7 + Phase 8 + Phase 9 + 10-01)
+- Average duration: ~6min (Phase 5-10)
 - Total execution time: N/A
 
 **By Phase:**
@@ -33,10 +33,11 @@ Progress: [########--] 82% (v1.0 complete, Phase 5-9 complete)
 | 7 (v1.1) | 2 | 23min | 11.5min |
 | 8 (v1.1) | 2 | 13min | 6.5min |
 | 9 (v1.1) | 2 | 14min | 7min |
+| 10 (v1.1) | 1 | 5min | 5min |
 
 **Recent Trend:**
-- Last 5 plans: 08-01 (8min), 08-02 (5min), 09-01 (9min), 09-02 (5min)
-- Trend: Phase 9 complete, infrastructure safeguards fully operational
+- Last 5 plans: 08-02 (5min), 09-01 (9min), 09-02 (5min), 10-01 (5min)
+- Trend: Documentation phase progressing quickly
 
 *Updated after each plan completion*
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - 09-02: STALE_CONNECTION_TIMEOUT_MINUTES=10 (2x cleanup interval for safety)
 - 09-02: Separate AsyncIOScheduler for MCP cleanup (independent of survey scheduler)
 - 09-02: Log levels: DEBUG for normal ops, WARN for violations, ERROR for failures
+- 10-01: docs/*.md files exist locally but are gitignored (project policy)
+- 10-01: Custom Connectors as primary SSE setup, mcp-remote as JSON fallback
 
 ### Pending Todos
 
@@ -84,9 +87,10 @@ None.
 ### Blockers/Concerns
 
 - Main app CORS middleware intercepts preflight before mounted app. May need X-API-Key in main app CORS if browser MCP clients require it.
+- docs/*.md files are gitignored; if versioning is needed, add `!docs/*.md` exception
 
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 09-02-PLAN.md (Graceful Cleanup and Structured Logging)
-Resume file: None (Phase 9 complete, ready for Phase 10)
+Stopped at: Completed 10-01-PLAN.md (SSE Guide, Env Reference, PyPI v1.1 Context)
+Resume file: None (ready for 10-02)
