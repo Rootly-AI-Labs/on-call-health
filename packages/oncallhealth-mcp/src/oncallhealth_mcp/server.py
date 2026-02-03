@@ -5,11 +5,11 @@ import asyncio
 import logging
 from typing import Any, Dict, Optional
 
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 
-from app.mcp.auth_helpers import extract_api_key_header
-from app.mcp.client import NotFoundError, OnCallHealthClient
-from app.mcp.normalizers import (
+from oncallhealth_mcp.auth import extract_api_key_header
+from oncallhealth_mcp.client import NotFoundError, OnCallHealthClient
+from oncallhealth_mcp.normalizers import (
     normalize_analysis_response,
     normalize_analysis_start_response,
     normalize_github_status,
@@ -22,21 +22,6 @@ from app.mcp.normalizers import (
 logger = logging.getLogger(__name__)
 
 mcp_server = FastMCP("On-Call Health")
-
-
-def _resolve_asgi_app(server: Any) -> Any:
-    """Resolve ASGI app from FastMCP server, supporting multiple API versions."""
-    if hasattr(server, "app"):
-        return server.app
-    if hasattr(server, "asgi_app"):
-        return server.asgi_app()
-    # FastMCP 1.x uses sse_app() or streamable_http_app()
-    if hasattr(server, "sse_app"):
-        return server.sse_app()
-    raise RuntimeError("FastMCP does not expose an ASGI app")
-
-
-mcp_app = _resolve_asgi_app(mcp_server)
 
 
 @mcp_server.tool()
