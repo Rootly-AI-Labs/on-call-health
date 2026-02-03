@@ -121,6 +121,7 @@ def _create_mcp_http_app() -> Starlette:
     mcp_http = mcp_server.http_app()
 
     # Create wrapper app with health endpoint and middleware
+    # IMPORTANT: Must pass lifespan from mcp_http to ensure FastMCP's StreamableHTTPSessionManager initializes
     # Build middleware list - order matters: infrastructure first, then CORS
     middleware_list = []
     if infrastructure_middleware is not None:
@@ -134,6 +135,7 @@ def _create_mcp_http_app() -> Starlette:
             Mount("/", mcp_http),  # Mount MCP app at root to handle all MCP routes
         ],
         middleware=middleware_list,
+        lifespan=mcp_http.lifespan,  # Use FastMCP's lifespan to initialize session manager
     )
 
     logger.info(
