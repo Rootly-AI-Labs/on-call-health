@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
+import { getValidToken, clearAuthData, redirectToLogin } from "@/lib/auth"
 
 import type {
   AnalysisResult,
@@ -95,9 +96,10 @@ export default function useDashboard() {
 
   // Centralized auth check helper
   const checkAuthToken = useCallback((): string | null => {
-    const authToken = localStorage.getItem('auth_token')
+    const authToken = getValidToken()
     if (!authToken && !hasShownAuthError) {
       setHasShownAuthError(true)
+      toast.error('Session expired. Please log in again.')
       router.push('/auth/login')
     }
     return authToken
@@ -126,20 +128,25 @@ export default function useDashboard() {
     try {
       // If there's a running analysis, delete it
       if (currentRunningAnalysisId) {
-        const authToken = localStorage.getItem('auth_token')
-        if (authToken) {
-          const response = await fetch(`${API_BASE}/analyses/${currentRunningAnalysisId}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${authToken}`
-            }
-          })
+        const authToken = getValidToken()
+        if (!authToken) {
+          toast.error('Session expired. Please log in again.')
+          router.push('/auth/login')
+          return
+        }
 
-          if (response.ok) {
-            toast.success("Analysis canceled successfully")
-          } else {
-            toast.error("Failed to cancel analysis")
+        const response = await fetch(`${API_BASE}/analyses/${currentRunningAnalysisId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
           }
+        })
+
+        if (response.ok) {
+          toast.success("Analysis canceled successfully")
+        } else {
+          toast.error("Failed to cancel analysis")
+        }
         }
       }
     } catch (error) {
@@ -431,7 +438,7 @@ export default function useDashboard() {
 
       // Small delay to ensure auth token and integrations are loaded
       const loadAnalysisWithDelay = () => {
-        const authToken = localStorage.getItem('auth_token')
+        const authToken = getValidToken()
         if (authToken) {
           loadSpecificAnalysis(analysisId)
         } else if (retryCount < maxRetries) {
@@ -440,6 +447,7 @@ export default function useDashboard() {
           timeoutId = setTimeout(loadAnalysisWithDelay, 500)
         } else {
           // Max retries exceeded - redirect to login
+          toast.error('Session expired. Please log in again.')
           router.push('/auth/login')
         }
       }

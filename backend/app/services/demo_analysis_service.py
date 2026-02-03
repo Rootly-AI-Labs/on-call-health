@@ -7,7 +7,7 @@ the dashboard and see example burnout analysis data without setting up integrati
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from sqlalchemy.orm import Session

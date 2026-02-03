@@ -5,7 +5,7 @@ Data collection module for gathering Rootly incident and user data.
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 import pytz
 

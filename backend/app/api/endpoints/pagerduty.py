@@ -3,7 +3,7 @@ PagerDuty integration API endpoints.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status

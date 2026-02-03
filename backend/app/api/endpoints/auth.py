@@ -2,7 +2,7 @@
 Authentication API endpoints.
 """
 from typing import Any, Dict, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -53,7 +53,7 @@ def build_error_redirect(frontend_url: str, error_msg: str) -> str:
 def store_oauth_code(db: Session, code: str, jwt_token: str, user_id: int) -> None:
     """Store OAuth temporary code in database."""
     try:
-        expires_at = datetime.utcnow() + timedelta(minutes=5)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
         db.execute(text("""
             INSERT INTO oauth_temp_codes (code, jwt_token, user_id, expires_at)
             VALUES (:code, :jwt_token, :user_id, :expires_at)
@@ -76,7 +76,7 @@ def get_oauth_code(db: Session, code: str) -> Optional[Dict[str, Any]]:
         db.execute(text("""
             DELETE FROM oauth_temp_codes
             WHERE expires_at < :now
-        """), {"now": datetime.utcnow()})
+        """), {"now": datetime.now(timezone.utc)})
         db.commit()
 
         # Get the code

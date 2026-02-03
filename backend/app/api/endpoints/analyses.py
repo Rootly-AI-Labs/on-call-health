@@ -2,7 +2,7 @@
 Burnout analysis API endpoints.
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
@@ -667,7 +667,7 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
         return {}
 
     # Use current time as end date for live survey data (surveys update without re-running analysis)
-    analysis_end_date = datetime.utcnow()
+    analysis_end_date = datetime.now(timezone.utc)
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
 
     # Query 1: Get all team member emails
@@ -915,7 +915,7 @@ async def regenerate_analysis_trends(
         total_incidents = metadata.get("total_incidents", 0)
         
         # Create daily trends data based on existing analysis results
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         import random
         
         # If we have team members with incidents, distribute them across days
@@ -1041,7 +1041,7 @@ async def verify_analysis_consistency(
         consistency_report = {
             "analysis_id": analysis_id,
             "analysis_status": analysis.status,
-            "verification_timestamp": datetime.utcnow().isoformat(),
+            "verification_timestamp": datetime.now(timezone.utc).isoformat(),
             "overall_consistency": True,
             "consistency_checks": {},
             "critical_issues": [],
@@ -1764,7 +1764,7 @@ async def get_user_github_daily_commits(
     collector = GitHubCollector()
     
     # Determine date range from analysis
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     
     # Try to get dates from analysis results metadata
     if analysis.results and isinstance(analysis.results, dict):
@@ -1950,7 +1950,7 @@ async def get_analysis_github_commits_timeline(
     collector = GitHubCollector()
     
     # Determine date range from analysis
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     import asyncio
     
     # Get dates from analysis metadata
@@ -2355,7 +2355,7 @@ async def get_member_daily_health(
                     incident_date = incident.get("created_at") or incident.get("attributes", {}).get("created_at")
                     if incident_date:
                         # Parse date to get day
-                        from datetime import datetime
+                        from datetime import datetime, timezone
                         try:
                             if isinstance(incident_date, str):
                                 # Handle different date formats
@@ -2456,7 +2456,7 @@ async def get_member_daily_health(
         logger.info(f"🔍 FALLBACK: {member_email} has {member_incident_count} total incidents, generating {days_analyzed} days of data")
         
         # Generate fallback daily data
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         import random
         incidents_distributed = 0
         
@@ -2601,7 +2601,7 @@ async def get_member_daily_health(
             team_health = round(team_health_by_date.get(date_str, 8.5) * 10)
             
             # Generate day name
-            from datetime import datetime
+            from datetime import datetime, timezone
             day_name = datetime.strptime(date_str, '%Y-%m-%d').strftime("%a, %b %d")
         
         # Build factors for detailed tooltips (consistent regardless of calculation method)
@@ -2690,7 +2690,7 @@ async def run_analysis_task(
 ):
     """Background task to run the actual burnout analysis."""
     import asyncio
-    from datetime import datetime
+    from datetime import datetime, timezone
     import logging
     import os
     import sys
