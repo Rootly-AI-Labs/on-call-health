@@ -20,7 +20,7 @@
       "environment": [
         {
           "name": "ONCALLHEALTH_API_URL",
-          "value": "https://api.oncallhealth.com"
+          "value": "https://api.oncallhealth.ai"
         },
         {
           "name": "LOG_LEVEL",
