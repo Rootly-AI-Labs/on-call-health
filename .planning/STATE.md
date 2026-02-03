@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** MCP clients and automation tools can authenticate reliably without JWT token expiration or session coupling.
-**Current focus:** Phase 8 - PyPI Distribution (Complete)
+**Current focus:** Phase 9 - Infrastructure (In Progress)
 
 ## Current Position
 
-Phase: 8 of 11 (PyPI Distribution)
-Plan: 2 of 2 in current phase
-Status: Phase 8 complete
-Last activity: 2026-02-02 - Completed 08-02-PLAN.md (README Documentation)
+Phase: 9 of 11 (Infrastructure)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-03 - Completed 09-01-PLAN.md (Connection Tracking and Rate Limiting)
 
-Progress: [#######---] 73% (v1.0 complete, Phase 5-8 complete)
+Progress: [########--] 77% (v1.0 complete, Phase 5-8 complete, 09-01 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16 (v1.0 + Phase 5 + Phase 6 + Phase 7 + Phase 8)
-- Average duration: ~6.5min (Phase 5-8)
+- Total plans completed: 17 (v1.0 + Phase 5 + Phase 6 + Phase 7 + Phase 8 + 09-01)
+- Average duration: ~7min (Phase 5-9)
 - Total execution time: N/A
 
 **By Phase:**
@@ -32,10 +32,11 @@ Progress: [#######---] 73% (v1.0 complete, Phase 5-8 complete)
 | 6 (v1.1) | 2 | 9min | 4.5min |
 | 7 (v1.1) | 2 | 23min | 11.5min |
 | 8 (v1.1) | 2 | 13min | 6.5min |
+| 9 (v1.1) | 1 | 9min | 9min |
 
 **Recent Trend:**
-- Last 5 plans: 07-01 (18min), 07-02 (5min), 08-01 (8min), 08-02 (5min)
-- Trend: Phase 8 complete, PyPI package ready for publishing
+- Last 5 plans: 07-02 (5min), 08-01 (8min), 08-02 (5min), 09-01 (9min)
+- Trend: Phase 9 started, connection tracking and rate limiting complete
 
 *Updated after each plan completion*
 
@@ -69,6 +70,9 @@ Recent decisions affecting current work:
 - 08-01: Flexible dependency bounds (>=X.Y,<Z.0) for PyPI compatibility
 - 08-02: Lazy import of server module for validation-first CLI startup
 - 08-02: README structure: install -> quick start -> config -> CLI -> integration -> tools
+- 09-01: MAX_CONNECTIONS_PER_KEY=5 (conservative for typical MCP usage)
+- 09-01: Per-tool rate limits (5/min expensive, 60/min cheap, 100/min default)
+- 09-01: Infrastructure middleware before CORS (reject early)
 
 ### Pending Todos
 
@@ -80,6 +84,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-02
-Stopped at: Completed 08-02-PLAN.md (README Documentation)
-Resume file: None (Phase 8 complete, ready for Phase 9)
+Last session: 2026-02-03
+Stopped at: Completed 09-01-PLAN.md (Connection Tracking and Rate Limiting)
+Resume file: None (ready for 09-02)
