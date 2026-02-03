@@ -85,6 +85,7 @@ echo "    Docker authenticated successfully"
 echo ""
 echo "==> Step 2: Building Docker image..."
 DOCKER_BUILDKIT=1 docker build \
+    --platform linux/amd64 \
     -f "${BACKEND_DIR}/Dockerfile.mcp" \
     -t "on-call-health-mcp:${IMAGE_TAG}" \
     "${BACKEND_DIR}"
