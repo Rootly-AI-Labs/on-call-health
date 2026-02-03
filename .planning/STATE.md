@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** MCP clients and automation tools can authenticate reliably without JWT token expiration or session coupling.
-**Current focus:** Phase 10 - Documentation (Complete, ready for Phase 11)
+**Current focus:** Phase 11 - AWS Deployment (In progress)
 
 ## Current Position
 
-Phase: 10 of 11 (Documentation)
-Plan: 3 of 3 in current phase
-Status: Phase complete, verification approved
-Last activity: 2026-02-03 - Phase 10 verified and approved
+Phase: 11 of 11 (AWS Deployment)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-03 - Completed 11-01-PLAN.md (MCP Server Containerization)
 
-Progress: [#########-] 95% (v1.0 complete, Phase 5-10 complete)
+Progress: [##########] 96% (v1.0 complete, Phase 5-11.01 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 21 (v1.0 + Phase 5 + Phase 6 + Phase 7 + Phase 8 + Phase 9 + Phase 10)
-- Average duration: ~5min (Phase 5-10)
+- Total plans completed: 22 (v1.0 + Phase 5 + Phase 6 + Phase 7 + Phase 8 + Phase 9 + Phase 10 + Phase 11.01)
+- Average duration: ~5min (Phase 5-11)
 - Total execution time: N/A
 
 **By Phase:**
@@ -34,10 +34,11 @@ Progress: [#########-] 95% (v1.0 complete, Phase 5-10 complete)
 | 8 (v1.1) | 2 | 13min | 6.5min |
 | 9 (v1.1) | 2 | 14min | 7min |
 | 10 (v1.1) | 3 | 10min | 3.3min |
+| 11 (v1.1) | 1 | 15min | 15min |
 
 **Recent Trend:**
-- Last 5 plans: 09-02 (5min), 10-01 (5min), 10-02 (3min), 10-03 (2min)
-- Trend: Documentation phase complete, ready for Phase 11
+- Last 5 plans: 10-01 (5min), 10-02 (3min), 10-03 (2min), 11-01 (15min)
+- Trend: AWS deployment phase started, containerization complete
 
 *Updated after each plan completion*
 
@@ -84,6 +85,9 @@ Recent decisions affecting current work:
 - 10-02: Phase 11 placeholder pattern for deployment docs TBD sections
 - 10-03: Blockquote format for deprecation notices (consistent with migration guide)
 - 10-03: Different redirect targets for production guide (AWS vs PyPI)
+- 11-01: Split auth_helpers.py from auth.py for standalone mode without DB dependencies
+- 11-01: Infrastructure middleware conditionally loaded via try/except ImportError
+- 11-01: Python urllib for health check (no curl/wget in minimal image)
 
 ### Pending Todos
 
@@ -97,5 +101,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 10-03-PLAN.md (Legacy Documentation Deprecation)
-Resume file: None (Phase 10 complete, ready for Phase 11)
+Stopped at: Completed 11-01-PLAN.md (MCP Server Containerization)
+Resume file: None (Plan 11-01 complete, ready for Plan 11-02)
