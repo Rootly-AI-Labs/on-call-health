@@ -447,8 +447,13 @@ export default function useDashboard() {
         return
       }
 
-      // Handle both numeric IDs and UUIDs
-      const analysisId = !isNaN(parseInt(savedAnalysisId)) ? parseInt(savedAnalysisId) : savedAnalysisId
+      // Parse analysis ID - should be numeric for persistence
+      const analysisId = parseInt(savedAnalysisId)
+      if (isNaN(analysisId)) {
+        // Invalid or corrupted ID
+        clearRunningAnalysisState()
+        return
+      }
 
       const elapsedMs = Date.now() - startTime
       const maxAnalysisTime = 30 * 60 * 1000 // 30 minutes max
