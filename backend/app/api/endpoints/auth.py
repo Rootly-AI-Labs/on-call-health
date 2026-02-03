@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
 import bcrypt
+import secrets
 from pydantic import EmailStr, field_validator, Field, BaseModel
 
 from ...models import get_db, User, OAuthProvider, UserEmail, OrganizationInvitation
@@ -478,7 +479,8 @@ async def exchange_auth_code_for_token(
 
         # Debug: Check if table exists and has any codes
         try:
-            count = db.query(OAuthTempCode).count()
+            result = db.execute(text("SELECT COUNT(*) FROM oauth_temp_codes"))
+            count = result.scalar()
             logger.error(f"📊 Total codes in database: {count}")
         except Exception as e:
             logger.error(f"❌ Failed to query oauth_temp_codes table: {e}")
@@ -665,7 +667,6 @@ async def delete_current_user_account(
     Requires email confirmation for safety.
     """
     # Verify email confirmation matches using constant-time comparison
-    import secrets
     expected = current_user.email.lower().encode('utf-8')
     provided = delete_request.email_confirmation.lower().encode('utf-8')
 
