@@ -83,7 +83,7 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster on-call-health \
-            --service on-call-health-mcp-service \
+            --service mcp-server \
             --task-definition ${{ steps.task-def.outputs.task-def-arn }} \
             --force-new-deployment
 
@@ -91,7 +91,7 @@ jobs:
         run: |
           aws ecs wait services-stable \
             --cluster on-call-health \
-            --services on-call-health-mcp-service
+            --services mcp-server
 
       - name: Deployment status
         run: |
