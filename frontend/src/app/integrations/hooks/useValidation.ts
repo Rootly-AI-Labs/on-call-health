@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import type { ValidationState, ValidationResult, ValidationErrorType } from "../types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface UseValidationOptions {
   provider: "jira" | "linear";
