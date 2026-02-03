@@ -662,18 +662,27 @@ async def connect_linear_manual(
 
     logger.info(f"[Linear] Manual token saved for user {current_user.id}")
 
+    # Capture values before background task (avoid DetachedInstanceError)
+    bg_user_id = current_user.id
+    bg_org_id = current_user.organization_id
+
     # Trigger background sync immediately after successful save
     async def sync_in_background():
         """Background task to sync Linear users after manual token save."""
+        from ...models import get_db
+        bg_db = next(get_db())
         try:
-            # Re-fetch integration to get fresh token
-            bg_integration = db.query(LinearIntegration).filter(
-                LinearIntegration.user_id == current_user.id
-            ).first()
-            if not bg_integration or not current_user.organization_id:
+            if not bg_org_id:
                 return
 
-            bg_token = await _get_valid_token(bg_integration, db)
+            # Re-fetch integration with fresh session
+            bg_integration = bg_db.query(LinearIntegration).filter(
+                LinearIntegration.user_id == bg_user_id
+            ).first()
+            if not bg_integration:
+                return
+
+            bg_token = await _get_valid_token(bg_integration, bg_db)
 
             # Fetch all Linear users with pagination
             all_users = []
@@ -697,8 +706,8 @@ async def connect_linear_manual(
                 if not linear_email:
                     continue
 
-                corr = db.query(UserCorrelation).filter(
-                    UserCorrelation.organization_id == current_user.organization_id,
+                corr = bg_db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == bg_org_id,
                     UserCorrelation.email == linear_email,
                 ).first()
                 if corr:
@@ -707,9 +716,9 @@ async def connect_linear_manual(
                     if linear_name and not corr.name:
                         corr.name = linear_name
                 else:
-                    db.add(UserCorrelation(
-                        user_id=current_user.id,
-                        organization_id=current_user.organization_id,
+                    bg_db.add(UserCorrelation(
+                        user_id=bg_user_id,
+                        organization_id=bg_org_id,
                         email=linear_email,
                         name=linear_name,
                         linear_user_id=linear_id,
@@ -717,10 +726,12 @@ async def connect_linear_manual(
                     ))
                 synced += 1
 
-            db.commit()
-            logger.info(f"[Linear] Background sync completed for user {current_user.id}: {synced} users synced")
+            bg_db.commit()
+            logger.info(f"[Linear] Background sync completed for user {bg_user_id}: {synced} users synced")
         except Exception as e:
-            logger.error(f"[Linear] Background sync failed for user {current_user.id}: {e}")
+            logger.error(f"[Linear] Background sync failed for user {bg_user_id}: {e}")
+        finally:
+            bg_db.close()
 
     # Fire and forget background sync
     asyncio.create_task(sync_in_background())
