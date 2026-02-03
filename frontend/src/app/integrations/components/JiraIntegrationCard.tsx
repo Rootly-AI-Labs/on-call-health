@@ -1,13 +1,14 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
+import { Loader2, Key } from "lucide-react"
 
 interface JiraIntegrationCardProps {
   onConnect: () => void
+  onTokenConnect: () => void
   isConnecting: boolean
 }
 
-export function JiraIntegrationCard({ onConnect, isConnecting }: JiraIntegrationCardProps) {
+export function JiraIntegrationCard({ onConnect, onTokenConnect, isConnecting }: JiraIntegrationCardProps) {
   return (
     <Card className="border-2 border-blue-200 max-w-2xl mx-auto">
       <CardContent className="pt-6 space-y-4">
@@ -16,32 +17,43 @@ export function JiraIntegrationCard({ onConnect, isConnecting }: JiraIntegration
         </div>
 
         <div className="space-y-3">
-          <Button
-            onClick={onConnect}
-            disabled={isConnecting}
-            className="w-full bg-blue-600 hover:bg-blue-700"
-          >
-            {isConnecting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <svg
-                  viewBox="0 0 24 24"
-                  className="w-4 h-4 mr-2"
-                  fill="currentColor"
-                >
-                  <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.232V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z"/>
-                </svg>
-                Connect with Jira
-              </>
-            )}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={onConnect}
+              disabled={isConnecting}
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-4 h-4 mr-2"
+                    fill="currentColor"
+                  >
+                    <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.232V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z"/>
+                  </svg>
+                  Connect with OAuth
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={onTokenConnect}
+              disabled={isConnecting}
+              variant="outline"
+              className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+            >
+              <Key className="w-4 h-4 mr-2" />
+              Use API Token
+            </Button>
+          </div>
 
           <p className="text-xs text-slate-500 text-center">
-            You'll be redirected to Atlassian to authorize access
+            Choose OAuth for automatic refresh or API Token for manual management
           </p>
         </div>
 
