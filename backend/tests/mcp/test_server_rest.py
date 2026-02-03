@@ -15,8 +15,16 @@ from app.mcp.server import (
     analysis_results,
     analysis_current,
     analysis_start,
+    integrations_list,
 )
 from app.mcp.client import NotFoundError
+from app.mcp.normalizers import (
+    normalize_rootly_integration,
+    normalize_github_status,
+    normalize_slack_status,
+    normalize_jira_status,
+    normalize_linear_status,
+)
 
 
 def _mock_ctx_with_api_key(api_key: str = "och_live_test123"):
@@ -414,3 +422,272 @@ class TestAnalysisStart:
 
             # Should use "integration" as fallback
             assert "integration" in result["message"]
+
+
+class TestIntegrationsList:
+    """Tests for integrations_list tool."""
+
+    @pytest.mark.asyncio
+    async def test_integrations_list_returns_all_types(self):
+        """Test successful fetch of all integration types."""
+        ctx = _mock_ctx_with_api_key()
+
+        # Mock responses for all 5 endpoints
+        rootly_response = _mock_response([
+            {"id": 1, "name": "Team Rootly", "organization_name": "Acme", "is_default": True}
+        ])
+        github_response = _mock_response({
+            "connected": True,
+            "integration": {"id": 1, "github_username": "testuser", "organizations": ["acme"]}
+        })
+        slack_response = _mock_response({
+            "connected": True,
+            "integration": {"id": 1, "workspace_id": "W123", "workspace_name": "Acme"}
+        })
+        jira_response = _mock_response({"connected": False})
+        linear_response = _mock_response({
+            "connected": True,
+            "integration": {"id": 1, "workspace_name": "Acme Linear", "workspace_id": "L123"}
+        })
+
+        with patch("app.mcp.server.OnCallHealthClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get.side_effect = [
+                rootly_response,
+                github_response,
+                slack_response,
+                jira_response,
+                linear_response,
+            ]
+            mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+            result = await integrations_list(ctx)
+
+            assert "rootly" in result
+            assert "github" in result
+            assert "slack" in result
+            assert "jira" in result
+            assert "linear" in result
+            assert len(result["rootly"]) == 1
+            assert len(result["github"]) == 1
+            assert len(result["jira"]) == 0  # Not connected
+            assert len(result["linear"]) == 1
+            assert result["rootly"][0]["name"] == "Team Rootly"
+            assert result["github"][0]["username"] == "testuser"
+
+    @pytest.mark.asyncio
+    async def test_integrations_list_handles_partial_failure(self):
+        """Test that one endpoint failure doesn't break entire response."""
+        ctx = _mock_ctx_with_api_key()
+
+        rootly_response = _mock_response([{"id": 1, "name": "Team"}])
+
+        with patch("app.mcp.server.OnCallHealthClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            # First call succeeds, rest fail
+            mock_client.get.side_effect = [
+                rootly_response,
+                Exception("GitHub API down"),
+                Exception("Slack timeout"),
+                Exception("Jira error"),
+                Exception("Linear unavailable"),
+            ]
+            mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+            result = await integrations_list(ctx)
+
+            # Should still return valid response with rootly data
+            assert len(result["rootly"]) == 1
+            assert result["github"] == []
+            assert result["slack"] == []
+            assert result["jira"] == []
+            assert result["linear"] == []
+
+    @pytest.mark.asyncio
+    async def test_integrations_list_raises_permission_error_without_key(self):
+        """Test missing API key handling."""
+        ctx = _mock_ctx_without_api_key()
+
+        with pytest.raises(PermissionError, match="Missing API key"):
+            await integrations_list(ctx)
+
+    @pytest.mark.asyncio
+    async def test_integrations_list_all_endpoints_called(self):
+        """Verify all 5 integration endpoints are called."""
+        ctx = _mock_ctx_with_api_key()
+
+        # All disconnected responses
+        empty_list_response = _mock_response([])
+        not_connected_response = _mock_response({"connected": False})
+
+        with patch("app.mcp.server.OnCallHealthClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get.side_effect = [
+                empty_list_response,  # rootly
+                not_connected_response,  # github
+                not_connected_response,  # slack
+                not_connected_response,  # jira
+                not_connected_response,  # linear
+            ]
+            mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+            await integrations_list(ctx)
+
+            # Verify all 5 endpoints were called
+            assert mock_client.get.call_count == 5
+            calls = [call[0][0] for call in mock_client.get.call_args_list]
+            assert "/rootly/integrations" in calls
+            assert "/integrations/github/status" in calls
+            assert "/integrations/slack/status" in calls
+            assert "/integrations/jira/status" in calls
+            assert "/integrations/linear/status" in calls
+
+
+class TestIntegrationNormalizers:
+    """Tests for integration response normalizers."""
+
+    def test_normalize_rootly_integration(self):
+        """Test Rootly integration normalization."""
+        data = {
+            "id": 1,
+            "name": "Test",
+            "organization_name": "Acme",
+            "is_default": True,
+            "total_users": 5,
+            "created_at": "2024-01-01T00:00:00",
+        }
+        result = normalize_rootly_integration(data)
+
+        assert result["id"] == 1
+        assert result["name"] == "Test"
+        assert result["platform"] == "rootly"
+        assert result["is_default"] is True
+        assert result["organization_name"] == "Acme"
+        assert result["total_users"] == 5
+
+    def test_normalize_rootly_integration_defaults(self):
+        """Test Rootly normalization with missing optional fields."""
+        data = {"id": 1, "name": "Minimal"}
+        result = normalize_rootly_integration(data)
+
+        assert result["id"] == 1
+        assert result["name"] == "Minimal"
+        assert result["platform"] == "rootly"
+        assert result["is_default"] is False
+        assert result["is_active"] is True
+        assert result["total_users"] == 0
+
+    def test_normalize_github_status_connected(self):
+        """Test GitHub status normalization when connected."""
+        data = {
+            "connected": True,
+            "integration": {
+                "id": 1,
+                "github_username": "user",
+                "organizations": ["org1", "org2"],
+                "token_preview": "...abc123",
+                "token_source": "oauth",
+            }
+        }
+        result = normalize_github_status(data)
+
+        assert len(result) == 1
+        assert result[0]["id"] == 1
+        assert result[0]["username"] == "user"
+        assert result[0]["organizations"] == ["org1", "org2"]
+        assert result[0]["has_token"] is True
+        assert result[0]["token_source"] == "oauth"
+
+    def test_normalize_github_status_not_connected(self):
+        """Test GitHub status normalization when not connected."""
+        result = normalize_github_status({"connected": False})
+        assert result == []
+
+        result = normalize_github_status(None)
+        assert result == []
+
+        result = normalize_github_status({})
+        assert result == []
+
+    def test_normalize_slack_status_connected(self):
+        """Test Slack status normalization when connected."""
+        data = {
+            "connected": True,
+            "integration": {
+                "id": 1,
+                "workspace_id": "W123",
+                "workspace_name": "Acme Slack",
+                "slack_user_id": "U456",
+                "token_source": "oauth",
+            }
+        }
+        result = normalize_slack_status(data)
+
+        assert len(result) == 1
+        assert result[0]["id"] == 1
+        assert result[0]["workspace_id"] == "W123"
+        assert result[0]["workspace_name"] == "Acme Slack"
+        assert result[0]["has_token"] is True
+
+    def test_normalize_slack_status_not_connected(self):
+        """Test Slack status normalization when not connected."""
+        result = normalize_slack_status({"connected": False})
+        assert result == []
+
+    def test_normalize_jira_status_connected(self):
+        """Test Jira status normalization when connected."""
+        data = {
+            "connected": True,
+            "integration": {
+                "id": 1,
+                "jira_cloud_id": "cloud123",
+                "jira_site_url": "https://acme.atlassian.net",
+                "jira_display_name": "John Doe",
+                "token_preview": "...xyz",
+                "token_source": "oauth",
+                "updated_at": "2024-01-15T10:00:00",
+            }
+        }
+        result = normalize_jira_status(data)
+
+        assert len(result) == 1
+        assert result[0]["id"] == 1
+        assert result[0]["cloud_id"] == "cloud123"
+        assert result[0]["site_url"] == "https://acme.atlassian.net"
+        assert result[0]["display_name"] == "John Doe"
+        assert result[0]["has_token"] is True
+
+    def test_normalize_jira_status_not_connected(self):
+        """Test Jira status normalization when not connected."""
+        result = normalize_jira_status({"connected": False})
+        assert result == []
+
+    def test_normalize_linear_status_connected(self):
+        """Test Linear status normalization when connected."""
+        data = {
+            "connected": True,
+            "integration": {
+                "id": 1,
+                "workspace_id": "lin123",
+                "workspace_name": "Acme Linear",
+                "workspace_url_key": "acme",
+                "token_preview": "...def",
+                "token_source": "oauth",
+            }
+        }
+        result = normalize_linear_status(data)
+
+        assert len(result) == 1
+        assert result[0]["id"] == 1
+        assert result[0]["workspace_id"] == "lin123"
+        assert result[0]["workspace_name"] == "Acme Linear"
+        assert result[0]["workspace_url_key"] == "acme"
+        assert result[0]["has_token"] is True
+
+    def test_normalize_linear_status_not_connected(self):
+        """Test Linear status normalization when not connected."""
+        result = normalize_linear_status({"connected": False})
+        assert result == []
+
+        result = normalize_linear_status(None)
+        assert result == []
