@@ -145,8 +145,7 @@ async def revoke_api_key(
     """
     Revoke an API key.
 
-    This is a soft delete - the key is marked as revoked but not removed.
-    Revoked keys cannot be used for authentication.
+    The key is permanently deleted from the database.
     """
     service = APIKeyService(db)
 
