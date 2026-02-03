@@ -842,12 +842,14 @@ async def sync_slack_user_ids(
 
             logger.debug(f"Built mapping for {len(email_to_slack_id)} Slack users with emails")
 
-            # Update correlations for all users in the organization
-            # Match by organization + email to support team roster (user_id=NULL)
+            # Update correlations for team members only (user_id=NULL)
+            # Match by organization + email to support team roster
             # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+            # Only match team members (user_id IS NULL), not personal correlations
             correlations = db.query(UserCorrelation).filter(
                 UserCorrelation.organization_id == current_user.organization_id,
                 UserCorrelation.organization_id.isnot(None),
+                UserCorrelation.user_id.is_(None),  # Only team members, not personal correlations
                 UserCorrelation.email.in_(list(email_to_slack_id.keys()))
             ).all()
 

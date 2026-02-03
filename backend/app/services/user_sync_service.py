@@ -395,11 +395,19 @@ class UserSyncService:
                 break
             except IntegrityError as e:
                 self.db.rollback()
-                if 'uq_user_correlation_user_email' in str(e.orig):
+                error_str = str(e.orig)
+                # Check for any of the UserCorrelation unique constraint violations
+                is_duplicate_key = any(constraint in error_str for constraint in [
+                    'uq_user_correlation_user_email',  # Old constraint (being removed)
+                    'uq_user_correlation_org_email_null_user',  # New: multi-tenant mode
+                    'uq_user_correlation_user_email_not_null'  # New: personal mode
+                ])
+
+                if is_duplicate_key:
                     if attempt < max_retries - 1:
                         logger.warning(
                             f"Duplicate key violation on commit (attempt {attempt+1}/{max_retries}). "
-                            f"Retrying after concurrent insert..."
+                            f"Retrying after concurrent insert... Error: {error_str}"
                         )
                         continue
                     else:
@@ -682,6 +690,28 @@ class UserSyncService:
             ).all()
 
             if survey_periods:
+                # Ensure keep_record has an ID before using it as FK reference
+                # NOTE: flush() does NOT expose data to concurrent transactions in READ COMMITTED isolation.
+                # It only synchronizes SQLAlchemy's session with the current transaction's state.
+                # Other transactions remain isolated until commit(), where unique constraints enforce atomicity.
+                if keep_record.id is None:
+                    try:
+                        self.db.flush()
+                        # Verify ID was actually assigned
+                        if keep_record.id is None:
+                            raise ValueError(
+                                f"Failed to assign ID to keep_record after flush for {email}. "
+                                f"This indicates a database constraint violation or connection issue."
+                            )
+                        logger.info(f"    💾 Flushed keep_record to get ID: {keep_record.id}")
+                    except Exception as flush_error:
+                        logger.error(
+                            f"    ❌ Failed to flush keep_record for {email}: {flush_error}. "
+                            f"Cannot safely merge duplicates without valid ID."
+                        )
+                        # Re-raise to prevent FK updates with NULL ID
+                        raise
+
                 logger.info(f"    🔗 Updating {len(survey_periods)} survey_periods to reference ID={keep_record.id}")
                 for period in survey_periods:
                     period.user_correlation_id = keep_record.id
