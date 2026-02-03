@@ -26,6 +26,18 @@ from starlette.routing import Mount, Route
 # SSE heartbeat interval (seconds) - prevents proxy timeout
 # ALB default idle timeout is 60s, most proxies are 30-120s
 # 30s keeps connections alive without excessive overhead
+#
+# Note: FastMCP's SSE transport doesn't expose ping_interval configuration.
+# For Streamable HTTP (stateless mode), heartbeat is less critical since
+# each request is independent. SSE long-polling is where heartbeat matters.
+#
+# Custom heartbeat implementation options:
+# 1. SSE comment format: ": heartbeat\n\n" (transparent to MCP protocol)
+# 2. Use ALB idle timeout > 30s to avoid premature connection close
+# 3. Configure proxy keep-alive settings at infrastructure level
+#
+# Current approach: Rely on infrastructure-level keep-alive (Phase 9).
+# For production, configure ALB target group idle timeout to 120s.
 SSE_HEARTBEAT_INTERVAL = 30
 
 # CORS configuration for web-based MCP clients
