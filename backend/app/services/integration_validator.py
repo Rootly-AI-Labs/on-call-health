@@ -176,7 +176,8 @@ class IntegrationValidator:
         email: Optional[str] = None
     ) -> Dict[str, Any]:
         """Validate Jira API Token (requires email for Basic Auth)."""
-        logger.info(f"Jira validation: token_len={len(token) if token else 0}, site_url={site_url}, email={email}")
+        redacted_email = f"***@{email.split('@')[1]}" if email and '@' in email else "[invalid]"
+        logger.info(f"Jira validation: token_len={len(token) if token else 0}, site_url={site_url}, email={redacted_email}")
 
         # Format validation
         if not token or not token.strip():
