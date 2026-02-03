@@ -93,7 +93,7 @@ export function LinearManualSetupForm({ form, onSave, onClose }: LinearManualSet
       <CardHeader className="p-8">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-neutral-100 rounded-lg flex items-center justify-center">
-            <Image src="/images/linear-logo-dark.png" alt="Linear" width={24} height={24} quality={100} />
+            <Image src="/images/linear-logo.png" alt="Linear" width={24} height={24} quality={100} />
           </div>
           <div className="flex-1">
             <CardTitle>Connect Linear with API Key</CardTitle>
