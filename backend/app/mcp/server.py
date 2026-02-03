@@ -26,15 +26,16 @@ mcp_server = FastMCP("On-Call Health")
 
 def _resolve_asgi_app(server: Any) -> Any:
     """Resolve ASGI app from FastMCP server, supporting multiple API versions."""
+    # Try modern FastMCP 2.x+ API first
+    if hasattr(server, "http_app"):
+        return server.http_app()
+    # Legacy FastMCP 1.x API (deprecated)
     if hasattr(server, "app"):
         return server.app
     if hasattr(server, "asgi_app"):
         return server.asgi_app()
-    # FastMCP uses streamable_http_app(), http_app(), or sse_app()
     if hasattr(server, "streamable_http_app"):
         return server.streamable_http_app()
-    if hasattr(server, "http_app"):
-        return server.http_app()
     if hasattr(server, "sse_app"):
         return server.sse_app()
     raise RuntimeError("FastMCP does not expose an ASGI app")

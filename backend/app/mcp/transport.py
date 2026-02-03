@@ -116,15 +116,13 @@ def _create_mcp_http_app() -> Starlette:
     # and maintain lazy loading pattern from __init__.py
     from app.mcp.server import mcp_server
 
-    # Get transport apps from FastMCP
-    # mcp 1.x provides streamable_http_app() and sse_app() methods
-    # These apps define their own routes at /mcp and /sse respectively
-    streamable_http = mcp_server.streamable_http_app()
-    sse_transport = mcp_server.sse_app()
+    # Get HTTP app from FastMCP
+    # FastMCP 2.x provides http_app() which includes all transport routes
+    http_app = mcp_server.http_app()
 
     # Create lifespan that initializes the session managers
-    # The streamable HTTP transport requires a task group to be running
-    # Access session_manager from mcp_server (created lazily by streamable_http_app())
+    # The HTTP transport requires a task group to be running
+    # Access session_manager from mcp_server (created lazily by http_app())
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncIterator[None]:
         """Initialize MCP transport session managers."""
@@ -136,16 +134,13 @@ def _create_mcp_http_app() -> Starlette:
             yield
         logger.info("MCP transport shut down")
 
-    # Create composite Starlette app by combining routes from all transports
-    # Extract routes from each transport app and include in main app
-    # This ensures all routes are properly matched at the top level
+    # Create composite Starlette app by combining routes from FastMCP and custom health check
+    # Extract routes from http_app and add our health check
     routes = [
         Route("/health", health_check, methods=["GET"]),
     ]
-    # Add routes from streamable HTTP transport (provides /mcp)
-    routes.extend(streamable_http.routes)
-    # Add routes from SSE transport (provides /sse and /messages)
-    routes.extend(sse_transport.routes)
+    # Add routes from HTTP app (provides all MCP endpoints)
+    routes.extend(http_app.routes)
 
     # Build middleware list
     # Infrastructure middleware runs first (connection/rate limits) if available,
@@ -162,7 +157,7 @@ def _create_mcp_http_app() -> Starlette:
     )
 
     logger.info(
-        "MCP transport initialized: /health, /mcp (streamable HTTP), /sse (legacy)"
+        "MCP transport initialized: /health, MCP HTTP endpoints"
     )
 
     return app
