@@ -147,7 +147,6 @@ export default function useDashboard() {
         } else {
           toast.error("Failed to cancel analysis")
         }
-        }
       }
     } catch (error) {
       console.error('Error canceling analysis:', error)
