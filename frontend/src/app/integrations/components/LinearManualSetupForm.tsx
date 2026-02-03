@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -14,18 +15,19 @@ import { StatusIndicator } from "./StatusIndicator";
 
 interface LinearManualSetupFormData {
   token: string;
-  nickname?: string;
 }
 
 interface LinearManualSetupFormProps {
   form: UseFormReturn<LinearManualSetupFormData>;
-  onSave: (data: { token: string; nickname?: string; userInfo?: { displayName: string | null; email: string | null } }) => Promise<void>;
-  isSaving: boolean;
+  onSave: (data: { token: string; userInfo?: { displayName: string | null; email: string | null } }) => Promise<boolean>;
+  onClose: () => void;
 }
 
-export function LinearManualSetupForm({ form, onSave, isSaving }: LinearManualSetupFormProps) {
+export function LinearManualSetupForm({ form, onSave, onClose }: LinearManualSetupFormProps) {
   const [showInstructions, setShowInstructions] = useState(false);
   const [showToken, setShowToken] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveAttempted = useRef(false);
 
   const {
     status,
@@ -48,13 +50,42 @@ export function LinearManualSetupForm({ form, onSave, isSaving }: LinearManualSe
     }
   }, [tokenValue, validateToken]);
 
-  const handleSave = async () => {
-    if (!isConnected) return;
-    await onSave({
-      token: tokenValue,
-      nickname: form.getValues("nickname"),
-      userInfo,
-    });
+  // Reset save attempt flag when token changes
+  useEffect(() => {
+    saveAttempted.current = false;
+  }, [tokenValue]);
+
+  // Auto-save when validation succeeds
+  useEffect(() => {
+    const shouldSave = isConnected && userInfo && !isSaving && !saveAttempted.current;
+
+    if (shouldSave) {
+      saveAttempted.current = true;
+      handleAutoSave();
+    }
+  }, [isConnected, userInfo, isSaving]);
+
+  const handleAutoSave = async () => {
+    setIsSaving(true);
+    try {
+      const success = await onSave({
+        token: tokenValue,
+        userInfo,
+      });
+
+      if (success) {
+        toast.success("Linear connected!", { duration: 3000 });
+        onClose();
+      } else {
+        // Save failed, allow retry
+        saveAttempted.current = false;
+      }
+    } catch (error) {
+      toast.error("Failed to save integration");
+      saveAttempted.current = false;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -86,13 +117,15 @@ export function LinearManualSetupForm({ form, onSave, isSaving }: LinearManualSe
             <div className="mt-4">
               <Alert className="border-neutral-200 bg-neutral-50">
                 <AlertDescription>
-                  <ol className="space-y-2 text-sm">
-                    <li><strong>1.</strong> In Linear, go to <strong>Settings</strong> (gear icon)</li>
-                    <li><strong>2.</strong> Navigate to <strong>API</strong> section</li>
-                    <li><strong>3.</strong> Under <strong>Personal API Keys</strong>, click <strong>Create key</strong></li>
-                    <li><strong>4.</strong> Give it a label (e.g., "On-Call Health") and click <strong>Create</strong></li>
-                    <li><strong>5.</strong> Copy the generated key (starts with <code className="bg-neutral-100 px-1 rounded">lin_api_</code>)</li>
-                  </ol>
+                  <a
+                    href="https://linear.app/settings/api"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-neutral-600 hover:text-neutral-700"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Create your API key at Linear
+                  </a>
                 </AlertDescription>
               </Alert>
             </div>
@@ -145,34 +178,20 @@ export function LinearManualSetupForm({ form, onSave, isSaving }: LinearManualSe
 
             {/* Success Status */}
             {isConnected && userInfo && (
-              <>
-                <Alert className="border-green-200 bg-green-50">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    <div className="space-y-2">
-                      <p className="font-semibold">API key validated!</p>
-                      <div className="space-y-1 text-sm">
-                        {userInfo.displayName && <p><span className="font-medium">Name:</span> {userInfo.displayName}</p>}
-                        {userInfo.email && <p><span className="font-medium">Email:</span> {userInfo.email}</p>}
-                      </div>
+              <Alert className="border-green-200 bg-green-50">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  <div className="space-y-2">
+                    <p className="font-semibold">
+                      {isSaving ? "Saving..." : "API key validated!"}
+                    </p>
+                    <div className="space-y-1 text-sm">
+                      {userInfo.displayName && <p><span className="font-medium">Name:</span> {userInfo.displayName}</p>}
+                      {userInfo.email && <p><span className="font-medium">Email:</span> {userInfo.email}</p>}
                     </div>
-                  </AlertDescription>
-                </Alert>
-
-                <FormField
-                  control={form.control}
-                  name="nickname"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Integration Name (optional)</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder={`Linear - ${userInfo.displayName || "Your Workspace"}`} />
-                      </FormControl>
-                      <FormDescription>Give this integration a custom name</FormDescription>
-                    </FormItem>
-                  )}
-                />
-              </>
+                  </div>
+                </AlertDescription>
+              </Alert>
             )}
 
             {/* Error Status */}
@@ -197,28 +216,6 @@ export function LinearManualSetupForm({ form, onSave, isSaving }: LinearManualSe
                   </div>
                 </AlertDescription>
               </Alert>
-            )}
-
-            {/* Save Button - only enabled when validation passes */}
-            {isConnected && (
-              <Button
-                type="button"
-                onClick={handleSave}
-                disabled={isSaving}
-                className="bg-black hover:bg-neutral-800 w-full"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Save Integration
-                  </>
-                )}
-              </Button>
             )}
           </form>
         </Form>
