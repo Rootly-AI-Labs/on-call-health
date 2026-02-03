@@ -252,11 +252,12 @@ class IntegrationValidator:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 # Use GraphQL viewer query to validate token and get user info
-                # Linear Personal API Keys use Bearer authentication (same as OAuth)
+                # IMPORTANT: Linear API Keys do NOT use Bearer prefix (only OAuth tokens do)
+                # See: https://developers.linear.app/docs/graphql/working-with-the-graphql-api
                 response = await client.post(
                     "https://api.linear.app/graphql",
                     headers={
-                        "Authorization": f"Bearer {token}",
+                        "Authorization": token,  # API keys: no Bearer prefix
                         "Content-Type": "application/json"
                     },
                     json={
