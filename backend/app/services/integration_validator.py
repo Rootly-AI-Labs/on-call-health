@@ -201,6 +201,8 @@ class IntegrationValidator:
                     }
                 )
 
+                logger.info(f"Jira API response: status={response.status_code}, body={response.text[:500]}")
+
                 if response.status_code == 200:
                     data = response.json()
                     return {
@@ -214,13 +216,15 @@ class IntegrationValidator:
                         }
                     }
                 elif response.status_code == 401:
+                    logger.warning(f"Jira 401: {response.text[:300]}")
                     error = get_error_response("jira", "authentication")
                     return {"valid": False, **error}
                 elif response.status_code == 403:
+                    logger.warning(f"Jira 403: {response.text[:300]}")
                     error = get_error_response("jira", "permissions")
                     return {"valid": False, **error}
                 else:
-                    logger.warning(f"Jira validation returned status {response.status_code}")
+                    logger.warning(f"Jira validation returned status {response.status_code}: {response.text[:300]}")
                     error = get_error_response("jira", "authentication")
                     return {"valid": False, **error}
 
