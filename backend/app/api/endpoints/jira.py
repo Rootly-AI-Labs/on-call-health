@@ -354,6 +354,29 @@ async def connect_jira_manual(
             detail="Jira site URL is required"
         )
 
+    # Validate and normalize site_url format
+    from urllib.parse import urlparse
+    site_url = site_url.strip()
+
+    # Ensure it has a scheme
+    if not site_url.startswith(("http://", "https://")):
+        site_url = f"https://{site_url}"
+
+    try:
+        parsed = urlparse(site_url)
+        if not parsed.netloc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Jira site URL format"
+            )
+        # Reconstruct clean URL
+        site_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip("/")
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Jira site URL format"
+        )
+
     # Backend re-validates token (never trust client validation)
     from ...services.integration_validator import IntegrationValidator
     validator = IntegrationValidator(db)
@@ -376,10 +399,9 @@ async def connect_jira_manual(
     # Validation succeeded - encrypt and save token
     logger.info(f"[Jira] Saving manual token for user {current_user.id}")
 
-    # Normalize site_url (strip https://)
-    normalized_site_url = site_url.strip().rstrip("/")
-    if normalized_site_url.startswith("https://"):
-        normalized_site_url = normalized_site_url.replace("https://", "")
+    # Normalize site_url for storage (strip scheme and trailing slashes)
+    parsed = urlparse(site_url)
+    normalized_site_url = f"{parsed.netloc}{parsed.path}".rstrip("/")
 
     # Encrypt token using Fernet
     enc_token = encrypt_token(token)
