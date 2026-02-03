@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Catch exhaustion before it burns out team members by analyzing cross-platform activity patterns, on-call load, and workload distribution.
-**Current focus:** Phase 4 - Linear Token Integration (Complete)
+**Current focus:** Phase 5 - User Experience (In progress)
 
 ## Current Position
 
-Phase: 4 of 5 (Linear Token Integration)
-Plan: 2 of 2 (Phase complete)
-Status: Phase 4 complete
-Last activity: 2026-02-03 - Completed Phase 4
+Phase: 5 of 5 (User Experience)
+Plan: 1 of 3 (In progress)
+Status: In progress
+Last activity: 2026-02-02 - Completed 05-01-PLAN.md
 
-Progress: [████████████████████] 100%
+Progress: [████████████████████░] 92%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 2.7 min
-- Total execution time: 0.45 hours
+- Total plans completed: 11
+- Average duration: 2.8 min
+- Total execution time: 0.52 hours
 
 **By Phase:**
 
@@ -31,9 +31,10 @@ Progress: [████████████████████] 100%
 | 02-validation-infrastructure | 4/4 | 14 min | 3.5 min |
 | 03-jira-token-integration | 2/2 | 6 min | 3.0 min |
 | 04-linear-token-integration | 2/2 | 5 min | 2.5 min |
+| 05-user-experience | 1/3 | 4 min | 4.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-02 (4 min), 04-01 (1 min), 03-02 (4 min), 03-01 (2 min), 02-04 (5 min)
+- Last 5 plans: 05-01 (4 min), 04-02 (4 min), 04-01 (1 min), 03-02 (4 min), 03-01 (2 min)
 - Trend: Consistent 1-5 min per plan
 
 *Updated after each plan completion*
@@ -86,6 +87,11 @@ Recent decisions affecting current work:
 | Help section simplified to single Linear API settings link | 04-02 | Implemented |
 | Form shows 'Saving...' status during auto-save | 04-02 | Implemented |
 | Nickname field removed (not needed for API token flow) | 04-02 | Implemented |
+| Auth method badge always visible (not in dropdown) for immediate visibility | 05-01 | Implemented |
+| Switch button hidden when token has error (clean state required) | 05-01 | Implemented |
+| Disconnect button moved to footer alongside switch button | 05-01 | Implemented |
+| Blue color for OAuth badge (RefreshCw icon indicates auto-renewal) | 05-01 | Implemented |
+| Neutral gray for API Token badge (Key icon) | 05-01 | Implemented |
 | Support tokens alongside OAuth (not replacement) | - | Implemented |
 | Trust user for token permissions | - | Implemented |
 | Validate token works, not permissions | - | Implemented |
@@ -102,8 +108,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-03T01:59:02Z
-Stopped at: Completed Phase 4 (Linear Token Integration)
+Last session: 2026-02-02T22:39:34Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
 
-**Phase 4 complete - ready for Phase 5 planning**
+**Phase 5 Plan 1 complete - Auth method visibility components created**
