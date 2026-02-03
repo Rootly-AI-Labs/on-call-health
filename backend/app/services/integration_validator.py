@@ -148,6 +148,7 @@ class IntegrationValidator:
         provider: str,
         token: str,
         site_url: Optional[str] = None,
+        email: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Validate a manual API token before saving to database.
 
@@ -155,13 +156,14 @@ class IntegrationValidator:
             provider: 'jira' or 'linear'
             token: The API token to validate (plaintext, not encrypted)
             site_url: Jira site URL (required for Jira, ignored for Linear)
+            email: User's email (required for Jira API token Basic Auth)
 
         Returns:
             Dict with 'valid' (bool), 'error' (str), 'error_type' (str),
             and optional 'user_info' (dict with display_name, email)
         """
         if provider == "jira":
-            return await self._validate_jira_manual_token(token, site_url)
+            return await self._validate_jira_manual_token(token, site_url, email)
         elif provider == "linear":
             return await self._validate_linear_manual_token(token)
         else:
@@ -170,10 +172,11 @@ class IntegrationValidator:
     async def _validate_jira_manual_token(
         self,
         token: str,
-        site_url: Optional[str]
+        site_url: Optional[str],
+        email: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Validate Jira Personal Access Token."""
-        logger.info(f"Jira validation: token_len={len(token) if token else 0}, site_url={site_url}")
+        """Validate Jira API Token (requires email for Basic Auth)."""
+        logger.info(f"Jira validation: token_len={len(token) if token else 0}, site_url={site_url}, email={email}")
 
         # Format validation
         if not token or not token.strip():
@@ -184,6 +187,12 @@ class IntegrationValidator:
         if not site_url or not site_url.strip():
             logger.warning("Jira validation failed: empty site_url")
             error = get_error_response("jira", "site_url")
+            return {"valid": False, **error}
+
+        if not email or not email.strip():
+            logger.warning("Jira validation failed: empty email")
+            error = get_error_response("jira", "format")
+            error["error"] = "Email is required for Jira API token authentication"
             return {"valid": False, **error}
 
         # Normalize site URL
@@ -199,12 +208,16 @@ class IntegrationValidator:
         token = token.strip()
 
         try:
+            # Jira API tokens use Basic Auth: base64(email:api_token)
+            import base64
+            credentials = base64.b64encode(f"{email}:{token}".encode()).decode()
+
             async with httpx.AsyncClient(timeout=10.0) as client:
                 # Use /myself endpoint to validate token and get user info
                 response = await client.get(
                     f"{site_url}/rest/api/3/myself",
                     headers={
-                        "Authorization": f"Bearer {token}",
+                        "Authorization": f"Basic {credentials}",
                         "Accept": "application/json"
                     }
                 )

@@ -13,6 +13,7 @@ interface UseValidationOptions {
 interface ValidateTokenParams {
   token: string;
   siteUrl?: string; // Required for Jira
+  email?: string; // Required for Jira API token auth
 }
 
 export function useValidation({ provider, debounceMs = 500 }: UseValidationOptions) {
@@ -26,7 +27,7 @@ export function useValidation({ provider, debounceMs = 500 }: UseValidationOptio
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const validateToken = useCallback(
-    async ({ token, siteUrl }: ValidateTokenParams): Promise<ValidationResult> => {
+    async ({ token, siteUrl, email }: ValidateTokenParams): Promise<ValidationResult> => {
       // Cancel any pending validation
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -55,6 +56,16 @@ export function useValidation({ provider, debounceMs = 500 }: UseValidationOptio
         return { valid: false, error: "Jira site URL is required", error_type: "site_url" };
       }
 
+      // For Jira, email is required for API token auth
+      if (provider === "jira" && (!email || !email.trim())) {
+        setState({
+          status: "error",
+          error: "Email is required for Jira API token authentication",
+          errorType: "format",
+        });
+        return { valid: false, error: "Email is required for Jira API token authentication", error_type: "format" };
+      }
+
       // Set validating state
       setState({
         status: "validating",
@@ -70,7 +81,7 @@ export function useValidation({ provider, debounceMs = 500 }: UseValidationOptio
           try {
             const endpoint = `${API_BASE}/integrations/${provider}/validate-token`;
             const body = provider === "jira"
-              ? { token, site_url: siteUrl }
+              ? { token, site_url: siteUrl, email }
               : { token };
 
             const authToken = localStorage.getItem('auth_token');

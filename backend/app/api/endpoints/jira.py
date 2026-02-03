@@ -340,6 +340,7 @@ async def connect_jira_manual(
     body = await request.json()
     token = body.get("token")
     site_url = body.get("site_url")
+    email = body.get("email")
     user_info = body.get("user_info")
 
     if not token:
@@ -352,6 +353,12 @@ async def connect_jira_manual(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Jira site URL is required"
+        )
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is required for Jira API token authentication"
         )
 
     # Validate and normalize site_url format
@@ -383,7 +390,8 @@ async def connect_jira_manual(
     result = await validator.validate_manual_token(
         provider="jira",
         token=token,
-        site_url=site_url
+        site_url=site_url,
+        email=email
     )
 
     if not result.get("valid"):
@@ -599,6 +607,7 @@ async def validate_jira_token(
     body = await request.json()
     token = body.get("token")
     site_url = body.get("site_url")
+    email = body.get("email")
 
     if not token:
         return {
@@ -614,12 +623,20 @@ async def validate_jira_token(
             "error_type": "site_url"
         }
 
+    if not email:
+        return {
+            "valid": False,
+            "error": "Email is required for Jira API token authentication",
+            "error_type": "format"
+        }
+
     from ...services.integration_validator import IntegrationValidator
     validator = IntegrationValidator(db)
     result = await validator.validate_manual_token(
         provider="jira",
         token=token,
-        site_url=site_url
+        site_url=site_url,
+        email=email
     )
 
     logger.info(
