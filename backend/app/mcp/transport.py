@@ -9,7 +9,9 @@ Stateless mode is enabled for horizontal scaling behind load balancers.
 """
 from __future__ import annotations
 
+import contextlib
 import logging
+from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 
 from starlette.applications import Starlette
@@ -47,16 +49,38 @@ def _create_mcp_http_app() -> Starlette:
 
     # Get transport apps from FastMCP
     # mcp 1.x provides streamable_http_app() and sse_app() methods
+    # These apps define their own routes at /mcp and /sse respectively
     streamable_http = mcp_server.streamable_http_app()
     sse_transport = mcp_server.sse_app()
 
-    # Create composite Starlette app with all routes
+    # Create lifespan that initializes the session managers
+    # The streamable HTTP transport requires a task group to be running
+    # Access session_manager from mcp_server (created lazily by streamable_http_app())
+    @contextlib.asynccontextmanager
+    async def lifespan(app: Starlette) -> AsyncIterator[None]:
+        """Initialize MCP transport session managers."""
+        logger.info("Starting MCP transport session managers")
+        # Get the session manager from mcp_server (public property)
+        session_manager = mcp_server.session_manager
+        async with session_manager.run():
+            logger.info("MCP transport ready")
+            yield
+        logger.info("MCP transport shut down")
+
+    # Create composite Starlette app by combining routes from all transports
+    # Extract routes from each transport app and include in main app
+    # This ensures all routes are properly matched at the top level
+    routes = [
+        Route("/health", health_check, methods=["GET"]),
+    ]
+    # Add routes from streamable HTTP transport (provides /mcp)
+    routes.extend(streamable_http.routes)
+    # Add routes from SSE transport (provides /sse and /messages)
+    routes.extend(sse_transport.routes)
+
     app = Starlette(
-        routes=[
-            Route("/health", health_check, methods=["GET"]),
-            Mount("/mcp", app=streamable_http),
-            Mount("/sse", app=sse_transport),
-        ]
+        routes=routes,
+        lifespan=lifespan,
     )
 
     logger.info(
