@@ -8,7 +8,7 @@ Finds correlations and patterns across different data sources:
 - Weekend work patterns across platforms
 """
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import statistics
 import logging
 

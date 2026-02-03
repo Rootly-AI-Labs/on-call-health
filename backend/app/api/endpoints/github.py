@@ -12,7 +12,7 @@ import os
 import logging
 from cryptography.fernet import Fernet
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 
 from ...models import get_db, User, GitHubIntegration, UserCorrelation
@@ -128,7 +128,7 @@ async def github_callback(
             existing_integration.github_username = github_username
             existing_integration.organizations = org_names
             existing_integration.token_source = "oauth"
-            existing_integration.updated_at = datetime.utcnow()
+            existing_integration.updated_at = datetime.now(timezone.utc)
             integration = existing_integration
         else:
             # Create new integration
@@ -523,7 +523,7 @@ async def connect_github_with_token(
             existing_integration.github_username = github_username
             existing_integration.organizations = org_names
             existing_integration.token_source = "manual"
-            existing_integration.updated_at = datetime.utcnow()
+            existing_integration.updated_at = datetime.now(timezone.utc)
             integration = existing_integration
         else:
             # Create new integration

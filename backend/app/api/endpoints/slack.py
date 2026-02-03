@@ -11,7 +11,7 @@ import os
 import urllib.parse
 from cryptography.fernet import Fernet
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 
 from ...models import get_db, User, SlackIntegration, UserCorrelation, UserBurnoutReport, Analysis, SlackWorkspaceMapping
@@ -341,7 +341,7 @@ async def slack_oauth_callback(
         if slack_integration:
             # Update existing OAuth integration
             slack_integration.slack_token = encrypt_token(access_token)
-            slack_integration.updated_at = datetime.utcnow()
+            slack_integration.updated_at = datetime.now(timezone.utc)
         else:
             # Create new OAuth integration (won't conflict with manual integrations)
             slack_integration = SlackIntegration(
@@ -1159,8 +1159,8 @@ async def handle_oncall_health_command(
             }
 
         # Check for existing survey response today (match by email)
-        from datetime import datetime
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        from datetime import datetime, timezone
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
         existing_report = db.query(UserBurnoutReport).filter(
             UserBurnoutReport.email == user_correlation.email,
@@ -1316,8 +1316,8 @@ async def handle_slack_interactions(
                     trigger_id = data.get("trigger_id")
 
                     # Check for existing report today (match by email)
-                    from datetime import datetime
-                    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                    from datetime import datetime, timezone
+                    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
                     # Try to get user account if user_id is available
                     user = None
@@ -1441,8 +1441,8 @@ async def handle_slack_interactions(
                     return {"response_action": "errors", "errors": {"comments_block": "Error submitting survey. Please try again."}}
 
                 # Check if user already submitted today (within last 24 hours)
-                from datetime import datetime, timedelta
-                today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                from datetime import datetime, timedelta, timezone
+                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
                 # Try to get user account if user_id is available
                 user = None
@@ -1486,7 +1486,7 @@ async def handle_slack_interactions(
                     existing_report.email = report_email  # Refresh email in case it changed
                     existing_report.email_domain = email_domain  # Refresh email_domain
                     existing_report.user_id = user_id  # Update user_id if they created an account
-                    existing_report.updated_at = datetime.utcnow()
+                    existing_report.updated_at = datetime.now(timezone.utc)
                     logging.info(f"Updated existing report ID {existing_report.id} for email {report_email}")
                     is_update = True
                 else:
@@ -1503,7 +1503,7 @@ async def handle_slack_interactions(
                         personal_circumstances=personal_circumstances,
                         additional_comments=comments,
                         submitted_via='slack',
-                        submitted_at=datetime.utcnow()
+                        submitted_at=datetime.now(timezone.utc)
                     )
                     db.add(new_report)
                     logging.info(f"Created new report for email {report_email} (user_id={user_id})")

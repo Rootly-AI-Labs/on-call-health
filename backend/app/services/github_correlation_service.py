@@ -4,7 +4,7 @@ This fixes the issue where only top_contributors (5 users) were used instead of 
 """
 import logging
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 

@@ -3,7 +3,7 @@ Enhanced GitHub collector that records mapping data with smart caching.
 """
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, TYPE_CHECKING
 
 from .mapping_recorder import MappingRecorder

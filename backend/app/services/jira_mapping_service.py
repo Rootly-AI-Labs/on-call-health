@@ -8,7 +8,7 @@ Mirrors GitHub mapping service:
 - Records auto-detected mappings to IntegrationMapping table for analysis tracking
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy.orm import Session
 from difflib import SequenceMatcher
@@ -140,13 +140,13 @@ class JiraMappingService:
 
     def _get_mapping_age_days(self, mapping) -> int:
         """Get age of mapping in days."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         age = now - mapping.created_at
         return age.days
 
     def _get_mapping_age_hours(self, mapping) -> int:
         """Get age of mapping in hours."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         age = now - mapping.created_at
         return int(age.total_seconds() / 3600)
 

@@ -613,7 +613,7 @@ def get_user_survey_results(
         )
 
     # Get survey results from the last N days
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
 
     results = db.query(UserBurnoutReport).filter(
         UserBurnoutReport.user_id == user_id,

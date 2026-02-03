@@ -5,7 +5,7 @@ This module provides standardized scoring for platform integrations (Rootly, Pag
 to ensure consistent evaluation across different data sources and integration quality.
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum

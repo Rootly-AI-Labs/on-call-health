@@ -5,7 +5,7 @@ Slack data collector for web app burnout analysis.
 import json
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 from collections import defaultdict
@@ -1085,7 +1085,7 @@ async def process_slack_messages_with_name_correlation(messages: List[str], days
             if time_match:
                 time_str = time_match.group(1)
                 try:
-                    from datetime import datetime
+                    from datetime import datetime, timezone
                     # Parse time (simplified - assumes today's date)
                     time_obj = datetime.strptime(time_str, '%I:%M %p')
                     hour = time_obj.hour

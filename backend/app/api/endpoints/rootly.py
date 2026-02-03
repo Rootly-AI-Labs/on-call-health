@@ -2,7 +2,7 @@
 Rootly integration API endpoints.
 """
 from typing import Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import os
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
@@ -222,8 +222,8 @@ async def add_rootly_integration(
         total_users=total_users,
         is_default=is_first_integration,  # First integration becomes default
         is_active=True,
-        created_at=datetime.utcnow(),
-        last_used_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        last_used_at=datetime.now(timezone.utc),
         cached_permissions=permissions,  # Cache permissions from preview
         permissions_checked_at=datetime.now(timezone.utc)  # Set cache timestamp
     )
@@ -1315,7 +1315,7 @@ async def get_oncall_users(
     Used to highlight on-call users when selecting survey recipients.
     """
     try:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         from app.core.rootly_client import RootlyAPIClient
         from app.core.pagerduty_client import PagerDutyAPIClient
 
@@ -1436,7 +1436,7 @@ async def get_synced_users(
         oncall_cache_info = None
         if include_oncall_status and integration_id:
             try:
-                from datetime import datetime, timedelta
+                from datetime import datetime, timedelta, timezone
                 from app.core.rootly_client import RootlyAPIClient
                 from app.core.pagerduty_client import PagerDutyAPIClient
                 from app.core.oncall_cache import (

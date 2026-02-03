@@ -9,7 +9,7 @@ Analyzes GitHub activity patterns to detect code quality issues that may indicat
 """
 from typing import Dict, List, Any, Optional
 import statistics
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 try:

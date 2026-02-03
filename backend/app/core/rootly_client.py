@@ -13,7 +13,7 @@ Recommended settings:
 import asyncio
 import httpx
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional, Callable
 from urllib.parse import urlencode
 
