@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** MCP clients and automation tools can authenticate reliably without JWT token expiration or session coupling.
-**Current focus:** Phase 8 - API Key Authentication (MCP Integration)
+**Current focus:** Phase 8 - PyPI Distribution (Package Structure)
 
 ## Current Position
 
-Phase: 7 of 11 (Transport Implementation)
-Plan: 2 of 2 in current phase
-Status: Phase 7 complete
-Last activity: 2026-02-03 - Completed 07-02-PLAN.md (FastAPI Mount)
+Phase: 8 of 11 (PyPI Distribution)
+Plan: 1 of 2 in current phase
+Status: Plan 08-01 complete
+Last activity: 2026-02-02 - Completed 08-01-PLAN.md (Package Structure)
 
-Progress: [######----] 65% (v1.0 complete, Phase 5-7 complete)
+Progress: [######----] 68% (v1.0 complete, Phase 5-7 complete, 08-01 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14 (v1.0 + Phase 5 + Phase 6 + Phase 7)
-- Average duration: ~7min (Phase 5-7)
+- Total plans completed: 15 (v1.0 + Phase 5 + Phase 6 + Phase 7 + 08-01)
+- Average duration: ~7min (Phase 5-8)
 - Total execution time: N/A
 
 **By Phase:**
@@ -31,10 +31,11 @@ Progress: [######----] 65% (v1.0 complete, Phase 5-7 complete)
 | 5 (v1.1) | 2 | 17min | 8.5min |
 | 6 (v1.1) | 2 | 9min | 4.5min |
 | 7 (v1.1) | 2 | 23min | 11.5min |
+| 8 (v1.1) | 1/2 | 8min | 8min |
 
 **Recent Trend:**
-- Last 5 plans: 06-01 (4min), 06-02 (5min), 07-01 (18min), 07-02 (5min)
-- Trend: Phase 7 complete, ready for Phase 8 (API Key Auth + MCP)
+- Last 5 plans: 06-02 (5min), 07-01 (18min), 07-02 (5min), 08-01 (8min)
+- Trend: Phase 8 in progress, package structure complete
 
 *Updated after each plan completion*
 
@@ -63,6 +64,9 @@ Recent decisions affecting current work:
 - 07-02: CORS applied at transport level to avoid FastMCP conflicts
 - 07-02: SSE heartbeat documented for infrastructure-level config (Phase 9)
 - 07-02: mcp-session-id exposed for browser session tracking
+- 08-01: Package name oncallhealth-mcp with hatchling build backend
+- 08-01: CLI validates ONCALLHEALTH_API_KEY before starting
+- 08-01: Flexible dependency bounds (>=X.Y,<Z.0) for PyPI compatibility
 
 ### Pending Todos
 
@@ -74,6 +78,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-03
-Stopped at: Completed 07-02-PLAN.md (FastAPI Mount)
-Resume file: None (ready for Phase 8)
+Last session: 2026-02-02
+Stopped at: Completed 08-01-PLAN.md (Package Structure)
+Resume file: None (ready for 08-02)
