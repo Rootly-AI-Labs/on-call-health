@@ -147,14 +147,14 @@ class APIKeyService:
         return query.order_by(APIKey.created_at.desc()).all()
 
     def revoke_key(self, key_id: int, user_id: int) -> bool:
-        """Revoke an API key (soft delete).
+        """Revoke an API key (hard delete).
 
         Args:
             key_id: The API key ID
             user_id: The user's ID (for ownership verification)
 
         Returns:
-            True if key was revoked, False if not found
+            True if key was deleted, False if not found
         """
         api_key = self.db.query(APIKey).filter(
             APIKey.id == key_id,
@@ -165,12 +165,13 @@ class APIKeyService:
         if not api_key:
             return False
 
-        api_key.revoked_at = datetime.now(timezone.utc)
+        key_name = api_key.name
+        self.db.delete(api_key)
         self.db.commit()
 
         logger.info(
-            "Revoked API key '%s' (id=%d) for user_id=%d",
-            api_key.name, key_id, user_id
+            "Deleted API key '%s' (id=%d) for user_id=%d",
+            key_name, key_id, user_id
         )
 
         return True
