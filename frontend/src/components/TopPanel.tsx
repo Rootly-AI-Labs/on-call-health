@@ -165,6 +165,42 @@ export function TopPanel() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => {
+                      setShowAccountSettings(true)
+                      setIsDropdownOpen(false)
+                    }}
+                    className="cursor-pointer focus:bg-purple-100 focus:text-purple-900"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Account Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setShowTeamManagement(true)
+                      setIsDropdownOpen(false)
+                    }}
+                    className="cursor-pointer focus:bg-purple-100 focus:text-purple-900"
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    <span className="flex-1">Organization</span>
+                    {userInfo.role && (
+                      <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-200 text-purple-900 capitalize">
+                        {userInfo.role.replace('_', ' ')}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      router.push("/dashboard/api-keys")
+                      setIsDropdownOpen(false)
+                    }}
+                    className="cursor-pointer focus:bg-purple-100 focus:text-purple-900"
+                  >
+                    <Key className="w-4 h-4 mr-2" />
+                    API Keys
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
                       openGettingStarted()
                       setIsDropdownOpen(false)
                     }}
@@ -186,42 +222,6 @@ export function TopPanel() {
                   >
                     <FileText className="w-4 h-4 mr-2" />
                     Disclaimer
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setShowAccountSettings(true)
-                      setIsDropdownOpen(false)
-                    }}
-                    className="cursor-pointer focus:bg-purple-100 focus:text-purple-900"
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    Account Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      router.push("/dashboard/api-keys")
-                      setIsDropdownOpen(false)
-                    }}
-                    className="cursor-pointer focus:bg-purple-100 focus:text-purple-900"
-                  >
-                    <Key className="w-4 h-4 mr-2" />
-                    API Keys
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setShowTeamManagement(true)
-                      setIsDropdownOpen(false)
-                    }}
-                    className="cursor-pointer focus:bg-purple-100 focus:text-purple-900"
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    <span className="flex-1">Organization</span>
-                    {userInfo.role && (
-                      <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-200 text-purple-900 capitalize">
-                        {userInfo.role.replace('_', ' ')}
-                      </span>
-                    )}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
