@@ -19,9 +19,12 @@ from typing import TYPE_CHECKING
 
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
+
+from app.mcp.context import set_request_context
 
 # SSE heartbeat interval (seconds) - prevents proxy timeout
 # ALB default idle timeout is 60s, most proxies are 30-120s
@@ -93,6 +96,16 @@ except ImportError:
     )
 
 
+class RequestContextMiddleware(BaseHTTPMiddleware):
+    """Middleware to inject HTTP request into context for MCP tools."""
+
+    async def dispatch(self, request, call_next):
+        """Set request in context before calling next middleware/handler."""
+        set_request_context(request)
+        response = await call_next(request)
+        return response
+
+
 async def health_check(request: "Request") -> JSONResponse:
     """Health check endpoint for AWS ALB.
 
@@ -122,8 +135,9 @@ def _create_mcp_http_app() -> Starlette:
 
     # Create wrapper app with health endpoint and middleware
     # IMPORTANT: Must pass lifespan from mcp_http to ensure FastMCP's StreamableHTTPSessionManager initializes
-    # Build middleware list - order matters: infrastructure first, then CORS
+    # Build middleware list - order matters: request context first, then infrastructure, then CORS
     middleware_list = []
+    middleware_list.append(Middleware(RequestContextMiddleware))
     if infrastructure_middleware is not None:
         middleware_list.append(infrastructure_middleware)
     middleware_list.append(cors_middleware)
