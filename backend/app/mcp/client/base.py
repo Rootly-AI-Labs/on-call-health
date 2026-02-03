@@ -3,15 +3,32 @@ OnCallHealth REST API client with connection pooling and API key injection.
 
 Provides the core HTTP client that the MCP server uses to communicate with
 oncallhealth.ai APIs, replacing direct database access.
+
+Features:
+- Connection pooling with configurable limits
+- API key injection via event hooks
+- Automatic retry with exponential backoff for transient failures
+- Circuit breaker to prevent retry storms during outages
+- Connection pool health monitoring with automatic recovery
 """
 import logging
 import time
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 import httpx
+from aiobreaker import CircuitBreakerError
 
+from .circuit_breaker import CircuitBreakerOpenError, create_circuit_breaker
 from .config import ClientConfig
 from .exceptions import map_http_error_to_mcp
+from .retry import (
+    RETRYABLE_STATUS_CODES,
+    RetriableHTTPError,
+    create_retry_decorator,
+)
+
+if TYPE_CHECKING:
+    from .health import ConnectionPoolMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +42,9 @@ class OnCallHealthClient:
     - Configurable timeouts (connect, read, write, pool)
     - Automatic client recreation after max age (default 4 hours)
     - HTTP error mapping to typed MCP exceptions
+    - Automatic retry with exponential backoff for transient failures
+    - Circuit breaker to prevent retry storms during outages
+    - Connection pool health monitoring with automatic recovery
 
     Usage:
         async with OnCallHealthClient(api_key="...") as client:
@@ -36,6 +56,14 @@ class OnCallHealthClient:
             response = await client.get("/api/v1/users")
         finally:
             await client.close()
+
+        # With health monitoring:
+        client = OnCallHealthClient(api_key="...")
+        await client.start_health_monitor()
+        try:
+            response = await client.get("/api/v1/users")
+        finally:
+            await client.close()  # Automatically stops health monitor
     """
 
     def __init__(
@@ -53,6 +81,16 @@ class OnCallHealthClient:
         self.config = config or ClientConfig.from_env()
         self._client: Optional[httpx.AsyncClient] = None
         self._created_at: float = 0
+
+        # Create circuit breaker with configured settings
+        self._circuit_breaker = create_circuit_breaker(
+            name="oncallhealth-api",
+            fail_max=self.config.circuit_breaker_fail_max,
+            timeout_seconds=self.config.circuit_breaker_timeout_seconds,
+        )
+
+        # Health monitor (started explicitly)
+        self._health_monitor: Optional["ConnectionPoolMonitor"] = None
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the HTTP client with health check.
@@ -124,7 +162,12 @@ class OnCallHealthClient:
         path: str,
         **kwargs: Any,
     ) -> httpx.Response:
-        """Make HTTP request with automatic error mapping.
+        """Make HTTP request with retry, circuit breaker, and error mapping.
+
+        Requests are wrapped with:
+        1. Circuit breaker - fails fast when service is down
+        2. Retry with exponential backoff - handles transient failures
+        3. Error mapping - converts HTTP errors to typed MCP exceptions
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE, etc.)
@@ -135,16 +178,46 @@ class OnCallHealthClient:
             httpx.Response for successful requests (status < 400)
 
         Raises:
+            CircuitBreakerOpenError: When circuit breaker is open
             MCPError: For HTTP errors (status >= 400), mapped to appropriate subclass
         """
-        client = await self._get_client()
-        response = await client.request(method, path, **kwargs)
+        # Create retry decorator with configured settings
+        retry_decorator = create_retry_decorator(
+            max_retries=self.config.max_retries,
+            initial_wait=self.config.retry_initial_wait,
+            max_wait=self.config.retry_max_wait,
+            jitter=self.config.retry_jitter,
+        )
 
-        if response.status_code >= 400:
-            error = map_http_error_to_mcp(response)
-            raise error
+        @retry_decorator
+        async def _request_with_retry() -> httpx.Response:
+            """Inner function that handles retry logic."""
+            client = await self._get_client()
+            response = await client.request(method, path, **kwargs)
 
-        return response
+            # Check for retriable HTTP status codes
+            if response.status_code in RETRYABLE_STATUS_CODES:
+                logger.warning(
+                    f"Retriable status {response.status_code} for {method} {path}"
+                )
+                raise RetriableHTTPError(response)
+
+            # Map non-retriable errors to MCP exceptions (fail fast)
+            if response.status_code >= 400:
+                error = map_http_error_to_mcp(response)
+                raise error
+
+            return response
+
+        try:
+            # Wrap with circuit breaker
+            return await self._circuit_breaker.call_async(_request_with_retry)
+        except CircuitBreakerError as e:
+            # Convert to our custom error with recovery time
+            raise CircuitBreakerOpenError(
+                self._circuit_breaker.name,
+                e.time_remaining,
+            )
 
     async def get(self, path: str, **kwargs: Any) -> httpx.Response:
         """Make GET request.
@@ -206,8 +279,34 @@ class OnCallHealthClient:
         """
         return await self.request("DELETE", path, **kwargs)
 
+    async def start_health_monitor(self, check_interval: int = 60) -> None:
+        """Start connection pool health monitoring.
+
+        Creates a background task that periodically checks pool health
+        and triggers client recreation if degradation is detected.
+
+        Args:
+            check_interval: Seconds between health checks (default: 60)
+        """
+        if self._health_monitor is None:
+            # Lazy import to avoid circular dependency
+            from .health import ConnectionPoolMonitor
+
+            self._health_monitor = ConnectionPoolMonitor(self, check_interval)
+            await self._health_monitor.start()
+
+    async def stop_health_monitor(self) -> None:
+        """Stop health monitoring."""
+        if self._health_monitor is not None:
+            await self._health_monitor.stop()
+            self._health_monitor = None
+
     async def close(self) -> None:
-        """Close the HTTP client and release resources."""
+        """Close the HTTP client and release resources.
+
+        Also stops the health monitor if running.
+        """
+        await self.stop_health_monitor()
         if self._client is not None:
             await self._client.aclose()
             self._client = None
