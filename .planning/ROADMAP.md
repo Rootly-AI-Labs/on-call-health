@@ -95,10 +95,11 @@ Plans:
   2. User can disconnect existing OAuth integration and reconnect with API token without data loss
   3. User can disconnect existing API token integration and reconnect with OAuth without data loss
   4. Auth method indicators clearly distinguish OAuth (auto-renew) from Token (manual rotation)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] TBD after phase planning
+- [ ] 05-01-PLAN.md — Auth method badge, switch button, and switch dialog components
+- [ ] 05-02-PLAN.md — Wire switch flow with state management and data preservation messaging
 
 ## Progress
 
@@ -111,4 +112,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Validation Infrastructure | 4/4 | Complete | 2026-02-02 |
 | 3. Jira Token Integration | 2/2 | Complete | 2026-02-02 |
 | 4. Linear Token Integration | 2/2 | Complete | 2026-02-02 |
-| 5. User Experience | 0/TBD | Not started | - |
+| 5. User Experience | 0/2 | Not started | - |
