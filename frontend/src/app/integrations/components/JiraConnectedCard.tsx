@@ -8,14 +8,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, Zap, Loader2, ChevronDown, AlertTriangle } from "lucide-react"
+import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, Zap, Loader2, ChevronDown, AlertTriangle, ArrowLeftRight } from "lucide-react"
 import type { JiraIntegration, AuthMethod } from "../types"
 import { StatusIndicator } from "./StatusIndicator"
+import { AuthMethodBadge } from "./AuthMethodBadge"
 
 interface JiraConnectedCardProps {
   integration: JiraIntegration
   onDisconnect: () => void
   onTest: () => void
+  onSwitchAuth: () => void
   isLoading?: boolean
 }
 
@@ -23,6 +25,7 @@ export function JiraConnectedCard({
   integration,
   onDisconnect,
   onTest,
+  onSwitchAuth,
   isLoading = false
 }: JiraConnectedCardProps) {
   // Check if token is invalid
@@ -31,59 +34,49 @@ export function JiraConnectedCard({
   return (
     <Card className={`border-2 ${hasTokenError ? 'border-red-200 bg-red-50/50' : 'border-green-200 bg-green-50/50'} max-w-2xl mx-auto`}>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <svg
-                viewBox="0 0 24 24"
-                className="w-6 h-6 text-white"
-                fill="currentColor"
-              >
-                <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.232V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z"/>
-              </svg>
-            </div>
-            <div>
-              <CardTitle className="text-lg flex items-center space-x-2">
-                <span>Jira</span>
-                {hasTokenError ? (
-                  <StatusIndicator status="error" />
-                ) : (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <div className="cursor-pointer">
-                        <StatusIndicator
-                          status="connected"
-                          authMethod={integration.token_source as AuthMethod}
-                          className="hover:bg-green-200 transition-colors"
-                        />
-                        <ChevronDown className="w-3 h-3 ml-1 inline" />
-                      </div>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuItem onClick={onTest} disabled={isLoading}>
-                        {isLoading ? (
-                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                        ) : (
-                          <Zap className="w-3 h-3 mr-2" />
-                        )}
-                        Test Connection
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </CardTitle>
-              <p className="text-sm text-slate-600">Project management and issue tracking</p>
-            </div>
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+            <svg
+              viewBox="0 0 24 24"
+              className="w-6 h-6 text-white"
+              fill="currentColor"
+            >
+              <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.232V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z"/>
+            </svg>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onDisconnect}
-            disabled={isLoading}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-          >
-            <Trash2 className="w-5 h-5" />
-          </Button>
+          <div>
+            <CardTitle className="text-lg flex items-center space-x-2">
+              <span>Jira</span>
+              <AuthMethodBadge authMethod={integration.token_source as AuthMethod} />
+              {hasTokenError ? (
+                <StatusIndicator status="error" />
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <div className="cursor-pointer">
+                      <StatusIndicator
+                        status="connected"
+                        authMethod={integration.token_source as AuthMethod}
+                        className="hover:bg-green-200 transition-colors"
+                      />
+                      <ChevronDown className="w-3 h-3 ml-1 inline" />
+                    </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={onTest} disabled={isLoading}>
+                      {isLoading ? (
+                        <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                      ) : (
+                        <Zap className="w-3 h-3 mr-2" />
+                      )}
+                      Test Connection
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </CardTitle>
+            <p className="text-sm text-slate-600">Project management and issue tracking</p>
+          </div>
         </div>
       </CardHeader>
 
@@ -126,21 +119,6 @@ export function JiraConnectedCard({
               </div>
             </div>
           )}
-
-          <div className="flex items-center space-x-2">
-            <Key className="w-4 h-4 text-slate-400" />
-            <div>
-              <div className="font-medium">Auth Method</div>
-              <div className="text-slate-600 flex items-center space-x-1">
-                <span>{integration.token_source === 'manual' ? 'API Token' : 'OAuth 2.0'}</span>
-                {integration.supports_refresh && (
-                  <span title="Auto-refresh enabled">
-                    <CheckCircle className="w-3 h-3 text-green-500" />
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
 
           {integration.accessible_sites_count && integration.accessible_sites_count > 0 && (
             <div className="flex items-center space-x-2">
@@ -185,6 +163,32 @@ export function JiraConnectedCard({
           <div>
             We collect issue assignments, worklogs, time tracking, and project membership data to analyze workload patterns and identify risk of overwork.
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end space-x-2 pt-4 border-t">
+          {!hasTokenError && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSwitchAuth}
+              disabled={isLoading}
+              className="text-blue-600 border-blue-300 hover:bg-blue-50"
+            >
+              <ArrowLeftRight className="w-4 h-4 mr-2" />
+              Switch to {integration.token_source === 'oauth' ? 'API Token' : 'OAuth'}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDisconnect}
+            disabled={isLoading}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Disconnect
+          </Button>
         </div>
       </CardContent>
     </Card>

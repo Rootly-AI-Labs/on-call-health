@@ -482,6 +482,199 @@ async def validate_linear_token(
     return result
 
 
+@router.post("/connect-manual")
+async def connect_linear_manual(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save manually provided Linear API key with validation and encryption.
+
+    Request body:
+        token: str - The Linear Personal API Key (lin_api_...)
+        user_info: dict (optional) - User info from frontend validation
+
+    Returns:
+        Success response with integration details or error
+    """
+    body = await request.json()
+    token = body.get("token")
+    user_info = body.get("user_info")
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token is required"
+        )
+
+    # Backend re-validates token (never trust client validation)
+    from ...services.integration_validator import IntegrationValidator
+    validator = IntegrationValidator(db)
+    result = await validator.validate_manual_token(
+        provider="linear",
+        token=token
+    )
+
+    if not result.get("valid"):
+        logger.warning(
+            f"[Linear] Manual token validation failed for user {current_user.id}: "
+            f"{result.get('error_type')}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Token validation failed")
+        )
+
+    # Validation succeeded - encrypt and save token
+    logger.info(f"[Linear] Saving manual token for user {current_user.id}")
+    enc_token = encrypt_token(token)
+
+    # Get user info from validation result
+    validated_user_info = result.get("user_info", {})
+    linear_user_id = validated_user_info.get("linear_id")
+    linear_display_name = validated_user_info.get("display_name")
+    linear_email = validated_user_info.get("email")
+
+    # Get workspace info via GraphQL (required for LinearIntegration)
+    workspace_info = await linear_integration_oauth.get_organization(token)
+    workspace_id = workspace_info.get("id")
+    workspace_name = workspace_info.get("name")
+    workspace_url_key = workspace_info.get("urlKey")
+
+    if not workspace_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not get Linear organization info"
+        )
+
+    # Upsert integration
+    integration = db.query(LinearIntegration).filter(
+        LinearIntegration.user_id == current_user.id
+    ).first()
+
+    now = datetime.now(dt_timezone.utc)
+
+    if integration:
+        # Update existing integration
+        integration.access_token = enc_token
+        integration.token_source = "manual"
+        integration.token_expires_at = None  # Manual tokens don't auto-expire
+        integration.workspace_id = workspace_id
+        integration.workspace_name = workspace_name
+        integration.workspace_url_key = workspace_url_key
+        integration.linear_user_id = linear_user_id
+        integration.linear_display_name = linear_display_name
+        integration.linear_email = linear_email
+        integration.refresh_token = None  # Manual tokens don't have refresh
+        integration.pkce_code_verifier = None  # Clear any PKCE state
+        integration.updated_at = now
+        logger.info(f"[Linear] Updated existing integration for user {current_user.id}")
+    else:
+        # Create new integration
+        integration = LinearIntegration(
+            user_id=current_user.id,
+            access_token=enc_token,
+            token_source="manual",
+            token_expires_at=None,
+            workspace_id=workspace_id,
+            workspace_name=workspace_name,
+            workspace_url_key=workspace_url_key,
+            linear_user_id=linear_user_id,
+            linear_display_name=linear_display_name,
+            linear_email=linear_email,
+            refresh_token=None,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(integration)
+        logger.info(f"[Linear] Created new manual integration for user {current_user.id}")
+
+    # Create workspace mapping (same pattern as OAuth callback lines 233-258)
+    organization_id = current_user.organization_id
+    if organization_id:
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        stmt = pg_insert(LinearWorkspaceMapping).values(
+            workspace_id=workspace_id,
+            workspace_name=workspace_name,
+            workspace_url_key=workspace_url_key,
+            owner_user_id=current_user.id,
+            organization_id=organization_id,
+            registered_via="manual",
+            status="active",
+            collection_enabled=True,
+            workload_metrics_enabled=True,
+            granted_scopes=",".join(REQUESTED_SCOPES),
+        ).on_conflict_do_update(
+            index_elements=['workspace_id'],
+            set_=dict(
+                workspace_name=workspace_name,
+                workspace_url_key=workspace_url_key,
+                status="active",
+                organization_id=organization_id,
+            )
+        )
+        db.execute(stmt)
+        logger.info(f"[Linear] Created or updated workspace mapping for org {organization_id}")
+
+    # Correlate user (same pattern as OAuth callback lines 260-287)
+    if linear_email and linear_user_id and organization_id:
+        # Before assigning this Linear account, remove it from any other users
+        from ...services.manual_mapping_service import ManualMappingService
+        service = ManualMappingService(db)
+        service.remove_linear_from_all_other_users(
+            current_user.id,
+            linear_user_id
+        )
+
+        corr = db.query(UserCorrelation).filter(
+            UserCorrelation.organization_id == organization_id,
+            UserCorrelation.email == linear_email,
+        ).first()
+        if corr:
+            corr.linear_user_id = linear_user_id
+            corr.linear_email = linear_email
+        else:
+            db.add(
+                UserCorrelation(
+                    user_id=current_user.id,
+                    organization_id=organization_id,
+                    email=linear_email,
+                    name=linear_display_name,
+                    linear_user_id=linear_user_id,
+                    linear_email=linear_email,
+                )
+            )
+
+    # Commit to database
+    try:
+        db.commit()
+        db.refresh(integration)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Linear] Failed to save manual integration: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save integration"
+        )
+
+    logger.info(f"[Linear] Manual token saved for user {current_user.id}")
+
+    return {
+        "success": True,
+        "integration": {
+            "id": integration.id,
+            "token_source": "manual",
+            "token_valid": True,
+            "workspace_id": workspace_id,
+            "workspace_name": workspace_name,
+            "linear_user_id": linear_user_id,
+            "linear_display_name": linear_display_name,
+            "linear_email": linear_email,
+        }
+    }
+
+
 # -------------------------------
 # Teams
 # -------------------------------

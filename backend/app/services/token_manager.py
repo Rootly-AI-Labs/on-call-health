@@ -161,6 +161,10 @@ class TokenManager:
             logger.info(
                 f"[{provider}] Token already refreshed for user {integration.user_id}"
             )
+            # Note: There's a small theoretical window between checking expiry and
+            # returning the token where it could be invalidated. However, this is
+            # extremely rare and any issues would be caught by error handling in
+            # API calls that use the token, triggering a retry with fresh state.
             return decrypt_token(integration.access_token)
 
         provider = self._get_provider_name(integration)

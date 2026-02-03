@@ -5,34 +5,38 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Catch exhaustion before it burns out team members by analyzing cross-platform activity patterns, on-call load, and workload distribution.
-**Current focus:** Phase 2 - Validation Infrastructure
+**Current focus:** Phase 5 - User Experience (Complete)
 
 ## Current Position
 
-Phase: 2 of 3 (Validation Infrastructure)
-Plan: 3 of 4 (In progress)
-Status: In progress
-Last activity: 2026-02-02 - Completed 02-03-PLAN.md
+Milestone: v1.1 complete (archived 2026-02-03)
+Phase: Ready for next milestone
+Plan: —
+Status: Milestone v1.1 archived and shipped
+Last activity: 2026-02-03 - Archived v1.1 milestone
 
-Progress: [█████████████████░░░] 75%
+Progress: Awaiting next milestone definition
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 2.6 min
-- Total execution time: 0.22 hours
+- Total plans completed: 12
+- Average duration: 2.7 min
+- Total execution time: 0.57 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-backend-foundation | 2/2 | 5 min | 2.5 min |
-| 02-validation-infrastructure | 3/4 | 9 min | 3.0 min |
+| 02-validation-infrastructure | 4/4 | 14 min | 3.5 min |
+| 03-jira-token-integration | 2/2 | 6 min | 3.0 min |
+| 04-linear-token-integration | 2/2 | 5 min | 2.5 min |
+| 05-user-experience | 2/2 | 7 min | 3.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-03 (4 min), 02-02 (3 min), 02-01 (2 min), 01-02 (2 min), 01-01 (3 min)
-- Trend: Consistent 2-4 min per plan
+- Last 5 plans: 05-02 (3 min), 05-01 (4 min), 04-02 (4 min), 04-01 (1 min), 03-02 (4 min)
+- Trend: Consistent 1-4 min per plan
 
 *Updated after each plan completion*
 
@@ -63,11 +67,41 @@ Recent decisions affecting current work:
 | StatusIndicator shows auth method (OAuth vs API Token) in badge | 02-03 | Implemented |
 | Manual setup forms auto-validate as user types token | 02-03 | Implemented |
 | Save button only enabled after successful validation | 02-03 | Implemented |
-| Support tokens alongside OAuth (not replacement) | - | Pending |
-| Trust user for token permissions | - | Pending |
-| Validate token works, not permissions | - | Pending |
-| Use same encryption as OAuth tokens | - | Pending |
-| Show both options in modal | - | Pending |
+| Validation cache TTL set to 900 seconds (15 minutes) | 02-04 | Implemented |
+| Status endpoints trigger notifications only on validation failures | 02-04 | Implemented |
+| Token source field enables frontend to display OAuth vs API Token badges | 02-04 | Implemented |
+| Backend re-validates all tokens (never trust frontend validation) | 03-01 | Implemented |
+| Manual tokens set token_expires_at=None (no auto-expiry) | 03-01 | Implemented |
+| Background sync fires immediately via asyncio.create_task() | 03-01 | Implemented |
+| Error wrapper prevents background task exceptions from affecting save response | 03-01 | Implemented |
+| Auto-save triggers when validation succeeds (no manual Save button) | 03-02 | Implemented |
+| Dual buttons have equal visual weight via flex-1 styling | 03-02 | Implemented |
+| Help section simplified to single Atlassian API token link | 03-02 | Implemented |
+| Form shows 'Saving...' status during auto-save | 03-02 | Implemented |
+| Nickname field removed (not needed for API token flow) | 03-02 | Implemented |
+| Backend re-validates all Linear tokens (never trust client validation) | 04-01 | Implemented |
+| Linear manual tokens set token_expires_at=None (no auto-expiry) | 04-01 | Implemented |
+| Linear workspace info fetched via GraphQL before save | 04-01 | Implemented |
+| Linear account removed from other users (enforces one-to-one mapping) | 04-01 | Implemented |
+| Auto-save triggers when validation succeeds (no manual Save button) | 04-02 | Implemented |
+| Dual buttons have equal visual weight via flex-1 styling | 04-02 | Implemented |
+| Help section simplified to single Linear API settings link | 04-02 | Implemented |
+| Form shows 'Saving...' status during auto-save | 04-02 | Implemented |
+| Nickname field removed (not needed for API token flow) | 04-02 | Implemented |
+| Auth method badge always visible (not in dropdown) for immediate visibility | 05-01 | Implemented |
+| Switch button hidden when token has error (clean state required) | 05-01 | Implemented |
+| Disconnect button moved to footer alongside switch button | 05-01 | Implemented |
+| Blue color for OAuth badge (RefreshCw icon indicates auto-renewal) | 05-01 | Implemented |
+| Neutral gray for API Token badge (Key icon) | 05-01 | Implemented |
+| Switch flow disconnects and shows toast, user manually reconnects (not automatic) | 05-02 | Implemented |
+| Data preservation message uses consistent blue info box styling across all dialogs | 05-02 | Implemented |
+| Toast message specifies new auth method (OAuth or API Token) to guide user | 05-02 | Implemented |
+| Switch handlers reuse existing disconnect logic | 05-02 | Implemented |
+| Support tokens alongside OAuth (not replacement) | - | Implemented |
+| Trust user for token permissions | - | Implemented |
+| Validate token works, not permissions | - | Implemented |
+| Use same encryption as OAuth tokens | - | Implemented |
+| Show both options in modal | - | Implemented |
 
 ### Pending Todos
 
@@ -79,6 +113,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-02 03:10:27 UTC
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-02-03
+Stopped at: v1.1 milestone archived
 Resume file: None
+
+**Milestone v1.1 archived. All requirements satisfied. Ready for next milestone definition.**

@@ -16,6 +16,7 @@ export interface CreateApiKeyResponse {
   id: number
   name: string
   key: string  // Full key - shown once only
+  last_four: string
   created_at: string
   expires_at: string | null
 }

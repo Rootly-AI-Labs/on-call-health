@@ -82,7 +82,31 @@ export function useValidation({ provider, debounceMs = 500 }: UseValidationOptio
             });
 
             if (!response.ok) {
-              throw new Error(`HTTP ${response.status}`);
+              // Try to parse error response from backend
+              try {
+                const errorResult = await response.json();
+                setState({
+                  status: "error",
+                  error: errorResult.error || `HTTP ${response.status}`,
+                  errorType: errorResult.error_type || "unknown",
+                });
+                resolve({
+                  valid: false,
+                  error: errorResult.error || `HTTP ${response.status}`,
+                  error_type: errorResult.error_type || "unknown",
+                });
+                return;
+              } catch {
+                // If JSON parsing fails, treat as unknown error
+                const error = `Server error: HTTP ${response.status}`;
+                setState({
+                  status: "error",
+                  error,
+                  errorType: "unknown",
+                });
+                resolve({ valid: false, error, error_type: "unknown" });
+                return;
+              }
             }
 
             const result: ValidationResult = await response.json();
@@ -115,6 +139,7 @@ export function useValidation({ provider, debounceMs = 500 }: UseValidationOptio
               return;
             }
 
+            // Network or parsing error
             const errorMessage = error instanceof Error ? error.message : "Network error";
             setState({
               status: "error",

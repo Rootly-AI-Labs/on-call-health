@@ -142,8 +142,10 @@ import { AIInsightsCard } from "./components/AIInsightsCard"
 import { GitHubConnectedCard } from "./components/GitHubConnectedCard"
 import { JiraIntegrationCard } from "./components/JiraIntegrationCard"
 import { JiraConnectedCard } from "./components/JiraConnectedCard"
+import { JiraManualSetupForm } from "./components/JiraManualSetupForm"
 import { LinearIntegrationCard } from "./components/LinearIntegrationCard"
 import { LinearConnectedCard } from "./components/LinearConnectedCard"
+import { LinearManualSetupForm } from "./components/LinearManualSetupForm"
 import { RootlyIntegrationForm } from "./components/RootlyIntegrationForm"
 import { SurveyFeedbackSection } from "./components/SurveyFeedbackSection"
 import { PagerDutyIntegrationForm } from "./components/PagerDutyIntegrationForm"
@@ -153,6 +155,7 @@ import { GitHubDisconnectDialog } from "./dialogs/GitHubDisconnectDialog"
 import { SlackDisconnectDialog } from "./dialogs/SlackDisconnectDialog"
 import { JiraDisconnectDialog } from "./dialogs/JiraDisconnectDialog"
 import { LinearDisconnectDialog } from "./dialogs/LinearDisconnectDialog"
+import { AuthMethodSwitchDialog } from "./dialogs/AuthMethodSwitchDialog"
 import { JiraWorkspaceSelector } from "./dialogs/JiraWorkspaceSelector"
 import { NewMappingDialog } from "./dialogs/NewMappingDialog"
 import { OrganizationManagementDialog } from "./dialogs/OrganizationManagementDialog"
@@ -281,12 +284,18 @@ export default function IntegrationsPage() {
   const [isConnectingLinear, setIsConnectingLinear] = useState(false)
   const [isSyncingJira, setIsSyncingJira] = useState(false)
   const [jiraWorkspaceSelectorOpen, setJiraWorkspaceSelectorOpen] = useState(false)
+  const [showJiraManualSetup, setShowJiraManualSetup] = useState(false)
+  const [showLinearManualSetup, setShowLinearManualSetup] = useState(false)
 
   // Disconnect confirmation state
   const [githubDisconnectDialogOpen, setGithubDisconnectDialogOpen] = useState(false)
   const [slackDisconnectDialogOpen, setSlackDisconnectDialogOpen] = useState(false)
   const [jiraDisconnectDialogOpen, setJiraDisconnectDialogOpen] = useState(false)
   const [linearDisconnectDialogOpen, setLinearDisconnectDialogOpen] = useState(false)
+
+  // Auth method switch dialog state
+  const [jiraSwitchDialogOpen, setJiraSwitchDialogOpen] = useState(false)
+  const [linearSwitchDialogOpen, setLinearSwitchDialogOpen] = useState(false)
   const [slackSurveyDisconnectDialogOpen, setSlackSurveyDisconnectDialogOpen] = useState(false)
   const [slackSurveyConfirmDisconnectOpen, setSlackSurveyConfirmDisconnectOpen] = useState(false)
   const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
@@ -810,6 +819,14 @@ export default function IntegrationsPage() {
       pagerdutyToken: "",
       nickname: "",
     },
+  })
+
+  const jiraManualForm = useForm<{ siteUrl: string; token: string }>({
+    defaultValues: { siteUrl: "", token: "" }
+  })
+
+  const linearManualForm = useForm<{ token: string }>({
+    defaultValues: { token: "" }
   })
 
   useEffect(() => {
@@ -2151,6 +2168,20 @@ export default function IntegrationsPage() {
     )
   }
 
+  const handleJiraSwitch = async () => {
+    // Disconnect first (reuses existing handler)
+    await JiraHandlers.handleJiraDisconnect(
+      setIsDisconnectingJira,
+      setJiraIntegration,
+      setActiveEnhancementTab
+    )
+    setJiraSwitchDialogOpen(false)
+    // User will manually reconnect with new method
+    // Toast message guides them
+    const newMethod = jiraIntegration?.token_source === 'oauth' ? 'API Token' : 'OAuth'
+    toast.success(`Jira disconnected. Ready to reconnect with ${newMethod}.`)
+  }
+
   const handleJiraTest = async () => {
     return JiraHandlers.handleJiraTest(toast)
   }
@@ -2178,6 +2209,19 @@ export default function IntegrationsPage() {
       setLinearIntegration,
       setActiveEnhancementTab
     )
+  }
+
+  const handleLinearSwitch = async () => {
+    // Disconnect first (reuses existing handler)
+    await LinearHandlers.handleLinearDisconnect(
+      setIsDisconnectingLinear,
+      setLinearIntegration,
+      setActiveEnhancementTab
+    )
+    setLinearSwitchDialogOpen(false)
+    // User will manually reconnect with new method
+    const newMethod = linearIntegration?.token_source === 'oauth' ? 'API Token' : 'OAuth'
+    toast.success(`Linear disconnected. Ready to reconnect with ${newMethod}.`)
   }
 
   const handleLinearTest = async () => {
@@ -3441,6 +3485,7 @@ export default function IntegrationsPage() {
             {activeEnhancementTab === 'jira' && !jiraIntegration && (
               <JiraIntegrationCard
                 onConnect={handleJiraConnect}
+                onTokenConnect={() => setShowJiraManualSetup(true)}
                 isConnecting={isConnectingJira}
               />
             )}
@@ -3450,6 +3495,7 @@ export default function IntegrationsPage() {
               <JiraConnectedCard
                 integration={jiraIntegration}
                 onDisconnect={() => setJiraDisconnectDialogOpen(true)}
+                onSwitchAuth={() => setJiraSwitchDialogOpen(true)}
                 onTest={handleJiraTest}
                 isLoading={isDisconnectingJira}
               />
@@ -3459,6 +3505,7 @@ export default function IntegrationsPage() {
             {activeEnhancementTab === 'linear' && !linearIntegration && (
               <LinearIntegrationCard
                 onConnect={handleLinearConnect}
+                onTokenConnect={() => setShowLinearManualSetup(true)}
                 isConnecting={isConnectingLinear}
               />
             )}
@@ -3468,6 +3515,7 @@ export default function IntegrationsPage() {
               <LinearConnectedCard
                 integration={linearIntegration}
                 onDisconnect={() => setLinearDisconnectDialogOpen(true)}
+                onSwitchAuth={() => setLinearSwitchDialogOpen(true)}
                 onTest={handleLinearTest}
                 isLoading={isDisconnectingLinear}
               />
@@ -4410,6 +4458,33 @@ export default function IntegrationsPage() {
           setLinearDisconnectDialogOpen(false)
         }}
       />
+
+      {/* Jira Switch Dialog */}
+      {jiraIntegration && (
+        <AuthMethodSwitchDialog
+          open={jiraSwitchDialogOpen}
+          onOpenChange={setJiraSwitchDialogOpen}
+          fromMethod={jiraIntegration.token_source as "oauth" | "manual"}
+          toMethod={jiraIntegration.token_source === 'oauth' ? 'manual' : 'oauth'}
+          integrationName="Jira"
+          isDisconnecting={isDisconnectingJira}
+          onConfirmSwitch={handleJiraSwitch}
+        />
+      )}
+
+      {/* Linear Switch Dialog */}
+      {linearIntegration && (
+        <AuthMethodSwitchDialog
+          open={linearSwitchDialogOpen}
+          onOpenChange={setLinearSwitchDialogOpen}
+          fromMethod={linearIntegration.token_source as "oauth" | "manual"}
+          toMethod={linearIntegration.token_source === 'oauth' ? 'manual' : 'oauth'}
+          integrationName="Linear"
+          isDisconnecting={isDisconnectingLinear}
+          onConfirmSwitch={handleLinearSwitch}
+        />
+      )}
+
       {/* Jira Workspace Selector Dialog */}
       <JiraWorkspaceSelector
         open={jiraWorkspaceSelectorOpen}
@@ -4419,6 +4494,51 @@ export default function IntegrationsPage() {
           await loadJiraIntegration(true)
         }}
       />
+      {/* Jira Manual Setup Dialog */}
+      <Dialog open={showJiraManualSetup} onOpenChange={(open) => {
+        setShowJiraManualSetup(open)
+        if (!open) jiraManualForm.reset()
+      }}>
+        <DialogContent className="max-w-2xl">
+          <JiraManualSetupForm
+            form={jiraManualForm}
+            onSave={async (data) => {
+              const success = await JiraHandlers.handleJiraManualConnect(
+                data,
+                () => loadJiraIntegration(true)
+              )
+              return success
+            }}
+            onClose={() => {
+              setShowJiraManualSetup(false)
+              jiraManualForm.reset()
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Linear Manual Setup Dialog */}
+      <Dialog open={showLinearManualSetup} onOpenChange={(open) => {
+        setShowLinearManualSetup(open)
+        if (!open) linearManualForm.reset()
+      }}>
+        <DialogContent className="max-w-2xl">
+          <LinearManualSetupForm
+            form={linearManualForm}
+            onSave={async (data) => {
+              const success = await LinearHandlers.handleLinearManualConnect(
+                data,
+                () => loadLinearIntegration(true)
+              )
+              return success
+            }}
+            onClose={() => {
+              setShowLinearManualSetup(false)
+              linearManualForm.reset()
+            }}
+          />
+        </DialogContent>
+      </Dialog>
       {/* Slack Survey Workspace Info & Disconnect Dialog */}
       <Dialog open={slackSurveyDisconnectDialogOpen} onOpenChange={setSlackSurveyDisconnectDialogOpen}>
         <DialogContent className="sm:max-w-md">

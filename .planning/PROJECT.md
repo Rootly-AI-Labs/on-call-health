@@ -12,29 +12,28 @@ Catch exhaustion before it burns out team members by analyzing cross-platform ac
 
 ### Validated
 
-<!-- Existing capabilities shipped and proven valuable -->
+<!-- Capabilities shipped and proven valuable -->
 
-- ✓ OAuth-based authentication for user login (Google, GitHub) — existing
-- ✓ OAuth integration setup for Jira and Linear (workspace/organization connection) — existing
-- ✓ Encrypted token storage with automatic refresh for Jira OAuth tokens — existing (PR #291)
-- ✓ Multi-platform user identity correlation and mapping — existing
-- ✓ Burnout analysis engine with AI insights — existing
-- ✓ Integration data collection from Rootly, PagerDuty, GitHub, Slack, Jira, Linear — existing
-- ✓ Multi-tenant organization support (partially implemented) — existing
-- ✓ Survey scheduling and delivery system — existing
+- ✓ OAuth-based authentication for user login (Google, GitHub)
+- ✓ OAuth integration setup for Jira and Linear (workspace/organization connection)
+- ✓ Encrypted token storage with automatic refresh for Jira OAuth tokens (PR #291)
+- ✓ Multi-platform user identity correlation and mapping
+- ✓ Burnout analysis engine with AI insights
+- ✓ Integration data collection from Rootly, PagerDuty, GitHub, Slack, Jira, Linear
+- ✓ Multi-tenant organization support (partially implemented)
+- ✓ Survey scheduling and delivery system
+- ✓ Token-based authentication for Jira integration (alternative to OAuth) — v1.1
+- ✓ Token-based authentication for Linear integration (alternative to OAuth) — v1.1
+- ✓ Integration setup UI with OAuth and Token options in modal — v1.1
+- ✓ Token validation during setup (verify token works before save) — v1.1
+- ✓ Encrypted token storage (same Fernet encryption as OAuth tokens) — v1.1
+- ✓ Token validity checking with platform-specific error messages — v1.1
+- ✓ Users can switch between OAuth and Token auth methods — v1.1
+- ✓ Team-level data access with tokens (same as OAuth) — v1.1
 
 ### Active
 
-<!-- Current scope for token-based authentication feature -->
-
-- [ ] Token-based authentication option for Jira integration (alternative to OAuth)
-- [ ] Token-based authentication option for Linear integration (alternative to OAuth)
-- [ ] Integration setup UI shows both OAuth and Token options in modal
-- [ ] Token validation during setup (verify token works)
-- [ ] Encrypted token storage (same encryption as OAuth tokens)
-- [ ] Token validity checking using existing mechanism
-- [ ] Users can disconnect OAuth and reconnect with token
-- [ ] Team-level data access with tokens (same as OAuth)
+<!-- No active requirements - ready for next milestone -->
 
 ### Out of Scope
 
@@ -75,11 +74,11 @@ Catch exhaustion before it burns out team members by analyzing cross-platform ac
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Support tokens alongside OAuth (not replacement) | Users have different security contexts; some can't use OAuth, others prefer it | — Pending |
-| Trust user for token permissions | No reliable way to test team-level access programmatically; user knows their org's token setup | — Pending |
-| Validate token works, not permissions | API call to test connectivity is sufficient; team data access verified during actual sync | — Pending |
-| Use same encryption as OAuth tokens | Consistency in security approach, leverage existing infrastructure | — Pending |
-| Show both options in modal | Clear choice for users, discoverability of token option for blocked users | — Pending |
+| Support tokens alongside OAuth (not replacement) | Users have different security contexts; some can't use OAuth, others prefer it | ✓ Implemented v1.1 |
+| Trust user for token permissions | No reliable way to test team-level access programmatically; user knows their org's token setup | ✓ Implemented v1.1 |
+| Validate token works, not permissions | API call to test connectivity is sufficient; team data access verified during actual sync | ✓ Implemented v1.1 |
+| Use same encryption as OAuth tokens | Consistency in security approach, leverage existing infrastructure | ✓ Implemented v1.1 |
+| Show both options in modal | Clear choice for users, discoverability of token option for blocked users | ✓ Implemented v1.1 |
 
 ---
-*Last updated: 2026-01-30 after initialization*
+*Last updated: 2026-02-03 after v1.1 milestone completion*

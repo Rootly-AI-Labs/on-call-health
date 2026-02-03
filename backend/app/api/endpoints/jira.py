@@ -320,6 +320,179 @@ async def jira_oauth_callback_post(
 # -------------------------------
 # Status / Test / Disconnect
 # -------------------------------
+@router.post("/connect-manual")
+async def connect_jira_manual(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Save manually provided Jira API token with validation and encryption.
+
+    Request body:
+        token: str - The Jira Personal Access Token
+        site_url: str - The Jira site URL (e.g., https://company.atlassian.net)
+        user_info: dict (optional) - User info from frontend validation
+
+    Returns:
+        Success response with integration details or error
+    """
+    body = await request.json()
+    token = body.get("token")
+    site_url = body.get("site_url")
+    user_info = body.get("user_info")
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token is required"
+        )
+
+    if not site_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Jira site URL is required"
+        )
+
+    # Validate and normalize site_url format
+    from urllib.parse import urlparse
+    site_url = site_url.strip()
+
+    # Ensure it has a scheme
+    if not site_url.startswith(("http://", "https://")):
+        site_url = f"https://{site_url}"
+
+    try:
+        parsed = urlparse(site_url)
+        if not parsed.netloc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Jira site URL format"
+            )
+        # Reconstruct clean URL
+        site_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip("/")
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Jira site URL format"
+        )
+
+    # Backend re-validates token (never trust client validation)
+    from ...services.integration_validator import IntegrationValidator
+    validator = IntegrationValidator(db)
+    result = await validator.validate_manual_token(
+        provider="jira",
+        token=token,
+        site_url=site_url
+    )
+
+    if not result.get("valid"):
+        logger.warning(
+            f"[Jira] Manual token validation failed for user {current_user.id}: "
+            f"{result.get('error_type')}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Token validation failed")
+        )
+
+    # Validation succeeded - encrypt and save token
+    logger.info(f"[Jira] Saving manual token for user {current_user.id}")
+
+    # Normalize site_url for storage (strip scheme and trailing slashes)
+    parsed = urlparse(site_url)
+    normalized_site_url = f"{parsed.netloc}{parsed.path}".rstrip("/")
+
+    # Encrypt token using Fernet
+    enc_token = encrypt_token(token)
+
+    # Get user info from validation result
+    validated_user_info = result.get("user_info", {})
+    jira_account_id = validated_user_info.get("account_id")
+    jira_display_name = validated_user_info.get("display_name")
+    jira_email = validated_user_info.get("email")
+
+    # Upsert integration
+    integration = db.query(JiraIntegration).filter(
+        JiraIntegration.user_id == current_user.id
+    ).first()
+
+    now = datetime.now(dt_timezone.utc)
+
+    if integration:
+        # Update existing integration
+        integration.access_token = enc_token
+        integration.token_source = "manual"
+        integration.token_expires_at = None  # Manual tokens don't auto-expire
+        integration.jira_site_url = normalized_site_url
+        integration.jira_account_id = jira_account_id
+        integration.jira_display_name = jira_display_name
+        integration.jira_email = jira_email
+        integration.refresh_token = None  # Manual tokens don't have refresh
+        integration.updated_at = now
+        logger.info(f"[Jira] Updated existing integration for user {current_user.id}")
+    else:
+        # Create new integration
+        integration = JiraIntegration(
+            user_id=current_user.id,
+            access_token=enc_token,
+            token_source="manual",
+            token_expires_at=None,
+            jira_site_url=normalized_site_url,
+            jira_account_id=jira_account_id,
+            jira_display_name=jira_display_name,
+            jira_email=jira_email,
+            refresh_token=None,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(integration)
+        logger.info(f"[Jira] Created new manual integration for user {current_user.id}")
+
+    # Commit to database
+    try:
+        db.commit()
+        db.refresh(integration)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Jira] Failed to save manual integration: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save integration"
+        )
+
+    # Trigger background sync immediately after successful save
+    import asyncio
+    from ...services.jira_user_sync_service import JiraUserSyncService
+
+    async def sync_in_background():
+        """Background task wrapper that catches and logs errors."""
+        try:
+            sync_service = JiraUserSyncService(db)
+            await sync_service.sync_jira_users(current_user)
+            logger.info(f"[Jira] Background sync completed for user {current_user.id}")
+        except Exception as e:
+            logger.error(f"[Jira] Background sync failed for user {current_user.id}: {e}")
+
+    # Fire and forget background sync
+    asyncio.create_task(sync_in_background())
+
+    logger.info(f"[Jira] Manual token saved and sync triggered for user {current_user.id}")
+
+    return {
+        "success": True,
+        "integration": {
+            "id": integration.id,
+            "token_source": "manual",
+            "token_valid": True,
+            "jira_site_url": integration.jira_site_url,
+            "jira_account_id": integration.jira_account_id,
+            "jira_display_name": integration.jira_display_name,
+            "jira_email": integration.jira_email,
+        }
+    }
+
+
 @router.get("/status")
 async def get_jira_status(
     current_user: User = Depends(get_current_user),

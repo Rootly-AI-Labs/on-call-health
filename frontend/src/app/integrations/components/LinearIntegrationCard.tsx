@@ -1,14 +1,15 @@
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
+import { Loader2, Key } from "lucide-react"
 
 interface LinearIntegrationCardProps {
   onConnect: () => void
+  onTokenConnect: () => void
   isConnecting: boolean
 }
 
-export function LinearIntegrationCard({ onConnect, isConnecting }: LinearIntegrationCardProps) {
+export function LinearIntegrationCard({ onConnect, onTokenConnect, isConnecting }: LinearIntegrationCardProps) {
   return (
     <Card className="border-2 border-neutral-200 max-w-2xl mx-auto">
       <CardContent className="pt-6 space-y-4">
@@ -17,26 +18,37 @@ export function LinearIntegrationCard({ onConnect, isConnecting }: LinearIntegra
         </div>
 
         <div className="space-y-3">
-          <Button
-            onClick={onConnect}
-            disabled={isConnecting}
-            className="w-full bg-black hover:bg-neutral-800 text-white"
-          >
-            {isConnecting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <Image src="/images/linear-logo-light.png" alt="Linear" width={16} height={16} className="mr-2" quality={100} />
-                Connect with Linear
-              </>
-            )}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={onConnect}
+              disabled={isConnecting}
+              className="flex-1 bg-black hover:bg-neutral-800 text-white"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Image src="/images/linear-logo-light.png" alt="Linear" width={16} height={16} className="mr-2" quality={100} />
+                  Connect with OAuth
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={onTokenConnect}
+              disabled={isConnecting}
+              variant="outline"
+              className="flex-1 border-neutral-300 text-neutral-700 hover:bg-neutral-50"
+            >
+              <Key className="w-4 h-4 mr-2" />
+              Use API Token
+            </Button>
+          </div>
 
           <p className="text-xs text-slate-500 text-center">
-            You'll be redirected to Linear to authorize access
+            Choose OAuth for automatic refresh or API Token for manual management
           </p>
         </div>
 
