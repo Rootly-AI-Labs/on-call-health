@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { AlertCircle, CheckCircle, Calendar, Globe, Key, Trash2, Zap, Loader2, ChevronDown, AlertTriangle, ArrowLeftRight } from "lucide-react"
+import { AlertCircle, CheckCircle, Calendar, Key, Trash2, Zap, Loader2, ChevronDown, AlertTriangle, ArrowLeftRight } from "lucide-react"
 import type { LinearIntegration, AuthMethod } from "../types"
 import { StatusIndicator } from "./StatusIndicator"
 import { AuthMethodBadge } from "./AuthMethodBadge"
@@ -86,16 +86,6 @@ export function LinearConnectedCard({
 
         {/* Integration Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          {integration.workspace_name && (
-            <div className="flex items-center space-x-2">
-              <Globe className="w-4 h-4 text-slate-400" />
-              <div>
-                <div className="font-medium">Workspace</div>
-                <div className="text-slate-600">{integration.workspace_name}</div>
-              </div>
-            </div>
-          )}
-
           {integration.linear_display_name && (
             <div className="flex items-center space-x-2">
               <CheckCircle className="w-4 h-4 text-slate-400" />
