@@ -73,10 +73,12 @@ export function useValidation({ provider, debounceMs = 500 }: UseValidationOptio
               ? { token, site_url: siteUrl }
               : { token };
 
+            const authToken = localStorage.getItem('auth_token');
             const response = await fetch(endpoint, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
+                ...(authToken && { "Authorization": `Bearer ${authToken}` }),
               },
               credentials: "include",
               signal: abortControllerRef.current?.signal,

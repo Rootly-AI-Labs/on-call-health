@@ -614,6 +614,7 @@ async def validate_jira_token(
             "error_type": "site_url"
         }
 
+    from ...services.integration_validator import IntegrationValidator
     validator = IntegrationValidator(db)
     result = await validator.validate_manual_token(
         provider="jira",
