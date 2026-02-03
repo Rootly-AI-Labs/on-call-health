@@ -45,10 +45,24 @@ export function getValidToken(): string | null {
  */
 export function parseTokenPayload(token: string): TokenPayload | null {
   try {
+    // Validate token format
+    if (!token || typeof token !== 'string') return null
+
     const parts = token.split('.')
     if (parts.length !== 3) return null
 
-    const payload = JSON.parse(atob(parts[1]))
+    // Validate base64 format before decoding
+    const payloadPart = parts[1]
+    if (!payloadPart || !/^[A-Za-z0-9_-]+$/.test(payloadPart)) return null
+
+    // Decode and parse with validation
+    const decoded = atob(payloadPart)
+    const payload = JSON.parse(decoded)
+
+    // Validate required fields
+    if (!payload || typeof payload !== 'object') return null
+    if (!payload.exp || typeof payload.exp !== 'number') return null
+
     return payload
   } catch {
     return null

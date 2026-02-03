@@ -478,8 +478,7 @@ async def exchange_auth_code_for_token(
 
         # Debug: Check if table exists and has any codes
         try:
-            result = db.execute(text("SELECT COUNT(*) FROM oauth_temp_codes"))
-            count = result.scalar()
+            count = db.query(OAuthTempCode).count()
             logger.error(f"📊 Total codes in database: {count}")
         except Exception as e:
             logger.error(f"❌ Failed to query oauth_temp_codes table: {e}")
@@ -509,6 +508,9 @@ async def update_user_role(
     Update a user's role within the organization.
     Only admin can change roles.
     """
+    # Normalize role to lowercase to prevent bypass
+    new_role = new_role.lower()
+
     # Check if current user is admin
     if current_user.role != 'admin':
         raise HTTPException(
@@ -662,8 +664,12 @@ async def delete_current_user_account(
 
     Requires email confirmation for safety.
     """
-    # Verify email confirmation matches
-    if delete_request.email_confirmation != current_user.email.lower():
+    # Verify email confirmation matches using constant-time comparison
+    import secrets
+    expected = current_user.email.lower().encode('utf-8')
+    provided = delete_request.email_confirmation.lower().encode('utf-8')
+
+    if not secrets.compare_digest(expected, provided):
         logger.warning(f"Account deletion failed - email mismatch for user {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
