@@ -16,6 +16,7 @@ from .middleware.security import security_middleware
 from .middleware.user_logging import user_logging_middleware
 from .middleware.logging_context import UserContextFilter
 from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, jira, linear, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations, surveys, api_keys
+from .mcp.transport import mcp_http_app
 
 # Configure logging based on environment variable
 LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
@@ -213,3 +214,9 @@ app.include_router(invitations.router, prefix="/api", tags=["invitations"])
 app.include_router(api_keys.router, prefix="/api", tags=["api-keys"])
 app.include_router(surveys.router, prefix="/api/surveys", tags=["surveys"])
 logger.debug("Surveys router registered successfully")
+
+# Mount MCP transport endpoints
+# Streamable HTTP at /mcp/mcp, SSE at /mcp/sse, health at /mcp/health
+# MCP transport has its own CORS middleware configured for web-based MCP clients
+app.mount("/mcp", mcp_http_app)
+logger.debug("MCP transport mounted at /mcp")
