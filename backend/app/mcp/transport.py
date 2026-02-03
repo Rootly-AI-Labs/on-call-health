@@ -6,6 +6,9 @@ This module creates an ASGI application that exposes the MCP server via:
 - /health: Health check endpoint for AWS ALB integration
 
 Stateless mode is enabled for horizontal scaling behind load balancers.
+
+CORS is configured for web-based MCP clients (MCP Inspector, browser tools).
+SSE heartbeat interval prevents proxy timeouts on long-lived connections.
 """
 from __future__ import annotations
 
@@ -15,8 +18,48 @@ from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
+
+# SSE heartbeat interval (seconds) - prevents proxy timeout
+# ALB default idle timeout is 60s, most proxies are 30-120s
+# 30s keeps connections alive without excessive overhead
+SSE_HEARTBEAT_INTERVAL = 30
+
+# CORS configuration for web-based MCP clients
+# Note: Applied at transport level, not main app level (avoids FastMCP conflicts)
+MCP_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "https://oncallhealth.ai",
+    "https://www.oncallburnout.com",
+    "https://oncallburnout.com",
+]
+
+MCP_CORS_HEADERS = [
+    "mcp-protocol-version",
+    "mcp-session-id",
+    "Authorization",
+    "Content-Type",
+    "X-API-Key",  # Required for MCP API key authentication
+]
+
+MCP_CORS_METHODS = ["GET", "POST", "DELETE", "OPTIONS"]
+
+# Headers exposed to browser clients (mcp-session-id critical for session tracking)
+MCP_CORS_EXPOSE_HEADERS = ["mcp-session-id"]
+
+cors_middleware = Middleware(
+    CORSMiddleware,
+    allow_origins=MCP_CORS_ORIGINS,
+    allow_methods=MCP_CORS_METHODS,
+    allow_headers=MCP_CORS_HEADERS,
+    expose_headers=MCP_CORS_EXPOSE_HEADERS,
+    allow_credentials=True,
+)
 
 if TYPE_CHECKING:
     from starlette.requests import Request
@@ -81,6 +124,7 @@ def _create_mcp_http_app() -> Starlette:
     app = Starlette(
         routes=routes,
         lifespan=lifespan,
+        middleware=[cors_middleware],
     )
 
     logger.info(
