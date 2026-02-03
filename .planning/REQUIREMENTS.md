@@ -84,11 +84,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UX-01 | Phase 3, Phase 4 | Complete |
 | UX-02 | Phase 3 | Pending |
 | UX-03 | Phase 4 | Complete |
-| UX-04 | Phase 5 | Pending |
+| UX-04 | Phase 5 | Complete |
 | UX-05 | Phase 3 | Pending |
 | UX-06 | Phase 4 | Complete |
-| SWITCH-01 | Phase 5 | Pending |
-| SWITCH-02 | Phase 5 | Pending |
+| SWITCH-01 | Phase 5 | Complete |
+| SWITCH-02 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 16 total

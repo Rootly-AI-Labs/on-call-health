@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Validation Infrastructure** - Type-aware token validation system
 - [x] **Phase 3: Jira Token Integration** - Complete Jira API token setup flow
 - [x] **Phase 4: Linear Token Integration** - Complete Linear API token setup flow
-- [ ] **Phase 5: User Experience** - Status indicators, help text, and method switching
+- [x] **Phase 5: User Experience** - Status indicators, help text, and method switching
 
 ## Phase Details
 
@@ -98,8 +98,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Auth method badge, switch button, and switch dialog components
-- [ ] 05-02-PLAN.md — Wire switch flow with state management and data preservation messaging
+- [x] 05-01-PLAN.md — Auth method badge, switch button, and switch dialog components
+- [x] 05-02-PLAN.md — Wire switch flow with state management and data preservation messaging
 
 ## Progress
 
@@ -112,4 +112,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Validation Infrastructure | 4/4 | Complete | 2026-02-02 |
 | 3. Jira Token Integration | 2/2 | Complete | 2026-02-02 |
 | 4. Linear Token Integration | 2/2 | Complete | 2026-02-02 |
-| 5. User Experience | 0/2 | Not started | - |
+| 5. User Experience | 2/2 | Complete | 2026-02-02 |
