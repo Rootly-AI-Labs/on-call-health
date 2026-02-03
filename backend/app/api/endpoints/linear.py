@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta, timezone as dt_timezone, date
+import asyncio
 import logging
 import base64
 import secrets
@@ -660,6 +661,69 @@ async def connect_linear_manual(
         )
 
     logger.info(f"[Linear] Manual token saved for user {current_user.id}")
+
+    # Trigger background sync immediately after successful save
+    async def sync_in_background():
+        """Background task to sync Linear users after manual token save."""
+        try:
+            # Re-fetch integration to get fresh token
+            bg_integration = db.query(LinearIntegration).filter(
+                LinearIntegration.user_id == current_user.id
+            ).first()
+            if not bg_integration or not current_user.organization_id:
+                return
+
+            bg_token = await _get_valid_token(bg_integration, db)
+
+            # Fetch all Linear users with pagination
+            all_users = []
+            cursor = None
+            for _ in range(20):  # Max pages
+                result = await linear_integration_oauth.get_users(bg_token, first=100, after=cursor)
+                nodes = result.get("nodes", [])
+                all_users.extend(nodes)
+                page_info = result.get("pageInfo", {})
+                if not page_info.get("hasNextPage"):
+                    break
+                cursor = page_info.get("endCursor")
+
+            # Sync active users to UserCorrelation
+            active_users = [u for u in all_users if u.get("active", True)]
+            synced = 0
+            for linear_user in active_users:
+                linear_id = linear_user.get("id")
+                linear_email = linear_user.get("email")
+                linear_name = linear_user.get("name")
+                if not linear_email:
+                    continue
+
+                corr = db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == current_user.organization_id,
+                    UserCorrelation.email == linear_email,
+                ).first()
+                if corr:
+                    corr.linear_user_id = linear_id
+                    corr.linear_email = linear_email
+                    if linear_name and not corr.name:
+                        corr.name = linear_name
+                else:
+                    db.add(UserCorrelation(
+                        user_id=current_user.id,
+                        organization_id=current_user.organization_id,
+                        email=linear_email,
+                        name=linear_name,
+                        linear_user_id=linear_id,
+                        linear_email=linear_email,
+                    ))
+                synced += 1
+
+            db.commit()
+            logger.info(f"[Linear] Background sync completed for user {current_user.id}: {synced} users synced")
+        except Exception as e:
+            logger.error(f"[Linear] Background sync failed for user {current_user.id}: {e}")
+
+    # Fire and forget background sync
+    asyncio.create_task(sync_in_background())
 
     return {
         "success": True,
