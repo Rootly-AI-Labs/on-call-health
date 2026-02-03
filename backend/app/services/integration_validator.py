@@ -592,8 +592,13 @@ class IntegrationValidator:
                     "Linear token decryption failed. Please reconnect your Linear integration."
                 )
 
+            # API keys (lin_api_*) don't use Bearer prefix, OAuth tokens do
+            if token.startswith("lin_api_"):
+                auth_header = token
+            else:
+                auth_header = f"Bearer {token}"
             headers = {
-                "Authorization": f"Bearer {token}",
+                "Authorization": auth_header,
                 "Content-Type": "application/json"
             }
             query = "query Viewer { viewer { id } }"
