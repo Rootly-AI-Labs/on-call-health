@@ -24,6 +24,13 @@ from app.mcp.infrastructure.connection_tracker import (
 from app.mcp.infrastructure.rate_limiter import (
     check_rate_limit,
     extract_tool_name,
+    MCP_RATE_LIMITS,
+)
+from app.mcp.infrastructure.logging import (
+    log_connection_open,
+    log_connection_close,
+    log_connection_limit_hit,
+    log_rate_limit_hit,
 )
 from app.services.api_key_service import compute_sha256_hash
 from app.models import APIKey, SessionLocal
@@ -77,14 +84,7 @@ class MCPInfrastructureMiddleware(BaseHTTPMiddleware):
             api_key_id, connection_id
         )
         if not can_connect:
-            logger.warning(
-                "MCP connection limit exceeded",
-                extra={
-                    "event": "connection_limit_hit",
-                    "api_key_id": api_key_id,
-                    "limit": MAX_CONNECTIONS_PER_KEY,
-                },
-            )
+            log_connection_limit_hit(api_key_id)
             return JSONResponse(
                 status_code=429,
                 content={
@@ -94,6 +94,9 @@ class MCPInfrastructureMiddleware(BaseHTTPMiddleware):
                 },
                 headers={"Retry-After": "60"},
             )
+
+        # Log successful connection open
+        log_connection_open(api_key_id, connection_id)
 
         try:
             # Cache request body for rate limit extraction
@@ -108,6 +111,9 @@ class MCPInfrastructureMiddleware(BaseHTTPMiddleware):
                     request, api_key_id, tool_name
                 )
                 if rate_limit_response is not None:
+                    # Log rate limit violation
+                    limit = MCP_RATE_LIMITS.get(tool_name, MCP_RATE_LIMITS["default"])
+                    log_rate_limit_hit(api_key_id, tool_name, limit)
                     return rate_limit_response
 
             # Update activity timestamp
@@ -124,6 +130,7 @@ class MCPInfrastructureMiddleware(BaseHTTPMiddleware):
         finally:
             # Always clean up connection on request completion
             await connection_tracker.remove_connection(api_key_id, connection_id)
+            log_connection_close(api_key_id, connection_id)
 
     async def _get_api_key_id(self, api_key: str) -> Optional[int]:
         """Look up API key ID from database.
