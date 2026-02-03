@@ -1,328 +1,143 @@
-# Stack Research: API Key Management
+# Stack Research: Token-Based Authentication
 
-**Domain:** API Key Authentication for FastAPI/SQLAlchemy/PostgreSQL
+**Domain:** API token authentication alongside OAuth 2.0
 **Researched:** 2026-01-30
-**Confidence:** HIGH (verified against official documentation and PyPI)
-
-## Executive Summary
-
-This research identifies the recommended 2026 stack for implementing API key management in the existing On-Call Health FastAPI application. The key decision points are:
-
-1. **Hashing Algorithm:** Argon2id via `argon2-cffi` (not passlib - it's unmaintained)
-2. **Key Generation:** Python's built-in `secrets` module
-3. **FastAPI Integration:** Native `APIKeyHeader` dependency
-4. **Storage Pattern:** Prefix + hashed lookup with SHA-256 for fast retrieval
+**Confidence:** HIGH
 
 ## Recommended Stack
 
-### Core Technologies
+### Core Authentication Libraries
 
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| `argon2-cffi` | 25.1.0 | Password/key hashing | Argon2 PHC winner; actively maintained; 5.6M weekly downloads; supports Python 3.8-3.14 | HIGH |
-| `secrets` (stdlib) | Python 3.10+ | Secure key generation | Cryptographically secure; no dependencies; stdlib since 3.6 | HIGH |
-| `hmac.compare_digest` (stdlib) | Python 3.10+ | Timing-safe comparison | Prevents timing attacks; no dependencies; stdlib | HIGH |
-| `hashlib.sha256` (stdlib) | Python 3.10+ | Fast lookup hash | For non-sensitive key prefix lookups; O(1) database retrieval | HIGH |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| **cryptography** | 46.0.4 | Token encryption/decryption using Fernet | Already in use; battle-tested symmetric encryption with AES-128-CBC + HMAC for integrity. Actively maintained (latest release Jan 2026). Provides the exact same security guarantees as existing OAuth token storage. |
+| **httpx** | Latest stable | Async HTTP client for API validation | Already in use; modern async/await support, HTTP/2, connection pooling. Perfect for validating Jira API tokens (Basic Auth) and Linear API keys (Bearer). Consistent with existing OAuth validation patterns. |
+| **pydantic** | 2.x (FastAPI compatible) | Request/response validation | Already in use via FastAPI; validates token input formats, prevents injection attacks. FastAPI now requires Pydantic v2 (v1 deprecated). |
 
 ### Supporting Libraries
 
-| Library | Version | Purpose | When to Use | Confidence |
-|---------|---------|---------|-------------|------------|
-| `pwdlib[argon2]` | 0.3.0 | Password hash wrapper | Alternative to direct argon2-cffi if multi-algorithm support needed; used by FastAPI-Users | MEDIUM |
-| `bcrypt` | 5.0.0 | Bcrypt hashing | Only for backward compatibility with existing hashes | HIGH |
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| **base64** | stdlib | Encode Jira email:token for Basic Auth | Jira API tokens require HTTP Basic Auth with base64-encoded "email:api_token" credentials. Use `base64.b64encode()` with UTF-8 encoding. |
+| **secrets** | stdlib | Generate secure test tokens | For development/testing only. Use `secrets.token_urlsafe()` for generating mock API tokens. Never use for production token generation (users provide their own). |
+| **python-jose[cryptography]** | Current | JWT validation (future-proofing) | Already in requirements.txt. Not needed for Jira API tokens or Linear API keys (they're opaque tokens), but useful if future providers use JWT-based API tokens. |
 
-### FastAPI Security Integration
+### Database (Already in Use)
 
-| Component | Import Path | Purpose | Notes |
-|-----------|-------------|---------|-------|
-| `APIKeyHeader` | `fastapi.security` | Header-based API key extraction | Primary method for MCP/automation clients |
-| `APIKeyQuery` | `fastapi.security` | Query param API key | Backup method; less secure (logs) |
-| `Security` | `fastapi` | Dependency injection | For combining multiple auth methods |
-| `Depends` | `fastapi` | Standard dependency | For route protection |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| **SQLAlchemy** | Current | ORM for token storage | Already in use; models already have `token_source` field ('oauth' or 'manual'). No schema changes needed—just leverage existing encrypted `access_token` column. |
+| **PostgreSQL** | Current | Relational database | Already in use; existing `jira_integrations` and `linear_integrations` tables already support manual tokens via `token_source='manual'` field. |
 
 ## Installation
 
+No new packages required. All necessary libraries already present in requirements.txt:
+
 ```bash
-# Add to requirements.txt (do NOT use passlib)
-argon2-cffi>=25.1.0
-
-# Or if using pwdlib wrapper:
-pwdlib[argon2]>=0.3.0
+# Already installed (verify versions)
+pip install cryptography==46.0.4
+pip install httpx
+pip install pydantic>=2.0.0
+pip install python-jose[cryptography]
 ```
-
-No additional pip installs needed - `secrets`, `hmac`, and `hashlib` are Python stdlib.
-
-## API Key Storage Pattern
-
-### Recommended: Prefix + Hash Pattern
-
-```
-Key Format: och_live_<random_32_bytes_hex>
-             |    |   |
-             |    |   +-- 64 hex chars from secrets.token_hex(32)
-             |    +------ Environment indicator (live/test)
-             +----------- Service prefix (On-Call Health)
-
-Storage:
-- key_prefix: "och_live_abc123" (first 16 chars, indexed)
-- key_hash: SHA256(full_key) for fast lookup
-- key_hash_argon2: Argon2id(full_key) for verification
-```
-
-### Database Schema Recommendations
-
-```sql
-CREATE TABLE api_keys (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-
-    -- Lookup fields (indexed)
-    key_prefix VARCHAR(20) NOT NULL,           -- "och_live_abc123"
-    key_hash_sha256 VARCHAR(64) NOT NULL,      -- Fast lookup hash
-
-    -- Verification field (not indexed)
-    key_hash_argon2 VARCHAR(128) NOT NULL,     -- Secure verification hash
-
-    -- Metadata
-    name VARCHAR(100) NOT NULL,                -- User-provided description
-    scopes VARCHAR(255)[] DEFAULT '{}',        -- Permission scopes
-
-    -- Lifecycle
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    last_used_at TIMESTAMPTZ,
-    expires_at TIMESTAMPTZ,                    -- NULL = never expires
-    revoked_at TIMESTAMPTZ,                    -- NULL = active
-
-    -- Constraints
-    CONSTRAINT api_keys_key_prefix_unique UNIQUE (key_prefix),
-    CONSTRAINT api_keys_key_hash_sha256_unique UNIQUE (key_hash_sha256)
-);
-
--- Fast lookup index (crucial for <50ms validation)
-CREATE INDEX idx_api_keys_prefix_active ON api_keys (key_prefix)
-    WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > NOW());
-
--- Hash index for SHA256 lookups (40% smaller, 15% faster than B-tree for equality)
-CREATE INDEX idx_api_keys_hash_sha256 USING HASH (key_hash_sha256);
-```
-
-### Why Two Hashes?
-
-| Hash | Purpose | Performance | Security |
-|------|---------|-------------|----------|
-| SHA-256 | Database lookup | O(1), <1ms | Not for secrets; only for identification |
-| Argon2id | Final verification | ~200ms target | Full password-grade security |
-
-This two-step approach achieves <50ms total validation:
-1. **Step 1:** Query by SHA-256 hash (~1-5ms with index)
-2. **Step 2:** Verify with Argon2id (~200ms, but only after DB match)
 
 ## Alternatives Considered
 
-| Recommended | Alternative | Why Not Use Alternative |
+| Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| `argon2-cffi` | `passlib` | Passlib unmaintained since 2020; breaks on Python 3.13+; FastAPI docs switched to pwdlib |
-| `argon2-cffi` | `bcrypt` | Fixed 4KB memory (less resistant to GPU attacks); truncates at 72 chars |
-| `secrets.token_hex()` | `uuid.uuid4()` | UUIDs are predictable with enough samples; not cryptographically designed |
-| `hmac.compare_digest()` | `==` operator | String equality vulnerable to timing attacks |
-| Prefix pattern | Full hash only | Full-hash-only requires hashing on every request; prefix enables fast lookup |
+| **Fernet (cryptography)** | AES-GCM via `cryptography.hazmat` | Only if you need authenticated encryption with associated data (AEAD). Fernet already provides authentication via HMAC, which is sufficient for token storage. AES-GCM adds complexity without meaningful security benefit here. |
+| **httpx AsyncClient** | aiohttp | Never—httpx is already in use and provides better HTTP/2 support and cleaner async API. aiohttp is also in requirements.txt but httpx is the standard for FastAPI projects. |
+| **base64 (stdlib)** | Custom encoding | Never—Jira's official API documentation mandates HTTP Basic Auth with base64 encoding. Using anything else breaks compatibility. |
+| **Direct token storage** | Token hashing (bcrypt, Argon2) | Never for API tokens. Hashing is one-way; you need to decrypt tokens to make API calls. Fernet encryption is the correct choice. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `passlib` | Unmaintained since 2020; Python 3.13+ incompatible; DeprecationWarnings on import | `argon2-cffi` directly or `pwdlib` |
-| `random` module | Not cryptographically secure; predictable output | `secrets` module |
-| `==` for key comparison | Timing attack vulnerable | `hmac.compare_digest()` |
-| Plain bcrypt for new keys | 72-char limit; no memory-hard protection | Argon2id |
-| Storing full API key | Database breach = full compromise | Store only hashes |
-| MD5/SHA1 for security | Cryptographically broken | SHA-256 for lookup; Argon2id for verification |
+| **PyJWT for API token validation** | Jira API tokens and Linear API keys are opaque tokens, not JWTs. PyJWT cannot validate them. | Validate by making test API call to provider (existing pattern in `integration_validator.py`). |
+| **OAuth2PasswordBearer for API tokens** | FastAPI's OAuth2PasswordBearer is designed for OAuth flows with token endpoints. API tokens are static, user-provided secrets. | Use `HTTPBearer` or custom dependency for extracting `Authorization` header. |
+| **Storing tokens in environment variables** | Multi-user SaaS app with per-user tokens. Environment variables are global and leak tokens across users. | Store in database with Fernet encryption (existing pattern). |
+| **Token rotation for user-provided API tokens** | Users manage their own API tokens in Jira/Linear dashboards. Server-side rotation would break user's token. | Document token expiration (Jira: 1 year default; Linear: never). Notify user to regenerate if validation fails. |
+| **plaintext token storage** | API tokens are bearer credentials—anyone with the token has full access. Plaintext storage violates security best practices. | Fernet encryption with `ENCRYPTION_KEY` (existing pattern). |
 
-## Implementation Patterns
+## Stack Patterns by Variant
 
-### Key Generation
+### If Jira API Token (Manual):
+- **Auth method:** HTTP Basic Auth
+- **Header format:** `Authorization: Basic <base64(email:api_token)>`
+- **Encoding:** `base64.b64encode(f"{email}:{api_token}".encode()).decode()`
+- **Storage:** Encrypt with Fernet, store in `jira_integrations.access_token`, set `token_source='manual'`
+- **Expiration:** Jira API tokens expire in 1 year by default (March-May 2026 batch). No server-side refresh—user must regenerate.
+- **Validation:** `GET https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/myself`
+- **Why this approach:** Jira's official API documentation mandates Basic Auth for API tokens. OAuth 3LO is for workspace-level integrations; API tokens are for users blocked by OAuth policies.
 
-```python
-import secrets
-import hashlib
-from argon2 import PasswordHasher
+### If Linear API Key (Manual):
+- **Auth method:** Bearer token
+- **Header format:** `Authorization: <api_key>` (note: no "Bearer" prefix for personal API keys)
+- **Storage:** Encrypt with Fernet, store in `linear_integrations.access_token`, set `token_source='manual'`
+- **Expiration:** Linear personal API keys never expire (unless manually revoked by user)
+- **Validation:** GraphQL query `{ viewer { id } }` to `https://api.linear.app/graphql`
+- **Why this approach:** Linear's official docs specify personal API keys use `Authorization: <API_KEY>` format, distinct from OAuth's `Bearer <token>`. Personal keys have higher rate limits (1,500/hr vs 500/hr for OAuth).
 
-def generate_api_key(user_id: int, environment: str = "live") -> tuple[str, str, str, str]:
-    """
-    Generate a new API key with prefix and hashes.
-
-    Returns: (full_key, prefix, sha256_hash, argon2_hash)
-    """
-    # 1. Generate cryptographically secure random bytes
-    random_part = secrets.token_hex(32)  # 64 hex characters
-
-    # 2. Create prefixed key (like Stripe: sk_live_xxx)
-    prefix = f"och_{environment}_{random_part[:8]}"
-    full_key = f"och_{environment}_{random_part}"
-
-    # 3. Create fast-lookup hash (SHA-256)
-    sha256_hash = hashlib.sha256(full_key.encode()).hexdigest()
-
-    # 4. Create secure verification hash (Argon2id)
-    ph = PasswordHasher()  # Uses Argon2id by default
-    argon2_hash = ph.hash(full_key)
-
-    return full_key, prefix, sha256_hash, argon2_hash
-```
-
-### Key Validation
-
-```python
-import hmac
-import hashlib
-from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
-from sqlalchemy.orm import Session
-
-async def validate_api_key(key: str, db: Session) -> Optional[User]:
-    """
-    Validate API key with timing-safe comparison.
-    Target: <50ms total latency.
-    """
-    # 1. Quick format check
-    if not key.startswith("och_"):
-        return None
-
-    # 2. Compute SHA-256 for fast DB lookup
-    key_hash = hashlib.sha256(key.encode()).hexdigest()
-
-    # 3. Database lookup by hash (indexed, ~1-5ms)
-    api_key_record = db.query(APIKey).filter(
-        APIKey.key_hash_sha256 == key_hash,
-        APIKey.revoked_at.is_(None),
-        or_(APIKey.expires_at.is_(None), APIKey.expires_at > func.now())
-    ).first()
-
-    if not api_key_record:
-        return None
-
-    # 4. Verify with Argon2 (secure, ~200ms)
-    ph = PasswordHasher()
-    try:
-        ph.verify(api_key_record.key_hash_argon2, key)
-    except VerifyMismatchError:
-        return None
-
-    # 5. Update last_used_at (async/background is fine)
-    api_key_record.last_used_at = func.now()
-
-    return api_key_record.user
-```
-
-### FastAPI Dependency
-
-```python
-from fastapi import Depends, HTTPException, status, Security
-from fastapi.security import APIKeyHeader
-
-# Define the header scheme
-api_key_header = APIKeyHeader(
-    name="X-API-Key",
-    scheme_name="API Key",
-    description="API key for MCP clients and automation",
-    auto_error=False  # Return None instead of 401, so we can check JWT too
-)
-
-async def get_current_user_api_key(
-    api_key: Optional[str] = Security(api_key_header),
-    db: Session = Depends(get_db)
-) -> Optional[User]:
-    """Dependency for API key authentication."""
-    if not api_key:
-        return None
-    return await validate_api_key(api_key, db)
-
-# Combined auth: JWT or API Key
-async def get_current_user(
-    jwt_user: Optional[User] = Depends(get_jwt_user_optional),
-    api_key_user: Optional[User] = Depends(get_current_user_api_key)
-) -> User:
-    """Accept either JWT or API key authentication."""
-    user = jwt_user or api_key_user
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing authentication",
-            headers={"WWW-Authenticate": "Bearer, ApiKey"}
-        )
-    return user
-```
-
-## Argon2 Configuration
-
-### Recommended Parameters (2026)
-
-```python
-from argon2 import PasswordHasher, Type
-
-# Production settings - balance security vs latency
-ph = PasswordHasher(
-    time_cost=3,           # iterations (default: 3)
-    memory_cost=65536,     # 64MB (default: 65536 KB)
-    parallelism=4,         # threads (default: 4)
-    hash_len=32,           # output length (default: 32)
-    salt_len=16,           # salt length (default: 16)
-    type=Type.ID           # Argon2id (hybrid, recommended)
-)
-
-# Target: 200-500ms verification time
-# Adjust time_cost based on your server hardware
-```
-
-### Why Argon2id?
-
-| Variant | Protection Against | Recommendation |
-|---------|-------------------|----------------|
-| Argon2d | GPU attacks | Data-dependent access; vulnerable to side-channel |
-| Argon2i | Side-channel attacks | Time-memory tradeoff vulnerable |
-| Argon2id | Both | **Recommended** - hybrid approach |
+### If OAuth 2.0 (Existing):
+- **Auth method:** Bearer token
+- **Header format:** `Authorization: Bearer <access_token>`
+- **Storage:** Already implemented—encrypted tokens with refresh logic
+- **Why preserve:** OAuth provides better UX for workspace-level integrations and supports automatic refresh. Keep existing implementation unchanged.
 
 ## Version Compatibility
 
 | Package | Compatible With | Notes |
 |---------|-----------------|-------|
-| `argon2-cffi>=25.1.0` | Python 3.8-3.14, PyPy | Includes Pyodide/WASM support |
-| `pwdlib>=0.3.0` | Python 3.10+ | Requires `[argon2]` extra |
-| `bcrypt>=5.0.0` | Python 3.8+, PyPy 3 | Now Rust-based; requires Rust compiler for source builds |
-| FastAPI 0.128.0 | Python 3.10+ | Dropped 3.8 support; Pydantic v1 deprecated |
+| **cryptography 46.0.4** | Python 3.8+ | Latest stable release (Jan 2026). Supports free-threaded Python 3.14. Minimum Rust 1.83.0 for build. |
+| **httpx** | FastAPI, asyncio | HTTP/2 support, connection pooling. Async client pattern already used in `integration_oauth.py` and `integration_validator.py`. |
+| **pydantic 2.x** | FastAPI 0.119+ | FastAPI requires Pydantic v2 (v1 deprecated). Already in use; compatible with existing validation patterns. |
+| **SQLAlchemy** | PostgreSQL | Existing models already support `token_source` field. No migration needed. |
 
-## Existing Codebase Integration Notes
+## Security Considerations
 
-The current On-Call Health backend uses:
-- `passlib[bcrypt]` in requirements.txt - **should migrate to argon2-cffi**
-- `python-jose[cryptography]` for JWT - **keep as-is, works alongside API keys**
-- Existing `app/mcp/auth.py` extracts bearer tokens - **extend to support X-API-Key header**
-- Security middleware in `app/middleware/security.py` - **add API key routes to sensitive routes**
+### Key Management
+- **Use existing ENCRYPTION_KEY:** Reuse `settings.ENCRYPTION_KEY` (already used for OAuth tokens). Consistent encryption key management.
+- **Key rotation:** If rotating encryption key, must re-encrypt both OAuth tokens AND manual API tokens. Existing `get_encryption_key()` pattern handles this.
 
-Migration path:
-1. Add `argon2-cffi>=25.1.0` to requirements.txt
-2. Keep `passlib[bcrypt]` temporarily for backward compat with existing password hashes
-3. Create new APIKey model with dual-hash storage
-4. Add FastAPI dependency that checks both JWT and API key
-5. Eventually remove passlib when all password hashes upgraded
+### Token Storage
+- **Never log tokens:** Existing logger in `integration_validator.py` only logs first 40 chars of encryption key (safe). Continue this pattern.
+- **Decrypt only when needed:** Decrypt tokens just-in-time for API calls (existing pattern). Never store decrypted tokens in memory longer than request lifecycle.
+
+### Token Validation
+- **Validate on first use:** When user provides API token, immediately validate with test API call before storing (existing pattern in `_validate_github`, `_validate_linear`, `_validate_jira`).
+- **Cache validation results:** Reuse existing `validation_cache.py` with Redis. TTL for manual tokens: 15 minutes (same as OAuth).
+- **Handle 401 gracefully:** If API call returns 401, invalidate cache and prompt user to update token (existing pattern).
+
+### Rate Limiting
+- **Jira API tokens:** Subject to Atlassian rate limits (logged in `integration_oauth.py` lines 486-501). No change needed.
+- **Linear API keys:** 1,500 requests/hour (vs 500/hour for OAuth). Higher limit is a benefit—no additional handling needed.
+
+### CAPTCHA Protection (Jira-specific)
+- **Risk:** Jira triggers CAPTCHA after multiple failed auth attempts, blocking REST API access entirely.
+- **Detection:** Check for `X-Seraph-LoginReason: AUTHENTICATION_DENIED` header.
+- **Mitigation:** Limit validation attempts. Cache failed validations to prevent retry storms. Existing validation cache helps here.
 
 ## Sources
 
-- [argon2-cffi PyPI](https://pypi.org/project/argon2-cffi/) - Version 25.1.0 verified (June 3, 2025)
-- [argon2-cffi Documentation](https://argon2-cffi.readthedocs.io/) - Official docs
-- [pwdlib PyPI](https://pypi.org/project/pwdlib/) - Version 0.3.0 verified (October 25, 2025)
-- [pwdlib Guide](https://frankie567.github.io/pwdlib/guide/) - Official usage guide
-- [bcrypt PyPI](https://pypi.org/project/bcrypt/) - Version 5.0.0 verified
-- [FastAPI Security Reference](https://fastapi.tiangolo.com/reference/security/) - APIKeyHeader documentation
-- [Python secrets module](https://docs.python.org/3/library/secrets.html) - Official stdlib docs
-- [Python hmac module](https://docs.python.org/3/library/hmac.html) - compare_digest documentation
-- [PostgreSQL Hash Indexes](https://www.postgresql.org/docs/current/hash-index.html) - Official docs on hash index performance
-- [Password Hashing Guide 2025](https://guptadeepak.com/the-complete-guide-to-password-hashing-argon2-vs-bcrypt-vs-scrypt-vs-pbkdf2-2026/) - Algorithm comparison
-- [FastAPI-Users Password Hash](https://fastapi-users.github.io/fastapi-users/latest/configuration/password-hash/) - pwdlib adoption
-- [passlib Maintenance Discussion](https://github.com/pypi/warehouse/issues/15454) - PyPI warehouse issue on passlib future
-- [Best Practices for API Keys](https://www.freecodecamp.org/news/best-practices-for-building-api-keys-97c26eabfea9/) - Prefix + hash pattern
-- [Prefix.dev API Keys](https://prefix.dev/blog/how_we_implented_api_keys) - Real-world implementation example
+### Official Documentation
+- [Jira Basic Auth for REST APIs](https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis/) — Jira API token authentication requirements
+- [Manage API tokens for your Atlassian account](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/) — Jira API token management and expiration
+- [Linear Getting Started](https://linear.app/developers/graphql) — Linear authentication methods and API key usage
+- [FastAPI Security](https://fastapi.tiangolo.com/tutorial/security/) — FastAPI security patterns and dependency injection
+- [Fernet Symmetric Encryption](https://cryptography.io/en/latest/fernet/) — Cryptography library Fernet implementation
+
+### Package Versions (Verified Jan 2026)
+- [cryptography 46.0.4 on PyPI](https://pypi.org/project/cryptography/) — Latest stable release
+- [HTTPX Documentation](https://www.python-httpx.org/) — Async client patterns
+- [Pydantic Documentation](https://docs.pydantic.dev/latest/) — Pydantic v2 migration guide
+
+### Community Best Practices
+- [Jira API Token Best Practices](https://community.atlassian.com/forums/Jira-questions/User-API-Token-Best-Practices/qaq-p/3095043) — Atlassian community security guidance
+- [How to Use Linear's API Tokens](https://www.storylane.io/tutorials/how-to-use-linears-api-tokens) — Linear API key tutorial
+- [The New Way To Generate Secure Tokens in Python](https://blog.miguelgrinberg.com/post/the-new-way-to-generate-secure-tokens-in-python) — Python secrets module best practices
 
 ---
-*Stack research for: API Key Management in FastAPI/SQLAlchemy/PostgreSQL*
+*Stack research for: Token-based authentication for Jira and Linear*
 *Researched: 2026-01-30*
+*Confidence: HIGH (all recommendations verified with official docs and existing codebase)*

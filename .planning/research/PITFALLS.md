@@ -1,310 +1,348 @@
-# Pitfalls Research
+# Pitfalls Research: Adding API Token Support to OAuth Integrations
 
-**Domain:** API Key Management for Existing Authentication System
+**Domain:** Dual authentication systems (OAuth + API tokens)
 **Researched:** 2026-01-30
 **Confidence:** HIGH
 
+---
+
 ## Critical Pitfalls
 
-### Pitfall 1: Timing Attack Vulnerability in Key Validation
+### Pitfall 1: Inconsistent Token Storage Security
 
 **What goes wrong:**
-Using standard string comparison (`==` or `===`) to validate API keys allows attackers to guess keys character-by-character by measuring response time differences. A real vulnerability (CVE-2026-23996) was discovered in fastapi-api-key for exactly this issue. The vLLM project also disclosed a similar timing attack vulnerability in their API key validation.
+API tokens stored with weaker encryption or plaintext while OAuth tokens use proper encryption. This creates a security downgrade where adding "convenience" (API tokens) introduces vulnerabilities that didn't exist in the OAuth-only system.
 
 **Why it happens:**
-Standard string comparison exits early on first mismatch. More matching characters = longer comparison time. Attackers can statistically determine correct characters by measuring microsecond differences across many requests.
+Developers assume API tokens are "simpler" and don't need the same security rigor as OAuth. The existing OAuth encryption infrastructure (Fernet with ENCRYPTION_KEY) may not be reused for API tokens, leading to ad-hoc storage solutions like environment variables or config files.
 
-**How to avoid:**
-- Use constant-time comparison functions: `hmac.compare_digest()` in Python or `crypto.timingSafeEqual()` in Node.js
-- Hash the incoming key before comparison (comparing hashes is safer since they're fixed length)
-- Implement aggressive rate limiting to disrupt statistical timing analysis (already have 5/minute for admin_api_key)
+**Consequences:**
+- Security audit fails because different credentials have different protection levels
+- API token leaks expose the entire integration, not just a short-lived OAuth session
+- Compliance violations (GDPR, SOC2) for inconsistent sensitive data handling
+- Cannot prove to security teams that API tokens receive equivalent protection
+
+**Prevention:**
+- **MUST**: Reuse existing `encrypt_token()` and `decrypt_token()` functions from `integration_validator.py`
+- **MUST**: Store API tokens in same database columns as OAuth tokens (`access_token` column with encryption)
+- **MUST**: Use same `ENCRYPTION_KEY` from config for all credential types
+- **VERIFY**: All token storage paths use `Fernet(get_encryption_key())` consistently
+- **TEST**: Write security tests that verify API tokens are never stored in plaintext
 
 **Warning signs:**
-- Using `==` or `if key == stored_key` anywhere in validation code
-- API key validation endpoint response times vary with input
-- Security scanners flagging timing vulnerabilities
+- API token storage code bypasses existing encryption helpers
+- New database columns added without encryption layer
+- Environment variables used to store user-provided API tokens
+- Tests that mock encryption only for OAuth paths, not API token paths
 
 **Phase to address:**
-Phase 1 (Database Schema & Core Model) - Build constant-time comparison into the validation function from day one.
+Phase 1: Token Storage Architecture - Establish encryption parity as first requirement before any API token input
 
 ---
 
-### Pitfall 2: Using Password Hashing (bcrypt/Argon2) for API Key Storage
+### Pitfall 2: Confused Permission Scoping
 
 **What goes wrong:**
-Developers apply password hashing best practices (bcrypt, Argon2id) to API keys, resulting in 200-350ms validation times instead of the required <50ms. At scale, this creates unacceptable latency and potential DoS vectors.
+OAuth tokens have scopes like `read:jira-work read:jira-user` while API tokens may have different, broader permissions (e.g., Jira API tokens have ALL permissions of the creating user). Code assumes all tokens have same permission boundaries, leading to over-privileged API operations.
 
 **Why it happens:**
-Password hashing algorithms are intentionally slow (work factor 12+ for bcrypt = 250ms+). Developers correctly learn "always hash credentials" but don't distinguish between user-facing password authentication (infrequent, one-off) and API key validation (every single request).
+OAuth scopes are explicit in the authorization flow, but API token permissions are often:
+- Determined by the creating user's role (not visible to your system)
+- All-or-nothing rather than granular
+- Not discoverable through API introspection
 
-**How to avoid:**
-- Use fast cryptographic hashes with HMAC: `HMAC-SHA256(key, server_secret)` or plain `SHA-256` of the full key
-- The security comes from key entropy (256+ bits), not hash slowness
-- Reserve bcrypt/Argon2 for user passwords only
-- Store: `sha256(prefix + long_token)` - lookup by prefix, compare hash
+**Consequences:**
+- Security incident: API token performs actions OAuth would reject
+- Compliance violation: Users gain more access through "manual" path than OAuth
+- Cannot implement least-privilege principle consistently
+- Risk assessment becomes impossible (cannot predict what each token can do)
+
+**Prevention:**
+- **DESIGN**: Add `token_scopes` JSON column to store discovered/declared permissions
+- **VALIDATION**: Test token permissions on setup with `test_permissions()` calls
+- **DOCUMENTATION**: Warn users that API tokens may have broader access than OAuth
+- **AUDIT**: Log which token type performed which operation for security review
+- **FAIL SAFE**: If scope cannot be determined, assume broadest permissions and flag for review
 
 **Warning signs:**
-- API key validation exceeding 50ms in load tests
-- Database CPU spiking on authentication checks
-- Validation time scales with bcrypt work factor adjustments
+- Permission checks only validate for OAuth flows
+- No capability testing during API token setup
+- Code assumes `token_source == 'manual'` means limited access
+- Error messages don't distinguish between OAuth scope denial vs API token permission denial
 
 **Phase to address:**
-Phase 1 (Database Schema) - Select SHA-256 or HMAC-SHA256 for key hashing, not bcrypt.
+Phase 1: Token Storage Architecture - Add permission metadata fields
+Phase 2: Token Validation Logic - Implement scope checking before use
 
 ---
 
-### Pitfall 3: Missing or Incorrect Database Index on Key Lookup Column
+### Pitfall 3: No Expiration Strategy for API Tokens
 
 **What goes wrong:**
-Full table scans on every API request because the hashed key column lacks a proper index. Query times of 200ms+ instead of <1ms. A single missing index has been documented to cause 35x slowdown (7 seconds to 200ms in production cases).
+OAuth tokens expire (Jira: 1hr, Linear: 24hr) and automatically refresh. API tokens have no expiration, creating infinite-lived credentials that violate security best practices. System never prompts users to rotate API tokens.
 
 **Why it happens:**
-Developers create the `api_keys` table but forget to index the lookup column. Or they index the full hash but query by prefix. Or they create a regular index instead of a unique index, missing integrity enforcement.
+API providers don't offer refresh tokens for API keys. Developers skip expiration handling entirely rather than implementing manual rotation workflows. The `token_expires_at` field gets set to `NULL` for API tokens without considering security implications.
 
-**How to avoid:**
-- Use composite primary key: `(prefix, key_hash)` - prefix for lookup, hash for verification
-- Add unique constraint on key_hash to prevent accidental duplicates
-- Create covering index that includes commonly-needed fields (user_id, expires_at, is_active)
-- Test with EXPLAIN ANALYZE before deployment
+**Consequences:**
+- Compromised API token grants perpetual access until manually revoked
+- Security audit fails: no credential rotation policy
+- Cannot implement "break glass" scenarios where all credentials expire
+- Lost/forgotten API tokens accumulate in database forever
+- Compliance violations (many standards require periodic credential rotation)
+
+**Prevention:**
+- **POLICY**: Set virtual expiration (e.g., 90 days) for API tokens in `token_expires_at`
+- **NOTIFICATION**: Email users 2 weeks before virtual expiration to rotate token
+- **UI**: Show "Last verified" date and "Expires in X days" for API tokens
+- **REVOCATION**: Automatically disable API token integrations after virtual expiration
+- **RENEWAL**: Provide self-service flow to update expired API token (not re-auth)
+- **MONITORING**: Alert on API tokens older than 180 days
 
 **Warning signs:**
-- Slow query logs showing seq scans on api_keys table
-- p99 latency spikes on authenticated endpoints
-- Database load increases linearly with key count
+- `token_expires_at IS NULL` for token_source='manual'
+- No scheduled jobs checking API token age
+- No UI showing token age or expiration status
+- Users surprised when "it just stopped working" after months of use
 
 **Phase to address:**
-Phase 1 (Database Schema) - Define indexes in migration, verify with EXPLAIN ANALYZE.
+Phase 2: Token Validation Logic - Implement virtual expiration checking
+Phase 3: User Experience - Add UI for token age and rotation reminders
 
 ---
 
-### Pitfall 4: Exposing Full API Key in Logs, Error Messages, or Database
+### Pitfall 4: Token Type Confusion in Validation Logic
 
 **What goes wrong:**
-Full API keys appear in application logs, error responses, or stored in recoverable form. Attackers with log access gain immediate API access. This is how the DOGE employee leak exposed government API keys via GitHub.
+Validation code attempts to refresh API tokens (which can't refresh) or skips OAuth token refresh (because generic "token exists" check passes). The `needs_refresh()` logic fails to distinguish between token types, causing either infinite refresh loops or stale OAuth tokens.
 
 **Why it happens:**
-- Logging request headers without filtering sensitive values
-- Returning helpful error messages like "Invalid key: sk_live_abc123..."
-- Storing keys encrypted (recoverable) instead of hashed (one-way)
-- Debug mode accidentally enabled in production
+Both token types stored in same `access_token` column. Code checks `if integration.has_token` without checking `if integration.supports_refresh`. The `needs_refresh()` function doesn't account for API tokens that never expire vs OAuth tokens that need proactive refresh.
 
-**How to avoid:**
-- Store only: `prefix` (for identification) + `hash(full_key)` (for verification)
-- Never store the full key - show it exactly once at creation time
-- Sanitize all logs: mask Authorization headers
-- Generic error messages: "Invalid API key" not "Key xyz not found"
-- Add prefix to keys (e.g., `och_live_`, `och_test_`) to identify leaked keys via automated scanning
+**Consequences:**
+- OAuth tokens expire mid-operation because refresh was skipped
+- Error logs full of "cannot refresh token" for API tokens
+- Race conditions where refresh attempt happens while API token is in use
+- User sees "token expired" error for API token that shouldn't expire
+- Distributed lock contention from unnecessary refresh attempts
+
+**Prevention:**
+- **VALIDATION**: Always check `integration.supports_refresh` before calling refresh
+- **BRANCHING**: Separate code paths for OAuth vs API token validation
+```python
+if integration.is_oauth and integration.needs_refresh:
+    await refresh_oauth_token(integration)
+elif integration.is_manual:
+    # API tokens don't refresh, check virtual expiration instead
+    check_virtual_expiration(integration)
+```
+- **TESTING**: Write tests for both paths with proper mocking
+- **LOGGING**: Log token type in all validation messages for debugging
 
 **Warning signs:**
-- Grep for API key patterns in log files
-- Error responses contain partial key information
-- Database has a decryptable `key` column instead of `key_hash`
+- Logs showing "refresh failed" for `token_source='manual'`
+- OAuth tokens expiring despite refresh infrastructure
+- Conditional logic like `if token_expires_at:` instead of `if is_oauth:`
+- Generic exception handlers catching both OAuth and API token errors
 
 **Phase to address:**
-Phase 1 (Core Model) - Design schema with hash-only storage; Phase 2 (CRUD API) - Implement log sanitization.
+Phase 2: Token Validation Logic - Implement type-aware validation branching
 
 ---
 
-### Pitfall 5: No Key Prefix for Identification and Revocation
+### Pitfall 5: User Confusion - When to Use Which Method
 
 **What goes wrong:**
-Users have multiple keys but cannot identify which key is which in their dashboard. When a key is compromised, they revoke the wrong one. Operations cannot quickly identify which service a leaked key belongs to.
+Users don't understand when to use OAuth vs API token. They create API token thinking it's "easier" but then can't access certain features. Or they use OAuth but wanted the simplicity of API tokens. Support tickets increase, user frustration grows, adoption stalls.
 
 **Why it happens:**
-Developers generate opaque random strings without structure. Works fine with one key, becomes unusable with multiple keys or in incident response.
+No clear guidance in UI about tradeoffs. Both options presented equally with generic "Choose authentication method" dropdown. Users pick based on what they see first, not what they need.
 
-**How to avoid:**
-- Use structured format: `{service_prefix}_{environment}_{short_token}_{long_token}`
-- Example: `och_live_abc123_[64-char-secret]`
-- Store and display short_token for identification (safe to show)
-- Only hash/verify long_token (never displayable after creation)
-- Stripe pattern: `sk_live_`, `sk_test_`, `pk_live_`, `pk_test_`
+**Consequences:**
+- Support burden: "Why can't I do X?" → "Because you chose API token"
+- User abandonment: "This is too complicated" after choosing wrong method
+- Security downgrade: Users pick API token to "avoid OAuth popup"
+- Feature confusion: Capabilities differ by auth method but not documented
+- Re-authentication churn: Users switch methods after initial setup
 
-**Warning signs:**
-- User support tickets about "which key is which"
-- Incident response delayed by key identification
-- Users regenerating all keys instead of revoking one
-
-**Phase to address:**
-Phase 1 (Core Model) - Design key format with prefix structure.
-
----
-
-### Pitfall 6: Dual Authentication Mode Without Clear Precedence Rules
-
-**What goes wrong:**
-During migration, both JWT and API keys are accepted. Conflicting authentication methods on same request cause unpredictable behavior. Middleware processes JWT first, then API key, resulting in wrong user context or authorization failures.
-
-**Why it happens:**
-Adding API key auth to existing JWT system without defining precedence. The current `get_current_user()` function in `dependencies.py` checks Authorization header then cookies - adding API keys requires a third path with clear priority.
-
-**How to avoid:**
-- Define explicit precedence: API Key header > Bearer JWT > Cookie
-- Document which auth method was used in request context for logging/debugging
-- Reject requests with multiple auth methods (or pick one consistently)
-- Use different headers: `X-API-Key` vs `Authorization: Bearer`
+**Prevention:**
+- **DECISION TREE**: Show comparison table before method selection
+  - OAuth: Automatic renewal, secure, recommended for most users
+  - API Token: Manual setup, for automation, requires rotation
+- **USE CASE GUIDANCE**: "Use OAuth if: ...", "Use API Token if: ..."
+- **WARNINGS**: "API tokens require manual rotation every 90 days"
+- **CAPABILITY MATRIX**: Show which features work with which method
+- **DEFAULT**: Pre-select OAuth unless user explicitly chooses API token
+- **CONFIRMATION**: "You selected API token. This means..." before proceeding
 
 **Warning signs:**
-- Tests pass individually but fail when auth methods combined
-- Logs show user A's request authorized as user B
-- "Works sometimes" authentication bugs
+- Support tickets asking "what's the difference?"
+- Users switching methods frequently
+- High abandonment rate during authentication setup
+- Users asking "which one should I pick?"
 
 **Phase to address:**
-Phase 2 (Validation Service) - Implement unified auth dispatcher with clear precedence.
-
----
-
-### Pitfall 7: Rate Limiting Bypassed by Generating New Keys
-
-**What goes wrong:**
-Rate limits are per-key, but users can generate unlimited keys. Attacker creates new key for each batch of requests, effectively bypassing all rate limits.
-
-**Why it happens:**
-Rate limiting implemented per-key without considering key creation as an attack vector. Current system has `admin_api_key: 5/minute` but this only limits key validation, not key creation.
-
-**How to avoid:**
-- Rate limit key creation: max 10 keys per user, 3 new keys per hour
-- Rate limit at user level, not just key level
-- Track request volume across all user's keys
-- Implement organization-level quotas
-
-**Warning signs:**
-- Users with dozens of active keys
-- Burst traffic from many keys belonging to same user
-- Key creation spikes before abuse incidents
-
-**Phase to address:**
-Phase 2 (CRUD API) - Enforce key count limits; Phase 3 (Rate Limiting) - Implement per-user rate tracking.
-
----
-
-### Pitfall 8: Show-Once Key Revealed Before User Confirms Copy
-
-**What goes wrong:**
-Key displayed immediately on creation. User navigates away accidentally. Key is lost forever. Support tickets flood in for "lost key" recovery (which is impossible by design).
-
-**Why it happens:**
-Standard form flow: submit -> success message with key. No user confirmation that they've saved it.
-
-**How to avoid:**
-- Two-step reveal: Create key -> Show "key created" with masked preview -> User clicks "Reveal key" -> Copy button -> "I've saved this key" confirmation
-- Require clipboard copy or download before dismissing
-- Send one-time-viewable key via secure channel as backup option
-- Clear UX warning: "This key will only be shown once. Store it securely."
-
-**Warning signs:**
-- Support tickets asking to recover lost keys
-- Users immediately regenerating keys after creation
-- Low key usage rate (users create but never use)
-
-**Phase to address:**
-Phase 4 (Frontend UI) - Implement confirmed reveal flow.
+Phase 3: User Experience - Add decision guidance UI
+Phase 4: Documentation - Create comparison guide
 
 ---
 
 ## Technical Debt Patterns
 
+Shortcuts that seem reasonable but create long-term problems.
+
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Store encrypted keys (not hashed) | Keys recoverable for support | Database breach = all keys compromised | Never for production API keys |
-| Skip key expiration | Simpler implementation | Stale keys accumulate, never rotated | Never - at minimum support optional expiration |
-| Single global rate limit | Quick to implement | No per-key/per-user granularity | MVP only, with plan to enhance |
-| No key prefix format | Faster generation | Cannot identify keys in logs/incidents | Never - always use prefixes |
-| In-memory rate limiting | No Redis dependency | Distributed bypass, state loss on restart | Development only (already handled in codebase) |
+| Skip token type validation during operations | Faster development, simpler code | Confusion errors, security incidents | Never - validation is critical |
+| Store API tokens without encryption | Easier implementation | Security audit failure, compliance violation | Never - encryption is required |
+| No virtual expiration for API tokens | Simpler token management | Perpetual credentials, security risk | Never - expiration policy required |
+| Reuse OAuth refresh logic for API tokens | Less code duplication | Failed refresh attempts, error noise | Never - tokens need separate paths |
+| Single "Add Integration" flow for both methods | Simpler UI | User confusion, wrong method selection | Only for MVP, must add guidance in Phase 2 |
+| Generic error messages for both token types | Less error handling code | Debugging nightmares, user confusion | Never - errors must indicate token type |
+| Assume API tokens have same scope as OAuth | Simplifies permission model | Security gaps, over-privileged operations | Never - scopes must be checked |
+
+---
 
 ## Integration Gotchas
 
+Common mistakes when connecting to external services.
+
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| MCP Authentication | Passing JWT where API key expected | MCP should accept API keys exclusively; separate from web auth |
-| Existing JWT system | Modifying `get_current_user()` directly | Create `get_current_user_or_api_key()` wrapper, keep JWT logic intact |
-| Redis rate limiting | Using same database as app | Already correct - using DB 1 for rate limiting. Continue this pattern for API key rate tracking |
-| Frontend token storage | Treating API keys like JWTs | API keys should never touch frontend; backend-to-backend only |
+| Jira API Token | Assuming token has same scopes as OAuth `read:jira-work` | Test permissions on setup - API token has ALL user permissions |
+| Jira OAuth | Not handling 1-hour expiration aggressively | Refresh token when `expires_at - now < 5 minutes` |
+| Linear API Token | Expecting refresh token like OAuth | API tokens are long-lived (no refresh), set virtual 90-day expiration |
+| Linear OAuth | Assuming 1-hour expiration like Jira | Linear tokens last 24 hours, refresh when `< 1 hour` remaining |
+| Both | Storing token_source after validation | Set token_source BEFORE first API call for proper error handling |
+| Both | Using same HTTP headers for both methods | OAuth: `Authorization: Bearer <token>`, API tokens vary by provider |
+| Jira | Expecting API token to work with cloud_id | API tokens are per-user, still need cloud_id from accessible_resources |
+| Linear | Treating API token as OAuth access_token | API tokens don't have associated refresh_token or expires_at |
+
+---
 
 ## Performance Traps
 
+Patterns that work at small scale but fail as usage grows.
+
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| bcrypt for key validation | 200-300ms per request | Use SHA-256/HMAC, target <5ms | Any production load |
-| Missing index on key_hash | p99 > 100ms, linear scaling | Composite index on (prefix, key_hash) | >1000 keys |
-| N+1 queries for key metadata | Load user/org on every request | Eager load in single query or cache | >100 requests/second |
-| Hash computation in Python | CPU bottleneck | Use hashlib (C bindings) not pure Python | >500 validations/second |
-| Logging every validation | Log volume explosion | Sample logging, metrics instead | >1000 requests/minute |
+| Refresh all OAuth tokens on cron job | High database load at same time | Randomize refresh time per integration | >100 integrations |
+| Check token expiration on every API call | Latency spikes, DB connection pool exhaustion | Cache expiration check for 1 minute | >1000 API calls/minute |
+| Attempt refresh on first API failure | Cascading failures, timeout storms | Proactive refresh before expiration | >50 concurrent users |
+| Encrypt/decrypt on every token read | CPU spikes, slow API responses | Cache decrypted token in request context | >500 requests/minute |
+| Sequential permission testing during setup | Slow onboarding, user abandonment | Parallel permission checks with timeout | >5 permission tests |
+| Lock entire table during token refresh | Other users blocked waiting | Use row-level or distributed locks (Redis) | >10 concurrent refreshes |
+
+---
 
 ## Security Mistakes
 
+Domain-specific security issues beyond general web security.
+
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Timing attack in comparison | Key can be guessed character-by-character | `hmac.compare_digest()` always |
-| Key in URL parameters | Logged in server/proxy access logs | Header only (`X-API-Key` or `Authorization`) |
-| Weak key entropy | Brute force possible | 256-bit minimum (32 bytes = 43 base64 chars) |
-| No key scope/permissions | All-or-nothing access | Plan for scoped keys even if v1 is full-access |
-| Accepting expired keys | Revocation doesn't work | Check expiration on every validation |
-| Missing audit log | Cannot investigate breaches | Log: key_id (not key), timestamp, endpoint, IP |
+| Log decrypted tokens in error messages | Token leakage in logs, SIEM systems | Always log `token[:8]...` not full token |
+| Store encryption key in application code | Source code leak exposes all tokens | Use environment variable, never commit |
+| Same encryption key for JWT and token storage | Key compromise affects both auth systems | Use separate `JWT_SECRET_KEY` and `ENCRYPTION_KEY` |
+| API token sent in URL query parameters | Token in browser history, proxy logs | Always use Authorization header or POST body |
+| Allow API token in webhook callbacks | Token exposed to third-party servers | Webhooks should use HMAC signing, not bearer tokens |
+| Skip TLS certificate validation in dev | Dev-to-production config leak disables TLS | Always validate certificates, use test certs in dev |
+| Reuse OAuth state parameter | CSRF vulnerability in token exchange | Generate unique state per authorization flow |
+| Store token_source based on user input | User claims "OAuth" but provides API token | Determine token_source by attempting introspection |
+
+---
 
 ## UX Pitfalls
 
+Common user experience mistakes in this domain.
+
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Key shown then immediately hidden | User didn't copy in time, lost forever | Reveal flow with confirmation, copy button |
-| No key naming/description | "Which key is for which service?" | Required name field, optional description |
-| Immediate key creation | Accidental key proliferation | Confirmation modal with security reminder |
-| No last-used timestamp | Cannot identify stale keys for cleanup | Track and display last successful authentication |
-| Revocation without confirmation | Accidental production outage | "Type key name to confirm" for active keys |
-| No partial key display | Cannot identify keys in dashboard | Show prefix + last 4 chars: `och_live_...x7Kp` |
+| "Authentication method" dropdown with no explanation | Users guess, pick wrong method, get frustrated | Show decision tree with "Recommended" badge on OAuth |
+| Generic "Token invalid" error | User doesn't know if OAuth expired or API token wrong | "Your OAuth token expired. Click to reconnect" vs "API token authentication failed. Check token in Jira settings" |
+| No indication which integration uses which method | User forgets what they set up 3 months ago | Show badge: "OAuth (Auto-renew)" vs "API Token (Rotate by Feb 1)" |
+| Setup flow doesn't test token immediately | User completes setup, integration fails later | Test permissions during setup, show what works/doesn't |
+| Can't switch from API token to OAuth without re-setup | User realizes they want auto-renewal | "Upgrade to OAuth" button that migrates integration |
+| No reminder when API token approaching expiration | Integration suddenly stops working | Email user 2 weeks before virtual expiration |
+| Error says "reconnect" for both token types | User goes through OAuth flow for API token issue | "Update API token" vs "Reconnect OAuth" |
+
+---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Key validation:** Constant-time comparison implemented - verify with timing analysis
-- [ ] **Key storage:** Only hash stored, never recoverable - check database schema directly
-- [ ] **Rate limiting:** Per-user limits, not just per-key - test with multiple keys
-- [ ] **Logging:** Keys never appear in logs - grep production logs for key patterns
-- [ ] **Error messages:** Generic "Invalid key" only - test invalid key error response
-- [ ] **Key expiration:** Optional expiry actually enforced - test with expired key
-- [ ] **Audit trail:** All authentications logged with key_id - verify audit table populated
-- [ ] **Index performance:** EXPLAIN ANALYZE shows index scan - test with 10k+ keys
-- [ ] **Dual auth:** JWT and API key precedence tested - send request with both
+Things that appear complete but are missing critical pieces.
+
+- [ ] **API Token Storage:** Token encryption uses same key/algorithm as OAuth—verify `encrypt_token()` function reused
+- [ ] **Token Refresh Logic:** Code checks `integration.supports_refresh` before attempting refresh—verify no refresh attempts for `token_source='manual'`
+- [ ] **Expiration Handling:** API tokens have virtual expiration set in `token_expires_at`—verify not NULL for manual tokens
+- [ ] **Permission Testing:** Setup flow calls `test_permissions()` for API tokens—verify capabilities stored in metadata
+- [ ] **Scope Validation:** Operations check token capabilities before execution—verify both OAuth scopes AND API token permissions validated
+- [ ] **Error Messages:** Errors distinguish between OAuth and API token issues—verify token_source included in error context
+- [ ] **UI Guidance:** Setup page explains OAuth vs API token tradeoffs—verify decision tree or comparison table present
+- [ ] **Rotation Reminders:** Scheduled job checks API token age—verify notification sent before virtual expiration
+- [ ] **Audit Logging:** Token operations log token_source and scope—verify can trace which token performed which action
+- [ ] **Migration Path:** Users can upgrade from API token to OAuth—verify state preserved during method change
+- [ ] **Documentation:** Setup guide covers both methods with recommendations—verify troubleshooting for each type
+- [ ] **Security Tests:** Tests verify API tokens encrypted—verify no plaintext tokens in database dumps
+
+---
 
 ## Recovery Strategies
 
+When pitfalls occur despite prevention, how to recover.
+
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Timing attack vulnerability | LOW | Add `hmac.compare_digest()`, deploy immediately |
-| Wrong hashing algorithm (bcrypt) | MEDIUM | Migration: add sha256 column, backfill, switch validation, drop bcrypt column |
-| Missing index | LOW | Add index (online in Postgres), immediate improvement |
-| Keys in logs | HIGH | Rotate all potentially-exposed keys, audit log access, implement log sanitization |
-| No key prefix | MEDIUM | Cannot retrofit existing keys - deprecate and require new keys with prefix |
-| Rate limit bypass | MEDIUM | Add per-user tracking, may require key regeneration for quota assignment |
-| Lost key (show-once failure) | LOW per incident | User regenerates key - but high support volume if UX poor |
+| API tokens stored without encryption | HIGH | 1. Generate new ENCRYPTION_KEY, 2. Email all users to re-enter API tokens, 3. Encrypt new tokens, 4. Rotate old tokens as users update |
+| OAuth and API tokens have inconsistent scopes | MEDIUM | 1. Add permission metadata to all integrations, 2. Test existing tokens, 3. Flag over-privileged API tokens, 4. Notify users of changes |
+| API tokens never expire (no rotation policy) | MEDIUM | 1. Set virtual expiration dates retroactively, 2. Email users with rotation deadlines, 3. Implement rotation reminders |
+| Token validation doesn't check token_source | LOW | 1. Add type-aware validation, 2. Deploy with feature flag, 3. Monitor error rates, 4. Enable for all users |
+| Users confused about OAuth vs API token | LOW | 1. Add decision tree to setup UI, 2. Email existing users with guidance, 3. Offer migration tool |
+| Logs contain decrypted tokens | HIGH | 1. Rotate all potentially leaked tokens, 2. Fix logging code, 3. Purge old logs, 4. Implement log scrubbing |
+| No virtual expiration for API tokens | MEDIUM | 1. Set expiration policy (90 days), 2. Backfill expiration dates, 3. Add rotation reminders, 4. Email users before first expiration wave |
+
+---
 
 ## Pitfall-to-Phase Mapping
 
+How roadmap phases should address these pitfalls.
+
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Timing attack | Phase 1: Core Model | Code review for `hmac.compare_digest()` |
-| Wrong hash algorithm | Phase 1: Schema Design | Verify SHA-256/HMAC, not bcrypt |
-| Missing index | Phase 1: Migration | EXPLAIN ANALYZE on validation query |
-| Key exposure in logs | Phase 2: CRUD API | Grep logs for key patterns after test run |
-| No key prefix | Phase 1: Core Model | Key format regex validation |
-| Dual auth confusion | Phase 2: Validation | Integration tests with both auth methods |
-| Rate limit bypass | Phase 3: Rate Limiting | Load test with multiple keys per user |
-| Show-once UX | Phase 4: Frontend | User testing of key creation flow |
-| No audit trail | Phase 2: CRUD API | Verify audit entries after each operation |
+| Inconsistent token storage security | Phase 1: Token Storage Architecture | Test that both OAuth and API tokens use same encryption; database dump shows no plaintext |
+| Confused permission scoping | Phase 1: Storage + Phase 2: Validation | Permission metadata stored; test_permissions() called during setup |
+| No expiration strategy for API tokens | Phase 2: Token Validation Logic | Virtual expiration set; scheduled job checks token age |
+| Token type confusion in validation | Phase 2: Token Validation Logic | Separate code paths for OAuth vs API; no refresh attempts for manual tokens |
+| User confusion about methods | Phase 3: User Experience | Decision tree in UI; comparison table shown before selection |
+| No rotation reminders | Phase 3: UX + Phase 5: Monitoring | Email sent 2 weeks before expiration; UI shows expiration date |
+| Generic error messages | Phase 3: User Experience | Errors mention token type; different messages for OAuth vs API issues |
+| Performance at scale | Phase 4: Optimization (future) | Token caching; distributed locks; parallel permission tests |
+| Audit/compliance gaps | Phase 5: Monitoring & Security | Audit logs show token_source; security tests verify encryption |
+
+---
 
 ## Sources
 
-- [CVE-2026-23996: Timing Side-Channels in fastapi-api-key](https://dev.to/cverports/cve-2026-23996-the-tell-tale-delay-timing-side-channels-in-fastapi-api-key-5e5m)
-- [vLLM API Key Timing Attack Advisory](https://github.com/vllm-project/vllm/security/advisories/GHSA-wr9h-g72x-mwhm)
-- [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
-- [Password Hashing Guide 2025: Argon2 vs Bcrypt vs Scrypt vs PBKDF2](https://guptadeepak.com/the-complete-guide-to-password-hashing-argon2-vs-bcrypt-vs-scrypt-vs-pbkdf2-2026/)
-- [How prefix.dev Implemented API Keys](https://prefix.dev/blog/how_we_implented_api_keys)
-- [Hashing API Keys To Improve Security - Octopus Deploy](https://octopus.com/blog/hashing-api-keys)
-- [API Key Authentication Best Practices - Zuplo](https://zuplo.com/blog/2022/12/01/api-key-authentication)
-- [FreeCodeCamp: Best Practices for Building Secure API Keys](https://www.freecodecamp.org/news/best-practices-for-building-api-keys-97c26eabfea9/)
-- [Stripe API Keys Documentation](https://docs.stripe.com/keys)
-- [API Rate Limiting 2026 - Levo.ai](https://www.levo.ai/resources/blogs/api-rate-limiting-guide-2026)
-- [Migrating from API Keys to OAuth 2.1 - Scalekit](https://www.scalekit.com/blog/migrating-from-api-keys-to-oauth-mcp-servers)
+- [API Keys vs OAuth: Which API Authentication Method Is More Secure? - Security Boulevard](https://securityboulevard.com/2026/01/api-keys-vs-oauth-which-api-authentication-method-is-more-secure/)
+- [API Authentication Best Practices in 2026 - DEV Community](https://dev.to/apiverve/api-authentication-best-practices-in-2026-3k4a)
+- [OAuth 2.0 for APIs: Flows, Tokens, and Pitfalls - Treblle](https://treblle.com/blog/oauth-2.0-for-apis)
+- [The State of API Security in 2026: Common Misconfigurations and Exploitation Vectors](https://www.appsecure.security/blog/state-of-api-security-common-misconfigurations)
+- [API Security Best Practices for API keys and tokens](https://42crunch.com/token-management-best-practices/)
+- [API Keys vs OAuth - Discover Best Practices to Secure your APIs](https://blog.axway.com/learning-center/digital-security/keys-oauth/api-keys-oauth)
+- [When JIRA Security is Top Priority: Best Practices to Learn From](https://nordlayer.com/blog/jira-security-best-practices/)
+- [Remediating Jira API Token leaks | GitGuardian](https://www.gitguardian.com/remediation/jira-api-token)
+- [Manage API tokens for your Atlassian account | Atlassian Support](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/)
+- [OAuth 2.0 authentication – Linear Developers](https://linear.app/developers/oauth-2-0-authentication)
+- [Linear API Essentials](https://rollout.com/integration-guides/linear/api-essentials)
+- [Remediating Linear Personal API key leaks | GitGuardian](https://www.gitguardian.com/remediation/linear-personal-api-key)
+- [OAuth Scopes Best Practices | Curity](https://curity.io/resources/learn/scope-best-practices/)
+- [Understanding the differences between API tokens and OAuth access tokens | Zendesk Developer Docs](https://developer.zendesk.com/documentation/api-basics/authentication/oauth-vs-api-tokens/)
+- [UX best practices for MFA — WorkOS](https://workos.com/blog/ux-best-practices-for-mfa)
+- [Multi factor authentication design: Security meets usability in UI/UX design - LogRocket Blog](https://blog.logrocket.com/ux-design/authentication-ui-ux/)
+- [JWT Security Best Practices: Checklist for APIs | Curity](https://curity.io/resources/learn/jwt-best-practices/)
+- [Validate Access Tokens | Okta Developer](https://developer.okta.com/docs/guides/validate-access-tokens/dotnet/main/)
 
 ---
-*Pitfalls research for: API Key Management*
+
+*Pitfalls research for: Token-based authentication (OAuth + API tokens) in On-Call Health platform*
 *Researched: 2026-01-30*

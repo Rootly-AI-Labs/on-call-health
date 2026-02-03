@@ -5,314 +5,327 @@
 ## Directory Layout
 
 ```
-on-call-health/
-├── backend/                       # FastAPI backend application
-│   ├── app/                       # Main application code
-│   │   ├── main.py               # FastAPI app initialization and router registration
-│   │   ├── api/                  # API route definitions
-│   │   │   └── endpoints/        # All API endpoints (analyses, auth, integrations)
-│   │   ├── services/             # Business logic services (analyzers, collectors, mappers)
-│   │   ├── models/               # SQLAlchemy ORM models
-│   │   ├── core/                 # Core infrastructure (config, clients, validation)
-│   │   ├── auth/                 # OAuth and JWT authentication
-│   │   ├── middleware/           # HTTP middleware (logging, security)
-│   │   ├── agents/               # AI agent definitions
-│   │   ├── mcp/                  # Model Context Protocol server implementation
-│   │   ├── workers/              # Background worker tasks
-│   │   ├── utils/                # Utility functions
-│   │   └── static/               # Static assets (favicon)
-│   ├── tests/                    # Pytest tests and mock data
-│   ├── migrations/               # Alembic database migrations
-│   ├── mock_data_helpers/        # Mock data generation for development
-│   ├── scripts/                  # Utility scripts
-│   ├── requirements.txt          # Python dependencies
-│   └── .env.example              # Environment variables template
-├── frontend/                      # Next.js React frontend
+project-root/
+├── backend/                                    # FastAPI backend application
+│   ├── app/
+│   │   ├── main.py                            # FastAPI app initialization, middleware setup
+│   │   ├── api/
+│   │   │   └── endpoints/                     # REST API route handlers
+│   │   │       ├── auth.py                    # Google/GitHub OAuth, login, logout
+│   │   │       ├── analyses.py                # Burnout analysis CRUD
+│   │   │       ├── integrations/              # Per-platform setup (GitHub, Slack, Jira, Linear)
+│   │   │       ├── rootly.py                  # Rootly incident webhooks
+│   │   │       ├── pagerduty.py               # PagerDuty incident webhooks
+│   │   │       ├── surveys.py                 # Survey creation, responses
+│   │   │       ├── notifications.py           # User notification status
+│   │   │       ├── invitations.py             # Organization team invitations
+│   │   │       ├── admin.py                   # Admin/debug endpoints
+│   │   │       └── migrate.py                 # Data migration helpers
+│   │   ├── auth/                              # Authentication & authorization
+│   │   │   ├── oauth.py                       # User auth OAuth providers
+│   │   │   ├── integration_oauth.py           # Integration-specific OAuth (Slack, Jira, Linear, GitHub)
+│   │   │   ├── jwt.py                         # JWT token encode/decode
+│   │   │   └── dependencies.py                # FastAPI dependency injection
+│   │   ├── models/                            # SQLAlchemy ORM models
+│   │   │   ├── user.py                        # User entity
+│   │   │   ├── organization.py                # Organization (team) entity
+│   │   │   ├── analysis.py                    # Burnout analysis result storage
+│   │   │   ├── {platform}_integration.py      # Rootly, GitHub, Slack, Jira, Linear
+│   │   │   ├── user_mapping.py                # Cross-platform user identity mapping
+│   │   │   ├── integration_mapping.py         # Mapping configurations
+│   │   │   ├── user_burnout_report.py         # Per-user burnout analysis results
+│   │   │   ├── survey_*.py                    # Survey schedule, period, responses
+│   │   │   └── base.py                        # Base model, session factory
+│   │   ├── services/                          # Core business logic
+│   │   │   ├── unified_burnout_analyzer.py    # Main burnout detection engine
+│   │   │   ├── ai_burnout_analyzer.py         # AI-enhanced analysis (OpenAI/Anthropic)
+│   │   │   ├── github_only_burnout_analyzer.py # GitHub-only fallback
+│   │   │   ├── github_collector.py            # GitHub API data fetching
+│   │   │   ├── slack_collector.py             # Slack API data fetching
+│   │   │   ├── github_mapping_service.py      # GitHub user mapping logic
+│   │   │   ├── {platform}_mapping_service.py  # Jira, Linear, Slack user mappers
+│   │   │   ├── integration_validator.py       # Integration permission/access validation
+│   │   │   ├── survey_scheduler.py            # Periodic survey triggering
+│   │   │   ├── notification_service.py        # Email/Slack notification sender
+│   │   │   ├── user_sync_service.py           # Sync users from integrations
+│   │   │   ├── token_refresh_coordinator.py   # OAuth token refresh manager
+│   │   │   └── account_linking.py             # Multi-account linking logic
+│   │   ├── core/                              # Shared utilities & config
+│   │   │   ├── config.py                      # Settings (DATABASE_URL, JWT_SECRET_KEY, etc.)
+│   │   │   ├── pagerduty_client.py            # PagerDuty API wrapper
+│   │   │   ├── rootly_client.py               # Rootly API wrapper
+│   │   │   ├── api_cache.py                   # Redis-based response caching
+│   │   │   ├── distributed_lock.py            # Redis-based distributed locking
+│   │   │   ├── rate_limiting.py               # Rate limit definitions & handlers
+│   │   │   ├── input_validation.py            # Pydantic validation models
+│   │   │   ├── burnout_config.py              # Burnout scoring thresholds
+│   │   │   ├── och_config.py                  # Organization config
+│   │   │   └── error_handler.py               # Custom error response formatting
+│   │   ├── middleware/                        # Request/response processing
+│   │   │   ├── security.py                    # CORS, CSRF, security headers
+│   │   │   ├── user_logging.py                # Adds user_id to request context
+│   │   │   └── logging_context.py             # Custom logging filter
+│   │   ├── agents/                            # AI agent framework (experimental)
+│   │   │   ├── burnout_agent.py               # Main agent orchestrator
+│   │   │   ├── tools/                         # Agent analysis tools
+│   │   │   │   ├── sentiment_analyzer.py
+│   │   │   │   ├── workload_analyzer.py
+│   │   │   │   ├── pattern_analyzer.py
+│   │   │   │   └── ...more tools
+│   │   │   └── workflows/                     # Multi-step analysis workflows
+│   │   ├── mcp/                               # Model Context Protocol server
+│   │   │   ├── server.py                      # MCP server definition
+│   │   │   ├── auth.py                        # MCP authentication
+│   │   │   └── serializers.py                 # Data serializers for MCP
+│   │   ├── utils/                             # Helper utilities
+│   │   │   ├── visual_logger.py               # Logging helper for task progress
+│   │   │   └── ...other utilities
+│   │   └── static/                            # Static assets (favicon)
+│   ├── migrations/                            # Database migrations
+│   │   ├── migration_runner.py                # Migration execution logic
+│   │   └── *.sql                              # Individual migration files
+│   ├── tests/                                 # Backend tests
+│   │   ├── mock_data/                         # Test fixtures & scenarios
+│   │   └── ...test files
+│   ├── scripts/                               # Utility scripts
+│   └── requirements.txt                       # Python dependencies
+├── frontend/                                  # Next.js frontend application
 │   ├── src/
-│   │   ├── app/                  # Next.js app router pages
-│   │   │   ├── dashboard/        # Main dashboard page
-│   │   │   ├── auth/             # Authentication pages (login, callback)
-│   │   │   ├── integrations/     # Integration setup pages
-│   │   │   ├── setup/            # Initial setup wizard
-│   │   │   ├── layout.tsx        # Root layout with providers
-│   │   │   └── globals.css       # Global styles
-│   │   ├── components/           # React components
-│   │   │   ├── dashboard/        # Dashboard-specific components
-│   │   │   ├── integrations/     # Integration UI components
-│   │   │   ├── ui/               # Shadcn UI components
-│   │   │   ├── notifications/    # Notification components
-│   │   │   └── [misc].tsx        # Standalone components
-│   │   ├── contexts/             # React Context providers
-│   │   ├── hooks/                # Custom React hooks
-│   │   ├── lib/                  # Utility functions and types
-│   │   └── types/                # TypeScript type definitions
-│   ├── public/                   # Static assets (images, fonts, videos)
-│   ├── e2e/                      # Playwright end-to-end tests
-│   ├── package.json
-│   ├── next.config.js
-│   ├── tsconfig.json
-│   └── playwright.config.ts
-├── .github/                       # GitHub configuration
-├── docker-compose.yml            # Docker Compose configuration
-├── .env.example                  # Example environment variables
-└── README.md
-
+│   │   ├── app/                              # Next.js App Router pages
+│   │   │   ├── layout.tsx                    # Root layout with providers
+│   │   │   ├── page.tsx                      # Landing page
+│   │   │   ├── dashboard/                    # Main dashboard page
+│   │   │   ├── auth/                         # Auth pages (login, oauth callbacks)
+│   │   │   ├── integrations/                 # Integration setup pages
+│   │   │   ├── setup/                        # Onboarding pages
+│   │   │   ├── invitations/                  # Team invitation pages
+│   │   │   ├── methodology/                  # Methodology documentation page
+│   │   │   ├── disclaimer/                   # Legal disclaimer page
+│   │   │   └── globals.css                   # Global styling
+│   │   ├── components/                       # Reusable React components
+│   │   │   ├── dashboard/                    # Dashboard-specific components
+│   │   │   │   ├── charts/                   # Chart components (Recharts)
+│   │   │   │   ├── dialogs/                  # Modal dialogs (delete, settings)
+│   │   │   │   └── insights/                 # Analysis insight displays
+│   │   │   ├── integrations/                 # Integration UI components
+│   │   │   ├── ui/                           # Radix UI + shadcn components
+│   │   │   ├── notifications/                # Toast notifications
+│   │   │   ├── TopPanel.tsx                  # Header with user menu
+│   │   │   ├── mapping-drawer.tsx            # User mapping UI
+│   │   │   ├── SlackSurveyTabs.tsx           # Survey delivery UI
+│   │   │   └── ...more components
+│   │   ├── contexts/                         # React Context providers
+│   │   │   ├── ChartModeContext.tsx          # Chart view mode (radar/bar)
+│   │   │   └── GettingStartedContext.tsx     # Onboarding state
+│   │   ├── hooks/                            # Custom React hooks
+│   │   │   ├── useDashboard.ts               # Main dashboard logic (data fetching, state)
+│   │   │   ├── useNotifications.ts           # Notification management
+│   │   │   ├── use-integrations-state.ts     # Integration setup state
+│   │   │   └── ...more hooks
+│   │   ├── lib/                              # Utilities & helper functions
+│   │   │   ├── types.ts                      # TypeScript interfaces for API responses
+│   │   │   ├── githubMetricUtils.ts          # GitHub metric calculations
+│   │   │   ├── riskFactorUtils.ts            # Burnout risk factor helpers
+│   │   │   ├── health-check.ts               # Backend connectivity check
+│   │   │   └── metadata.ts                   # Page metadata
+│   │   └── types/                            # Type definitions
+│   ├── public/                               # Static assets
+│   │   ├── images/                           # Brand/product images
+│   │   └── fonts/                            # Web fonts
+│   ├── e2e/                                  # Playwright E2E tests
+│   ├── package.json                          # Node dependencies
+│   ├── tsconfig.json                         # TypeScript config
+│   └── next.config.js                        # Next.js config
+├── .github/                                   # GitHub Actions CI/CD
+│   └── workflows/                             # Pipeline definitions
+├── migrations/                                # (Root-level) Migration scripts
+├── docker-compose.yml                         # Docker Compose configuration
+└── README.md                                  # Project documentation
 ```
 
 ## Directory Purposes
 
-**`backend/app/`:**
-- Purpose: Main application package containing all backend business logic
-- Contains: API routes, services, models, authentication, middleware
-- Key files: `main.py` (FastAPI app initialization)
+**Backend Core (`backend/app/`):**
+- Main application code organized by layer (API, Services, Models, Core utilities)
+- Python FastAPI application with SQLAlchemy ORM
+- Entry point: `app/main.py`
 
-**`backend/app/api/endpoints/`:**
-- Purpose: All REST API endpoint definitions
-- Contains: Router objects with endpoint handlers, request/response models
-- Key files: `analyses.py`, `auth.py`, `rootly.py`, `pagerduty.py`, `github.py`, `slack.py`, `jira.py`, `linear.py`
-- Naming: One file per major feature/integration
+**API Endpoints (`backend/app/api/endpoints/`):**
+- REST route handlers for all operations
+- Each file focuses on a domain (auth, analyses, integrations, etc.)
+- Pattern: One router per file, registered in main.py
 
-**`backend/app/services/`:**
-- Purpose: Business logic services for data collection, analysis, and processing
-- Contains: Collector classes, analyzer classes, mapping services
-- Typical organization:
-  - Collector pattern: `*_collector.py` (e.g., `github_collector.py`, `slack_collector.py`)
-  - Analyzer pattern: `*_analyzer.py` (e.g., `unified_burnout_analyzer.py`, `ai_burnout_analyzer.py`)
-  - Mapper pattern: `*_mapping_service.py` (e.g., `github_mapping_service.py`)
-- Key files: `unified_burnout_analyzer.py` (orchestrates analysis), `ai_burnout_analyzer.py` (LLM-based analysis)
+**Models (`backend/app/models/`):**
+- SQLAlchemy declarative models
+- Database schema definition
+- Relationships: User→Organization→Integrations, User→Analysis
+- Key file: `base.py` (SessionLocal, Base, create_tables)
 
-**`backend/app/models/`:**
-- Purpose: SQLAlchemy ORM model definitions
-- Contains: Declarative models with relationships
-- Naming: Snake_case file names matching model names (e.g., `user.py` for `User` model)
-- Special: `__init__.py` exports all models and database utilities (`get_db`, `create_tables`, `SessionLocal`)
-- Key files: `base.py` (Base model and database setup), `user.py`, `organization.py`, `analysis.py`
+**Services (`backend/app/services/`):**
+- Business logic layer with complex operations
+- Examples: UnifiedBurnoutAnalyzer orchestrates analysis workflow
+- Collectors (GitHub, Slack) encapsulate platform-specific API interactions
+- Mappers resolve user identities across platforms
 
-**`backend/app/core/`:**
-- Purpose: Core infrastructure and configuration
-- Contains: Settings, API clients, configuration, caching, validation, rate limiting
-- Key files:
-  - `config.py`: Environment-based settings from .env
-  - `och_config.py`: Burnout scoring logic and configuration
-  - `rootly_client.py`: Rootly API client
-  - `pagerduty_client.py`: PagerDuty API client
-  - `input_validation.py`: Pydantic request validation schemas
+**Auth (`backend/app/auth/`):**
+- OAuth provider configuration (Google, GitHub for login)
+- Integration OAuth managers (Slack, Jira, Linear, GitHub for data sources)
+- JWT token creation/validation
+- Dependency injection for route protection
 
-**`backend/app/auth/`:**
-- Purpose: Authentication and authorization logic
-- Contains: OAuth providers, JWT handling, authentication dependencies
-- Key files:
-  - `oauth.py`: Primary OAuth handler
-  - `integration_oauth.py`: OAuth for integrations (GitHub, Slack, Jira, Linear)
-  - `jwt.py`: JWT token encoding/decoding
-  - `dependencies.py`: FastAPI authentication dependencies
+**Core (`backend/app/core/`):**
+- Shared configuration and clients
+- API clients for external services (PagerDuty, Rootly, GitHub, Slack, etc.)
+- Caching, locking, rate limiting, validation
 
-**`backend/app/middleware/`:**
-- Purpose: HTTP middleware for cross-cutting concerns
-- Contains: Security headers, logging, error handling
-- Key files:
-  - `security.py`: Security headers middleware
-  - `user_logging.py`: User context logging middleware
-  - `logging_context.py`: Context filter for structured logging
+**Middleware (`backend/app/middleware/`):**
+- Request/response interceptors
+- Security headers, CORS, user logging context
+- Runs before all endpoints
 
-**`backend/tests/`:**
-- Purpose: Pytest unit and integration tests
-- Contains: Test files and mock data
-- Naming: `test_*.py` files matching module names
-- Key files:
-  - `conftest.py`: Pytest fixtures and configuration
-  - `mock_data/`: Mock data generators for testing
+**Frontend App Router (`frontend/src/app/`):**
+- Next.js App Router directory structure
+- Each subdirectory is a route (dashboard/, auth/, integrations/)
+- `page.tsx` files are entry points for routes
+- `layout.tsx` is the root layout wrapper
 
-**`frontend/src/app/`:**
-- Purpose: Next.js app router pages and layout
-- Contains: Page components, layout definitions, global styles
-- Structure: Next.js file-based routing (e.g., `dashboard/page.tsx` → `/dashboard` route)
-- Key files:
-  - `layout.tsx`: Root layout with all providers
-  - `page.tsx`: Home page
-  - `dashboard/page.tsx`: Main dashboard page
+**Components (`frontend/src/components/`):**
+- Reusable React components
+- Dashboard components for charts, dialogs, insights
+- Integration UI components
+- Radix UI + shadcn components in `ui/` subdirectory
 
-**`frontend/src/components/`:**
-- Purpose: Reusable React components
-- Contains: UI components, dashboard components, integration components
-- Subdirectories:
-  - `ui/`: Shadcn UI primitive components (Button, Dialog, etc.)
-  - `dashboard/`: Dashboard-specific components (cards, charts, modals)
-  - `integrations/`: Integration setup and configuration UI
-- Naming: PascalCase `.tsx` files (e.g., `TeamHealthOverview.tsx`)
+**Hooks (`frontend/src/hooks/`):**
+- Custom React hooks for data fetching and state management
+- `useDashboard.ts` is the main hook (1600+ lines) managing all dashboard logic
+- Hooks handle API communication, local state, caching
 
-**`frontend/src/contexts/`:**
-- Purpose: React Context API providers for global state
-- Contains: Context definitions and provider components
-- Naming: `*Context.ts` for context definition, wrapped in provider
-- Key contexts: `GettingStartedContext`, `ChartModeContext`
+**Lib (`frontend/src/lib/`):**
+- Utility functions and type definitions
+- `types.ts`: TypeScript interfaces matching backend API responses
+- Helper utilities for metrics, UI state, health checks
 
-**`frontend/src/hooks/`:**
-- Purpose: Custom React hooks for reusable logic
-- Contains: API calls, state management, side effects
-- Naming: `use*.ts` (e.g., `useDashboard.ts`, `useNotifications.ts`)
-- Key hooks: `useDashboard` (loads analysis data), `useIntegrations` (integration state)
-
-**`frontend/src/lib/`:**
-- Purpose: Utility functions, type definitions, helper functions
-- Contains: Non-component code (types, utils, API helpers)
-- Key files:
-  - `types.ts`: TypeScript interfaces (Integration, GitHubActivity, etc.)
-  - `githubMetricUtils.ts`: GitHub metric calculations
-  - `riskFactorUtils.ts`: Risk factor calculations
-  - `health-check.ts`: API health checks
-
-**`frontend/e2e/`:**
-- Purpose: End-to-end tests using Playwright
-- Contains: E2E test files
-- Naming: `*.spec.ts` files
-- Key tests: `smoke.spec.ts`, `auth.spec.ts`, `integrations.spec.ts`
-
-**`backend/migrations/`:**
-- Purpose: Alembic database migration scripts
-- Contains: Migration files for schema changes
-- Naming: Alembic-generated files with migration descriptions
-- Pattern: One migration per significant schema change
-
-**`backend/mock_data_helpers/`:**
-- Purpose: Generate mock data for development and testing
-- Contains: Mock data generators matching real API formats
+**Contexts (`frontend/src/contexts/`):**
+- React Context providers for global state
+- ChartModeContext: Chart view preference
+- GettingStartedContext: Onboarding UI state
 
 ## Key File Locations
 
 **Entry Points:**
-- `backend/app/main.py`: FastAPI app initialization
-- `frontend/src/app/layout.tsx`: Next.js root layout
-- `frontend/src/app/dashboard/page.tsx`: Main dashboard page
+- Backend: `backend/app/main.py` (FastAPI app creation, middleware, router registration)
+- Frontend: `frontend/src/app/layout.tsx` (Root layout with providers)
+- Database: `backend/app/models/base.py` (SessionLocal, create_tables)
 
 **Configuration:**
-- `backend/app/core/config.py`: Environment settings
-- `frontend/next.config.js`: Next.js configuration
-- `frontend/tsconfig.json`: TypeScript configuration
-- `backend/requirements.txt`: Python dependencies
+- Backend env: `backend/.env` (DATABASE_URL, JWT_SECRET_KEY, OAuth credentials)
+- Backend code: `backend/app/core/config.py` (Settings class)
+- Frontend env: `frontend/.env.local` (NEXT_PUBLIC_API_URL, GA_MEASUREMENT_ID)
 
-**Core Logic:**
-- `backend/app/services/unified_burnout_analyzer.py`: Main analysis orchestrator
-- `backend/app/services/ai_burnout_analyzer.py`: AI-powered analysis
-- `backend/app/core/och_config.py`: Burnout scoring configuration
-- `frontend/src/hooks/useDashboard.ts`: Dashboard data fetching
-
-**Authentication:**
-- `backend/app/api/endpoints/auth.py`: OAuth endpoints
-- `backend/app/auth/dependencies.py`: FastAPI auth dependencies
-- `frontend/src/components/AuthInterceptor.tsx`: Auth interceptor
-
-**Integrations:**
-- `backend/app/api/endpoints/github.py`: GitHub integration endpoints
-- `backend/app/api/endpoints/slack.py`: Slack integration endpoints
-- `backend/app/services/github_collector.py`: GitHub data collection
-- `backend/app/services/slack_collector.py`: Slack data collection
+**Core Business Logic:**
+- Burnout analysis: `backend/app/services/unified_burnout_analyzer.py`
+- Dashboard state: `frontend/src/hooks/useDashboard.ts`
+- Authentication: `backend/app/auth/` (oauth.py, dependencies.py)
 
 **Testing:**
-- `backend/tests/conftest.py`: Pytest configuration and fixtures
-- `frontend/e2e/smoke.spec.ts`: Basic smoke tests
-- `frontend/e2e/integrations.spec.ts`: Integration flow tests
+- Backend tests: `backend/tests/`
+- Frontend E2E: `frontend/e2e/` (Playwright tests)
+- Mock data: `backend/tests/mock_data/scenarios/`
 
 ## Naming Conventions
 
 **Files:**
-
-- **Python**: `snake_case.py`
-  - Models: `model_name.py` (e.g., `user.py`, `rootly_integration.py`)
-  - Services: `service_name.py` or `service_name_service.py` (e.g., `unified_burnout_analyzer.py`, `github_collector.py`)
-  - Tests: `test_feature.py` (e.g., `test_github_slack_metrics.py`)
-  - Utilities: `function_name.py` or `*_utils.py` (e.g., `incident_utils.py`)
-
-- **TypeScript/React**: `PascalCase.tsx` or `camelCase.ts`
-  - Components: `ComponentName.tsx` (e.g., `DashboardView.tsx`, `TeamHealthOverview.tsx`)
-  - Hooks: `useName.ts` (e.g., `useDashboard.ts`, `useNotifications.ts`)
-  - Utilities: `camelCase.ts` or `name-utils.ts` (e.g., `githubMetricUtils.ts`)
-  - Types: `types.ts` or `*-types.ts`
+- Python: `snake_case.py` (e.g., `unified_burnout_analyzer.py`)
+- TypeScript: `kebab-case.ts` (hooks, utils) or `PascalCase.tsx` (components, pages)
+- API files: `{platform}_name.py` (e.g., `github_collector.py`, `slack_integration.py`)
+- Test files: `test_{module}.py` or `{module}.test.ts`
 
 **Directories:**
+- Python packages: `snake_case` (e.g., `app/api/endpoints/`)
+- React: `components/`, `hooks/`, `lib/`, `app/`, `contexts/`
+- Feature domains: Feature name in plural or singular depending on scope (e.g., `integrations/`, `surveys/`)
 
-- **Backend**:
-  - Feature packages: `lowercase` (e.g., `services/`, `models/`, `auth/`)
-  - Grouping: By domain (e.g., all auth files in `auth/`)
+**Classes/Functions:**
+- Python classes: `PascalCase` (e.g., `UnifiedBurnoutAnalyzer`, `GitHubCollector`)
+- Python functions: `snake_case` (e.g., `extract_analysis_summary`, `get_current_user`)
+- React components: `PascalCase` (e.g., `TopPanel`, `MappingDrawer`)
+- React hooks: `useXxx` (e.g., `useDashboard`, `useNotifications`)
 
-- **Frontend**:
-  - Page routes: `lowercase` matching route path (e.g., `dashboard/`, `auth/`)
-  - Feature groups: `lowercase` (e.g., `components/dashboard/`, `components/integrations/`)
-
-**Classes and Functions:**
-
-- **Python**: `PascalCase` for classes, `snake_case` for functions
-  - Classes: `UnifiedBurnoutAnalyzer`, `GitHubCollector`, `RootlyAPIClient`
-  - Functions: `analyze_incidents()`, `get_user_by_id()`, `extract_analysis_summary()`
-
-- **TypeScript**: `PascalCase` for types and components, `camelCase` for functions
-  - Types: `interface Integration`, `type GitHubActivity`
-  - Components: `export function DashboardView() {}`
-  - Functions: `const fetchAnalysis = async () => {}`
+**Variables/State:**
+- Python: `snake_case`
+- TypeScript: `camelCase` (local), `PascalCase` (interfaces/types)
+- React state: `camelCase` (e.g., `selectedIntegration`, `analysisRunning`)
 
 ## Where to Add New Code
 
-**New Feature - Backend:**
-- Primary code: `backend/app/services/feature_name.py` (if business logic) or `backend/app/api/endpoints/feature_name.py` (if new endpoints)
-- Database model: `backend/app/models/feature_name.py`
-- Tests: `backend/tests/test_feature_name.py`
-- Integration: Import and register router in `backend/app/main.py` if new endpoint
+**New Feature (e.g., new analysis type):**
+- Primary code: `backend/app/services/{feature_name}.py`
+- API endpoint: `backend/app/api/endpoints/{feature_name}.py`
+- Models: `backend/app/models/{feature_name}.py` (if new entities)
+- Frontend page: `frontend/src/app/{feature_name}/page.tsx`
+- Frontend components: `frontend/src/components/{feature_name}/`
+- Tests: `backend/tests/test_{feature_name}.py`, `frontend/e2e/{feature_name}.spec.ts`
 
-**New Feature - Frontend:**
-- Page: `frontend/src/app/feature-name/page.tsx` (if new route)
-- Components: `frontend/src/components/feature-name/FeatureName.tsx`
-- Hook: `frontend/src/hooks/useFeature.ts` (if state management needed)
-- Types: Add to `frontend/src/lib/types.ts`
-- Tests: `frontend/e2e/feature-name.spec.ts`
+**New Component/Module (reusable):**
+- React component: `frontend/src/components/{ComponentName}.tsx`
+- Hook: `frontend/src/hooks/use{FeatureName}.ts`
+- Service: `backend/app/services/{module_name}.py`
+- Middleware: `backend/app/middleware/{concern_name}.py` (if cross-cutting)
 
-**New External Integration (e.g., new platform):**
-- Model: `backend/app/models/platform_integration.py`
-- Collector: `backend/app/services/platform_collector.py`
-- Mapper: `backend/app/services/platform_mapping_service.py`
-- Endpoints: `backend/app/api/endpoints/platform.py`
-- OAuth handler: Add to `backend/app/auth/integration_oauth.py` or create `backend/app/auth/platform_oauth.py`
-- Frontend UI: `frontend/src/components/integrations/PlatformSetup.tsx`
+**Utilities:**
+- Shared helpers: `frontend/src/lib/{utility_name}.ts` or `backend/app/utils/{utility_name}.py`
+- Type definitions: `frontend/src/lib/types.ts` (append to interfaces) or `frontend/src/types/` (new file)
+- Constants: Collocated with usage (module-level) or in `backend/app/core/config.py` for config
 
-**New Utility Function:**
-- Shared helpers: `backend/app/utils/feature_utils.py` or `frontend/src/lib/feature-utils.ts`
-- Math/calculations: `backend/app/core/feature_config.py` (if configuration-heavy)
+**Integration with External Service:**
+- Client/API wrapper: `backend/app/core/{platform}_client.py`
+- Collector: `backend/app/services/{platform}_collector.py`
+- OAuth handler: `backend/app/auth/integration_oauth.py` (extend handlers)
+- Model: `backend/app/models/{platform}_integration.py`
+- Endpoint: `backend/app/api/endpoints/{platform}.py`
 
 ## Special Directories
 
-**`backend/migrations/`:**
-- Purpose: Database schema version control
-- Generated: Yes (by Alembic)
-- Committed: Yes (track all migrations in git)
-- When to create: After modifying any model with `alembic revision --autogenerate`
+**Migrations (`backend/migrations/`):**
+- Purpose: Track database schema changes
+- Generated: Yes (via migration runner)
+- Committed: Yes
+- Pattern: Each migration is a `.sql` or `.py` file applied sequentially
+- Runner: `backend/migrations/migration_runner.py` (called on app startup)
 
-**`frontend/public/`:**
-- Purpose: Static assets served directly by Next.js
-- Subdirectories: `images/`, `fonts/`, `videos/`
-- Generated: No (manually managed)
-- Committed: Yes (except node_modules)
+**Tests (`backend/tests/`, `frontend/e2e/`):**
+- Purpose: Unit tests, integration tests, E2E tests
+- Generated: No (manually written)
+- Committed: Yes
+- Backend: Use pytest framework
+- Frontend: Use Playwright for E2E
 
-**`backend/tests/mock_data/`:**
-- Purpose: Mock data for development and testing
-- Generated: Dynamically at test runtime
-- Committed: Yes (generators and fixtures, not data instances)
-- Use: Import `MockDataLoader` in tests to generate realistic test data
+**Mock Data (`backend/tests/mock_data/`):**
+- Purpose: Test fixtures and scenario data
+- Generated: May be auto-generated from templates
+- Committed: Yes (small datasets)
+- Structure: `scenarios/` for predefined test scenarios
 
-**`backend/app/static/`:**
-- Purpose: Static files served by FastAPI (favicon)
+**Static Assets (`frontend/public/`, `backend/app/static/`):**
+- Purpose: Favicon, images, fonts
 - Generated: No
 - Committed: Yes
+- Frontend public assets loaded by Next.js at build time
 
-**`backend/app/mcp/`:**
-- Purpose: Model Context Protocol server for AI integration
-- Generated: No
-- Committed: Yes
-- Special: Provides tools/capabilities to Claude/AI models
+**Node Modules (`frontend/node_modules/`):**
+- Purpose: npm dependencies
+- Generated: Yes (via npm install)
+- Committed: No (in .gitignore)
 
-**`backend/app/agents/`:**
-- Purpose: AI agent definitions using smolagents framework
-- Generated: No
-- Committed: Yes
-- Usage: Called by burnout analyzer for AI-enhanced analysis
+**Python Environment (`backend/venv/` or `.venv/`):**
+- Purpose: Isolated Python dependencies
+- Generated: Yes (via python -m venv)
+- Committed: No (in .gitignore)
+
+**Build Output (`frontend/.next/`, `frontend/dist/`):**
+- Purpose: Compiled Next.js output
+- Generated: Yes (via npm run build)
+- Committed: No (in .gitignore)
 
 ---
 

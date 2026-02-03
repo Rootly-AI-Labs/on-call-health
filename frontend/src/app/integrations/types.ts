@@ -139,21 +139,20 @@ export interface SlackIntegration {
 
 export interface JiraIntegration {
   id: number
+  user_id: number
   jira_site_url: string
-  jira_site_name?: string
-  jira_cloud_id: string
-  jira_account_id: string
+  jira_cloud_id?: string
   jira_display_name?: string
   jira_email?: string
-  token_source: "oauth" | "manual"
-  is_oauth: boolean
-  supports_refresh: boolean
-  token_expires_at?: string
-  updated_at: string
+  jira_account_id?: string
   accessible_sites_count?: number
-  token_preview?: string
-  token_valid?: boolean // Token validation status
-  token_error?: string | null // Token validation error message
+  token_valid?: boolean
+  token_error?: string | null
+  token_expires_at?: string | null
+  supports_refresh?: boolean
+  token_source?: 'oauth' | 'manual'  // Add this field
+  created_at: string
+  updated_at: string
 }
 
 export interface JiraWorkspace {
@@ -174,20 +173,18 @@ export interface JiraWorkspacesResponse {
 
 export interface LinearIntegration {
   id: number
-  workspace_id: string
-  workspace_name?: string
-  workspace_url_key?: string
-  linear_user_id: string
+  user_id: number
+  linear_id?: string
   linear_display_name?: string
   linear_email?: string
-  token_source: "oauth" | "manual"
-  is_oauth: boolean
-  supports_refresh: boolean
-  token_expires_at?: string
-  token_valid?: boolean // Token validation status
-  token_error?: string | null // Token validation error message
+  organization_id?: number
+  token_valid?: boolean
+  token_error?: string | null
+  token_expires_at?: string | null
+  supports_refresh?: boolean
+  token_source?: 'oauth' | 'manual'  // Add this field
+  created_at: string
   updated_at: string
-  token_preview?: string
 }
 
 export interface LinearTeam {
@@ -262,6 +259,35 @@ export const isValidRootlyToken = (token: string): boolean => {
 
 export const isValidPagerDutyToken = (token: string): boolean => {
   return /^[A-Za-z0-9+_-]{20,32}$/.test(token)
+}
+
+// Validation Types
+export type ConnectionStatus = 'connected' | 'validating' | 'error' | 'disconnected';
+export type AuthMethod = 'oauth' | 'manual';
+export type ValidationErrorType = 'authentication' | 'permissions' | 'network' | 'format' | 'site_url' | 'unknown';
+
+export interface ValidationResult {
+  valid: boolean;
+  error: string | null;
+  error_type: ValidationErrorType | null;
+  help_url?: string;
+  action?: string;
+  user_info?: {
+    display_name: string | null;
+    email: string | null;
+  };
+}
+
+export interface ValidationState {
+  status: ConnectionStatus;
+  error: string | null;
+  errorType: ValidationErrorType | null;
+  helpUrl?: string;
+  actionHint?: string;
+  userInfo?: {
+    displayName: string | null;
+    email: string | null;
+  };
 }
 
 // API Base URL

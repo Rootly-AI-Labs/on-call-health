@@ -4,198 +4,241 @@
 
 ## APIs & External Services
 
-**Incident Management:**
-- PagerDuty - On-call schedules and incident data
-  - SDK/Client: Custom `PagerDutyAPIClient` in `backend/app/core/pagerduty_client.py`
-  - Auth: API token via `PAGERDUTY_API_KEY` (HTTP `Authorization: Token token=X`)
-  - Base URL: `https://api.pagerduty.com`
-  - Data: Users, on-call schedules, incidents with timezone normalization
+**Incident & On-Call Platforms:**
+- **Rootly** - Incident management and response platform
+  - SDK/Client: Custom `RootlyAPIClient` in `backend/app/core/rootly_client.py`
+  - Auth: `ROOTLY_API_KEY` environment variable
+  - Base URL: `ROOTLY_API_BASE_URL` (default: https://api.rootly.com)
+  - Used for: Fetching incidents, incident resolution data, user schedules
+  - Timeout: 32s for incidents endpoint, 30s default
 
-- Rootly - Engineering reliability platform (primary on-call data source)
-  - SDK/Client: Custom HTTP client in `backend/app/api/endpoints/rootly.py`
-  - Auth: API token
-  - Base URL: Configurable via `ROOTLY_API_BASE_URL` (default: `https://api.rootly.com`)
-  - Data: On-call schedules, incidents, team metadata
+- **PagerDuty** - On-call scheduling and alerting
+  - SDK/Client: Custom `PagerDutyClient` in `backend/app/core/pagerduty_client.py`
+  - Auth: `PAGERDUTY_API_KEY` environment variable
+  - Used for: Fetching on-call schedules, incidents, user data
+  - Integration: Token validation and caching
 
-**Social/Communication:**
-- Slack - Team messaging and notifications
-  - SDK/Client: Custom collectors in `backend/app/services/slack_collector.py` and `backend/app/services/enhanced_slack_collector.py`
-  - OAuth: `slack_integration_oauth` in `backend/app/auth/integration_oauth.py`
-  - Auth: OAuth 2.0 with client ID/secret or bot token
-  - Client ID env var: `SLACK_CLIENT_ID`
-  - Client Secret env var: `SLACK_CLIENT_SECRET`
-  - Signing secret env var: `SLACK_SIGNING_SECRET` (for webhook verification)
-  - Webhook handling: Incoming webhooks in `backend/app/api/endpoints/slack.py`
-  - Data: Messages, user activity, workspace info
-  - Service: Direct message sending via `backend/app/services/slack_dm_sender.py`
+**Code & Issue Tracking:**
+- **Jira** - Issue tracking and project management
+  - OAuth: OAuth 2.0 integration via `backend/app/auth/integration_oauth.py`
+  - Config: `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`
+  - Callback: `GET /auth/jira/callback`
+  - Used for: Mapping issues to incidents, workload analysis
+  - Token Storage: Encrypted in database via `JiraIntegration` model
+  - Automatic Token Refresh: Implemented for OAuth tokens
 
-- GitHub - Code repository and team activity
-  - SDK/Client: Custom `GitHubCollector` in `backend/app/services/github_collector.py`
-  - HTTP library: `requests` module
-  - OAuth: `github_integration_oauth` in `backend/app/auth/integration_oauth.py`
-  - Auth: OAuth 2.0 with client ID/secret
-  - Client ID env var: `GITHUB_CLIENT_ID`
-  - Client Secret env var: `GITHUB_CLIENT_SECRET`
-  - Frontend OAuth: `NEXT_PUBLIC_GITHUB_CLIENT_ID` available but optional
-  - Data: Commits, pull requests, code reviews, team contributions
-  - Service: `backend/app/services/github_api_manager.py` for API calls
+- **Linear** - Issue tracking and planning
+  - OAuth: OAuth 2.0 integration via `backend/app/auth/integration_oauth.py`
+  - Config: `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`
+  - Callback: `GET /auth/linear/callback`
+  - Used for: Issue mapping, workload analysis
+  - Token Storage: Encrypted in database via `LinearIntegration` model
+  - Workspace Mapping: Stored in `LinearWorkspaceMapping` model
 
-- Jira - Issue tracking and project management
-  - SDK/Client: Custom client in `backend/app/api/endpoints/jira.py`
-  - OAuth: `jira_integration_oauth` in `backend/app/auth/integration_oauth.py`
-  - Auth: OAuth 2.0 with client ID/secret
-  - Client ID env var: `JIRA_CLIENT_ID`
-  - Client Secret env var: `JIRA_CLIENT_SECRET`
-  - HTTP library: `httpx` for async requests
-  - Service: `backend/app/services/jira_user_sync_service.py` for user synchronization
-  - Data: Issues, worklogs, project metadata
+- **GitHub** - Code repository and collaboration
+  - OAuth: OAuth 2.0 integration for authentication (see below)
+  - API Integration: Direct GitHub API via PAT in `backend/app/auth/integration_oauth.py`
+  - Config: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_TOKEN` (PAT)
+  - Used for: Repository data, commit analysis, PR activity
 
-- Linear - Modern issue tracking
-  - SDK/Client: Custom client in `backend/app/api/endpoints/linear.py`
-  - OAuth: `linear_integration_oauth` in `backend/app/auth/integration_oauth.py`
-  - Auth: OAuth 2.0 with client ID/secret
-  - Client ID env var: `LINEAR_CLIENT_ID`
-  - Client Secret env var: `LINEAR_CLIENT_SECRET`
-  - Data: Issues, cycles, team members
-
-**Authentication Providers:**
-- Google OAuth - Login and user authentication
-  - Provider: `GoogleOAuth` in `backend/app/auth/oauth.py`
-  - Client ID env var: `GOOGLE_CLIENT_ID`
-  - Client Secret env var: `GOOGLE_CLIENT_SECRET`
-  - Redirect URI: Configurable via `GOOGLE_REDIRECT_URI` (default: `http://localhost:8000/auth/google/callback`)
-  - Auth endpoints: `https://accounts.google.com/o/oauth2/auth`, `https://oauth2.googleapis.com/token`
-  - Scopes: `openid email profile`
-
-- GitHub OAuth - Login and user authentication
-  - Provider: `GitHubOAuth` in `backend/app/auth/oauth.py`
-  - Client ID env var: `GITHUB_CLIENT_ID`
-  - Client Secret env var: `GITHUB_CLIENT_SECRET`
-  - Redirect URI: Configurable via `GITHUB_REDIRECT_URI` (default: `http://localhost:8000/auth/github/callback`)
-  - Scopes: `user:email`
-
-**AI/LLM Services (conditional):**
-- Anthropic API - AI burnout analysis (conditionally imported)
-  - Client: Imported dynamically in `backend/app/api/endpoints/llm.py`
-  - Usage: AI-powered analysis of burnout indicators
-
-- OpenAI API - AI burnout analysis (conditionally imported)
-  - Client: Imported dynamically in `backend/app/api/endpoints/llm.py`
-  - Usage: Alternative AI provider for analysis
-
-## Data Storage
-
-**Databases:**
-- PostgreSQL 15
-  - Connection: `DATABASE_URL` environment variable (required)
-  - Client: SQLAlchemy ORM with psycopg2-binary driver
-  - Pool: 30 base connections + 20 overflow (total max: 50)
-  - Query timeout: 60 seconds (configurable via `DB_STATEMENT_TIMEOUT_MS`)
-  - Lock timeout: 30 seconds (configurable via `DB_LOCK_TIMEOUT_MS`)
-  - Pool recycle: 5 minutes (connections recycled every 300 seconds)
-  - Migrations: Alembic in `backend/migrations/` (run automatically at startup)
-
-**File Storage:**
-- Local filesystem only
-  - Static files: `app/static/` for favicon.svg and API documentation assets
-  - No external storage (S3, GCS, etc.) configured
-
-**Caching:**
-- Redis 7
-  - Connection: `REDIS_URL` (default: `redis://localhost:6379`)
-  - Alternative config: `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`
-  - Client: Python `redis` module
-  - Purpose: Distributed rate limiting and locking
-  - Distributed lock service: `backend/app/core/distributed_lock.py` for token refresh coordination
-  - API response caching: `backend/app/core/api_cache.py` for PagerDuty/Rootly responses (1-hour TTL)
+**Communication:**
+- **Slack** - Team messaging and notifications
+  - OAuth: OAuth 2.0 integration via `backend/app/auth/integration_oauth.py`
+  - Config: `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`
+  - Callback: `GET /auth/slack/callback`
+  - Used for: Message analysis, channel data, team metrics
+  - Token Storage: Encrypted in database via `SlackIntegration` model
+  - Workspace Mapping: Stored in `SlackWorkspaceMapping` model
 
 ## Authentication & Identity
 
-**Auth Provider:**
-- Custom OAuth implementation
-  - Implementation: `backend/app/auth/oauth.py` for Google/GitHub
-  - Implementation: `backend/app/auth/integration_oauth.py` for Slack/GitHub/Jira/Linear integrations
-  - Token storage: Encrypted in database (`ENCRYPTION_KEY` required)
-  - JWT: HS256 signing key (`JWT_SECRET_KEY` required)
-  - Token expiry: 7 days (`JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7`)
-  - Encryption: Separate encryption key for OAuth tokens to prevent token exposure on database breach
+**User Login Providers (OAuth 2.0):**
+- **Google OAuth**
+  - Implementation: `GoogleOAuth` class in `backend/app/auth/oauth.py`
+  - Endpoints: `GET /auth/google`, `GET /auth/google/callback`
+  - Scopes: `openid email profile`
+  - Config: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+  - Redirect URI: `GOOGLE_REDIRECT_URI` (default: http://localhost:8000/auth/google/callback)
+
+- **GitHub OAuth**
+  - Implementation: `GitHubOAuth` class in `backend/app/auth/oauth.py`
+  - Endpoints: `GET /auth/github`, `GET /auth/github/callback`
+  - Config: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+  - Redirect URI: `GITHUB_REDIRECT_URI` (default: http://localhost:8000/auth/github/callback)
 
 **Session Management:**
-- Frontend: localStorage for `auth_token` (retrieved in `frontend/src/components/integrations/api-service.ts`)
-- Backend: JWT tokens in Authorization header
-- CORS: Configured for localhost:3000-3002 (dev) and production domains
-  - `https://www.oncallburnout.com`, `https://oncallburnout.com`
-  - Dynamic: `PRODUCTION_FRONTEND_URL` and `VERCEL_URL` if set
+- JWT tokens for API authentication
+  - Secret: `JWT_SECRET_KEY` (required, generated via `openssl rand -hex 32`)
+  - Algorithm: HS256
+  - Expiration: 7 days
+  - Stored in httpOnly cookies or Authorization header
+
+- Token encryption for sensitive data
+  - Encryption Key: `ENCRYPTION_KEY` (required, generated via `openssl rand -base64 32`)
+  - Method: Fernet (symmetric encryption)
+  - Used for: OAuth tokens, API tokens, LLM keys stored in database
+
+## Data Storage
+
+**Database:**
+- PostgreSQL 15
+  - Connection: `DATABASE_URL` env var (e.g., `postgresql://postgres:password@postgres:5432/burnout_detector`)
+  - ORM: SQLAlchemy
+  - Models location: `backend/app/models/`
+  - Migrations: Alembic in `backend/migrations/`
+  - Key tables: `users`, `oauth_provider`, `jira_integration`, `linear_integration`, `slack_integration`, `user_burnout_report`, `survey_period`
+
+**Caching & Locking:**
+- Redis 7
+  - Connection: `REDIS_URL` or `REDIS_HOST:REDIS_PORT` env vars
+  - Client: `redis` Python library
+  - Uses:
+    - API response caching (`api_cache.py`)
+    - Distributed locking for token refresh (`distributed_lock.py`)
+    - Rate limiting via slowapi
+  - Default DB: 1 (configurable via `REDIS_DB`)
+
+**File Storage:**
+- Local filesystem only - No external file storage service
+- Mock data helpers in `backend/mock_data_helpers/`
+
+## LLM Integration
+
+**Language Models:**
+- **Anthropic Claude** - Primary AI model
+  - SDK: `anthropic` Python library
+  - Auth: `ANTHROPIC_API_KEY` environment variable
+  - Integration: Both system-level and per-user token storage
+  - Endpoint: `/api/llm/token` for token management
+
+- **OpenAI** - Alternative LLM provider
+  - SDK: `openai` Python library
+  - Auth: User-provided API key via `/api/llm/token`
+  - Used by: Agent framework (smolagents) as fallback
+
+**AI Framework:**
+- **smolagents** - Agent framework for agentic analysis
+  - Integration: `CodeAgent` in `backend/app/agents/burnout_agent.py`
+  - Supports: LiteLLMModel abstraction layer
+  - Custom tools: Sentiment, pattern, workload, code quality analysis
+
+**Model Abstraction:**
+- **litellm** - Unified LLM interface
+  - Supports: Multiple providers (OpenAI, Anthropic, others)
+  - Used by: smolagents framework for model flexibility
 
 ## Monitoring & Observability
 
-**Error Tracking:**
-- None detected (no Sentry, Rollbar, etc.)
-- Application uses standard logging with context
+**Error Tracking & APM:**
+- **New Relic** - Application Performance Monitoring
+  - Backend: `newrelic` Python agent
+    - Config: `backend/newrelic.ini`
+    - License: `NEW_RELIC_LICENSE_KEY` env var
+    - App name: `NEW_RELIC_APP_NAME` env var
+  - Frontend: `@newrelic/browser-agent` npm package
+    - Config via env vars:
+      - `NEXT_PUBLIC_NEW_RELIC_ACCOUNT_ID`
+      - `NEXT_PUBLIC_NEW_RELIC_TRUST_KEY`
+      - `NEXT_PUBLIC_NEW_RELIC_AGENT_ID`
+      - `NEXT_PUBLIC_NEW_RELIC_LICENSE_KEY`
+      - `NEXT_PUBLIC_NEW_RELIC_APPLICATION_ID`
 
-**Logs:**
-- Standard Python logging in backend
-  - Format: `%(asctime)s - %(name)s - %(levelname)s - [user=%(user_id)s]%(analysis_ref)s - %(message)s`
-  - User context: Middleware in `backend/app/middleware/user_logging.py` adds user_id to all logs
-  - Configurable level via `LOG_LEVEL` env var (default: INFO)
-  - Production: WARNING level recommended to reduce noise
-- Browser monitoring: New Relic (optional, via frontend env vars)
-  - `NEXT_PUBLIC_NEW_RELIC_ACCOUNT_ID`
-  - `NEXT_PUBLIC_NEW_RELIC_TRUST_KEY`
-  - `NEXT_PUBLIC_NEW_RELIC_AGENT_ID`
-  - `NEXT_PUBLIC_NEW_RELIC_LICENSE_KEY`
-  - `NEXT_PUBLIC_NEW_RELIC_APPLICATION_ID`
-- Server monitoring: New Relic (optional, backend)
-  - Package: `newrelic` in requirements.txt (agent would be configured via newrelic.ini)
+**Logging:**
+- Python logging module (backend)
+  - Log level: `LOG_LEVEL` env var (default: INFO)
+  - Output: Console and New Relic agent
+  - Contextualized logging: `backend/app/middleware/logging_context.py`
+  - User tracking: `backend/app/middleware/user_logging.py`
+
+**Analytics:**
+- **Google Analytics 4** (optional)
+  - Frontend: `NEXT_PUBLIC_GA_MEASUREMENT_ID` env var
+  - Default ID: `G-VMJT128VZS` (project's own measurement)
+  - Optional: Users can provide their own GA4 measurement ID
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Primary: Railway (platform-specific env vars supported)
-  - Detection: `VERCEL_URL` environment variable
-  - Fallback: Vercel Next.js deployment support
-- Docker containerization: `frontend/Dockerfile`, `frontend/Dockerfile.dev`, `backend/Dockerfile`
-- Docker Compose: `docker-compose.yml` for local development
+- Railway - Container hosting platform
+  - Base images: `rootlyio/on-call-health:backend-base` and `rootlyio/on-call-health:frontend-base`
+  - Environment: Both staging and production supported
+  - Secrets managed via Railway environment variables
 
 **CI Pipeline:**
-- Not detected in codebase (no GitHub Actions, CircleCI, etc. configs)
-- Pre-commit: Husky 9.1.7 for local hooks
+- GitHub Actions
+  - Workflow files in `.github/workflows/`
+  - `ci.yml` - Build and test pipeline
+  - `e2e-tests.yml` - End-to-end testing with Playwright
+  - `claude-code-review.yml` - AI-powered code review
 
-## Environment Configuration
-
-**Required env vars:**
-- Backend:
-  - `DATABASE_URL` - PostgreSQL connection string
-  - `JWT_SECRET_KEY` - JWT signing key (generate: `openssl rand -hex 32`)
-  - `ENCRYPTION_KEY` - OAuth token encryption (generate: `openssl rand -base64 32`)
-- Frontend:
-  - None required for local development (all have sensible defaults)
-
-**Secrets location:**
-- Backend: `backend/.env` file (not committed, created from `.env.example`)
-- Frontend: `frontend/.env.local` (not committed, created from `.env.example`)
-- Production: Railway environment variables or managed secret store
-
-**Optional integrations env vars (backend):**
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
-- `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`
-- `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`
-- `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`
-- `ROOTLY_API_KEY`
-- `PAGERDUTY_API_KEY`
-- `REDIS_URL` (or `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`)
+**Deployment Process:**
+- Docker-based deployment
+  - Backend: `uvicorn app.main:app --host 0.0.0.0 --port 8000`
+  - Database migrations: Automated in `start.sh` (alembic)
+  - Frontend: `bun run build && next start`
 
 ## Webhooks & Callbacks
 
-**Incoming:**
-- Slack: `backend/app/api/endpoints/slack.py` accepts webhook events for interactive components
-  - Signature verification using `SLACK_SIGNING_SECRET`
-- No other incoming webhooks configured
+**Incoming Webhooks:**
+- OAuth callbacks for integration setup:
+  - `GET /auth/google/callback` - Google OAuth completion
+  - `GET /auth/github/callback` - GitHub OAuth completion
+  - `GET /auth/jira/callback` - Jira OAuth completion
+  - `GET /auth/linear/callback` - Linear OAuth completion
+  - `GET /auth/slack/callback` - Slack OAuth completion
 
-**Outgoing:**
-- Slack DM delivery: `backend/app/services/slack_dm_sender.py` sends survey notifications
-- No outgoing webhooks to other services detected
+**Outgoing Webhooks:**
+- Not detected - Integrations use polling/API calls rather than event-driven webhooks
+
+## Environment Configuration
+
+**Required Environment Variables:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET_KEY` - Secret for JWT signing (generate: `openssl rand -hex 32`)
+- `ENCRYPTION_KEY` - Key for token encryption (generate: `openssl rand -base64 32`)
+
+**Optional but Recommended:**
+- `ROOTLY_API_KEY` - Rootly API authentication
+- `PAGERDUTY_API_KEY` - PagerDuty API authentication
+- `FRONTEND_URL` - URL for survey links (default: http://localhost:3000)
+- `ENVIRONMENT` - Environment name (default: development)
+- `LOG_LEVEL` - Logging verbosity (default: INFO, use WARNING for production)
+
+**OAuth Configuration:**
+- Google: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
+- GitHub: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_REDIRECT_URI`, `GITHUB_TOKEN`
+- Jira: `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`
+- Linear: `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`
+- Slack: `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, `SLACK_REDIRECT_URI`
+
+**LLM Configuration:**
+- `ANTHROPIC_API_KEY` - For system-level Claude API access
+- User-provided LLM keys stored encrypted in database
+
+**Frontend-Specific:**
+- `NEXT_PUBLIC_API_URL` - Backend API base URL
+- `NEXT_PUBLIC_GA_MEASUREMENT_ID` - Google Analytics measurement ID
+- `NEXT_PUBLIC_SLACK_CLIENT_ID` - For OAuth flow from frontend
+- `NEXT_PUBLIC_JIRA_CLIENT_ID` - For OAuth flow from frontend
+- `NEXT_PUBLIC_NEW_RELIC_*` - New Relic browser monitoring configuration
+
+## Working Hours & Timezone Configuration
+
+**Business Hours Customization:**
+- `BUSINESS_HOURS_START` - Start of business hours (default: 9, 24-hour format)
+- `BUSINESS_HOURS_END` - End of business hours (default: 17)
+- `LATE_NIGHT_START` - Start of late night (default: 22)
+- `LATE_NIGHT_END` - End of late night (default: 6)
+- Note: All times applied in user's local timezone (fetched from Rootly/PagerDuty profiles)
+
+## Rate Limiting
+
+**Configuration:**
+- `BYPASS_RATE_LIMITING` - Bypass rate limits for development (default: false)
+- Redis-based rate limiting via slowapi
+- Token refresh distributed locking:
+  - `TOKEN_REFRESH_LOCK_TTL` - TTL for lock (default: 30s)
+  - `TOKEN_REFRESH_LOCK_TIMEOUT` - Lock acquisition timeout (default: 10s)
 
 ---
 

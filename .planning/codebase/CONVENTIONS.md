@@ -5,242 +5,187 @@
 ## Naming Patterns
 
 **Files:**
-- TypeScript/TSX files: kebab-case for components and utilities (e.g., `use-toast.ts`, `error-boundary.tsx`, `github-integration-card.tsx`)
-- Python files: snake_case (e.g., `slack_collector.py`, `rootly_client.py`, `integration_validator.py`)
-- UI components: PascalCase (e.g., `SlackIntegrationCard.tsx`, `AIInsightsCard.tsx`)
+- TypeScript/React: camelCase for files (e.g., `ChartModeContext.tsx`, `integration_validator.py`)
+- Python: snake_case for files (e.g., `api_cache.py`, `input_validation.py`)
+- Test files: prefix with `test_` and match module name (e.g., `test_integration_validator.py`)
+- E2E test files: descriptive.spec.ts pattern (e.g., `smoke.spec.ts`, `auth.spec.ts`)
 
 **Functions:**
-- Frontend: camelCase (e.g., `testConnection()`, `loadRootlyIntegrations()`, `deleteIntegration()`)
-- Backend: snake_case (e.g., `test_connection()`, `validate_github()`, `get_cached_validation()`)
-- React hooks: camelCase with `use` prefix (e.g., `useToast()`, `useDashboard()`, `useInfiniteScroll()`)
+- Python: snake_case (e.g., `sanitize_string()`, `validate_token_format()`, `_get_redis_client()`)
+- TypeScript/React: camelCase (e.g., `useChartMode()`, `ChartModeProvider()`)
+- Async functions: use async/await pattern, explicitly named with verb prefix (e.g., `async validateGitHub()`)
+- Private functions: prefix with underscore (e.g., `_validate_github()`, `_get_redis_client()`)
 
 **Variables:**
-- Frontend: camelCase (e.g., `setConnectionStatus`, `previewData`, `integrationId`)
-- Backend: snake_case (e.g., `auth_token`, `user_id`, `error_details`)
+- Python: snake_case for module-level and local vars (e.g., `MAX_STRING_LENGTH`, `_fallback_cache`)
+- TypeScript: camelCase for local variables (e.g., `chartMode`, `currentStep`)
+- Constants: UPPER_SNAKE_CASE in both languages (e.g., `MAX_REQUEST_SIZE = 10 * 1024 * 1024`)
+- Type/interface names in TypeScript: PascalCase (e.g., `ChartModeContextType`, `Notification`)
+- Boolean variables: prefix with is/has/should (e.g., `isOpen`, `hasRefreshToken`, `shouldLog`)
 
 **Types:**
-- TypeScript interfaces: PascalCase (e.g., `State`, `ToasterToast`, `Integration`)
-- Python models: PascalCase class names (e.g., `User`, `SlackIntegration`, `UserCorrelation`)
-- Enums/constants: UPPER_SNAKE_CASE (e.g., `TOAST_LIMIT`, `TOAST_REMOVE_DELAY`)
+- TypeScript interfaces: PascalCase (e.g., `GettingStartedContextType`, `NotificationActions`)
+- Enums: PascalCase for enum, PascalCase for values (e.g., `PlatformType.GITHUB`, `AnalysisTimeRange.DAYS_7`)
+- Pydantic models: PascalCase (e.g., `BaseValidatedModel`, `RootlyIntegrationRequest`)
 
 ## Code Style
 
 **Formatting:**
-- Frontend: Uses ESLint with Next.js core-web-vitals config, maintained at `frontend/.eslintrc.json`
-- Backend: Python follows PEP 8 conventions (implicit, no explicit formatter detected)
-- Indentation: 2 spaces in TypeScript/JavaScript, 4 spaces in Python (standard)
+- Frontend: ESLint with Next.js core-web-vitals config
+- Config: `.eslintrc.json` at `frontend/.eslintrc.json`
+- Key rule override: `react/no-unescaped-entities: off` (allow unescaped entities in JSX)
+- Prettier integration via ESLint (no separate .prettierrc observed)
+- Line length: Not explicitly specified but code follows readable conventions
 
 **Linting:**
-- Frontend: ESLint configured via `frontend/.eslintrc.json` with one custom rule: `"react/no-unescaped-entities": "off"`
-- Backend: No explicit linter detected; follows standard Python conventions
-- Type checking: Frontend runs TypeScript strict type checking (note: `tsconfig.json` has `"strict": false`)
-
-**Line Length:**
-- No explicit limit detected; follows common patterns of ~80-100 characters
+- Frontend: ESLint 9.x with Next.js config extension
+- Python: Not formally configured (no pylint/flake8 config found)
+- Enforcement: ESLint runs via `npm run lint` in frontend
+- TypeScript: strict mode OFF (`"strict": false` in tsconfig.json) - allows development flexibility
 
 ## Import Organization
 
-**Frontend (TypeScript/React):**
-1. React/Next.js imports
-2. Third-party libraries
-3. Type imports (using `import type`)
-4. Internal aliases (using `@/` path alias)
-5. Relative imports
+**Order:**
+1. React/Framework imports from 'react' or 'next/*'
+2. Third-party UI library imports (@radix-ui, lucide-react, etc.)
+3. Custom component imports from '@/' paths
+4. Local utility/hook imports
 
-Example from `use-toast.ts`:
+**Example from `frontend/src/app/auth/success/page.tsx`:**
 ```typescript
-import * as React from "react"
-import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
-```
-
-**Backend (Python):**
-1. Standard library imports
-2. Third-party imports (fastapi, sqlalchemy, etc.)
-3. Relative imports from app modules
-
-Example from `rootly.py`:
-```python
-from typing import Dict, Any, List
-from datetime import datetime, timedelta
-import logging
-import os
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from ...models import get_db, User, RootlyIntegration
-from ...auth.dependencies import get_current_active_user
-from ...core.rootly_client import RootlyAPIClient
+import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 ```
 
 **Path Aliases:**
-- Frontend: `@/*` maps to `./src/*` (configured in `frontend/tsconfig.json`)
+- Frontend: `@/*` maps to `./src/*` (configured in tsconfig.json baseUrl and paths)
+- Used throughout codebase for imports (e.g., `@/components/ui/card`, `@/contexts/ChartModeContext`)
+
+**Python imports:**
+- Standard library first
+- Third-party libraries next (fastapi, pydantic, sqlalchemy, redis, etc.)
+- Local module imports last
+- No path aliases (all relative imports)
 
 ## Error Handling
 
-**Frontend Patterns:**
-- Try-catch blocks with finally clauses for cleanup
-- User-facing error messages via toast notifications (using `sonner` library)
-- Error state management through React state (e.g., `setConnectionStatus('error')`)
-- Console logging for debugging: `console.error('Error message:', error)`
-- Error details captured and passed to user: `user_message`, `user_guidance`, `error_code`
+**Patterns:**
+- **FastAPI/Python backend**: Use try/except blocks with specific exception handling
+  - Security middleware: catch broad exceptions, log with emoji prefix (🚨) for visibility
+  - Validation: raise `ValueError` with descriptive messages
+  - Database operations: catch `sqlalchemy.exc.OperationalError` for lock/transient errors
+  - Network operations: catch `httpx.TimeoutException`, `httpx.NetworkError` separately
 
-Example from `integration-handlers.ts`:
-```typescript
-try {
-  // operation
-  toast.success("Success message")
-} catch (error) {
-  console.error('Error context:', error)
-  toast.error(error instanceof Error ? error.message : "An unexpected error occurred.")
-} finally {
-  setIsLoading(false)
-}
-```
+- **Frontend**: Use try/catch for async operations
+  - Auth pages: Set status state ('processing' | 'success' | 'error')
+  - Include ref to prevent double execution in React Strict Mode: `hasAttemptedAuth = useRef(false)`
+  - Generic error messages for security (no information disclosure)
 
-**Backend Patterns:**
-- Custom exception classes: `RetryableError`, `NonRetryableError` in `core/error_handler.py`
-- HTTPException for API responses with detailed error context
-- Structured error responses with `user_message`, `user_guidance`, `error_code` fields
-- Logger-based error tracking: `logger.error()`, `logger.warning()`
-- Retry mechanism with exponential backoff for transient errors
-
-Example from `rootly.py`:
-```python
-try:
-  # operation
-except SomeError:
-  error_details = {
-    "error_code": code,
-    "user_message": "User-friendly text",
-    "user_guidance": "Actionable steps"
-  }
-  raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_details)
-```
+**Error Messages:**
+- Backend: "Authentication error" for token failures (generic, no token details)
+- Backend: Include context: `f"Request size exceeds maximum allowed limit"` with specific limits in response
+- Frontend: Use user-friendly messages, hide technical details
+- Logging: Include stack traces and context for debugging, emoji prefix for security events
 
 ## Logging
 
-**Frontend:**
-- Framework: `console` object
-- Pattern: `console.error()`, `console.log()` for debugging
-- Usage: Primarily for error tracking and debugging; used in catch blocks
+**Framework:** Python standard `logging` module
 
-Example: `console.error('Connection test error:', error)`
+**Patterns:**
+- Import at module level: `logger = logging.getLogger(__name__)`
+- Log levels: WARNING for security events, DEBUG for validation, INFO for flow
+- Security events: Use emoji prefix (🚨) for visibility (e.g., `logger.warning(f"🚨 Security event: ...")`)
+- Sample-rate logging for high-volume operations: `if _should_log(): logger.info(...)`
+- Structured logging: Use JSON format for complex event data: `json.dumps(event_data)`
 
-**Backend:**
-- Framework: Python `logging` module
-- Pattern: `logger = logging.getLogger(__name__)` at module level
-- Levels: `logger.info()`, `logger.warning()`, `logger.error()`
-- Context: Error context strings in retry logs and operation failures
-
-Example from `error_handler.py`:
+**Example from `security.py`:**
 ```python
-logger.info(f"Operation attempt {attempt + 1}/{max}, retrying in {delay}s")
-logger.warning(f"Operation failed after {max_retries} retries: {error}")
+logger.warning(f"🚨 Request too large: {content_length} bytes from {request.client.host}")
+logger.error(f"🚨 Security middleware error: {e}")
 ```
 
 ## Comments
 
 **When to Comment:**
-- Docstrings for all functions and classes (especially in Python models and services)
-- Inline comments for complex logic or non-obvious implementations
-- Comments explaining regex patterns (seen in `slack_collector.py`)
-- Comments marking removed/deprecated code with context
+- Explain "why" decisions, not "what" code does
+- Complex algorithms or non-obvious validation logic
+- Security-related workarounds (e.g., "Skip restrictive CSP for Swagger UI")
+- Prevent common mistakes (e.g., "Body reading would consume request stream")
+- Configuration rationale (e.g., "Uses DB 0, same as oncall cache")
 
 **JSDoc/TSDoc:**
-- Backend: Docstrings using Python conventions (`"""..."""`)
-- Frontend: Minimal JSDoc; relies on TypeScript types for documentation
-
-Example from `user.py`:
+- Not heavily used in frontend code
+- Python docstrings present for module/function documentation
+- Example from `input_validation.py`:
 ```python
-def has_github_integration(self) -> bool:
-    """Check if user has GitHub integration set up."""
-    return len(self.github_integrations) > 0
+"""
+Comprehensive input validation and sanitization for API security.
+"""
+
+def sanitize_string(value: str, max_length: int = MAX_STRING_LENGTH) -> str:
+    """
+    Sanitize string input to prevent XSS and injection attacks.
+    """
 ```
 
 ## Function Design
 
-**Size:** Functions typically 20-80 lines; longer functions exist for complex operations like data collection
+**Size:** Functions are focused and typically 20-50 lines
+- Middleware functions: 40-80 lines (handle multiple responsibilities)
+- Validation functions: 10-30 lines (single concern)
+- Helper functions: 5-20 lines (pure logic)
 
 **Parameters:**
-- Frontend: Functions accept React state setters and simple data types; avoid over-parameterization
-  - Example: `testConnection(platform, token, setIsTestingConnection, setConnectionStatus, ...)`
-- Backend: Use dependency injection for database sessions and authentication
-  - Example: `async def test_rootly_token_preview(request: Request, token_request: RootlyTokenRequest, current_user: User = Depends(...), db: Session = Depends(...))`
+- Use type hints consistently (both Python and TypeScript)
+- Optional parameters at end, use defaults
+- Python: Use Pydantic models for complex inputs (validated input models)
+- TypeScript: Use interfaces for component props
 
 **Return Values:**
-- Frontend: Often return Promise<void> with side effects through state setters
-- Backend: Return structured Pydantic models or HTTPException for errors
+- Early returns for guard clauses (e.g., check None and return)
+- Explicit return types via type hints
+- Async functions return awaitable values (Promise in TS, coroutine in Python)
+- Validation functions return bool or raise ValueError
 
-Example from `integration_validator.py`:
+**Example from `input_validation.py`:**
 ```python
-async def _validate_github(self, user_id: int) -> Dict[str, Any]:
-    """Return {"valid": bool, "error": str|None, ...}"""
+def validate_token_format(platform: str, token: str) -> bool:
+    """Validate API token format based on platform."""
+    pattern_key = f"{platform.lower()}_token"
+    pattern = PATTERNS.get(pattern_key)
+
+    if not pattern:
+        logger.warning(f"No token pattern defined for platform: {platform}")
+        return len(token) >= 10 and re.match(r"^[A-Za-z0-9_-]+$", token)
+
+    return bool(pattern.match(token))
 ```
 
 ## Module Design
 
 **Exports:**
-- Frontend: Re-export components and utilities via barrel files (e.g., `components/notifications/index.ts`)
-- Backend: Use `__init__.py` for module organization but import directly from specific files
-
-Example barrel file at `frontend/src/components/notifications/index.ts`:
-```typescript
-// Re-exports from this module
+- Python: Use `__all__` at end of module to explicitly export public API
+- TypeScript: Use named exports, avoid default exports for functions/classes
+- Example from `input_validation.py`:
+```python
+__all__ = [
+    'BaseValidatedModel',
+    'TokenValidation',
+    'validate_token_format',
+    'sanitize_string'
+]
 ```
 
 **Barrel Files:**
-- Frontend: Used in `components/ui/`, `components/notifications/` for organizing UI components
-- Backend: Minimal use; typically import from specific modules
+- Not explicitly used in observed codebase
+- Component exports done individually
 
-## Architecture Patterns
-
-**Frontend:**
-- Custom hooks pattern for state and side effects
-- Handler pattern for async operations (e.g., `integration-handlers.ts` contains functions like `testConnection()`, `addIntegration()`)
-- API service layer (e.g., `components/integrations/api-service.ts`)
-- Separation of UI components from business logic
-
-**Backend:**
-- Service layer pattern (e.g., `services/slack_collector.py`, `services/github_collector.py`)
-- Model-driven architecture using SQLAlchemy ORM
-- Dependency injection via FastAPI
-- Endpoint-per-feature organization (e.g., `api/endpoints/rootly.py`, `api/endpoints/slack.py`)
-- Custom middleware for security, logging, and rate limiting
-
-## Async Patterns
-
-**Frontend:**
-- Async functions for API calls and external operations
-- Return void with state updates via setters
-- Use `Promise<void>` return type for async handlers
-
-**Backend:**
-- Async/await throughout for I/O operations
-- asyncio.gather() for parallel operations
-- return_exceptions=True when collecting results from parallel tasks
-- Retry logic with exponential backoff
-
-Example from `rootly_client.py`:
-```python
-results = await asyncio.gather(
-  *[fetch_task(item) for item in items],
-  return_exceptions=True
-)
-```
-
-## Type Safety
-
-**Frontend:**
-- TypeScript with `strict: false` in tsconfig (permissive mode)
-- `type` keyword for type-only imports
-- Partial<T> for optional updates
-- type guards using `instanceof`
-
-**Backend:**
-- Python type hints on function signatures
-- Pydantic models for validation and serialization
-- Dict[str, Any] for flexible data structures
-- Optional[T] for nullable values
+**Module Organization:**
+- Constants/configuration at top
+- Helper functions before main functions
+- Classes before functions that use them
+- Exports at end (__all__)
 
 ---
 

@@ -4,7 +4,7 @@ Integration validation result caching using Redis.
 Caches validation results (GitHub, Linear, Jira status) to avoid
 redundant API calls when checking integration health.
 
-TTL: 5 minutes (300 seconds) - same as previous in-memory cache.
+TTL: 15 minutes (900 seconds) - per Phase 2 CONTEXT.md decision.
 """
 import json
 import logging
@@ -17,8 +17,8 @@ import redis
 
 logger = logging.getLogger(__name__)
 
-# Cache TTL in seconds (5 minutes)
-VALIDATION_CACHE_TTL_SECONDS = 300
+# Cache TTL in seconds (15 minutes per Phase 2 CONTEXT.md decision)
+VALIDATION_CACHE_TTL_SECONDS = 900
 
 # In-memory fallback when Redis unavailable
 _fallback_cache: Dict[int, Dict] = {}

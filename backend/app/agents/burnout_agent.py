@@ -4,7 +4,7 @@ Burnout Detection Agent using smolagents framework
 from typing import Dict, List, Any, Optional
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 try:
     from smolagents import CodeAgent, LiteLLMModel
@@ -267,7 +267,7 @@ Begin your comprehensive analysis of {member_name} now, using the tools in a log
         """
         analysis_results = {
             "member_name": member_data.get("name", "Unknown"),
-            "analysis_timestamp": datetime.utcnow().isoformat(),
+            "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
             "data_sources_analyzed": available_data_sources,
             "ai_insights": {},
             "risk_assessment": {},
@@ -643,7 +643,7 @@ Begin your comprehensive analysis of {member_name} now, using the tools in a log
         return {
             "error": True,
             "error_message": error_message,
-            "analysis_timestamp": datetime.utcnow().isoformat(),
+            "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
             "ai_insights": {},
             "risk_assessment": {
                 "overall_risk_level": "unknown",
@@ -787,7 +787,7 @@ Begin your comprehensive analysis of {member_name} now, using the tools in a log
         # Structure the response
         return {
             "member_name": member_name,
-            "analysis_timestamp": datetime.utcnow().isoformat(),
+            "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
             "data_sources_analyzed": available_data_sources,
             "ai_insights": {
                 "llm_analysis": agent_result,  # Full LLM reasoning

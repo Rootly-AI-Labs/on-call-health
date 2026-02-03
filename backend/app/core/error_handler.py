@@ -7,7 +7,7 @@ import logging
 from typing import Any, Callable, Dict, Optional, TypeVar
 from functools import wraps
 import aiohttp
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 

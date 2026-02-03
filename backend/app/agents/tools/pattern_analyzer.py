@@ -2,7 +2,7 @@
 Pattern Analysis Tool for Burnout Detection Agent
 """
 from typing import Dict, List, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import statistics
 import logging
 from collections import defaultdict, Counter

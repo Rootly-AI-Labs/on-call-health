@@ -94,6 +94,55 @@ export async function handleJiraConnect(
 }
 
 /**
+ * Connect Jira integration via manual API token
+ */
+export async function handleJiraManualConnect(
+  data: { token: string; siteUrl: string; userInfo?: { displayName: string | null; email: string | null } },
+  loadJiraIntegration: () => Promise<void>
+): Promise<boolean> {
+  try {
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) {
+      toast.error('Please log in to connect Jira')
+      return false
+    }
+
+    const response = await fetch(`${API_BASE}/integrations/jira/connect-manual`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        token: data.token,
+        site_url: data.siteUrl,
+        user_info: data.userInfo ? {
+          display_name: data.userInfo.displayName,
+          email: data.userInfo.email
+        } : undefined
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || 'Failed to save Jira integration')
+    }
+
+    // Clear cache to force refresh
+    localStorage.removeItem('jira_integration')
+
+    // Reload integration state
+    await loadJiraIntegration()
+
+    return true
+  } catch (error) {
+    console.error('Error connecting Jira with token:', error)
+    toast.error(error instanceof Error ? error.message : 'Failed to connect Jira')
+    return false
+  }
+}
+
+/**
  * Disconnect Jira integration
  */
 export async function handleJiraDisconnect(

@@ -20,6 +20,7 @@ from ..core.validation_cache import (
     set_cached_validation,
     invalidate_validation_cache,
 )
+from ..core.error_messages import get_error_response
 from ..models import GitHubIntegration, LinearIntegration, JiraIntegration
 from .token_refresh_coordinator import refresh_token_with_lock
 
@@ -94,6 +95,9 @@ def _parse_expires_in(raw_expires_in: Any) -> int:
                 raise ValueError("Invalid expires_in format")
             value = int(candidate)
         elif isinstance(raw_expires_in, float):
+            # Check if integer first to prevent issues with large floats like 1e20
+            if not raw_expires_in.is_integer():
+                raise ValueError("Non-integer expires_in value")
             # Check bounds BEFORE conversion to prevent overflow with large floats (e.g., 1e9)
             if raw_expires_in > EXPIRES_IN_MAX_SECONDS or raw_expires_in < EXPIRES_IN_MIN_SECONDS:
                 logger.warning(
@@ -101,8 +105,6 @@ def _parse_expires_in(raw_expires_in: Any) -> int:
                     f"This may indicate an API change or malformed response."
                 )
                 return EXPIRES_IN_DEFAULT_SECONDS
-            if not raw_expires_in.is_integer():
-                raise ValueError("Non-integer expires_in value")
             value = int(raw_expires_in)
         elif isinstance(raw_expires_in, int):
             value = raw_expires_in
@@ -140,6 +142,174 @@ class IntegrationValidator:
 
     def __init__(self, db: Session):
         self.db = db
+
+    async def validate_manual_token(
+        self,
+        provider: str,
+        token: str,
+        site_url: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Validate a manual API token before saving to database.
+
+        Args:
+            provider: 'jira' or 'linear'
+            token: The API token to validate (plaintext, not encrypted)
+            site_url: Jira site URL (required for Jira, ignored for Linear)
+
+        Returns:
+            Dict with 'valid' (bool), 'error' (str), 'error_type' (str),
+            and optional 'user_info' (dict with display_name, email)
+        """
+        if provider == "jira":
+            return await self._validate_jira_manual_token(token, site_url)
+        elif provider == "linear":
+            return await self._validate_linear_manual_token(token)
+        else:
+            return {"valid": False, "error": f"Unknown provider: {provider}", "error_type": "unknown"}
+
+    async def _validate_jira_manual_token(
+        self,
+        token: str,
+        site_url: Optional[str]
+    ) -> Dict[str, Any]:
+        """Validate Jira Personal Access Token."""
+        # Format validation
+        if not token or not token.strip():
+            error = get_error_response("jira", "format")
+            return {"valid": False, **error}
+
+        if not site_url or not site_url.strip():
+            error = get_error_response("jira", "site_url")
+            return {"valid": False, **error}
+
+        # Normalize site URL
+        site_url = site_url.strip().rstrip("/")
+        if not site_url.startswith("https://"):
+            site_url = f"https://{site_url}"
+
+        # Basic format check - Jira tokens are base64-ish alphanumeric
+        token = token.strip()
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # Use /myself endpoint to validate token and get user info
+                response = await client.get(
+                    f"{site_url}/rest/api/3/myself",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Accept": "application/json"
+                    }
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "valid": True,
+                        "error": None,
+                        "error_type": None,
+                        "user_info": {
+                            "display_name": data.get("displayName"),
+                            "email": data.get("emailAddress"),
+                            "account_id": data.get("accountId")
+                        }
+                    }
+                elif response.status_code == 401:
+                    error = get_error_response("jira", "authentication")
+                    return {"valid": False, **error}
+                elif response.status_code == 403:
+                    error = get_error_response("jira", "permissions")
+                    return {"valid": False, **error}
+                else:
+                    logger.warning(f"Jira validation returned status {response.status_code}")
+                    error = get_error_response("jira", "authentication")
+                    return {"valid": False, **error}
+
+        except httpx.TimeoutException:
+            error = get_error_response("jira", "network")
+            error["message"] = "Jira API request timed out. The site may be slow or unreachable."
+            return {"valid": False, **error}
+        except httpx.NetworkError:
+            error = get_error_response("jira", "network")
+            return {"valid": False, **error}
+        except Exception as e:
+            logger.exception(f"Unexpected error validating Jira token: {e}")
+            error = get_error_response("jira", "network")
+            return {"valid": False, **error}
+
+    async def _validate_linear_manual_token(self, token: str) -> Dict[str, Any]:
+        """Validate Linear Personal API Key."""
+        # Format validation
+        if not token or not token.strip():
+            error = get_error_response("linear", "format")
+            return {"valid": False, **error}
+
+        token = token.strip()
+
+        # Linear API keys typically start with lin_api_
+        if not token.startswith("lin_api_"):
+            error = get_error_response("linear", "format")
+            return {"valid": False, **error}
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # Use GraphQL viewer query to validate token and get user info
+                # IMPORTANT: Linear API Keys do NOT use Bearer prefix (only OAuth tokens do)
+                # See: https://developers.linear.app/docs/graphql/working-with-the-graphql-api
+                response = await client.post(
+                    "https://api.linear.app/graphql",
+                    headers={
+                        "Authorization": token,  # API keys: no Bearer prefix
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "query": "query { viewer { id name email } }"
+                    }
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    if "errors" in data:
+                        # GraphQL returned errors
+                        error_msg = data["errors"][0].get("message", "")
+                        if "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower():
+                            error = get_error_response("linear", "authentication")
+                        else:
+                            error = get_error_response("linear", "permissions")
+                        return {"valid": False, **error}
+
+                    viewer = data.get("data", {}).get("viewer", {})
+                    return {
+                        "valid": True,
+                        "error": None,
+                        "error_type": None,
+                        "user_info": {
+                            "display_name": viewer.get("name"),
+                            "email": viewer.get("email"),
+                            "linear_id": viewer.get("id")
+                        }
+                    }
+                elif response.status_code == 401:
+                    error = get_error_response("linear", "authentication")
+                    return {"valid": False, **error}
+                elif response.status_code == 403:
+                    error = get_error_response("linear", "permissions")
+                    return {"valid": False, **error}
+                else:
+                    logger.warning(f"Linear validation returned status {response.status_code}")
+                    error = get_error_response("linear", "authentication")
+                    return {"valid": False, **error}
+
+        except httpx.TimeoutException:
+            error = get_error_response("linear", "network")
+            error["message"] = "Linear API request timed out."
+            return {"valid": False, **error}
+        except httpx.NetworkError:
+            error = get_error_response("linear", "network")
+            return {"valid": False, **error}
+        except Exception as e:
+            logger.exception(f"Unexpected error validating Linear token: {e}")
+            error = get_error_response("linear", "network")
+            return {"valid": False, **error}
 
     async def validate_all_integrations(
         self,
@@ -423,8 +593,13 @@ class IntegrationValidator:
                     "Linear token decryption failed. Please reconnect your Linear integration."
                 )
 
+            # API keys (lin_api_*) don't use Bearer prefix, OAuth tokens do
+            if token.startswith("lin_api_"):
+                auth_header = token
+            else:
+                auth_header = f"Bearer {token}"
             headers = {
-                "Authorization": f"Bearer {token}",
+                "Authorization": auth_header,
                 "Content-Type": "application/json"
             }
             query = "query Viewer { viewer { id } }"

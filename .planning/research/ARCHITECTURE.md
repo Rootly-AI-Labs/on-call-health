@@ -1,409 +1,386 @@
-# Architecture Research: API Key Management for On-Call Health
+# Architecture Research: Dual-Auth Integration (OAuth + Token)
 
-**Domain:** API Key Authentication alongside OAuth/JWT
+**Domain:** Integration authentication systems
 **Researched:** 2026-01-30
 **Confidence:** HIGH
 
-## System Overview
+## Standard Architecture
+
+### System Overview
+
+Dual-auth systems support both OAuth 2.0 flows (for delegated access) and direct API token flows (for manual/service access) within the same integration architecture. The pattern separates authentication method from authorization logic.
 
 ```
-                         ┌──────────────────────────────────────────────────────────────────┐
-                         │                    Frontend (Next.js)                            │
-                         │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-                         │  │  Settings Page  │  │  API Key Modal  │  │  Key List View  │  │
-                         │  │  (existing)     │  │  (new)          │  │  (new)          │  │
-                         │  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  │
-                         │           │                    │                    │            │
-                         └───────────┼────────────────────┼────────────────────┼────────────┘
-                                     │                    │                    │
-                                     ▼                    ▼                    ▼
-┌────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                    FastAPI Backend                                              │
-│                                                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────────────────────────┐ │
-│  │                            Authentication Layer                                            │ │
-│  │  ┌─────────────────┐    ┌─────────────────────────────────────────────────────────────┐  │ │
-│  │  │  HTTPBearer     │    │                 Unified Auth Dependency                     │  │ │
-│  │  │  (existing)     │◄───┤  get_current_user_or_api_key() - NEW                        │  │ │
-│  │  │                 │    │    ├─ Tries JWT token first (Authorization: Bearer <jwt>)   │  │ │
-│  │  │  APIKeyHeader   │◄───┤    └─ Falls back to API key (X-API-Key: <key>)              │  │ │
-│  │  │  (new)          │    │                                                             │  │ │
-│  │  └─────────────────┘    └─────────────────────────────────────────────────────────────┘  │ │
-│  └───────────────────────────────────────────────────────────────────────────────────────────┘ │
-│                                              │                                                  │
-│                                              ▼                                                  │
-│  ┌───────────────────────────────────────────────────────────────────────────────────────────┐ │
-│  │                               API Endpoints                                                │ │
-│  │  ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────────────────────┐  │ │
-│  │  │  /api/keys         │  │  /api/keys/{id}    │  │  Protected Endpoints (existing)    │  │ │
-│  │  │  POST (create)     │  │  DELETE (revoke)   │  │  • /rootly/*                       │  │ │
-│  │  │  GET (list)        │  │  PATCH (update)    │  │  • /integrations/*                 │  │ │
-│  │  └────────────────────┘  └────────────────────┘  │  • /analyses/*                     │  │ │
-│  │                                                   │  • /mcp/* (server)                 │  │ │
-│  │                                                   └────────────────────────────────────┘  │ │
-│  └───────────────────────────────────────────────────────────────────────────────────────────┘ │
-│                                              │                                                  │
-│                                              ▼                                                  │
-│  ┌───────────────────────────────────────────────────────────────────────────────────────────┐ │
-│  │                               Service Layer                                                │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────────────────────┐  │ │
-│  │  │                    ApiKeyService (NEW)                                               │  │ │
-│  │  │    • create_api_key(user_id, name, scopes) -> (key_id, raw_key)                     │  │ │
-│  │  │    • validate_api_key(raw_key) -> User | None                                        │  │ │
-│  │  │    • list_api_keys(user_id) -> List[ApiKeyInfo]                                     │  │ │
-│  │  │    • revoke_api_key(user_id, key_id)                                                │  │ │
-│  │  │    • update_api_key(user_id, key_id, name)                                          │  │ │
-│  │  │    • check_scope(api_key_id, required_scope) -> bool                                │  │ │
-│  │  └─────────────────────────────────────────────────────────────────────────────────────┘  │ │
-│  └───────────────────────────────────────────────────────────────────────────────────────────┘ │
-│                                              │                                                  │
-│                                              ▼                                                  │
-│  ┌───────────────────────────────────────────────────────────────────────────────────────────┐ │
-│  │                               Model Layer                                                  │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────────────────────┐  │ │
-│  │  │                         ApiKey Model (NEW)                                           │  │ │
-│  │  │    id, user_id, name, key_prefix, key_hash, scopes,                                 │  │ │
-│  │  │    last_used_at, expires_at, is_active, created_at                                  │  │ │
-│  │  └─────────────────────────────────────────────────────────────────────────────────────┘  │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────────────────────┐  │ │
-│  │  │                       User Model (existing)                                          │  │ │
-│  │  │    + api_keys relationship                                                          │  │ │
-│  │  └─────────────────────────────────────────────────────────────────────────────────────┘  │ │
-│  └───────────────────────────────────────────────────────────────────────────────────────────┘ │
-│                                              │                                                  │
-│                                              ▼                                                  │
-│  ┌───────────────────────────────────────────────────────────────────────────────────────────┐ │
-│  │                             PostgreSQL Database                                            │ │
-│  │  ┌───────────────────────────────────────────────────────────────────────────────────┐    │ │
-│  │  │  api_keys table                                                                    │    │ │
-│  │  │  ├─ id (PK)                                                                        │    │ │
-│  │  │  ├─ user_id (FK -> users.id, indexed)                                              │    │ │
-│  │  │  ├─ name (user-friendly identifier)                                                │    │ │
-│  │  │  ├─ key_prefix (first 8 chars for identification: "och_xxxx...")                   │    │ │
-│  │  │  ├─ key_hash (SHA-256 hash, indexed for fast lookup)                               │    │ │
-│  │  │  ├─ scopes (JSON array: ["mcp:read", "mcp:write", "api:full"])                     │    │ │
-│  │  │  ├─ last_used_at (timestamp)                                                       │    │ │
-│  │  │  ├─ expires_at (nullable timestamp)                                                │    │ │
-│  │  │  ├─ is_active (boolean, default true)                                              │    │ │
-│  │  │  └─ created_at (timestamp)                                                         │    │ │
-│  │  └───────────────────────────────────────────────────────────────────────────────────┘    │ │
-│  └───────────────────────────────────────────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     Frontend Layer                           │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │   OAuth UI  │  │  Token UI   │  │  Status UI  │          │
+│  │  (Redirect) │  │ (Form/Copy) │  │ (Validation)│          │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘          │
+│         │                │                │                  │
+├─────────┴────────────────┴────────────────┴──────────────────┤
+│                      API Gateway                             │
+│                  (Route Selection)                           │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────────┐          ┌──────────────────┐          │
+│  │  OAuth Endpoints │          │ Manual Endpoints │          │
+│  ├──────────────────┤          ├──────────────────┤          │
+│  │ /connect         │          │ /manual/setup    │          │
+│  │ /callback        │          │ /manual/validate │          │
+│  │ /disconnect      │          │ /manual/test     │          │
+│  └────────┬─────────┘          └────────┬─────────┘          │
+│           │                             │                    │
+│           └──────────┬──────────────────┘                    │
+│                      ▼                                       │
+│         ┌───────────────────────────┐                        │
+│         │  Integration Validator    │                        │
+│         │  (Unified Interface)      │                        │
+│         └─────────┬─────────────────┘                        │
+│                   │                                          │
+├───────────────────┴──────────────────────────────────────────┤
+│                   Service Layer                              │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐                   │
+│  │ OAuth Manager   │  │ Token Manager   │                   │
+│  │ - Exchange code │  │ - Store token   │                   │
+│  │ - Refresh token │  │ - Validate      │                   │
+│  │ - Handle expiry │  │ - Encrypt/Drypt │                   │
+│  └────────┬────────┘  └────────┬────────┘                   │
+│           │                    │                             │
+│           └──────────┬─────────┘                             │
+│                      ▼                                       │
+│         ┌───────────────────────────┐                        │
+│         │  Token Abstraction Layer  │                        │
+│         │  (get_valid_token())      │                        │
+│         └─────────┬─────────────────┘                        │
+│                   │                                          │
+├───────────────────┴──────────────────────────────────────────┤
+│                   Data Layer                                 │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              Integration Model                        │   │
+│  ├──────────────────────────────────────────────────────┤   │
+│  │ Fields:                                               │   │
+│  │ - access_token (encrypted)                            │   │
+│  │ - refresh_token (encrypted, nullable for manual)      │   │
+│  │ - token_source: "oauth" | "manual"                    │   │
+│  │ - token_expires_at (nullable for non-expiring tokens) │   │
+│  │ - platform-specific fields (cloud_id, workspace_id)   │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Component Responsibilities
+### Component Responsibilities
 
-| Component | Responsibility | Communicates With |
-|-----------|----------------|-------------------|
-| **ApiKey Model** | SQLAlchemy model defining api_keys table schema | Database, ApiKeyService |
-| **ApiKeyService** | Business logic for key creation, validation, revocation | ApiKey Model, User Model |
-| **Unified Auth Dependency** | FastAPI dependency that accepts JWT OR API key | JWT module, ApiKeyService |
-| **API Key Endpoints** | CRUD operations for user's API keys | ApiKeyService, Auth dependencies |
-| **MCP Auth** | Extracts authentication from MCP context | Unified Auth Dependency |
-| **Frontend Key Management** | UI for creating, viewing, revoking keys | API Key Endpoints |
-
-## Data Flow
-
-### Key Creation Flow
-
-```
-┌──────────┐     ┌──────────────┐     ┌──────────────┐     ┌───────────────┐     ┌────────────┐
-│ Frontend │────►│ POST /api/   │────►│ ApiKeyService│────►│ Generate key  │────►│ Store hash │
-│          │     │ keys         │     │ .create()    │     │ with secrets  │     │ in DB      │
-└──────────┘     └──────────────┘     └──────────────┘     └───────────────┘     └────────────┘
-                                              │
-                                              ▼
-                                     ┌───────────────────┐
-                                     │ Return raw key    │
-                                     │ (ONCE ONLY!)      │
-                                     │ och_xxxxxxxxxxxx  │
-                                     └───────────────────┘
-```
-
-**Security Note:** The raw API key is returned ONLY at creation time. It is never stored and cannot be retrieved later. Users must save it immediately.
-
-### Key Validation Flow (API Request Authentication)
-
-```
-┌──────────────┐     ┌─────────────────────┐     ┌────────────────────┐     ┌──────────────────┐
-│ API Request  │────►│ Unified Auth        │────►│ Check X-API-Key    │────►│ Hash key with    │
-│ X-API-Key:   │     │ Dependency          │     │ header present?    │     │ SHA-256          │
-│ och_xxx...   │     └─────────────────────┘     └────────────────────┘     └──────────────────┘
-└──────────────┘                                          │                          │
-                                                          │ Yes                      │
-                                                          ▼                          ▼
-                                              ┌────────────────────┐     ┌──────────────────┐
-                                              │ Query api_keys     │◄────│ Compare hash     │
-                                              │ WHERE key_hash =   │     │ with DB          │
-                                              │ AND is_active=true │     │                  │
-                                              └────────────────────┘     └──────────────────┘
-                                                          │
-                                                          ▼
-                                              ┌────────────────────┐     ┌──────────────────┐
-                                              │ Load User via      │────►│ Update           │
-                                              │ user_id            │     │ last_used_at     │
-                                              └────────────────────┘     └──────────────────┘
-                                                          │
-                                                          ▼
-                                              ┌────────────────────┐
-                                              │ Return User +      │
-                                              │ API Key context    │
-                                              └────────────────────┘
-```
-
-### MCP Server Authentication Flow (Primary Use Case)
-
-```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│ Claude Desktop   │────►│ MCP Transport    │────►│ mcp/auth.py      │────►│ Unified Auth     │
-│ or other client  │     │ (SSE/stdio)      │     │ require_user()   │     │ Dependency       │
-│                  │     │ Authorization:   │     │                  │     │                  │
-│                  │     │ Bearer och_xxx   │     │                  │     │                  │
-└──────────────────┘     └──────────────────┘     └──────────────────┘     └──────────────────┘
-                                                                                    │
-                                                                                    ▼
-                                                                         ┌──────────────────┐
-                                                                         │ JWT? Try first   │
-                                                                         │ API Key? Fallback│
-                                                                         │ → User object    │
-                                                                         └──────────────────┘
-```
+| Component | Responsibility | Typical Implementation |
+|-----------|----------------|------------------------|
+| **OAuth Endpoints** | Handle OAuth flow initialization and callback processing | FastAPI routes with redirect to provider, exchange code for token |
+| **Manual Endpoints** | Accept and validate direct API tokens from users | FastAPI routes accepting token in request body, immediate validation |
+| **Integration Validator** | Unified token validation regardless of source | Service class with `validate_all_integrations()` method |
+| **Token Abstraction Layer** | Get valid token for API calls (refresh if needed) | `get_valid_token()` method that abstracts OAuth refresh vs manual token |
+| **OAuth Manager** | Provider-specific OAuth flows (Jira, Linear, etc.) | Class per provider with `exchange_code_for_token()`, `refresh_access_token()` |
+| **Token Manager** | Encrypt/decrypt tokens, handle storage | Fernet encryption, database persistence |
+| **Integration Model** | Unified data model with discriminator field | SQLAlchemy model with `token_source` discriminator |
 
 ## Recommended Project Structure
 
 ```
-backend/app/
-├── auth/                          # Authentication module (existing)
-│   ├── __init__.py
-│   ├── dependencies.py            # MODIFY: Add unified auth dependency
-│   ├── jwt.py                     # JWT handling (existing)
-│   ├── oauth.py                   # OAuth providers (existing)
-│   └── api_key.py                 # NEW: API key authentication utilities
-├── models/                        # Database models (existing)
-│   ├── __init__.py                # MODIFY: Export ApiKey
-│   ├── user.py                    # MODIFY: Add api_keys relationship
-│   └── api_key.py                 # NEW: ApiKey model
-├── services/                      # Business logic (existing)
-│   └── api_key_service.py         # NEW: API key service
-├── api/
-│   └── endpoints/
-│       └── api_keys.py            # NEW: API key CRUD endpoints
-└── mcp/
-    ├── auth.py                    # MODIFY: Use unified auth
-    └── server.py                  # MCP server (existing)
-
-frontend/src/
+backend/
 ├── app/
-│   └── settings/
-│       └── api-keys/              # NEW: API key management page
-│           └── page.tsx
-└── components/
-    └── settings/
-        └── api-keys/              # NEW: API key components
-            ├── api-key-list.tsx
-            ├── create-key-modal.tsx
-            └── key-display.tsx
+│   ├── api/
+│   │   └── endpoints/
+│   │       ├── jira.py              # OAuth endpoints: /connect, /callback
+│   │       ├── jira_manual.py       # Manual endpoints: /manual/setup, /manual/validate
+│   │       ├── linear.py            # OAuth endpoints
+│   │       └── linear_manual.py     # Manual endpoints
+│   ├── auth/
+│   │   └── integration_oauth.py     # OAuth managers (JiraIntegrationOAuth, LinearIntegrationOAuth)
+│   ├── services/
+│   │   ├── integration_validator.py # Unified validation service
+│   │   ├── token_refresh_coordinator.py # Handles OAuth token refresh with locking
+│   │   └── token_manager.py         # NEW: Abstraction layer for get_valid_token()
+│   ├── models/
+│   │   ├── jira_integration.py      # Model with token_source field
+│   │   └── linear_integration.py    # Model with token_source field
+│   └── core/
+│       ├── encryption.py            # Centralized encryption utilities
+│       └── validation_cache.py      # Cache validation results
+frontend/
+├── components/
+│   ├── integrations/
+│   │   ├── JiraOAuthSetup.tsx       # OAuth flow UI
+│   │   ├── JiraManualSetup.tsx      # Manual token input UI
+│   │   ├── LinearOAuthSetup.tsx     # OAuth flow UI
+│   │   └── LinearManualSetup.tsx    # Manual token input UI
+│   └── shared/
+│       └── IntegrationStatusBadge.tsx # Shows OAuth vs Manual status
 ```
 
 ### Structure Rationale
 
-- **`auth/api_key.py`:** Separate API key utilities from JWT to keep concerns isolated while sharing the auth module namespace
-- **`models/api_key.py`:** Follow existing model pattern (one model per file)
-- **`services/api_key_service.py`:** Follow existing service pattern for business logic
-- **`api/endpoints/api_keys.py`:** Follow existing endpoint pattern for CRUD operations
-- **Frontend in settings:** API keys are a user setting, so they belong in the settings section alongside existing integrations
+- **Separate route files for OAuth vs Manual**: Clear separation of concerns, easier to maintain distinct flows
+- **Token abstraction layer**: `get_valid_token()` hides whether token came from OAuth (needs refresh) or manual (no refresh)
+- **Discriminator field**: `token_source` on model enables conditional logic without separate tables
+- **Unified validator**: Same validation logic regardless of token source, simplifies integration checks
+- **Frontend UI separation**: Users see different flows based on auth method, but same status display
 
 ## Architectural Patterns
 
-### Pattern 1: Unified Authentication Dependency
+### Pattern 1: Strategy Pattern for Token Retrieval
 
-**What:** A single FastAPI dependency that tries multiple authentication methods in order (JWT first, then API key).
+**What:** Abstraction layer that provides valid tokens regardless of source (OAuth with refresh vs manual without refresh)
 
-**When to use:** When endpoints should accept either authentication method transparently.
+**When to use:** When the same API client needs tokens from different sources but shouldn't care about token lifecycle
 
 **Trade-offs:**
-- Pro: Endpoints don't need to know which auth method was used
-- Pro: Easy to extend with additional auth methods
-- Con: Slightly more complex dependency code
+- ✅ Clean separation: API clients don't need to know about OAuth refresh logic
+- ✅ Easier to add new auth methods (e.g., service accounts, machine tokens)
+- ❌ Additional abstraction layer adds complexity
+- ❌ Must handle both expiring (OAuth) and non-expiring (manual API key) tokens
 
 **Example:**
 ```python
-# backend/app/auth/dependencies.py
+class TokenManager:
+    """Abstraction layer for retrieving valid tokens."""
 
-from fastapi import Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, APIKeyHeader
+    async def get_valid_token(self, integration: Integration) -> str:
+        """Get a valid access token, refreshing OAuth tokens if needed."""
+        if integration.token_source == "oauth":
+            return await self._get_oauth_token(integration)
+        elif integration.token_source == "manual":
+            return await self._get_manual_token(integration)
+        else:
+            raise ValueError(f"Unknown token source: {integration.token_source}")
 
-http_bearer = HTTPBearer(auto_error=False)
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+    async def _get_oauth_token(self, integration: Integration) -> str:
+        """Get OAuth token, refreshing if expired."""
+        if needs_refresh(integration.token_expires_at):
+            return await self._refresh_oauth_token(integration)
+        return decrypt_token(integration.access_token)
 
-async def get_current_user_or_api_key(
-    request: Request,
-    bearer_token: Optional[str] = Depends(http_bearer),
-    api_key: Optional[str] = Depends(api_key_header),
-    db: Session = Depends(get_db)
-) -> User:
-    """
-    Unified auth dependency.
-    1. Try JWT token from Authorization header
-    2. Fall back to API key from X-API-Key header
-    """
-    # Try JWT first (existing behavior)
-    if bearer_token:
-        user = await _validate_jwt(bearer_token.credentials, db)
-        if user:
-            return user
-
-    # Try cookie token (existing behavior for web app)
-    cookie_token = request.cookies.get("auth_token")
-    if cookie_token:
-        user = await _validate_jwt(cookie_token, db)
-        if user:
-            return user
-
-    # Try API key
-    if api_key:
-        user = await _validate_api_key(api_key, db)
-        if user:
-            return user
-
-    raise HTTPException(status_code=401, detail="Not authenticated")
+    async def _get_manual_token(self, integration: Integration) -> str:
+        """Get manual API token (no refresh needed)."""
+        return decrypt_token(integration.access_token)
 ```
 
-### Pattern 2: Hash-Based Key Storage
+### Pattern 2: Discriminator Field Pattern
 
-**What:** Store only a SHA-256 hash of the API key, never the raw key itself.
+**What:** Single integration table with `token_source` field to differentiate OAuth vs manual authentication
 
-**When to use:** Always. API keys should never be stored in plaintext.
+**When to use:** When integration behavior is 95% shared, only authentication method differs
 
 **Trade-offs:**
-- Pro: Even if database is compromised, keys cannot be extracted
-- Pro: Fast lookup using indexed hash
-- Con: Cannot show full key to user after creation (feature, not bug)
+- ✅ Single source of truth for integration data
+- ✅ Easier to query "all integrations for user" regardless of auth method
+- ✅ Avoids data duplication (workspace_id, user mappings, etc.)
+- ❌ Some fields nullable for one method but not the other (e.g., `refresh_token`)
+- ❌ Conditional logic based on `token_source` scattered throughout code
 
 **Example:**
 ```python
-# backend/app/services/api_key_service.py
+class JiraIntegration(Base):
+    __tablename__ = "jira_integrations"
 
-import hashlib
-import secrets
+    # Shared fields
+    user_id = Column(Integer, ForeignKey("users.id"))
+    jira_cloud_id = Column(String)
+    jira_site_url = Column(String)
 
-class ApiKeyService:
-    KEY_PREFIX = "och_"  # On-Call Health prefix for easy identification
+    # Auth fields
+    access_token = Column(Text)  # Always present, encrypted
+    refresh_token = Column(Text, nullable=True)  # Only for OAuth
+    token_source = Column(String, default="oauth")  # "oauth" | "manual"
+    token_expires_at = Column(DateTime, nullable=True)  # Only for OAuth
 
-    def create_api_key(self, db: Session, user_id: int, name: str) -> tuple[int, str]:
-        """
-        Create a new API key.
-        Returns: (key_id, raw_key) - raw_key is shown once and never stored
-        """
-        # Generate cryptographically secure random key
-        random_part = secrets.token_urlsafe(32)
-        raw_key = f"{self.KEY_PREFIX}{random_part}"
+    @property
+    def supports_refresh(self) -> bool:
+        return self.token_source == "oauth" and self.refresh_token is not None
+```
 
-        # Hash for storage (never store the raw key)
-        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+### Pattern 3: Unified Validation Interface
 
-        # Store prefix for UI identification
-        key_prefix = raw_key[:12]  # "och_" + first 8 chars
+**What:** Same validation method for all integrations, regardless of auth source
 
-        api_key = ApiKey(
-            user_id=user_id,
-            name=name,
-            key_prefix=key_prefix,
-            key_hash=key_hash,
-            is_active=True
+**When to use:** Always - validation logic should be identical (make API call to verify token works)
+
+**Trade-offs:**
+- ✅ Consistent user experience across auth methods
+- ✅ Single cache for validation results
+- ✅ Simpler to add new integrations
+- ❌ Must handle OAuth token refresh during validation
+
+**Example:**
+```python
+class IntegrationValidator:
+    async def validate_all_integrations(self, user_id: int) -> Dict[str, Dict[str, Any]]:
+        """Validate all integrations regardless of auth source."""
+        results = {}
+
+        # Jira validation (OAuth or manual)
+        if jira_integration := self._get_jira(user_id):
+            token = await self.token_manager.get_valid_token(jira_integration)
+            results["jira"] = await self._validate_jira_api(token, jira_integration.jira_cloud_id)
+
+        return results
+
+    async def _validate_jira_api(self, token: str, cloud_id: str) -> Dict[str, Any]:
+        """Test Jira API with token (doesn't care if OAuth or manual)."""
+        response = await httpx.get(
+            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/myself",
+            headers={"Authorization": f"Bearer {token}"}
         )
-        db.add(api_key)
-        db.commit()
-
-        return api_key.id, raw_key  # Return raw key ONCE
-
-    def validate_api_key(self, db: Session, raw_key: str) -> Optional[User]:
-        """Validate an API key and return the associated user."""
-        if not raw_key or not raw_key.startswith(self.KEY_PREFIX):
-            return None
-
-        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-
-        api_key = db.query(ApiKey).filter(
-            ApiKey.key_hash == key_hash,
-            ApiKey.is_active == True
-        ).first()
-
-        if not api_key:
-            return None
-
-        # Check expiration
-        if api_key.expires_at and api_key.expires_at < datetime.utcnow():
-            return None
-
-        # Update last used timestamp
-        api_key.last_used_at = datetime.utcnow()
-        db.commit()
-
-        return api_key.user
+        return {"valid": response.status_code == 200}
 ```
 
-### Pattern 3: Prefix-Based Key Identification
+## Data Flow
 
-**What:** Include a recognizable prefix (e.g., `och_`) in API keys for easy identification.
+### OAuth Flow (Existing)
 
-**When to use:** Standard practice for API key design. Helps users and security tools identify key types.
+```
+User clicks "Connect Jira"
+    ↓
+Frontend: POST /jira/connect
+    ↓
+Backend: Generate OAuth URL with state
+    ↓
+Frontend: Redirect to Jira OAuth page
+    ↓
+User authorizes in Jira
+    ↓
+Jira: Redirect to {FRONTEND_URL}/setup/jira/callback?code=XXX&state=YYY
+    ↓
+Frontend: POST /jira/callback with code
+    ↓
+Backend: Exchange code for access_token + refresh_token
+    ↓
+Backend: Store in DB with token_source="oauth"
+    ↓
+Backend: Return success
+    ↓
+Frontend: Redirect to /integrations?jira_connected=1
+```
 
-**Trade-offs:**
-- Pro: Users can easily identify On-Call Health keys
-- Pro: Security scanners can detect exposed keys
-- Pro: Enables quick visual verification in logs
-- Con: Slightly shorter entropy (minimal impact with 32+ bytes of random data)
+### Manual Token Flow (New)
 
-**Example Keys:**
-- `och_xk7Yz...` - On-Call Health API key
-- Similar to: `sk-...` (OpenAI), `ghp_...` (GitHub), `rk_...` (Stripe)
+```
+User clicks "Use API Token"
+    ↓
+Frontend: Show form with token input field
+    ↓
+User pastes API token from Jira settings
+    ↓
+User enters Jira site URL (e.g., "mycompany.atlassian.net")
+    ↓
+Frontend: POST /jira/manual/setup
+    {
+        "api_token": "user_provided_token",
+        "site_url": "mycompany.atlassian.net"
+    }
+    ↓
+Backend: Validate token immediately (call Jira API)
+    ↓
+Backend: If valid, get cloud_id and user info
+    ↓
+Backend: Store in DB with token_source="manual", refresh_token=null
+    ↓
+Backend: Return success
+    ↓
+Frontend: Show success message, redirect to /integrations
+```
 
-## Anti-Patterns
+### Unified Validation Flow
 
-### Anti-Pattern 1: Storing Raw API Keys
+```
+User navigates to /analysis (or periodic background job)
+    ↓
+Backend: GET /integrations/validate (or internal service call)
+    ↓
+IntegrationValidator.validate_all_integrations(user_id)
+    ↓
+For each integration:
+    ├─ Get integration from DB
+    ├─ Check token_source field
+    ├─ If OAuth: get_valid_token() → checks expiry → refreshes if needed
+    ├─ If Manual: get_valid_token() → returns stored token
+    ├─ Make API call to provider (Jira /myself, Linear viewer query, etc.)
+    ├─ Return {valid: true/false, error: "..."}
+    └─ Cache result for 5 minutes
+    ↓
+Return validation results to frontend
+    ↓
+Frontend: Display status badges (OAuth vs Manual, Valid vs Invalid)
+```
 
-**What people do:** Store the actual API key in the database (encrypted or not).
+## Scaling Considerations
+
+| Concern | At 100 users | At 10K users | At 1M users |
+|---------|--------------|--------------|-------------|
+| **Token refresh concurrency** | In-process locking sufficient | Redis-based distributed locks for OAuth refresh | Dedicated token refresh service with queue |
+| **Validation caching** | In-memory cache (5 min TTL) | Redis cache with 5 min TTL | Redis cache + invalidation on token update |
+| **OAuth callback handling** | Single backend instance | Multiple instances with session store in Redis | Load balancer with sticky sessions or stateless approach |
+| **Manual token validation** | Synchronous validation on setup | Background validation job after setup | Rate-limited validation with circuit breaker for provider APIs |
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Separate Tables for OAuth vs Manual
+
+**What people do:** Create `jira_oauth_integrations` and `jira_manual_integrations` tables
 
 **Why it's wrong:**
-- If encryption key is compromised, all API keys are exposed
-- Database backups contain usable credentials
-- Unnecessary attack surface
+- Data duplication (workspace mappings, user correlations must exist in both)
+- Complex queries ("get all Jira integrations for user" needs UNION)
+- Hard to migrate users between auth methods
+- Business logic must handle two code paths for everything
 
-**Do this instead:** Store only SHA-256 hash. Key is shown once at creation, never stored.
+**Do this instead:** Use single table with `token_source` discriminator field
 
-### Anti-Pattern 2: Using JWT for Long-Lived Machine Tokens
+### Anti-Pattern 2: Exposing Token Source to API Clients
 
-**What people do:** Create JWT tokens with very long expiration for MCP/programmatic access.
-
-**Why it's wrong:**
-- JWTs cannot be revoked without token blocklist
-- Long-lived JWTs accumulate if user creates many
-- No way to track "which token did what"
-
-**Do this instead:** Use revocable API keys with audit trail (last_used_at, name).
-
-### Anti-Pattern 3: Global API Key (No User Binding)
-
-**What people do:** Create shared API keys not associated with specific users.
+**What people do:** Every API client checks `if integration.token_source == "oauth"` before calling provider API
 
 **Why it's wrong:**
-- No audit trail of which user performed actions
-- Cannot revoke access for specific users
-- Violates principle of least privilege
+- Business logic polluted with authentication concerns
+- Hard to add new auth methods (every client needs updates)
+- Token refresh logic scattered across codebase
+- Difficult to test
 
-**Do this instead:** Each API key belongs to exactly one user. User's permissions apply to their keys.
+**Do this instead:** Use token abstraction layer with `get_valid_token()` method that hides refresh logic
 
-### Anti-Pattern 4: Returning Key on GET Requests
+### Anti-Pattern 3: Different Validation Logic for OAuth vs Manual
 
-**What people do:** Allow users to retrieve their API key value after creation.
+**What people do:** Separate validation methods that behave differently based on token source
 
 **Why it's wrong:**
-- Increases exposure window
-- If someone gains temporary read access, they get permanent API access
-- Encourages insecure storage habits
+- Inconsistent user experience (OAuth users see different errors than manual users)
+- Duplicate validation logic with subtle differences
+- Cache invalidation becomes complex
+- Frontend must know about token source to display status correctly
 
-**Do this instead:** Show raw key ONCE at creation with prominent "save now" warning. Only show prefix (e.g., `och_xk7Y...`) in subsequent views.
+**Do this instead:** Unified validation interface that makes same API call regardless of token source
+
+### Anti-Pattern 4: No Token Expiry Handling for Manual Tokens
+
+**What people do:** Assume manual API tokens never expire, skip validation
+
+**Why it's wrong:**
+- Many providers do expire API tokens (Jira Cloud tokens can be revoked)
+- Users don't know their integration is broken until analysis fails
+- No proactive notification of invalid tokens
+- Poor user experience
+
+**Do this instead:** Validate all tokens periodically (manual and OAuth), surface errors to users
+
+### Anti-Pattern 5: Frontend Duplication for OAuth vs Manual
+
+**What people do:** Completely separate UI components with duplicated logic
+
+**Why it's wrong:**
+- Maintenance burden (bug fixes need to be applied twice)
+- Inconsistent user experience
+- Hard to share common elements (status display, disconnection, etc.)
+
+**Do this instead:** Shared status components, separate only the auth flow UI (redirect vs form)
 
 ## Integration Points
 
@@ -411,122 +388,134 @@ class ApiKeyService:
 
 | Service | Integration Pattern | Notes |
 |---------|---------------------|-------|
-| Claude Desktop / MCP Clients | X-API-Key header or Authorization: Bearer | Primary use case for API keys |
-| CI/CD Pipelines | X-API-Key header | Automated analysis runs |
-| Third-party integrations | X-API-Key header | Any programmatic access |
+| **Jira Cloud OAuth** | OAuth 2.0 (3LO) with refresh tokens | 1-hour token expiry, requires refresh_token |
+| **Jira Cloud API Token** | Personal Access Token (PAT) in Authorization header | Does not expire automatically, user-managed |
+| **Linear OAuth** | OAuth 2.0 with PKCE | 24-hour token expiry, optional refresh |
+| **Linear API Key** | API key in Authorization header | No expiry, workspace-scoped |
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| Auth ↔ Models | Direct import | ApiKey model used by auth dependency |
-| Auth ↔ Services | Dependency injection | ApiKeyService validates keys |
-| Endpoints ↔ Services | Dependency injection | Standard FastAPI pattern |
-| MCP ↔ Auth | Direct import | `require_user()` uses unified auth |
+| **Frontend ↔ OAuth Endpoints** | REST API (POST /connect, POST /callback) | OAuth endpoints return redirect URLs, frontend handles navigation |
+| **Frontend ↔ Manual Endpoints** | REST API (POST /manual/setup) | Synchronous validation, return success/error immediately |
+| **Endpoints ↔ Integration Validator** | Direct service call | Validator used for pre-flight checks before analysis |
+| **Integration Validator ↔ Token Manager** | Direct method call | Abstraction layer for token retrieval |
+| **Token Manager ↔ OAuth Manager** | Direct method call | OAuth-specific refresh logic |
+| **All layers ↔ Integration Model** | SQLAlchemy ORM | Single model accessed by all layers |
 
-## Suggested Build Order
+## Build Order Dependencies
 
-Based on dependencies and the existing codebase patterns, the recommended implementation order is:
+Recommended implementation order to minimize disruption:
 
-### Phase 1: Backend Foundation (Model + Service)
+### Phase 1: Data Model Extension
+**Goal:** Add discriminator field to existing models
+**Dependencies:** None (extends existing schema)
+**Build:**
+1. Add `token_source` column to `jira_integration` table (default "oauth")
+2. Add `token_source` column to `linear_integration` table (default "oauth")
+3. Migration to set all existing records to "oauth"
+4. Add model properties: `is_oauth`, `is_manual`, `supports_refresh`
 
-**What to build:**
-1. `models/api_key.py` - SQLAlchemy model
-2. Database migration (Alembic)
-3. `services/api_key_service.py` - Business logic
-4. Unit tests for service
+### Phase 2: Token Abstraction Layer
+**Goal:** Create unified token retrieval interface
+**Dependencies:** Phase 1 (needs `token_source` field)
+**Build:**
+1. Create `TokenManager` service class
+2. Implement `get_valid_token()` method with OAuth refresh logic
+3. Update `IntegrationValidator` to use `TokenManager`
+4. Test with existing OAuth integrations (should work unchanged)
 
-**Why first:** Everything else depends on the data model and core business logic.
-
-**Integration points:** Add `api_keys` relationship to User model in `models/user.py`.
-
-### Phase 2: Authentication Middleware
-
-**What to build:**
-1. `auth/api_key.py` - API key validation utilities
-2. Modify `auth/dependencies.py` - Unified auth dependency
-3. Modify `mcp/auth.py` - Use unified auth for MCP
-4. Integration tests for auth flow
-
-**Why second:** Auth middleware must work before endpoints can use it.
-
-**Integration points:**
-- `get_current_user_or_api_key()` replaces `get_current_user()` where API key access is desired
-- MCP `require_user()` gains API key support transparently
-
-### Phase 3: API Endpoints
-
-**What to build:**
-1. `api/endpoints/api_keys.py` - CRUD endpoints
-2. Register router in `main.py`
-3. API endpoint tests
-
-**Why third:** Endpoints need working auth and service layer.
-
-**Endpoints:**
-- `POST /api/keys` - Create new key
-- `GET /api/keys` - List user's keys (shows prefix only)
-- `DELETE /api/keys/{id}` - Revoke key
-- `PATCH /api/keys/{id}` - Update name
+### Phase 3: Manual Token Storage
+**Goal:** Accept and store manual API tokens
+**Dependencies:** Phase 1, Phase 2
+**Build:**
+1. Create `/jira/manual/setup` endpoint
+2. Validate token by calling Jira API
+3. Store with `token_source="manual"`, `refresh_token=null`
+4. Create `/linear/manual/setup` endpoint
+5. Validate token by calling Linear API
+6. Store with `token_source="manual"`
 
 ### Phase 4: Frontend UI
+**Goal:** User-facing manual token input
+**Dependencies:** Phase 3 (needs backend endpoints)
+**Build:**
+1. Create manual token input forms
+2. Add UI switcher (OAuth vs Manual)
+3. Update status badges to show auth method
+4. Add help text for obtaining manual tokens
 
-**What to build:**
-1. API key list component
-2. Create key modal (with "copy and save" UX)
-3. Settings page integration
-4. E2E tests
+### Phase 5: Unified Validation Display
+**Goal:** Show validation status regardless of auth method
+**Dependencies:** Phase 2, Phase 3
+**Build:**
+1. Update validation response to include `token_source`
+2. Frontend displays OAuth vs Manual in status
+3. Different error messages for OAuth (reconnect) vs Manual (re-enter token)
 
-**Why last:** Frontend depends on working backend API.
+## Key Decisions for Implementation
 
-**Integration points:** Add to existing settings page, similar to integration management UI.
+### Decision 1: Single Table vs Separate Tables
+**Recommendation:** Single table with `token_source` discriminator
+**Rationale:**
+- Integration data (workspace, user mappings) is identical regardless of auth
+- Simpler queries for "all integrations"
+- Easier to migrate users between auth methods if needed
+- SQLAlchemy handles discriminator patterns well
 
-## Scaling Considerations
+### Decision 2: Token Refresh During Validation
+**Recommendation:** Always attempt refresh for OAuth tokens during validation
+**Rationale:**
+- Validation is the right time to discover expired tokens
+- User sees accurate status (not "valid" when token is actually expired)
+- Prevents analysis failures due to expired tokens
+- Uses existing token refresh infrastructure
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 0-1k users | Current architecture is sufficient. SHA-256 hash lookup is fast with index. |
-| 1k-100k users | Consider caching validated keys in Redis (TTL ~5 minutes) to reduce DB load |
-| 100k+ users | Rate limiting per API key, key usage analytics, separate read replica for key validation |
+### Decision 3: Manual Token Validation Frequency
+**Recommendation:** Validate manual tokens same as OAuth (cached 5 min)
+**Rationale:**
+- Manual tokens can be revoked by user in provider settings
+- Consistent UX (OAuth and manual users see same validation behavior)
+- Prevents surprises during analysis ("why did my manual token stop working?")
 
-### Scaling Priorities
-
-1. **First bottleneck:** Database lookups per request. Mitigate with indexed `key_hash` column (included in design).
-2. **Second bottleneck:** If API key validation becomes hot path, add Redis cache layer for recently-used keys.
-
-## Security Considerations
-
-### Key Format
-- Prefix: `och_` (On-Call Health identifier)
-- Random part: 32 bytes from `secrets.token_urlsafe()` = ~256 bits entropy
-- Total: ~47 characters (e.g., `och_xk7Yz9AB...`)
-
-### Storage
-- Raw key: Never stored, shown once at creation
-- Stored: SHA-256 hash (64 hex chars)
-- Prefix: First 12 chars for UI identification (`och_xk7Y...`)
-
-### Validation
-- Constant-time comparison via `secrets.compare_digest()` for hash comparison
-- No timing attacks possible
-
-### Revocation
-- Immediate: Set `is_active = False`
-- No blocklist needed (unlike JWT)
-
-### Expiration (Optional)
-- `expires_at` column allows time-limited keys
-- Validated on every request
+### Decision 4: Frontend UI Strategy
+**Recommendation:** Separate setup components, shared status components
+**Rationale:**
+- Setup flows are fundamentally different (redirect vs form)
+- Status display is identical (valid/invalid, last validated)
+- Reduces code duplication
+- Clear user experience (choose auth method, then distinct flow)
 
 ## Sources
 
+### OAuth & API Token Architecture (2026)
+- [Curity: Token Patterns](https://curity.io/resources/learn/token-patterns/)
+- [Microservices.io: Authentication in Microservices - Part 2](https://microservices.io/post/architecture/2025/05/28/microservices-authn-authz-part-2-authentication.html)
+- [ACMEMinds: Building Secure APIs in 2026](https://acmeminds.com/building-secure-apis-in-2026-best-practices-for-authentication-and-authorization/)
+
+### Dual Authentication Support
+- [Auth0: Why Migrate from API Keys to OAuth2](https://auth0.com/blog/why-migrate-from-api-keys-to-oauth2-access-tokens/)
+- [Nordic APIs: HTTP Auth, API Keys, and OAuth](https://nordicapis.com/the-difference-between-http-auth-api-keys-and-oauth/)
+- [Axway: API Keys vs OAuth Best Practices](https://blog.axway.com/learning-center/digital-security/keys-oauth/api-keys-oauth)
+
+### FastAPI Multiple Auth Strategies
 - [FastAPI Security Documentation](https://fastapi.tiangolo.com/tutorial/security/)
-- [FastAPI API Key Authentication - TestDriven.io](https://testdriven.io/tips/6840e037-4b8f-4354-a9af-6863fb1c69eb/)
-- [API Key Authentication Best Practices - Zuplo](https://zuplo.com/blog/2022/12/01/api-key-authentication)
-- [Best Practices for Building Secure API Keys - Bomberbot](https://www.bomberbot.com/api/best-practices-for-building-secure-api-keys-a-comprehensive-guide/)
-- [Google Cloud API Keys Best Practices](https://docs.cloud.google.com/docs/authentication/api-keys-best-practices)
-- Existing On-Call Health codebase patterns (auth/, models/, services/)
+- [GitHub Issue #1550: Multiple Authentication Types](https://github.com/fastapi/fastapi/issues/1550)
+- [Better Stack: Authentication with FastAPI](https://betterstack.com/community/guides/scaling-python/authentication-fastapi/)
+- [Practical FastAPI Security Guide (2025)](https://blog.greeden.me/en/2025/12/30/practical-fastapi-security-guide-designing-modern-apis-protected-by-jwt-auth-oauth2-scopes-and-api-keys/)
+
+### Unified API Patterns
+- [Merge.dev: What is a Unified API](https://www.merge.dev/blog/what-is-a-unified-api)
+- [Microservices.io: API Gateway Pattern](https://microservices.io/patterns/security/access-token.html)
+
+### API Security Best Practices (2026)
+- [Xano: Modern API Design Best Practices](https://www.xano.com/blog/modern-api-design-best-practices/)
+- [Informatica: Enterprise API Security Architecture](https://www.informatica.com/resources/articles/enterprise-api-security-architecture.html)
+- [Curity: API Security Trends 2026](https://curity.io/blog/api-security-trends-2026/)
+- [Devcom: API Security Best Practices 2026](https://devcom.com/tech-blog/api-security-best-practices-protect-your-data/)
 
 ---
-*Architecture research for: API Key Management in On-Call Health*
+*Architecture research for: Token-based authentication integration alongside OAuth*
 *Researched: 2026-01-30*
+*Confidence: HIGH - based on current architecture inspection + verified industry patterns*
