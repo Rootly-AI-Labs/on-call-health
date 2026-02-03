@@ -145,6 +145,7 @@ import { JiraConnectedCard } from "./components/JiraConnectedCard"
 import { JiraManualSetupForm } from "./components/JiraManualSetupForm"
 import { LinearIntegrationCard } from "./components/LinearIntegrationCard"
 import { LinearConnectedCard } from "./components/LinearConnectedCard"
+import { LinearManualSetupForm } from "./components/LinearManualSetupForm"
 import { RootlyIntegrationForm } from "./components/RootlyIntegrationForm"
 import { SurveyFeedbackSection } from "./components/SurveyFeedbackSection"
 import { PagerDutyIntegrationForm } from "./components/PagerDutyIntegrationForm"
@@ -283,6 +284,7 @@ export default function IntegrationsPage() {
   const [isSyncingJira, setIsSyncingJira] = useState(false)
   const [jiraWorkspaceSelectorOpen, setJiraWorkspaceSelectorOpen] = useState(false)
   const [showJiraManualSetup, setShowJiraManualSetup] = useState(false)
+  const [showLinearManualSetup, setShowLinearManualSetup] = useState(false)
 
   // Disconnect confirmation state
   const [githubDisconnectDialogOpen, setGithubDisconnectDialogOpen] = useState(false)
@@ -816,6 +818,10 @@ export default function IntegrationsPage() {
 
   const jiraManualForm = useForm<{ siteUrl: string; token: string }>({
     defaultValues: { siteUrl: "", token: "" }
+  })
+
+  const linearManualForm = useForm<{ token: string }>({
+    defaultValues: { token: "" }
   })
 
   useEffect(() => {
@@ -3466,6 +3472,7 @@ export default function IntegrationsPage() {
             {activeEnhancementTab === 'linear' && !linearIntegration && (
               <LinearIntegrationCard
                 onConnect={handleLinearConnect}
+                onTokenConnect={() => setShowLinearManualSetup(true)}
                 isConnecting={isConnectingLinear}
               />
             )}
@@ -4444,6 +4451,29 @@ export default function IntegrationsPage() {
             onClose={() => {
               setShowJiraManualSetup(false)
               jiraManualForm.reset()
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Linear Manual Setup Dialog */}
+      <Dialog open={showLinearManualSetup} onOpenChange={(open) => {
+        setShowLinearManualSetup(open)
+        if (!open) linearManualForm.reset()
+      }}>
+        <DialogContent className="max-w-2xl">
+          <LinearManualSetupForm
+            form={linearManualForm}
+            onSave={async (data) => {
+              const success = await LinearHandlers.handleLinearManualConnect(
+                data,
+                () => loadLinearIntegration(true)
+              )
+              return success
+            }}
+            onClose={() => {
+              setShowLinearManualSetup(false)
+              linearManualForm.reset()
             }}
           />
         </DialogContent>
