@@ -56,10 +56,12 @@ export default function useDashboard() {
   const [trendsCache, setTrendsCache] = useState<Map<string, any>>(new Map())
   const [githubTimelineCache, setGithubTimelineCache] = useState<Map<string, any>>(new Map())
 
-  // Debug function to inspect cache (accessible in browser console)
+  // Debug function to inspect cache (accessible in browser console) - only in development
   useEffect(() => {
-    (window as any).debugAnalysisCache = () => {
-      return { analysisCache, trendsCache, githubTimelineCache }
+    if (process.env.NODE_ENV === 'development') {
+      (window as any).debugAnalysisCache = () => {
+        return { analysisCache, trendsCache, githubTimelineCache }
+      }
     }
   }, [analysisCache, trendsCache, githubTimelineCache])
 
@@ -439,12 +441,14 @@ export default function useDashboard() {
     if (savedAnalysisId && savedStartTime) {
       // Validate saved values
       const startTime = parseInt(savedStartTime)
-      const analysisId = parseInt(savedAnalysisId)
 
-      if (isNaN(startTime) || isNaN(analysisId)) {
+      if (isNaN(startTime)) {
         clearRunningAnalysisState()
         return
       }
+
+      // Handle both numeric IDs and UUIDs
+      const analysisId = !isNaN(parseInt(savedAnalysisId)) ? parseInt(savedAnalysisId) : savedAnalysisId
 
       const elapsedMs = Date.now() - startTime
       const maxAnalysisTime = 30 * 60 * 1000 // 30 minutes max
@@ -462,7 +466,7 @@ export default function useDashboard() {
         const maxPollAttempts = 360 // 30 minutes at 5s intervals
         let errorCount = 0
         const maxErrors = 3
-        let timeoutId: NodeJS.Timeout | null = null
+        let timeoutIdRef: NodeJS.Timeout | null = null
 
         // Start polling this analysis
         const pollAnalysis = async () => {
@@ -482,33 +486,43 @@ export default function useDashboard() {
               return
             }
 
-            const pollResponse = await fetch(`${API_BASE}/analyses/${analysisId}`, {
-              headers: { 'Authorization': `Bearer ${authToken}` }
-            })
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
 
-            if (pollResponse.ok) {
-              const analysisData = await pollResponse.json()
-              errorCount = 0 // Reset error count on success
+            try {
+              const pollResponse = await fetch(`${API_BASE}/analyses/${analysisId}`, {
+                headers: { 'Authorization': `Bearer ${authToken}` },
+                signal: controller.signal
+              })
+              clearTimeout(timeoutId)
 
-              if (analysisData.status === 'completed') {
+              if (pollResponse.ok) {
+                const analysisData = await pollResponse.json()
+                errorCount = 0 // Reset error count on success
+
+                if (analysisData.status === 'completed') {
+                  clearRunningAnalysisState()
+                  setCurrentAnalysis(analysisData)
+                  updateURLWithAnalysis(analysisData.uuid || analysisData.id)
+                  toast.success("Analysis completed!")
+                } else if (analysisData.status === 'running' || analysisData.status === 'pending') {
+                  // Continue polling
+                  timeoutIdRef = setTimeout(pollAnalysis, 5000)
+                } else if (analysisData.status === 'failed') {
+                  clearRunningAnalysisState()
+                  toast.error("Analysis failed")
+                }
+              } else if (pollResponse.status === 404) {
+                // Analysis not found
                 clearRunningAnalysisState()
-                setCurrentAnalysis(analysisData)
-                updateURLWithAnalysis(analysisData.uuid || analysisData.id)
-                toast.success("Analysis completed!")
-              } else if (analysisData.status === 'running' || analysisData.status === 'pending') {
-                // Continue polling
-                timeoutId = setTimeout(pollAnalysis, 5000)
-              } else if (analysisData.status === 'failed') {
-                clearRunningAnalysisState()
-                toast.error("Analysis failed")
+                toast.error("Analysis no longer exists")
+              } else {
+                // Other HTTP errors - retry with backoff
+                throw new Error(`HTTP ${pollResponse.status}`)
               }
-            } else if (pollResponse.status === 404) {
-              // Analysis not found
-              clearRunningAnalysisState()
-              toast.error("Analysis no longer exists")
-            } else {
-              // Other HTTP errors - retry with backoff
-              throw new Error(`HTTP ${pollResponse.status}`)
+            } catch (fetchError) {
+              clearTimeout(timeoutId)
+              throw fetchError
             }
           } catch (error) {
             console.error('Error polling restored analysis:', error)
@@ -520,7 +534,7 @@ export default function useDashboard() {
             } else {
               // Retry with exponential backoff
               const backoffMs = 5000 * Math.pow(2, errorCount - 1)
-              timeoutId = setTimeout(pollAnalysis, backoffMs)
+              timeoutIdRef = setTimeout(pollAnalysis, backoffMs)
             }
           }
         }
@@ -529,8 +543,8 @@ export default function useDashboard() {
 
         // Cleanup on unmount
         return () => {
-          if (timeoutId) {
-            clearTimeout(timeoutId)
+          if (timeoutIdRef) {
+            clearTimeout(timeoutIdRef)
           }
         }
       } else {
@@ -1782,7 +1796,6 @@ export default function useDashboard() {
         try {
           if (!analysis_id) {
             setAnalysisRunning(false)
-      setCurrentRunningAnalysisId(null)
             setCurrentRunningAnalysisId(null)
             return
           }
@@ -1868,9 +1881,8 @@ export default function useDashboard() {
               return
             } else if (analysisData.status === 'failed') {
               setAnalysisRunning(false)
-      setCurrentRunningAnalysisId(null)
-            setCurrentRunningAnalysisId(null)
-              
+              setCurrentRunningAnalysisId(null)
+
               // Check if we have partial data to display
               if (analysisData.analysis_data?.partial_data) {
                 setCurrentAnalysis(analysisData)
