@@ -123,6 +123,13 @@ export default function useDashboard() {
     router.push(`/dashboard?${params.toString()}`, { scroll: false })
   }
 
+  // Helper function to clear running analysis state
+  const clearRunningAnalysisState = () => {
+    setAnalysisRunning(false)
+    setCurrentRunningAnalysisId(null)
+    localStorage.removeItem('running_analysis_id')
+    localStorage.removeItem('running_analysis_start')
+  }
 
   const cancelRunningAnalysis = async () => {
     try {
@@ -153,8 +160,7 @@ export default function useDashboard() {
       toast.error("Error canceling analysis")
     } finally {
       // Reset all analysis state
-      setAnalysisRunning(false)
-      setCurrentRunningAnalysisId(null)
+      clearRunningAnalysisState()
       setAnalysisProgress(0)
       setAnalysisStage("loading")
       setCurrentStageIndex(0)
@@ -424,6 +430,69 @@ export default function useDashboard() {
       }
     }
   }, [previousAnalyses, redirectingToSuggested])
+
+  // Restore running analysis state on mount (if user navigated away during analysis)
+  useEffect(() => {
+    const savedAnalysisId = localStorage.getItem('running_analysis_id')
+    const savedStartTime = localStorage.getItem('running_analysis_start')
+
+    if (savedAnalysisId && savedStartTime) {
+      const elapsedMs = Date.now() - parseInt(savedStartTime)
+      const maxAnalysisTime = 30 * 60 * 1000 // 30 minutes max
+
+      // If less than 30 minutes elapsed, assume analysis might still be running
+      if (elapsedMs < maxAnalysisTime) {
+        setAnalysisRunning(true)
+        setCurrentRunningAnalysisId(parseInt(savedAnalysisId))
+        setAnalysisStage("loading")
+        setAnalysisProgress(50) // Show mid-progress since we don't know exact state
+        toast.info("Resuming analysis in progress...")
+
+        // Start polling this analysis
+        const pollAnalysis = async () => {
+          try {
+            const authToken = getValidToken()
+            if (!authToken) {
+              clearRunningAnalysisState()
+              return
+            }
+
+            const pollResponse = await fetch(`${API_BASE}/analyses/${savedAnalysisId}`, {
+              headers: { 'Authorization': `Bearer ${authToken}` }
+            })
+
+            if (pollResponse.ok) {
+              const analysisData = await pollResponse.json()
+
+              if (analysisData.status === 'completed') {
+                clearRunningAnalysisState()
+                setCurrentAnalysis(analysisData)
+                updateURLWithAnalysis(analysisData.uuid || analysisData.id)
+                toast.success("Analysis completed!")
+              } else if (analysisData.status === 'running' || analysisData.status === 'pending') {
+                // Continue polling
+                setTimeout(pollAnalysis, 5000)
+              } else if (analysisData.status === 'failed') {
+                clearRunningAnalysisState()
+                toast.error("Analysis failed")
+              }
+            } else {
+              // Analysis not found or error
+              clearRunningAnalysisState()
+            }
+          } catch (error) {
+            console.error('Error polling restored analysis:', error)
+            clearRunningAnalysisState()
+          }
+        }
+
+        pollAnalysis()
+      } else {
+        // Too much time has passed, clear stale state
+        clearRunningAnalysisState()
+      }
+    }
+  }, []) // Run only once on mount
 
   // Load specific analysis from URL - with delay to ensure auth token is available
   useEffect(() => {
@@ -1641,10 +1710,14 @@ export default function useDashboard() {
 
       const { id: analysis_id } = responseData
       setCurrentRunningAnalysisId(analysis_id)
-      
+
       if (!analysis_id) {
         throw new Error('No analysis ID returned from server')
       }
+
+      // Persist running analysis state to survive navigation
+      localStorage.setItem('running_analysis_id', analysis_id.toString())
+      localStorage.setItem('running_analysis_start', Date.now().toString())
 
 
       // Refresh the analyses list to show the new running analysis in sidebar
@@ -1735,10 +1808,7 @@ export default function useDashboard() {
               setTimeout(() => {
                 setTargetProgress(100)
                 setTimeout(() => {
-                  setAnalysisRunning(false)
-      setCurrentRunningAnalysisId(null)
-            setCurrentRunningAnalysisId(null)
-                  setCurrentRunningAnalysisId(null)
+                  clearRunningAnalysisState()
                   setCurrentAnalysis(analysisData)
                   setRedirectingToSuggested(false) // Turn off redirect loader
                   updateURLWithAnalysis(analysisData.uuid || analysisData.id)
