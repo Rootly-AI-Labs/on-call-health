@@ -446,7 +446,7 @@ export default function useDashboard() {
         setCurrentRunningAnalysisId(parseInt(savedAnalysisId))
         setAnalysisStage("loading")
         setAnalysisProgress(50) // Show mid-progress since we don't know exact state
-        toast.info("Resuming analysis in progress...")
+        toast.info("Analysis still running...")
 
         // Start polling this analysis
         const pollAnalysis = async () => {
