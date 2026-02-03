@@ -30,7 +30,11 @@ def _resolve_asgi_app(server: Any) -> Any:
         return server.app
     if hasattr(server, "asgi_app"):
         return server.asgi_app()
-    # FastMCP 1.x uses sse_app() or streamable_http_app()
+    # FastMCP uses streamable_http_app(), http_app(), or sse_app()
+    if hasattr(server, "streamable_http_app"):
+        return server.streamable_http_app()
+    if hasattr(server, "http_app"):
+        return server.http_app()
     if hasattr(server, "sse_app"):
         return server.sse_app()
     raise RuntimeError("FastMCP does not expose an ASGI app")
