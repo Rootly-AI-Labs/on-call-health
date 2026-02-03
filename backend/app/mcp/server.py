@@ -6,28 +6,17 @@ import logging
 from typing import Any, Dict, Optional
 
 from mcp.server.fastmcp import FastMCP
-from sqlalchemy.orm import Session
 
-from app.mcp.auth import extract_api_key_header, require_user_api_key
+from app.mcp.auth import extract_api_key_header
 from app.mcp.client import NotFoundError, OnCallHealthClient
 from app.mcp.normalizers import (
     normalize_analysis_response,
     normalize_analysis_start_response,
-)
-from app.mcp.serializers import (
-    serialize_github_integration,
-    serialize_jira_integration,
-    serialize_linear_integration,
-    serialize_rootly_integration,
-    serialize_slack_integration,
-)
-from app.models import (
-    SessionLocal,
-    RootlyIntegration,
-    GitHubIntegration,
-    SlackIntegration,
-    JiraIntegration,
-    LinearIntegration,
+    normalize_github_status,
+    normalize_jira_status,
+    normalize_linear_status,
+    normalize_rootly_integration,
+    normalize_slack_status,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,60 +25,18 @@ mcp_server = FastMCP("On-Call Health")
 
 
 def _resolve_asgi_app(server: Any) -> Any:
+    """Resolve ASGI app from FastMCP server, supporting multiple API versions."""
     if hasattr(server, "app"):
         return server.app
     if hasattr(server, "asgi_app"):
         return server.asgi_app()
+    # FastMCP 1.x uses sse_app() or streamable_http_app()
+    if hasattr(server, "sse_app"):
+        return server.sse_app()
     raise RuntimeError("FastMCP does not expose an ASGI app")
 
 
 mcp_app = _resolve_asgi_app(mcp_server)
-
-
-def _get_db() -> Session:
-    return SessionLocal()
-
-
-def _handle_task_exception(task: asyncio.Task) -> None:
-    """Log exceptions from background tasks to prevent silent failures."""
-    if task.cancelled():
-        return
-    exc = task.exception()
-    if exc is not None:
-        logger.error("Background analysis task failed: %s", exc, exc_info=exc)
-
-
-def _get_integration_for_user(
-    db: Session,
-    user_id: int,
-    integration_id: Optional[int],
-) -> RootlyIntegration:
-    if integration_id:
-        integration = db.query(RootlyIntegration).filter(
-            RootlyIntegration.id == integration_id,
-            RootlyIntegration.user_id == user_id,
-            RootlyIntegration.is_active == True,  # noqa: E712
-        ).first()
-        if not integration:
-            raise LookupError("Integration not found")
-        return integration
-
-    integration = db.query(RootlyIntegration).filter(
-        RootlyIntegration.user_id == user_id,
-        RootlyIntegration.is_active == True,  # noqa: E712
-        RootlyIntegration.is_default == True,  # noqa: E712
-    ).first()
-    if integration:
-        return integration
-
-    integration = db.query(RootlyIntegration).filter(
-        RootlyIntegration.user_id == user_id,
-        RootlyIntegration.is_active == True,  # noqa: E712
-    ).first()
-    if integration:
-        return integration
-
-    raise ValueError("No active Rootly integration found")
 
 
 @mcp_server.tool()
@@ -182,44 +129,57 @@ async def analysis_current(ctx: Any) -> Dict[str, Any]:
 @mcp_server.tool()
 async def integrations_list(ctx: Any) -> Dict[str, Any]:
     """List connected integrations for the current user."""
-    db = _get_db()
-    try:
-        user = require_user_api_key(ctx, db)
-        rootly = (
-            db.query(RootlyIntegration)
-            .filter(RootlyIntegration.user_id == user.id)
-            .all()
-        )
-        github = (
-            db.query(GitHubIntegration)
-            .filter(GitHubIntegration.user_id == user.id)
-            .all()
-        )
-        slack = (
-            db.query(SlackIntegration)
-            .filter(SlackIntegration.user_id == user.id)
-            .all()
-        )
-        jira = (
-            db.query(JiraIntegration)
-            .filter(JiraIntegration.user_id == user.id)
-            .all()
-        )
-        linear = (
-            db.query(LinearIntegration)
-            .filter(LinearIntegration.user_id == user.id)
-            .all()
+    api_key = extract_api_key_header(ctx)
+    if not api_key:
+        raise PermissionError("Missing API key. Provide X-API-Key header.")
+
+    async with OnCallHealthClient(api_key=api_key) as client:
+        # Parallel fetch all integration types
+        results = await asyncio.gather(
+            client.get("/rootly/integrations"),
+            client.get("/integrations/github/status"),
+            client.get("/integrations/slack/status"),
+            client.get("/integrations/jira/status"),
+            client.get("/integrations/linear/status"),
+            return_exceptions=True,
         )
 
-        return {
-            "rootly": [serialize_rootly_integration(item) for item in rootly],
-            "github": [serialize_github_integration(item) for item in github],
-            "slack": [serialize_slack_integration(item) for item in slack],
-            "jira": [serialize_jira_integration(item) for item in jira],
-            "linear": [serialize_linear_integration(item) for item in linear],
+        integrations: Dict[str, Any] = {
+            "rootly": [],
+            "github": [],
+            "slack": [],
+            "jira": [],
+            "linear": [],
         }
-    finally:
-        db.close()
+
+        # Process results, handling partial failures gracefully
+        endpoint_names = ["rootly", "github", "slack", "jira", "linear"]
+
+        for idx, (name, result) in enumerate(zip(endpoint_names, results)):
+            if isinstance(result, Exception):
+                logger.warning(f"Failed to fetch {name} integrations: {result}")
+                integrations[name] = []
+            else:
+                try:
+                    data = result.json()
+                    if name == "rootly":
+                        # Rootly returns a list directly
+                        integrations[name] = [
+                            normalize_rootly_integration(item) for item in data
+                        ]
+                    elif name == "github":
+                        integrations[name] = normalize_github_status(data)
+                    elif name == "slack":
+                        integrations[name] = normalize_slack_status(data)
+                    elif name == "jira":
+                        integrations[name] = normalize_jira_status(data)
+                    elif name == "linear":
+                        integrations[name] = normalize_linear_status(data)
+                except Exception as e:
+                    logger.warning(f"Failed to normalize {name} response: {e}")
+                    integrations[name] = []
+
+        return integrations
 
 
 @mcp_server.resource("oncallhealth://methodology")
