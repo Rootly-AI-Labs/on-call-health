@@ -116,53 +116,30 @@ def _create_mcp_http_app() -> Starlette:
     # and maintain lazy loading pattern from __init__.py
     from app.mcp.server import mcp_server
 
-    # Get transport apps from FastMCP
-    # mcp 1.x provides streamable_http_app() and sse_app() methods
-    # These apps define their own routes at /mcp and /sse respectively
-    streamable_http = mcp_server.streamable_http_app()
-    sse_transport = mcp_server.sse_app()
+    # Get HTTP app from FastMCP
+    # FastMCP 2.x provides http_app() which includes all transport routes and its own lifespan
+    mcp_http = mcp_server.http_app()
 
-    # Create lifespan that initializes the session managers
-    # The streamable HTTP transport requires a task group to be running
-    # Access session_manager from mcp_server (created lazily by streamable_http_app())
-    @contextlib.asynccontextmanager
-    async def lifespan(app: Starlette) -> AsyncIterator[None]:
-        """Initialize MCP transport session managers."""
-        logger.info("Starting MCP transport session managers")
-        # Get the session manager from mcp_server (public property)
-        session_manager = mcp_server.session_manager
-        async with session_manager.run():
-            logger.info("MCP transport ready")
-            yield
-        logger.info("MCP transport shut down")
-
-    # Create composite Starlette app by combining routes from all transports
-    # Extract routes from each transport app and include in main app
-    # This ensures all routes are properly matched at the top level
-    routes = [
-        Route("/health", health_check, methods=["GET"]),
-    ]
-    # Add routes from streamable HTTP transport (provides /mcp)
-    routes.extend(streamable_http.routes)
-    # Add routes from SSE transport (provides /sse and /messages)
-    routes.extend(sse_transport.routes)
-
-    # Build middleware list
-    # Infrastructure middleware runs first (connection/rate limits) if available,
-    # then CORS middleware handles preflight and response headers
+    # Create wrapper app with health endpoint and middleware
+    # IMPORTANT: Must pass lifespan from mcp_http to ensure FastMCP's StreamableHTTPSessionManager initializes
+    # Build middleware list - order matters: infrastructure first, then CORS
     middleware_list = []
     if infrastructure_middleware is not None:
         middleware_list.append(infrastructure_middleware)
     middleware_list.append(cors_middleware)
 
+    # Create new Starlette app with health endpoint and MCP app mounted
     app = Starlette(
-        routes=routes,
-        lifespan=lifespan,
+        routes=[
+            Route("/health", health_check, methods=["GET"]),
+            Mount("/", mcp_http),  # Mount MCP app at root to handle all MCP routes
+        ],
         middleware=middleware_list,
+        lifespan=mcp_http.lifespan,  # Use FastMCP's lifespan to initialize session manager
     )
 
     logger.info(
-        "MCP transport initialized: /health, /mcp (streamable HTTP), /sse (legacy)"
+        "MCP transport initialized: /health, MCP HTTP endpoints"
     )
 
     return app
