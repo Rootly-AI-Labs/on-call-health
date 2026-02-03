@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Catch exhaustion before it burns out team members by analyzing cross-platform activity patterns, on-call load, and workload distribution.
-**Current focus:** Phase 3 - Jira Token Integration (Complete)
+**Current focus:** Phase 4 - Linear Token Integration (In Progress)
 
 ## Current Position
 
-Phase: 3 of 5 (Jira Token Integration)
-Plan: 2 of 2 (Phase complete)
-Status: Phase 3 complete
-Last activity: 2026-02-02 - Completed Phase 3
+Phase: 4 of 5 (Linear Token Integration)
+Plan: 1 of 2
+Status: In progress
+Last activity: 2026-02-02 - Completed 04-01-PLAN.md
 
-Progress: [████████████████████] 100%
+Progress: [█████████████████░░░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 2.8 min
-- Total execution time: 0.37 hours
+- Total plans completed: 9
+- Average duration: 2.6 min
+- Total execution time: 0.39 hours
 
 **By Phase:**
 
@@ -30,10 +30,11 @@ Progress: [████████████████████] 100%
 | 01-backend-foundation | 2/2 | 5 min | 2.5 min |
 | 02-validation-infrastructure | 4/4 | 14 min | 3.5 min |
 | 03-jira-token-integration | 2/2 | 6 min | 3.0 min |
+| 04-linear-token-integration | 1/2 | 1 min | 1.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02 (4 min), 03-01 (2 min), 02-04 (5 min), 02-03 (4 min), 02-02 (3 min)
-- Trend: Consistent 2-5 min per plan
+- Last 5 plans: 04-01 (1 min), 03-02 (4 min), 03-01 (2 min), 02-04 (5 min), 02-03 (4 min)
+- Trend: Consistent 1-5 min per plan
 
 *Updated after each plan completion*
 
@@ -76,6 +77,10 @@ Recent decisions affecting current work:
 | Help section simplified to single Atlassian API token link | 03-02 | Implemented |
 | Form shows 'Saving...' status during auto-save | 03-02 | Implemented |
 | Nickname field removed (not needed for API token flow) | 03-02 | Implemented |
+| Backend re-validates all Linear tokens (never trust client validation) | 04-01 | Implemented |
+| Linear manual tokens set token_expires_at=None (no auto-expiry) | 04-01 | Implemented |
+| Linear workspace info fetched via GraphQL before save | 04-01 | Implemented |
+| Linear account removed from other users (enforces one-to-one mapping) | 04-01 | Implemented |
 | Support tokens alongside OAuth (not replacement) | - | Implemented |
 | Trust user for token permissions | - | Implemented |
 | Validate token works, not permissions | - | Implemented |
@@ -92,8 +97,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-02
-Stopped at: Completed Phase 3 (Jira Token Integration)
+Last session: 2026-02-02T18:45:05Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
 
-**Phase 3 complete - ready for Phase 4 planning**
+**Phase 4 Plan 01 complete - ready for Plan 02 (frontend integration)**
