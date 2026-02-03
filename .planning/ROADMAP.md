@@ -80,10 +80,11 @@ Plans:
   3. Help text provides guidance for obtaining Linear Personal API Key
   4. Platform-specific error messages display for Linear token failures
   5. User can successfully connect Linear integration using valid API token
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] TBD after phase planning
+- [ ] 04-01-PLAN.md — Backend POST /connect-manual endpoint with validation, encryption, and workspace mapping
+- [ ] 04-02-PLAN.md — Frontend dual-button card and auto-save form
 
 ### Phase 5: User Experience
 **Goal**: Users can see auth method for integrations, access helpful guidance, and switch between OAuth and token
@@ -109,5 +110,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Backend Foundation | 2/2 | Complete | 2026-02-01 |
 | 2. Validation Infrastructure | 4/4 | Complete | 2026-02-02 |
 | 3. Jira Token Integration | 2/2 | Complete | 2026-02-02 |
-| 4. Linear Token Integration | 0/TBD | Not started | - |
+| 4. Linear Token Integration | 0/2 | Planned | - |
 | 5. User Experience | 0/TBD | Not started | - |
