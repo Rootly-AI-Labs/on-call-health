@@ -97,7 +97,7 @@ export async function handleJiraConnect(
  * Connect Jira integration via manual API token
  */
 export async function handleJiraManualConnect(
-  data: { token: string; siteUrl: string; userInfo?: { displayName: string | null; email: string | null } },
+  data: { token: string; siteUrl: string; email: string; userInfo?: { displayName: string | null; email: string | null } },
   loadJiraIntegration: () => Promise<void>
 ): Promise<boolean> {
   try {
@@ -116,6 +116,7 @@ export async function handleJiraManualConnect(
       body: JSON.stringify({
         token: data.token,
         site_url: data.siteUrl,
+        email: data.email,
         user_info: data.userInfo ? {
           display_name: data.userInfo.displayName,
           email: data.userInfo.email

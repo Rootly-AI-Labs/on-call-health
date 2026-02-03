@@ -14,12 +14,13 @@ import { StatusIndicator } from "./StatusIndicator";
 
 interface JiraManualSetupFormData {
   siteUrl: string;
+  email: string;
   token: string;
 }
 
 interface JiraManualSetupFormProps {
   form: UseFormReturn<JiraManualSetupFormData>;
-  onSave: (data: { token: string; siteUrl: string; userInfo?: { displayName: string | null; email: string | null } }) => Promise<boolean>;
+  onSave: (data: { token: string; siteUrl: string; email: string; userInfo?: { displayName: string | null; email: string | null } }) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -44,18 +45,19 @@ export function JiraManualSetupForm({ form, onSave, onClose }: JiraManualSetupFo
 
   const tokenValue = form.watch("token");
   const siteUrlValue = form.watch("siteUrl");
+  const emailValue = form.watch("email");
 
-  // Auto-validate when both token and siteUrl are provided
+  // Auto-validate when token, siteUrl, and email are all provided
   useEffect(() => {
-    if (tokenValue && tokenValue.trim() && siteUrlValue && siteUrlValue.trim()) {
-      validateToken({ token: tokenValue, siteUrl: siteUrlValue });
+    if (tokenValue && tokenValue.trim() && siteUrlValue && siteUrlValue.trim() && emailValue && emailValue.trim()) {
+      validateToken({ token: tokenValue, siteUrl: siteUrlValue, email: emailValue });
     }
-  }, [tokenValue, siteUrlValue, validateToken]);
+  }, [tokenValue, siteUrlValue, emailValue, validateToken]);
 
   // Reset save attempt flag when inputs change
   useEffect(() => {
     saveAttempted.current = false;
-  }, [tokenValue, siteUrlValue]);
+  }, [tokenValue, siteUrlValue, emailValue]);
 
   // Auto-save when validation succeeds
   useEffect(() => {
@@ -73,6 +75,7 @@ export function JiraManualSetupForm({ form, onSave, onClose }: JiraManualSetupFo
       const success = await onSave({
         token: tokenValue,
         siteUrl: siteUrlValue,
+        email: emailValue,
         userInfo,
       });
 
@@ -155,6 +158,27 @@ export function JiraManualSetupForm({ form, onSave, onClose }: JiraManualSetupFo
                   </FormControl>
                   <FormDescription>
                     Your Atlassian site URL (e.g., https://acme.atlassian.net)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Atlassian Account Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="email"
+                      placeholder="you@company.com"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    The email address associated with your Atlassian account
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

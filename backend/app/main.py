@@ -104,7 +104,13 @@ def get_cors_origins() -> list[str]:
     origins.extend(f"http://{host}:{port}" for host in ["localhost", "127.0.0.1"] for port in dev_ports)
 
     # Production domains
-    origins.extend(["https://www.oncallburnout.com", "https://oncallburnout.com"])
+    origins.extend([
+        "https://www.oncallburnout.com",
+        "https://oncallburnout.com",
+        "https://oncallhealth.ai",
+        "https://www.oncallhealth.ai",
+        "https://testing.oncallhealth.ai",
+    ])
 
     # Optional environment-based origins
     production_frontend = os.getenv("PRODUCTION_FRONTEND_URL")
