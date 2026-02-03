@@ -4,7 +4,7 @@ Account linking service for managing multiple OAuth providers and email addresse
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..models import User, OAuthProvider, UserEmail, Organization, OrganizationInvitation
 from ..auth.oauth import github_oauth, google_oauth

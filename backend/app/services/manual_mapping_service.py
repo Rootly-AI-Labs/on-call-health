@@ -5,7 +5,7 @@ import logging
 from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from ..models import UserMapping, UserCorrelation, get_db
 

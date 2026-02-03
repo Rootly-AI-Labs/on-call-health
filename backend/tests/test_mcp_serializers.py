@@ -21,7 +21,7 @@ def test_serialize_rootly_integration_hides_token():
         is_default=True,
         is_active=True,
         total_users=5,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     data = serialize_rootly_integration(integration)
     assert "api_token" not in data
@@ -36,8 +36,8 @@ def test_serialize_github_integration_hides_token():
         github_token="secret",
         organizations=["rootly"],
         token_source="oauth",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     data = serialize_github_integration(integration)
     assert "github_token" not in data
@@ -52,8 +52,8 @@ def test_serialize_slack_integration_hides_token():
         slack_user_id="U123",
         workspace_id="T123",
         token_source="oauth",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     data = serialize_slack_integration(integration)
     assert "slack_token" not in data
@@ -70,8 +70,8 @@ def test_serialize_jira_integration_hides_token():
         jira_site_url="example.atlassian.net",
         jira_display_name="Jane",
         token_source="oauth",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     data = serialize_jira_integration(integration)
     assert "access_token" not in data
@@ -89,8 +89,8 @@ def test_serialize_linear_integration_hides_token():
         workspace_name="Rootly",
         workspace_url_key="rootly",
         token_source="oauth",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     data = serialize_linear_integration(integration)
     assert "access_token" not in data

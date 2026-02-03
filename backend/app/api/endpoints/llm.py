@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 import logging
 from cryptography.fernet import Fernet
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 
 from ...models import get_db, User

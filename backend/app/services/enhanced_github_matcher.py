@@ -7,7 +7,7 @@ import asyncio
 from typing import Optional, Dict, List, Set, Tuple
 from difflib import SequenceMatcher
 import aiohttp
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 

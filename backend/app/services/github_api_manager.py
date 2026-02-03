@@ -7,7 +7,7 @@ to ensure reliable GitHub API interactions at scale.
 import asyncio
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Callable
 from enum import Enum
 import aiohttp
@@ -65,7 +65,7 @@ class GitHubAPIManager:
             "rate_limited_requests": 0,
             "circuit_breaker_blocks": 0,
             "average_response_time": 0.0,
-            "last_reset": datetime.utcnow()
+            "last_reset": datetime.now(timezone.utc)
         }
         
         logger.info("🛡️ GitHubAPIManager initialized with enterprise resilience patterns")
@@ -285,7 +285,7 @@ class GitHubAPIManager:
             "rate_limited_requests": 0,
             "circuit_breaker_blocks": 0,
             "average_response_time": 0.0,
-            "last_reset": datetime.utcnow()
+            "last_reset": datetime.now(timezone.utc)
         }
     
     async def fetch_user_info(self, username: str, token: str) -> Optional[Dict[str, Any]]:

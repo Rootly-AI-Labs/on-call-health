@@ -4,7 +4,7 @@ PagerDuty API client for fetching incident and user data.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 import aiohttp
 import pytz
@@ -836,7 +836,7 @@ class PagerDutyDataCollector:
             "metadata": {
                 "source": "pagerduty",
                 "enhancement_applied": True,
-                "enhancement_timestamp": datetime.utcnow().isoformat(),
+                "enhancement_timestamp": datetime.now(timezone.utc).isoformat(),
                 "assignment_extraction_stats": assignment_stats,
                 "email_success_rate": f"{incidents_with_emails}/{total_incidents} ({email_pct:.1f}%)"
             }

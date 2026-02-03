@@ -6,7 +6,7 @@ import redis
 import json
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Set
 
 logger = logging.getLogger(__name__)
@@ -31,12 +31,12 @@ def get_cache_key(integration_id: str) -> str:
     Generate cache key for on-call data.
     Includes today's date so cache automatically expires at midnight.
     """
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return f"oncall:{integration_id}:{today}"
 
 def get_seconds_until_midnight() -> int:
     """Calculate seconds until UTC midnight for cache TTL."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     return int((midnight - now).total_seconds())
 
@@ -79,8 +79,8 @@ def set_cached_oncall_emails(integration_id: str, emails: Set[str]) -> bool:
 
         data = {
             'emails': list(emails),
-            'cached_at': datetime.utcnow().isoformat(),
-            'expires_at': (datetime.utcnow() + timedelta(seconds=ttl)).isoformat()
+            'cached_at': datetime.now(timezone.utc).isoformat(),
+            'expires_at': (datetime.now(timezone.utc) + timedelta(seconds=ttl)).isoformat()
         }
 
         client.setex(cache_key, ttl, json.dumps(data))

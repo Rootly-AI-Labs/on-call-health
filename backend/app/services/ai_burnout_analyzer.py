@@ -5,7 +5,7 @@ Integrates the smolagents-powered workload health detection agent with the exist
 """
 import logging
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..agents.burnout_agent import create_burnout_agent
 from ..agents.workflows import run_team_analysis_workflow
@@ -129,7 +129,7 @@ class AIBurnoutAnalyzerService:
         try:
             # Analyze team patterns with verbose insights
             team_insights = {
-                "analysis_timestamp": datetime.utcnow().isoformat(),
+                "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
                 "team_size": len(team_members),
                 "data_sources": available_integrations,
                 "executive_summary": self._generate_executive_summary(team_members, available_integrations),
@@ -1064,7 +1064,7 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
 - Avoid phrases like "intriguing paradox" or other cliche openings
 - Write each sentence with fresh language - no recycled phrases from previous analyses
 
-**Analysis Timestamp:** {datetime.utcnow().isoformat()}
+**Analysis Timestamp:** {datetime.now(timezone.utc).isoformat()}
 
 **Team Data:**
 - Team Size: {team_data['team_size']} members

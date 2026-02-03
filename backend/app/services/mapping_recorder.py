@@ -286,8 +286,8 @@ class MappingRecorder:
     
     def cleanup_stale_mappings(self, days_old: int = 30) -> int:
         """Remove mappings older than specified days."""
-        from datetime import datetime, timedelta
-        cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+        from datetime import datetime, timedelta, timezone
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_old)
         
         deleted_count = self.db.query(IntegrationMapping).filter(
             IntegrationMapping.created_at < cutoff_date

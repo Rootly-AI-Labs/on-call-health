@@ -535,7 +535,7 @@ class UserSyncService:
         Update a UserCorrelation record with platform-specific data.
         Returns 1 if updated, 0 if no changes.
         """
-        from datetime import datetime
+        from datetime import datetime, timezone
         updated = False
 
         # Update integration_ids array - add if not already present

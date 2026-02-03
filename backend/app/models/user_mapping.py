@@ -54,7 +54,7 @@ class UserMapping(Base):
         """Check if mapping has been verified recently (within 30 days)."""
         if not self.last_verified:
             return False
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         return self.last_verified > datetime.now() - timedelta(days=30)
     
     @property

@@ -7,7 +7,7 @@ import logging
 import math
 import os
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional, TYPE_CHECKING
 from collections import defaultdict
 
@@ -2286,7 +2286,7 @@ class UnifiedBurnoutAnalyzer:
             commit_weekdays = []
             daily_commit_counts = {}
 
-            from datetime import datetime
+            from datetime import datetime, timezone
 
             for commit in commits:
                 dt_utc = self._parse_iso_utc(commit.get("timestamp"))
@@ -2580,7 +2580,7 @@ class UnifiedBurnoutAnalyzer:
 
             # 3. Deadline Pressure Indicator
             # Count tickets with approaching deadlines (<7 days)
-            from datetime import datetime, timedelta
+            from datetime import datetime, timedelta, timezone
             now = datetime.now()
             approaching_deadline_count = 0
 
@@ -2636,7 +2636,7 @@ class UnifiedBurnoutAnalyzer:
         # 2. Temporal Coverage Assessment
         days_with_activity = 0
         if incidents:
-            from datetime import datetime
+            from datetime import datetime, timezone
             incident_dates = set()
             for incident in incidents:
                 try:
@@ -2925,7 +2925,7 @@ class UnifiedBurnoutAnalyzer:
             end_time = shift.get('end_time')
             if start_time and end_time:
                 try:
-                    from datetime import datetime
+                    from datetime import datetime, timezone
                     start = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
                     end = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
                     hours = (end - start).total_seconds() / 3600
@@ -3924,7 +3924,7 @@ class UnifiedBurnoutAnalyzer:
                 # AI successfully generated insights
                 analysis_result["ai_team_insights"] = team_insights
                 analysis_result["ai_enhanced"] = True
-                analysis_result["ai_enhancement_timestamp"] = datetime.utcnow().isoformat()
+                analysis_result["ai_enhancement_timestamp"] = datetime.now(timezone.utc).isoformat()
             else:
                 # AI was requested but failed/unavailable
                 analysis_result["ai_enhanced"] = False
@@ -5282,7 +5282,7 @@ class UnifiedBurnoutAnalyzer:
                 if earliest_due is None or parsed < earliest_due:
                     earliest_due = parsed
 
-            today = datetime.utcnow().date()
+            today = datetime.now(timezone.utc).date()
 
             if earliest_due is None:
                 deadline_score = 0.3
@@ -5634,7 +5634,7 @@ class UnifiedBurnoutAnalyzer:
                 if earliest_due is None or parsed < earliest_due:
                     earliest_due = parsed
 
-            today = datetime.utcnow().date()
+            today = datetime.now(timezone.utc).date()
 
             if earliest_due is None:
                 deadline_score = 0.3

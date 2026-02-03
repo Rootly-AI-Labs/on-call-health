@@ -8,7 +8,7 @@ Uses historical patterns and current trends to predict future burnout risk:
 - Intervention timing recommendations
 """
 from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import statistics
 import math
 import logging

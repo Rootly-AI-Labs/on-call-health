@@ -4,7 +4,7 @@ Workload Analysis Tool for Burnout Detection Agent
 from typing import Dict, List, Any, Optional
 import statistics
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 try:
     from smolagents import BaseTool

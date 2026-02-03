@@ -95,6 +95,9 @@ def _parse_expires_in(raw_expires_in: Any) -> int:
                 raise ValueError("Invalid expires_in format")
             value = int(candidate)
         elif isinstance(raw_expires_in, float):
+            # Check if integer first to prevent issues with large floats like 1e20
+            if not raw_expires_in.is_integer():
+                raise ValueError("Non-integer expires_in value")
             # Check bounds BEFORE conversion to prevent overflow with large floats (e.g., 1e9)
             if raw_expires_in > EXPIRES_IN_MAX_SECONDS or raw_expires_in < EXPIRES_IN_MIN_SECONDS:
                 logger.warning(
@@ -102,8 +105,6 @@ def _parse_expires_in(raw_expires_in: Any) -> int:
                     f"This may indicate an API change or malformed response."
                 )
                 return EXPIRES_IN_DEFAULT_SECONDS
-            if not raw_expires_in.is_integer():
-                raise ValueError("Non-integer expires_in value")
             value = int(raw_expires_in)
         elif isinstance(raw_expires_in, int):
             value = raw_expires_in
