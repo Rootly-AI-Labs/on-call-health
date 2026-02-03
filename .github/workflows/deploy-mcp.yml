@@ -40,11 +40,12 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
       - name: Download current task definition
+        continue-on-error: true
         run: |
           aws ecs describe-task-definition \
             --task-definition on-call-health-mcp \
             --query taskDefinition \
-            > task-definition.json
+            > task-definition.json 2>/dev/null || true
 
       - name: Update task definition with new image
         env:
@@ -52,6 +53,13 @@ jobs:
           ECR_REPOSITORY: on-call-health-mcp
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          # Use existing task def if available, otherwise use template
+          if [ ! -s task-definition.json ]; then
+            sed -e "s/ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g" \
+                -e "s/REGION/${{ secrets.AWS_REGION }}/g" \
+                infra/ecs/task-definition.json > task-definition.json
+          fi
+
           # Update image in task definition
           NEW_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           jq --arg IMAGE "$NEW_IMAGE" \
