@@ -268,8 +268,15 @@ class TestOnCallHealthClientErrorMapping:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_429_raises_rate_limit_error(self, respx_mock):
-        """429 response should raise RateLimitError."""
+    async def test_429_is_retriable(self, respx_mock):
+        """429 response should be retried (rate limit is transient).
+
+        Note: 429 is a retriable status code. After retries are exhausted,
+        a RetriableHTTPError is raised. Use RateLimitError mapping for
+        immediate failure cases (e.g., when processing retry-after header).
+        """
+        from app.mcp.client.retry import RetriableHTTPError
+
         respx_mock.get("https://api.oncallhealth.ai/api/v1/test").mock(
             return_value=httpx.Response(
                 429,
@@ -278,41 +285,69 @@ class TestOnCallHealthClientErrorMapping:
             )
         )
 
-        client = OnCallHealthClient(api_key="test-key")
+        # With default retries, 429 will be retried then fail with RetriableHTTPError
+        config = ClientConfig(
+            max_retries=0,  # Disable retries for this test
+            circuit_breaker_fail_max=10,  # High threshold to not interfere
+        )
+        client = OnCallHealthClient(api_key="test-key", config=config)
         try:
-            with pytest.raises(RateLimitError) as exc_info:
+            # With no retries, the RetriableHTTPError is raised
+            with pytest.raises(RetriableHTTPError) as exc_info:
                 await client.get("/api/v1/test")
-            assert exc_info.value.retry_after == 60
+            assert exc_info.value.status_code == 429
         finally:
             await client.close()
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_500_raises_service_unavailable_error(self, respx_mock):
-        """500 response should raise ServiceUnavailableError."""
+    async def test_500_is_retriable(self, respx_mock):
+        """500 response should be retried (server error is transient).
+
+        Note: 500 is a retriable status code. After retries are exhausted,
+        a RetriableHTTPError is raised.
+        """
+        from app.mcp.client.retry import RetriableHTTPError
+
         respx_mock.get("https://api.oncallhealth.ai/api/v1/test").mock(
             return_value=httpx.Response(500, json={"error": "Internal error"})
         )
 
-        client = OnCallHealthClient(api_key="test-key")
+        config = ClientConfig(
+            max_retries=0,  # Disable retries for this test
+            circuit_breaker_fail_max=10,
+        )
+        client = OnCallHealthClient(api_key="test-key", config=config)
         try:
-            with pytest.raises(ServiceUnavailableError):
+            with pytest.raises(RetriableHTTPError) as exc_info:
                 await client.get("/api/v1/test")
+            assert exc_info.value.status_code == 500
         finally:
             await client.close()
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_503_raises_service_unavailable_error(self, respx_mock):
-        """503 response should raise ServiceUnavailableError."""
+    async def test_503_is_retriable(self, respx_mock):
+        """503 response should be retried (service unavailable is transient).
+
+        Note: 503 is a retriable status code. After retries are exhausted,
+        a RetriableHTTPError is raised.
+        """
+        from app.mcp.client.retry import RetriableHTTPError
+
         respx_mock.get("https://api.oncallhealth.ai/api/v1/test").mock(
             return_value=httpx.Response(503, json={"error": "Service unavailable"})
         )
 
-        client = OnCallHealthClient(api_key="test-key")
+        config = ClientConfig(
+            max_retries=0,  # Disable retries for this test
+            circuit_breaker_fail_max=10,
+        )
+        client = OnCallHealthClient(api_key="test-key", config=config)
         try:
-            with pytest.raises(ServiceUnavailableError):
+            with pytest.raises(RetriableHTTPError) as exc_info:
                 await client.get("/api/v1/test")
+            assert exc_info.value.status_code == 503
         finally:
             await client.close()
 
