@@ -117,42 +117,22 @@ def _create_mcp_http_app() -> Starlette:
     from app.mcp.server import mcp_server
 
     # Get HTTP app from FastMCP
-    # FastMCP 2.x provides http_app() which includes all transport routes
-    http_app = mcp_server.http_app()
+    # FastMCP 2.x provides http_app() which includes all transport routes and its own lifespan
+    mcp_http = mcp_server.http_app()
 
-    # Create lifespan that initializes the session managers
-    # The HTTP transport requires a task group to be running
-    # Access session_manager from mcp_server (created lazily by http_app())
-    @contextlib.asynccontextmanager
-    async def lifespan(app: Starlette) -> AsyncIterator[None]:
-        """Initialize MCP transport session managers."""
-        logger.info("Starting MCP transport session managers")
-        # Get the session manager from mcp_server (public property)
-        session_manager = mcp_server.session_manager
-        async with session_manager.run():
-            logger.info("MCP transport ready")
-            yield
-        logger.info("MCP transport shut down")
-
-    # Create composite Starlette app by combining routes from FastMCP and custom health check
-    # Extract routes from http_app and add our health check
-    routes = [
-        Route("/health", health_check, methods=["GET"]),
-    ]
-    # Add routes from HTTP app (provides all MCP endpoints)
-    routes.extend(http_app.routes)
-
-    # Build middleware list
-    # Infrastructure middleware runs first (connection/rate limits) if available,
-    # then CORS middleware handles preflight and response headers
+    # Create wrapper app with health endpoint and middleware
+    # Build middleware list - order matters: infrastructure first, then CORS
     middleware_list = []
     if infrastructure_middleware is not None:
         middleware_list.append(infrastructure_middleware)
     middleware_list.append(cors_middleware)
 
+    # Create new Starlette app with health endpoint and MCP app mounted
     app = Starlette(
-        routes=routes,
-        lifespan=lifespan,
+        routes=[
+            Route("/health", health_check, methods=["GET"]),
+            Mount("/", mcp_http),  # Mount MCP app at root to handle all MCP routes
+        ],
         middleware=middleware_list,
     )
 
