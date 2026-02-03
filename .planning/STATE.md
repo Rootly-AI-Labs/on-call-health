@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** MCP clients and automation tools can authenticate reliably without JWT token expiration or session coupling.
-**Current focus:** Phase 8 - PyPI Distribution (Package Structure)
+**Current focus:** Phase 8 - PyPI Distribution (Complete)
 
 ## Current Position
 
 Phase: 8 of 11 (PyPI Distribution)
-Plan: 1 of 2 in current phase
-Status: Plan 08-01 complete
-Last activity: 2026-02-02 - Completed 08-01-PLAN.md (Package Structure)
+Plan: 2 of 2 in current phase
+Status: Phase 8 complete
+Last activity: 2026-02-02 - Completed 08-02-PLAN.md (README Documentation)
 
-Progress: [######----] 68% (v1.0 complete, Phase 5-7 complete, 08-01 complete)
+Progress: [#######---] 73% (v1.0 complete, Phase 5-8 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15 (v1.0 + Phase 5 + Phase 6 + Phase 7 + 08-01)
-- Average duration: ~7min (Phase 5-8)
+- Total plans completed: 16 (v1.0 + Phase 5 + Phase 6 + Phase 7 + Phase 8)
+- Average duration: ~6.5min (Phase 5-8)
 - Total execution time: N/A
 
 **By Phase:**
@@ -31,11 +31,11 @@ Progress: [######----] 68% (v1.0 complete, Phase 5-7 complete, 08-01 complete)
 | 5 (v1.1) | 2 | 17min | 8.5min |
 | 6 (v1.1) | 2 | 9min | 4.5min |
 | 7 (v1.1) | 2 | 23min | 11.5min |
-| 8 (v1.1) | 1/2 | 8min | 8min |
+| 8 (v1.1) | 2 | 13min | 6.5min |
 
 **Recent Trend:**
-- Last 5 plans: 06-02 (5min), 07-01 (18min), 07-02 (5min), 08-01 (8min)
-- Trend: Phase 8 in progress, package structure complete
+- Last 5 plans: 07-01 (18min), 07-02 (5min), 08-01 (8min), 08-02 (5min)
+- Trend: Phase 8 complete, PyPI package ready for publishing
 
 *Updated after each plan completion*
 
@@ -67,6 +67,8 @@ Recent decisions affecting current work:
 - 08-01: Package name oncallhealth-mcp with hatchling build backend
 - 08-01: CLI validates ONCALLHEALTH_API_KEY before starting
 - 08-01: Flexible dependency bounds (>=X.Y,<Z.0) for PyPI compatibility
+- 08-02: Lazy import of server module for validation-first CLI startup
+- 08-02: README structure: install -> quick start -> config -> CLI -> integration -> tools
 
 ### Pending Todos
 
@@ -79,5 +81,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: Completed 08-01-PLAN.md (Package Structure)
-Resume file: None (ready for 08-02)
+Stopped at: Completed 08-02-PLAN.md (README Documentation)
+Resume file: None (Phase 8 complete, ready for Phase 9)
