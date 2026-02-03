@@ -16,7 +16,7 @@ import { NotificationDrawer } from "@/components/notifications"
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog"
 import { TeamManagementDialog } from "@/components/TeamManagementDialog"
 import { useGettingStarted } from "@/contexts/GettingStartedContext"
-import { LogOut, BookOpen, HelpCircle, Settings, Users, FileText, MessageSquareMore } from "lucide-react"
+import { LogOut, BookOpen, HelpCircle, Settings, Users, FileText, MessageSquareMore, Key } from "lucide-react"
 
 interface UserInfo {
   name: string
@@ -100,7 +100,7 @@ export function TopPanel() {
                 className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
                   isActive("/dashboard")
                     ? "bg-purple-700 text-white shadow-sm"
-                    : "text-neutral-700 hover:text-white hover:bg-purple-600"
+                    : "text-neutral-700 hover:text-white hover:bg-purple-800"
                 }`}
               >
                 Dashboard
@@ -110,7 +110,7 @@ export function TopPanel() {
                 className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
                   isActive("/integrations")
                     ? "bg-purple-700 text-white shadow-sm"
-                    : "text-neutral-700 hover:text-white hover:bg-purple-600"
+                    : "text-neutral-700 hover:text-white hover:bg-purple-800"
                 }`}
               >
                 Integrations
@@ -196,6 +196,16 @@ export function TopPanel() {
                   >
                     <Settings className="w-4 h-4 mr-2" />
                     Account Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      router.push("/dashboard/api-keys")
+                      setIsDropdownOpen(false)
+                    }}
+                    className="cursor-pointer focus:bg-purple-100 focus:text-purple-900"
+                  >
+                    <Key className="w-4 h-4 mr-2" />
+                    API Keys
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

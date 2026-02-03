@@ -27,6 +27,8 @@ on:
 jobs:
   e2e-tests:
     name: E2E Tests (${{ matrix.browser }})
+    # Skip for Dependabot PRs - they don't have access to secrets for security
+    if: github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -41,10 +43,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -60,7 +62,7 @@ jobs:
         run: echo "version=$(npm list @playwright/test --depth=0 --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -89,13 +91,15 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
           PLAYWRIGHT_API_URL: ${{ secrets.PLAYWRIGHT_API_URL }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL_AVERY }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD_AVERY }}
           E2E_TEST_EMAIL_AVERY: ${{ secrets.E2E_TEST_EMAIL_AVERY }}
           E2E_TEST_PASSWORD_AVERY: ${{ secrets.E2E_TEST_PASSWORD_AVERY }}
           E2E_ROOTLY_API_KEY: ${{ secrets.E2E_ROOTLY_API_KEY }}
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report-${{ matrix.browser }}
           path: frontend/playwright-report/
@@ -103,7 +107,7 @@ jobs:
 
       - name: Upload test videos
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-videos-${{ matrix.browser }}
           path: frontend/test-results/
@@ -111,7 +115,7 @@ jobs:
 
       - name: Comment PR with results
         if: github.event_name == 'pull_request' && failure()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             github.rest.issues.createComment({

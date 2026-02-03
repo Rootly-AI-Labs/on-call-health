@@ -42,8 +42,7 @@ export function NotificationItem({
   return (
     <div
       className={cn(
-        "group relative px-6 py-4 transition-colors hover:bg-accent/50",
-        isUnread && "bg-accent/30",
+        "group relative px-6 py-4 transition-colors",
         isExpired && "opacity-60"
       )}
     >

@@ -15,7 +15,7 @@ from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
 from .middleware.security import security_middleware
 from .middleware.user_logging import user_logging_middleware
 from .middleware.logging_context import UserContextFilter
-from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, jira, linear, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations, surveys
+from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, jira, linear, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations, surveys, api_keys
 
 # Configure logging based on environment variable
 LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
@@ -210,5 +210,6 @@ app.include_router(migrate.router, prefix="/api/migrate", tags=["migration"])
 app.include_router(admin.router, prefix="/api", tags=["admin"])
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 app.include_router(invitations.router, prefix="/api", tags=["invitations"])
+app.include_router(api_keys.router, prefix="/api", tags=["api-keys"])
 app.include_router(surveys.router, prefix="/api/surveys", tags=["surveys"])
 logger.debug("Surveys router registered successfully")

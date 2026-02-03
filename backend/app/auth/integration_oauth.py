@@ -680,9 +680,20 @@ class LinearIntegrationOAuth:
         return resp.json()
 
     async def _graphql_query(self, access_token: str, query: str, variables: dict = None) -> Dict[str, Any]:
-        """Execute a GraphQL query against Linear API."""
+        """Execute a GraphQL query against Linear API.
+
+        Handles both OAuth tokens and API keys:
+        - OAuth tokens: Use "Bearer {token}" format
+        - API keys (lin_api_*): Use raw token (no Bearer prefix)
+        """
+        # Linear API keys don't use Bearer prefix, only OAuth tokens do
+        if access_token.startswith("lin_api_"):
+            auth_header = access_token
+        else:
+            auth_header = f"Bearer {access_token}"
+
         headers = {
-            "Authorization": f"Bearer {access_token}",
+            "Authorization": auth_header,
             "Content-Type": "application/json",
         }
 
