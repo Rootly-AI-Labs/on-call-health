@@ -49,7 +49,6 @@ anthropic
 openai
 
 # MCP Server Framework
-mcp[cli]>=1.0.0
 fastmcp
 
 # Monitoring

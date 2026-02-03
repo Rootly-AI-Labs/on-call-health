@@ -5,7 +5,6 @@
 uvicorn[standard]
 
 # MCP Server Framework
-mcp[cli]>=1.0.0
 fastmcp
 
 # Web framework (Starlette transport layer)
