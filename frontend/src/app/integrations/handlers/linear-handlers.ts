@@ -94,6 +94,54 @@ export async function handleLinearConnect(
 }
 
 /**
+ * Connect Linear integration via manual API key
+ */
+export async function handleLinearManualConnect(
+  data: { token: string; userInfo?: { displayName: string | null; email: string | null } },
+  loadLinearIntegration: () => Promise<void>
+): Promise<boolean> {
+  try {
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) {
+      toast.error('Please log in to connect Linear')
+      return false
+    }
+
+    const response = await fetch(`${API_BASE}/integrations/linear/connect-manual`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        token: data.token,
+        user_info: data.userInfo ? {
+          display_name: data.userInfo.displayName,
+          email: data.userInfo.email
+        } : undefined
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || 'Failed to save Linear integration')
+    }
+
+    // Clear cache to force refresh
+    localStorage.removeItem('linear_integration')
+
+    // Reload integration state
+    await loadLinearIntegration()
+
+    return true
+  } catch (error) {
+    console.error('Error connecting Linear with API key:', error)
+    toast.error(error instanceof Error ? error.message : 'Failed to connect Linear')
+    return false
+  }
+}
+
+/**
  * Disconnect Linear integration
  */
 export async function handleLinearDisconnect(
