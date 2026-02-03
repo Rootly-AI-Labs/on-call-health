@@ -670,7 +670,9 @@ async def connect_linear_manual(
     async def sync_in_background():
         """Background task to sync Linear users after manual token save."""
         from ...models import get_db
-        bg_db = next(get_db())
+        # Properly consume generator to ensure cleanup
+        db_gen = get_db()
+        bg_db = next(db_gen)
         try:
             if not bg_org_id:
                 return
@@ -718,7 +720,11 @@ async def connect_linear_manual(
         except Exception as e:
             logger.error(f"[Linear] Background sync failed for user {bg_user_id}: {e}")
         finally:
-            bg_db.close()
+            # Properly close generator to trigger cleanup
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass
 
     # Fire and forget background sync
     asyncio.create_task(sync_in_background())
