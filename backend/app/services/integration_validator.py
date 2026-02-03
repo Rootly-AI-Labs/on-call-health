@@ -173,12 +173,16 @@ class IntegrationValidator:
         site_url: Optional[str]
     ) -> Dict[str, Any]:
         """Validate Jira Personal Access Token."""
+        logger.info(f"Jira validation: token_len={len(token) if token else 0}, site_url={site_url}")
+
         # Format validation
         if not token or not token.strip():
+            logger.warning("Jira validation failed: empty token")
             error = get_error_response("jira", "format")
             return {"valid": False, **error}
 
         if not site_url or not site_url.strip():
+            logger.warning("Jira validation failed: empty site_url")
             error = get_error_response("jira", "site_url")
             return {"valid": False, **error}
 
