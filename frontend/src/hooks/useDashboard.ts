@@ -440,6 +440,8 @@ export default function useDashboard() {
 
     if (savedAnalysisId && savedStartTime) {
       // Validate saved values with explicit radix
+      // Note: currentRunningAnalysisId is typed as number | null
+      // Backend only returns numeric IDs for running analyses
       const startTime = parseInt(savedStartTime, 10)
       const analysisId = parseInt(savedAnalysisId, 10)
 
@@ -1808,14 +1810,20 @@ export default function useDashboard() {
             return
           }
 
+          const controller = new AbortController()
+          const fetchTimeout = setTimeout(() => controller.abort(), 10000) // 10s timeout
+
           let pollResponse
           try {
             pollResponse = await fetch(`${API_BASE}/analyses/${analysis_id}`, {
               headers: {
                 'Authorization': `Bearer ${currentAuthToken}`
-              }
+              },
+              signal: controller.signal
             })
+            clearTimeout(fetchTimeout)
           } catch (networkError) {
+            clearTimeout(fetchTimeout)
             // Network error (including CORS errors from 502) - retry with backoff
             pollRetryCount++
 
