@@ -118,7 +118,7 @@ export function LinearManualSetupForm({ form, onSave, onClose }: LinearManualSet
               <Alert className="border-neutral-200 bg-neutral-50">
                 <AlertDescription>
                   <a
-                    href="https://linear.app/settings/api"
+                    href="https://linear.app/settings/account/security"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center text-neutral-600 hover:text-neutral-700"
