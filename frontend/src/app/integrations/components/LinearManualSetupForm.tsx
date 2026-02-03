@@ -57,13 +57,14 @@ export function LinearManualSetupForm({ form, onSave, onClose }: LinearManualSet
 
   // Auto-save when validation succeeds
   useEffect(() => {
-    const shouldSave = isConnected && userInfo && !isSaving && !saveAttempted.current;
+    const hasValidToken = tokenValue && tokenValue.trim();
+    const shouldSave = hasValidToken && isConnected && userInfo && !isSaving && !saveAttempted.current;
 
     if (shouldSave) {
       saveAttempted.current = true;
       handleAutoSave();
     }
-  }, [isConnected, userInfo, isSaving]);
+  }, [isConnected, userInfo, isSaving, tokenValue]);
 
   const handleAutoSave = async () => {
     setIsSaving(true);

@@ -61,7 +61,8 @@ export function JiraManualSetupForm({ form, onSave, onClose }: JiraManualSetupFo
 
   // Auto-save when validation succeeds
   useEffect(() => {
-    const shouldSave = isConnected && userInfo && !isSaving && !saveAttempted.current;
+    const hasValidInputs = tokenValue && tokenValue.trim() && siteUrlValue && siteUrlValue.trim() && emailValue && emailValue.trim();
+    const shouldSave = hasValidInputs && isConnected && userInfo && !isSaving && !saveAttempted.current;
 
     if (shouldSave) {
       saveAttempted.current = true;
