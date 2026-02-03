@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Backend Foundation** - Token storage architecture with encryption parity
 - [x] **Phase 2: Validation Infrastructure** - Type-aware token validation system
 - [x] **Phase 3: Jira Token Integration** - Complete Jira API token setup flow
-- [ ] **Phase 4: Linear Token Integration** - Complete Linear API token setup flow
+- [x] **Phase 4: Linear Token Integration** - Complete Linear API token setup flow
 - [ ] **Phase 5: User Experience** - Status indicators, help text, and method switching
 
 ## Phase Details
@@ -83,8 +83,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Backend POST /connect-manual endpoint with validation, encryption, and workspace mapping
-- [ ] 04-02-PLAN.md — Frontend dual-button card and auto-save form
+- [x] 04-01-PLAN.md — Backend POST /connect-manual endpoint with validation, encryption, and workspace mapping
+- [x] 04-02-PLAN.md — Frontend dual-button card and auto-save form
 
 ### Phase 5: User Experience
 **Goal**: Users can see auth method for integrations, access helpful guidance, and switch between OAuth and token
@@ -110,5 +110,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Backend Foundation | 2/2 | Complete | 2026-02-01 |
 | 2. Validation Infrastructure | 4/4 | Complete | 2026-02-02 |
 | 3. Jira Token Integration | 2/2 | Complete | 2026-02-02 |
-| 4. Linear Token Integration | 0/2 | Planned | - |
+| 4. Linear Token Integration | 2/2 | Complete | 2026-02-02 |
 | 5. User Experience | 0/TBD | Not started | - |

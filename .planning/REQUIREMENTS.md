@@ -74,19 +74,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | AUTH-01 | Phase 3 | Pending |
-| AUTH-02 | Phase 4 | Pending |
+| AUTH-02 | Phase 4 | Complete |
 | AUTH-03 | Phase 2 | Pending |
 | AUTH-04 | Phase 2 | Pending |
 | AUTH-05 | Phase 2 | Pending |
 | TOKEN-01 | Phase 1 | Complete |
 | TOKEN-02 | Phase 1 | Complete |
 | TOKEN-03 | Phase 1 | Complete |
-| UX-01 | Phase 3, Phase 4 | Pending |
+| UX-01 | Phase 3, Phase 4 | Complete |
 | UX-02 | Phase 3 | Pending |
-| UX-03 | Phase 4 | Pending |
+| UX-03 | Phase 4 | Complete |
 | UX-04 | Phase 5 | Pending |
 | UX-05 | Phase 3 | Pending |
-| UX-06 | Phase 4 | Pending |
+| UX-06 | Phase 4 | Complete |
 | SWITCH-01 | Phase 5 | Pending |
 | SWITCH-02 | Phase 5 | Pending |
 
