@@ -142,6 +142,7 @@ import { AIInsightsCard } from "./components/AIInsightsCard"
 import { GitHubConnectedCard } from "./components/GitHubConnectedCard"
 import { JiraIntegrationCard } from "./components/JiraIntegrationCard"
 import { JiraConnectedCard } from "./components/JiraConnectedCard"
+import { JiraManualSetupForm } from "./components/JiraManualSetupForm"
 import { LinearIntegrationCard } from "./components/LinearIntegrationCard"
 import { LinearConnectedCard } from "./components/LinearConnectedCard"
 import { RootlyIntegrationForm } from "./components/RootlyIntegrationForm"
@@ -281,6 +282,7 @@ export default function IntegrationsPage() {
   const [isConnectingLinear, setIsConnectingLinear] = useState(false)
   const [isSyncingJira, setIsSyncingJira] = useState(false)
   const [jiraWorkspaceSelectorOpen, setJiraWorkspaceSelectorOpen] = useState(false)
+  const [showJiraManualSetup, setShowJiraManualSetup] = useState(false)
 
   // Disconnect confirmation state
   const [githubDisconnectDialogOpen, setGithubDisconnectDialogOpen] = useState(false)
@@ -810,6 +812,10 @@ export default function IntegrationsPage() {
       pagerdutyToken: "",
       nickname: "",
     },
+  })
+
+  const jiraManualForm = useForm<{ siteUrl: string; token: string }>({
+    defaultValues: { siteUrl: "", token: "" }
   })
 
   useEffect(() => {
@@ -3441,6 +3447,7 @@ export default function IntegrationsPage() {
             {activeEnhancementTab === 'jira' && !jiraIntegration && (
               <JiraIntegrationCard
                 onConnect={handleJiraConnect}
+                onTokenConnect={() => setShowJiraManualSetup(true)}
                 isConnecting={isConnectingJira}
               />
             )}
@@ -4419,6 +4426,28 @@ export default function IntegrationsPage() {
           await loadJiraIntegration(true)
         }}
       />
+      {/* Jira Manual Setup Dialog */}
+      <Dialog open={showJiraManualSetup} onOpenChange={(open) => {
+        setShowJiraManualSetup(open)
+        if (!open) jiraManualForm.reset()
+      }}>
+        <DialogContent className="max-w-2xl">
+          <JiraManualSetupForm
+            form={jiraManualForm}
+            onSave={async (data) => {
+              const success = await JiraHandlers.handleJiraManualConnect(
+                data,
+                () => loadJiraIntegration(true)
+              )
+              return success
+            }}
+            onClose={() => {
+              setShowJiraManualSetup(false)
+              jiraManualForm.reset()
+            }}
+          />
+        </DialogContent>
+      </Dialog>
       {/* Slack Survey Workspace Info & Disconnect Dialog */}
       <Dialog open={slackSurveyDisconnectDialogOpen} onOpenChange={setSlackSurveyDisconnectDialogOpen}>
         <DialogContent className="sm:max-w-md">
