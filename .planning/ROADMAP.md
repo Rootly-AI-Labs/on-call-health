@@ -28,12 +28,12 @@ See `.planning/milestones/v1.0-ROADMAP.md` for archived v1.0 phases.
 
 **Milestone Goal:** Enable zero-installation MCP server access via SSE-hosted endpoint and PyPI distribution, replacing direct database access with REST API calls. Deploy to AWS for production hosting.
 
-- [ ] **Phase 5: REST API Client** - Foundation layer for all MCP-to-API communication
-- [ ] **Phase 6: MCP Tools Refactor** - Migrate all tools from direct DB to REST API client
-- [ ] **Phase 7: Transport Implementation** - SSE and Streamable HTTP endpoints
-- [ ] **Phase 8: PyPI Distribution** - Publishable package for self-hosted users
-- [ ] **Phase 9: Infrastructure** - Connection limits, rate limiting, graceful cleanup
-- [ ] **Phase 10: Documentation** - User guides for SSE and PyPI deployment
+- [x] **Phase 5: REST API Client** - Foundation layer for all MCP-to-API communication
+- [x] **Phase 6: MCP Tools Refactor** - Migrate all tools from direct DB to REST API client
+- [x] **Phase 7: Transport Implementation** - SSE and Streamable HTTP endpoints
+- [x] **Phase 8: PyPI Distribution** - Publishable package for self-hosted users
+- [x] **Phase 9: Infrastructure** - Connection limits, rate limiting, graceful cleanup
+- [x] **Phase 10: Documentation** - User guides for SSE and PyPI deployment
 - [ ] **Phase 11: AWS Deployment** - Docker containerization and ECS/Fargate production deployment
 
 ## Phase Details
@@ -48,11 +48,11 @@ See `.planning/milestones/v1.0-ROADMAP.md` for archived v1.0 phases.
   3. Persistent failures trigger circuit breaker, preventing retry storms
   4. HTTP status codes are translated to appropriate MCP exceptions
   5. API key is automatically injected into all outgoing requests
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: Core REST client implementation
-- [ ] 05-02: Resilience patterns (retry, circuit breaker)
+- [ ] 05-01-PLAN.md - Core REST client with config, exceptions, API key injection
+- [ ] 05-02-PLAN.md - Resilience patterns (retry, circuit breaker, health monitor)
 
 ### Phase 6: MCP Tools Refactor
 **Goal**: All MCP tools use REST API client instead of direct database queries
@@ -64,11 +64,11 @@ Plans:
   3. User can retrieve analysis results via MCP using REST API
   4. User can list integrations via MCP using REST API
   5. All direct database query code is removed from MCP server
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: Migrate analysis tools to REST client
-- [ ] 06-02: Migrate integration tools and cleanup
+- [ ] 06-01-PLAN.md - Migrate analysis tools (status, results, current, start) to REST client
+- [ ] 06-02-PLAN.md - Migrate integrations_list and remove all database dependencies
 
 ### Phase 7: Transport Implementation
 **Goal**: MCP server accessible via SSE and Streamable HTTP transports with proper authentication
@@ -80,11 +80,11 @@ Plans:
   3. Connections stay alive across proxy timeouts (heartbeat every 30 seconds)
   4. Health check at `/health` returns 200 OK when service is ready
   5. Web-based MCP clients work with proper CORS headers
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: Streamable HTTP and SSE endpoints
-- [ ] 07-02: Authentication and CORS
+- [ ] 07-01-PLAN.md - Transport layer with Streamable HTTP, SSE, and health check endpoints
+- [ ] 07-02-PLAN.md - CORS configuration, heartbeat, and main.py integration
 
 ### Phase 8: PyPI Distribution
 **Goal**: Users can install and run MCP server via `uvx oncallhealth-mcp` with minimal configuration
@@ -95,11 +95,11 @@ Plans:
   2. User can run server via `uvx oncallhealth-mcp` with API_KEY environment variable
   3. User can choose between SSE and stdio transports via CLI flag
   4. README provides clear installation and setup instructions
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 08-01: Package structure and pyproject.toml
-- [ ] 08-02: CLI entry point and configuration
+- [ ] 08-01-PLAN.md - Package structure, pyproject.toml, and MCP source code
+- [ ] 08-02-PLAN.md - CLI entry point, README, and build verification
 
 ### Phase 9: Infrastructure
 **Goal**: Hosted SSE endpoint is protected against resource exhaustion and abuse
@@ -111,11 +111,11 @@ Plans:
   3. SSE endpoint has rate limiting independent of API endpoint rate limits
   4. Disconnected clients are cleaned up gracefully (no resource leaks)
   5. Connection events are logged for debugging and monitoring
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 09-01: Connection limits and rate limiting
-- [ ] 09-02: Graceful cleanup and logging
+- [ ] 09-01-PLAN.md - Connection tracking and rate limiting infrastructure
+- [ ] 09-02-PLAN.md - Graceful cleanup and structured logging
 
 ### Phase 10: Documentation
 **Goal**: Users can successfully deploy MCP server using either hosted SSE or PyPI package
@@ -127,11 +127,12 @@ Plans:
   3. User understands all environment variables and their purpose
   4. User understands this is a breaking change from stdio+direct-DB mode
   5. User can build Docker image and deploy to AWS following documentation
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 10-01: User guides (SSE and PyPI)
-- [ ] 10-02: Migration and deployment documentation
+- [ ] 10-01-PLAN.md - SSE deployment guide and environment variable reference
+- [ ] 10-02-PLAN.md - Migration guide and AWS deployment documentation
+- [ ] 10-03-PLAN.md - Deprecate legacy documentation with redirect notices
 
 ### Phase 11: AWS Deployment
 **Goal**: MCP SSE endpoint is running on AWS ECS/Fargate with load balancing, auto-scaling, and HTTPS
@@ -159,14 +160,14 @@ Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1-4 | v1.0 | 8/8 | Complete | 2026-02-03 |
-| 5. REST API Client | v1.1 | 0/2 | Not started | - |
-| 6. MCP Tools Refactor | v1.1 | 0/2 | Not started | - |
-| 7. Transport Implementation | v1.1 | 0/2 | Not started | - |
-| 8. PyPI Distribution | v1.1 | 0/2 | Not started | - |
-| 9. Infrastructure | v1.1 | 0/2 | Not started | - |
-| 10. Documentation | v1.1 | 0/2 | Not started | - |
+| 5. REST API Client | v1.1 | 2/2 | Complete | 2026-02-03 |
+| 6. MCP Tools Refactor | v1.1 | 2/2 | Complete | 2026-02-03 |
+| 7. Transport Implementation | v1.1 | 2/2 | Complete | 2026-02-03 |
+| 8. PyPI Distribution | v1.1 | 2/2 | Complete | 2026-02-03 |
+| 9. Infrastructure | v1.1 | 2/2 | Complete | 2026-02-03 |
+| 10. Documentation | v1.1 | 3/3 | Complete | 2026-02-03 |
 | 11. AWS Deployment | v1.1 | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-02*
-*Last updated: 2026-02-02*
+*Last updated: 2026-02-03*

@@ -71,12 +71,12 @@ Requirements for MCP server distribution milestone. Each maps to roadmap phases.
 
 ### Documentation
 
-- [ ] **DOCS-01**: SSE endpoint usage guide (Claude Desktop config)
-- [ ] **DOCS-02**: PyPI/uvx installation guide
-- [ ] **DOCS-03**: Environment variable reference
-- [ ] **DOCS-04**: Migration notice for users on stdio+direct-DB mode (breaking change)
-- [ ] **DOCS-05**: Deployment guide for hosting SSE endpoint on AWS
-- [ ] **DOCS-06**: Docker build and deployment instructions
+- [x] **DOCS-01**: SSE endpoint usage guide (Claude Desktop config)
+- [x] **DOCS-02**: PyPI/uvx installation guide
+- [x] **DOCS-03**: Environment variable reference
+- [x] **DOCS-04**: Migration notice for users on stdio+direct-DB mode (breaking change)
+- [x] **DOCS-05**: Deployment guide for hosting SSE endpoint on AWS
+- [x] **DOCS-06**: Docker build and deployment instructions
 
 ## Future Requirements
 
@@ -117,46 +117,46 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLIENT-01 | Phase 5 | Pending |
-| CLIENT-02 | Phase 5 | Pending |
-| CLIENT-03 | Phase 5 | Pending |
-| CLIENT-04 | Phase 5 | Pending |
-| CLIENT-05 | Phase 5 | Pending |
-| CLIENT-06 | Phase 5 | Pending |
-| CLIENT-07 | Phase 5 | Pending |
-| CLIENT-08 | Phase 5 | Pending |
-| TOOLS-01 | Phase 6 | Pending |
-| TOOLS-02 | Phase 6 | Pending |
-| TOOLS-03 | Phase 6 | Pending |
-| TOOLS-04 | Phase 6 | Pending |
-| TOOLS-05 | Phase 6 | Pending |
-| TOOLS-06 | Phase 6 | Pending |
-| TOOLS-07 | Phase 6 | Pending |
-| TOOLS-08 | Phase 6 | Pending |
-| TRANS-01 | Phase 7 | Pending |
-| TRANS-02 | Phase 7 | Pending |
-| TRANS-03 | Phase 7 | Pending |
-| TRANS-04 | Phase 7 | Pending |
-| TRANS-05 | Phase 7 | Pending |
-| TRANS-06 | Phase 7 | Pending |
-| PYPI-01 | Phase 8 | Pending |
-| PYPI-02 | Phase 8 | Pending |
-| PYPI-03 | Phase 8 | Pending |
-| PYPI-04 | Phase 8 | Pending |
-| PYPI-05 | Phase 8 | Pending |
-| PYPI-06 | Phase 8 | Pending |
-| PYPI-07 | Phase 8 | Pending |
-| INFRA-01 | Phase 9 | Pending |
-| INFRA-02 | Phase 9 | Pending |
-| INFRA-03 | Phase 9 | Pending |
-| INFRA-04 | Phase 9 | Pending |
-| INFRA-05 | Phase 9 | Pending |
-| DOCS-01 | Phase 10 | Pending |
-| DOCS-02 | Phase 10 | Pending |
-| DOCS-03 | Phase 10 | Pending |
-| DOCS-04 | Phase 10 | Pending |
-| DOCS-05 | Phase 10 | Pending |
-| DOCS-06 | Phase 10 | Pending |
+| CLIENT-01 | Phase 5 | Complete |
+| CLIENT-02 | Phase 5 | Complete |
+| CLIENT-03 | Phase 5 | Complete |
+| CLIENT-04 | Phase 5 | Complete |
+| CLIENT-05 | Phase 5 | Complete |
+| CLIENT-06 | Phase 5 | Complete |
+| CLIENT-07 | Phase 5 | Complete |
+| CLIENT-08 | Phase 5 | Complete |
+| TOOLS-01 | Phase 6 | Complete |
+| TOOLS-02 | Phase 6 | Complete |
+| TOOLS-03 | Phase 6 | Complete |
+| TOOLS-04 | Phase 6 | Complete |
+| TOOLS-05 | Phase 6 | Complete |
+| TOOLS-06 | Phase 6 | Complete |
+| TOOLS-07 | Phase 6 | Complete |
+| TOOLS-08 | Phase 6 | Complete |
+| TRANS-01 | Phase 7 | Complete |
+| TRANS-02 | Phase 7 | Complete |
+| TRANS-03 | Phase 7 | Complete |
+| TRANS-04 | Phase 7 | Complete |
+| TRANS-05 | Phase 7 | Complete |
+| TRANS-06 | Phase 7 | Complete |
+| PYPI-01 | Phase 8 | Complete |
+| PYPI-02 | Phase 8 | Complete |
+| PYPI-03 | Phase 8 | Complete |
+| PYPI-04 | Phase 8 | Complete |
+| PYPI-05 | Phase 8 | Complete |
+| PYPI-06 | Phase 8 | Complete |
+| PYPI-07 | Phase 8 | Complete |
+| INFRA-01 | Phase 9 | Complete |
+| INFRA-02 | Phase 9 | Complete |
+| INFRA-03 | Phase 9 | Complete |
+| INFRA-04 | Phase 9 | Complete |
+| INFRA-05 | Phase 9 | Complete |
+| DOCS-01 | Phase 10 | Complete |
+| DOCS-02 | Phase 10 | Complete |
+| DOCS-03 | Phase 10 | Complete |
+| DOCS-04 | Phase 10 | Complete |
+| DOCS-05 | Phase 10 | Complete |
+| DOCS-06 | Phase 10 | Complete |
 | AWS-01 | Phase 11 | Pending |
 | AWS-02 | Phase 11 | Pending |
 | AWS-03 | Phase 11 | Pending |
