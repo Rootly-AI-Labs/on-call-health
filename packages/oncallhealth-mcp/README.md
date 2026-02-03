@@ -5,6 +5,9 @@
 
 MCP server for On-Call Health burnout analysis. Connects AI assistants like Claude to your on-call data for workload insights.
 
+> **v1.1 Architecture**: This package uses REST API calls to communicate with oncallhealth.ai.
+> You only need an API key - no database credentials or backend setup required.
+
 ## Installation
 
 ### Using uvx (recommended)
@@ -41,6 +44,18 @@ ONCALLHEALTH_API_KEY=och_live_... oncallhealth-mcp
 |----------|----------|---------|-------------|
 | `ONCALLHEALTH_API_KEY` | Yes | - | API key from oncallhealth.ai |
 | `ONCALLHEALTH_API_URL` | No | `https://api.oncallhealth.ai` | API endpoint URL |
+
+For the complete list of environment variables including advanced options, see the [Environment Variable Reference](../../docs/ENV_REFERENCE.md).
+
+## What's New in v1.1
+
+v1.1 replaces the previous architecture (direct database access) with REST API calls:
+
+- **Simpler setup**: Just an API key - no DATABASE_URL, REDIS_URL, or JWT_SECRET_KEY needed
+- **Works from anywhere**: No VPN or database connectivity required
+- **Automatic updates**: Server-side improvements without package updates
+
+If upgrading from v1.0, see the [Migration Guide](../../docs/MIGRATION.md).
 
 ## CLI Reference
 
