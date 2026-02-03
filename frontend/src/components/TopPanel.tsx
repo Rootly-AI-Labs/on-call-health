@@ -100,7 +100,7 @@ export function TopPanel() {
                 className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
                   isActive("/dashboard")
                     ? "bg-purple-700 text-white shadow-sm"
-                    : "text-neutral-700 hover:text-white hover:bg-purple-600"
+                    : "text-neutral-700 hover:text-white hover:bg-purple-800"
                 }`}
               >
                 Dashboard
@@ -110,7 +110,7 @@ export function TopPanel() {
                 className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
                   isActive("/integrations")
                     ? "bg-purple-700 text-white shadow-sm"
-                    : "text-neutral-700 hover:text-white hover:bg-purple-600"
+                    : "text-neutral-700 hover:text-white hover:bg-purple-800"
                 }`}
               >
                 Integrations
