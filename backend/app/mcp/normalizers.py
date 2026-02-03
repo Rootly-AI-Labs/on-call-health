@@ -112,3 +112,123 @@ def normalize_analysis_start_response(
             f"This usually takes 2-3 minutes for {days_back} days of data."
         ),
     }
+
+
+def normalize_rootly_integration(rest_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Transform /rootly/integrations response item to MCP format.
+
+    Args:
+        rest_data: Single integration dict from GET /rootly/integrations
+
+    Returns:
+        Normalized dict matching MCP integrations_list contract
+    """
+    return {
+        "id": rest_data.get("id"),
+        "name": rest_data.get("name"),
+        "platform": rest_data.get("platform", "rootly"),
+        "organization_name": rest_data.get("organization_name"),
+        "is_default": rest_data.get("is_default", False),
+        "is_active": rest_data.get("is_active", True),
+        "total_users": rest_data.get("total_users", 0),
+        "last_used_at": serialize_datetime(rest_data.get("last_used_at")),
+        "created_at": serialize_datetime(rest_data.get("created_at")),
+    }
+
+
+def normalize_github_status(rest_data: Optional[Dict[str, Any]]) -> list:
+    """Transform /integrations/github/status response to MCP format.
+
+    REST returns single status object if connected, empty/null if not.
+    MCP expects list of integrations.
+
+    Args:
+        rest_data: Response dict from GET /integrations/github/status
+
+    Returns:
+        List with single integration dict if connected, empty list otherwise
+    """
+    if not rest_data or not rest_data.get("connected"):
+        return []
+    integration = rest_data.get("integration", {})
+    return [{
+        "id": integration.get("id"),
+        "username": integration.get("github_username"),
+        "organizations": integration.get("organizations", []),
+        "has_token": bool(integration.get("token_preview")),
+        "token_source": integration.get("token_source"),
+        "created_at": serialize_datetime(integration.get("connected_at")),
+        "updated_at": serialize_datetime(integration.get("last_updated")),
+    }]
+
+
+def normalize_slack_status(rest_data: Optional[Dict[str, Any]]) -> list:
+    """Transform /integrations/slack/status response to MCP format.
+
+    Args:
+        rest_data: Response dict from GET /integrations/slack/status
+
+    Returns:
+        List with single integration dict if connected, empty list otherwise
+    """
+    if not rest_data or not rest_data.get("connected"):
+        return []
+    integration = rest_data.get("integration", {})
+    return [{
+        "id": integration.get("id"),
+        "workspace_id": integration.get("workspace_id"),
+        "workspace_name": integration.get("workspace_name"),
+        "slack_user_id": integration.get("slack_user_id"),
+        "has_token": integration.get("token_source") == "oauth",
+        "token_source": integration.get("token_source"),
+        "created_at": serialize_datetime(integration.get("connected_at")),
+        "updated_at": serialize_datetime(integration.get("last_updated")),
+    }]
+
+
+def normalize_jira_status(rest_data: Optional[Dict[str, Any]]) -> list:
+    """Transform /integrations/jira/status response to MCP format.
+
+    Args:
+        rest_data: Response dict from GET /integrations/jira/status
+
+    Returns:
+        List with single integration dict if connected, empty list otherwise
+    """
+    if not rest_data or not rest_data.get("connected"):
+        return []
+    integration = rest_data.get("integration", {})
+    return [{
+        "id": integration.get("id"),
+        "cloud_id": integration.get("jira_cloud_id"),
+        "site_url": integration.get("jira_site_url"),
+        "display_name": integration.get("jira_display_name"),
+        "has_token": bool(integration.get("token_preview")),
+        "token_source": integration.get("token_source"),
+        "created_at": serialize_datetime(integration.get("updated_at")),
+        "updated_at": serialize_datetime(integration.get("updated_at")),
+    }]
+
+
+def normalize_linear_status(rest_data: Optional[Dict[str, Any]]) -> list:
+    """Transform /integrations/linear/status response to MCP format.
+
+    Args:
+        rest_data: Response dict from GET /integrations/linear/status
+
+    Returns:
+        List with single integration dict if connected, empty list otherwise
+    """
+    if not rest_data or not rest_data.get("connected"):
+        return []
+    integration = rest_data.get("integration", {})
+    return [{
+        "id": integration.get("id"),
+        "workspace_id": integration.get("workspace_id"),
+        "workspace_name": integration.get("workspace_name"),
+        "workspace_url_key": integration.get("workspace_url_key"),
+        "has_token": bool(integration.get("token_preview")),
+        "token_source": integration.get("token_source"),
+        "created_at": serialize_datetime(integration.get("updated_at")),
+        "updated_at": serialize_datetime(integration.get("updated_at")),
+    }]
