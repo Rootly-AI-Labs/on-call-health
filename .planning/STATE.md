@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** MCP clients and automation tools can authenticate reliably without JWT token expiration or session coupling.
-**Current focus:** Phase 7 - Transport Implementation
+**Current focus:** Phase 8 - API Key Authentication (MCP Integration)
 
 ## Current Position
 
 Phase: 7 of 11 (Transport Implementation)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-03 - Completed 07-01-PLAN.md (Transport Layer)
+Plan: 2 of 2 in current phase
+Status: Phase 7 complete
+Last activity: 2026-02-03 - Completed 07-02-PLAN.md (FastAPI Mount)
 
-Progress: [######----] 62% (v1.0 complete, Phase 6 complete, 07-01 complete)
+Progress: [######----] 65% (v1.0 complete, Phase 5-7 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12 (v1.0 + Phase 5 + Phase 6)
-- Average duration: ~6min (Phase 5-6)
+- Total plans completed: 14 (v1.0 + Phase 5 + Phase 6 + Phase 7)
+- Average duration: ~7min (Phase 5-7)
 - Total execution time: N/A
 
 **By Phase:**
@@ -30,11 +30,11 @@ Progress: [######----] 62% (v1.0 complete, Phase 6 complete, 07-01 complete)
 | 1-4 (v1.0) | 8 | - | - |
 | 5 (v1.1) | 2 | 17min | 8.5min |
 | 6 (v1.1) | 2 | 9min | 4.5min |
-| 7 (v1.1) | 1 | 18min | 18min |
+| 7 (v1.1) | 2 | 23min | 11.5min |
 
 **Recent Trend:**
-- Last 5 plans: 05-02 (12min), 06-01 (4min), 06-02 (5min), 07-01 (18min)
-- Trend: 07-01 completed, ready for 07-02 (FastAPI mount)
+- Last 5 plans: 06-01 (4min), 06-02 (5min), 07-01 (18min), 07-02 (5min)
+- Trend: Phase 7 complete, ready for Phase 8 (API Key Auth + MCP)
 
 *Updated after each plan completion*
 
@@ -60,6 +60,9 @@ Recent decisions affecting current work:
 - 07-01: Combined routes from FastMCP apps at top level (not Mount) for proper routing
 - 07-01: Lifespan context manager initializes StreamableHTTPSessionManager
 - 07-01: Health check at /health without auth for ALB compatibility
+- 07-02: CORS applied at transport level to avoid FastMCP conflicts
+- 07-02: SSE heartbeat documented for infrastructure-level config (Phase 9)
+- 07-02: mcp-session-id exposed for browser session tracking
 
 ### Pending Todos
 
@@ -67,10 +70,10 @@ None.
 
 ### Blockers/Concerns
 
-None.
+- Main app CORS middleware intercepts preflight before mounted app. May need X-API-Key in main app CORS if browser MCP clients require it.
 
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 07-01-PLAN.md (Transport Layer)
-Resume file: None (ready for 07-02)
+Stopped at: Completed 07-02-PLAN.md (FastAPI Mount)
+Resume file: None (ready for Phase 8)
