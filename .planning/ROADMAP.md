@@ -13,7 +13,7 @@ This roadmap extends the existing OAuth-based Jira and Linear integrations to su
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Backend Foundation** - Token storage architecture with encryption parity
-- [ ] **Phase 2: Validation Infrastructure** - Type-aware token validation system
+- [x] **Phase 2: Validation Infrastructure** - Type-aware token validation system
 - [ ] **Phase 3: Jira Token Integration** - Complete Jira API token setup flow
 - [ ] **Phase 4: Linear Token Integration** - Complete Linear API token setup flow
 - [ ] **Phase 5: User Experience** - Status indicators, help text, and method switching
@@ -49,10 +49,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Backend validation endpoints for Jira and Linear
-- [ ] 02-02-PLAN.md — Notification service and validation tests
-- [ ] 02-03-PLAN.md — Frontend validation hooks and status indicators
-- [ ] 02-04-PLAN.md — Cache configuration and end-to-end verification
+- [x] 02-01-PLAN.md — Backend validation endpoints for Jira and Linear
+- [x] 02-02-PLAN.md — Notification service and validation tests
+- [x] 02-03-PLAN.md — Frontend validation hooks and status indicators
+- [x] 02-04-PLAN.md — Cache configuration and end-to-end verification
 
 ### Phase 3: Jira Token Integration
 **Goal**: Users can connect Jira integration using API token (alternative to OAuth)
@@ -64,10 +64,11 @@ Plans:
   3. Help text provides guidance for obtaining Jira Personal Access Token
   4. Platform-specific error messages display for Jira token failures
   5. User can successfully connect Jira integration using valid API token
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] TBD after phase planning
+- [ ] 03-01-PLAN.md — Backend POST /connect-manual endpoint with validation and encryption
+- [ ] 03-02-PLAN.md — Frontend dual-button card and auto-save form
 
 ### Phase 4: Linear Token Integration
 **Goal**: Users can connect Linear integration using API token (alternative to OAuth)
@@ -106,7 +107,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Backend Foundation | 2/2 | Complete | 2026-02-01 |
-| 2. Validation Infrastructure | 0/4 | Not started | - |
-| 3. Jira Token Integration | 0/TBD | Not started | - |
+| 2. Validation Infrastructure | 4/4 | Complete | 2026-02-02 |
+| 3. Jira Token Integration | 0/2 | Not started | - |
 | 4. Linear Token Integration | 0/TBD | Not started | - |
 | 5. User Experience | 0/TBD | Not started | - |
