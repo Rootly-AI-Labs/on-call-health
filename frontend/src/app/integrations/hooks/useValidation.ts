@@ -3,6 +3,8 @@
 import { useState, useCallback, useRef } from "react";
 import type { ValidationState, ValidationResult, ValidationErrorType } from "../types";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
 interface UseValidationOptions {
   provider: "jira" | "linear";
   debounceMs?: number;
@@ -66,7 +68,7 @@ export function useValidation({ provider, debounceMs = 500 }: UseValidationOptio
       return new Promise((resolve) => {
         debounceTimerRef.current = setTimeout(async () => {
           try {
-            const endpoint = `/api/${provider}/validate-token`;
+            const endpoint = `${API_BASE}/integrations/${provider}/validate-token`;
             const body = provider === "jira"
               ? { token, site_url: siteUrl }
               : { token };
