@@ -469,6 +469,7 @@ async def validate_linear_token(
             "error_type": "format"
         }
 
+    from ...services.integration_validator import IntegrationValidator
     validator = IntegrationValidator(db)
     result = await validator.validate_manual_token(
         provider="linear",
