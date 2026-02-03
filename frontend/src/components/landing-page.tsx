@@ -273,7 +273,7 @@ export default function LandingPage() {
         {/* Features Banner */}
         <div className="container mx-auto px-4 pt-12 pb-0 mt-6 lg:mt-40 lg:py-20 relative z-10">
           <Image
-            src="/images/landing/wandb_testimonial.png"
+            src="/images/landing/wandb_testimonial_large.png"
             alt="Rootly customer story"
             width={1784}
             height={602}
