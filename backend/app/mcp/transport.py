@@ -73,6 +73,11 @@ cors_middleware = Middleware(
     allow_credentials=True,
 )
 
+# Import infrastructure middleware for connection/rate limiting
+from app.mcp.infrastructure import MCPInfrastructureMiddleware
+
+infrastructure_middleware = Middleware(MCPInfrastructureMiddleware)
+
 if TYPE_CHECKING:
     from starlette.requests import Request
 
@@ -133,10 +138,12 @@ def _create_mcp_http_app() -> Starlette:
     # Add routes from SSE transport (provides /sse and /messages)
     routes.extend(sse_transport.routes)
 
+    # Infrastructure middleware runs first (connection/rate limits),
+    # then CORS middleware handles preflight and response headers
     app = Starlette(
         routes=routes,
         lifespan=lifespan,
-        middleware=[cors_middleware],
+        middleware=[infrastructure_middleware, cors_middleware],
     )
 
     logger.info(

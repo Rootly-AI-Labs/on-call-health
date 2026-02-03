@@ -8,9 +8,13 @@ from app.mcp.infrastructure.connection_tracker import (
     ConnectionState,
     MAX_CONNECTIONS_PER_KEY,
 )
+from app.mcp.infrastructure.middleware import MCPInfrastructureMiddleware
+from app.mcp.infrastructure.rate_limiter import MCP_RATE_LIMITS
 
 __all__ = [
     "connection_tracker",
     "ConnectionState",
     "MAX_CONNECTIONS_PER_KEY",
+    "MCPInfrastructureMiddleware",
+    "MCP_RATE_LIMITS",
 ]
