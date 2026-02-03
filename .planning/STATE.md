@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 3 of 3 (Jira Token Integration)
-Plan: 1 of 4
+Plan: 2 of 4
 Status: In progress
-Last activity: 2026-02-03 - Completed 03-01-PLAN.md
+Last activity: 2026-02-03 - Completed 03-02-PLAN.md
 
-Progress: [███████████████████░] 87.5%
+Progress: [████████████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 2.7 min
-- Total execution time: 0.31 hours
+- Total plans completed: 8
+- Average duration: 2.8 min
+- Total execution time: 0.37 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [███████████████████░] 87.5%
 |-------|-------|-------|----------|
 | 01-backend-foundation | 2/2 | 5 min | 2.5 min |
 | 02-validation-infrastructure | 4/4 | 14 min | 3.5 min |
-| 03-jira-token-integration | 1/4 | 2 min | 2.0 min |
+| 03-jira-token-integration | 2/4 | 6 min | 3.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01 (2 min), 02-04 (5 min), 02-03 (4 min), 02-02 (3 min), 02-01 (2 min)
+- Last 5 plans: 03-02 (4 min), 03-01 (2 min), 02-04 (5 min), 02-03 (4 min), 02-02 (3 min)
 - Trend: Consistent 2-5 min per plan
 
 *Updated after each plan completion*
@@ -71,11 +71,16 @@ Recent decisions affecting current work:
 | Manual tokens set token_expires_at=None (no auto-expiry) | 03-01 | Implemented |
 | Background sync fires immediately via asyncio.create_task() | 03-01 | Implemented |
 | Error wrapper prevents background task exceptions from affecting save response | 03-01 | Implemented |
-| Support tokens alongside OAuth (not replacement) | - | Pending |
-| Trust user for token permissions | - | Pending |
-| Validate token works, not permissions | - | Pending |
+| Auto-save triggers when validation succeeds (no manual Save button) | 03-02 | Implemented |
+| Dual buttons have equal visual weight via flex-1 styling | 03-02 | Implemented |
+| Help section simplified to single Atlassian API token link | 03-02 | Implemented |
+| Form shows 'Saving...' status during auto-save | 03-02 | Implemented |
+| Nickname field removed (not needed for API token flow) | 03-02 | Implemented |
+| Support tokens alongside OAuth (not replacement) | - | Implemented |
+| Trust user for token permissions | - | Implemented |
+| Validate token works, not permissions | - | Implemented |
 | Use same encryption as OAuth tokens | - | Implemented |
-| Show both options in modal | - | Pending |
+| Show both options in modal | - | Implemented |
 
 ### Pending Todos
 
@@ -87,8 +92,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-03 01:17:45 UTC
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-02-03 01:24:17 UTC
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
 
-**Phase 3 Plan 1 complete - ready for 03-02 (Frontend UI)**
+**Phase 3 Plan 2 complete - ready for 03-03 (E2E testing and docs)**
