@@ -4,6 +4,12 @@ FROM ${BASE_IMAGE}
 
 WORKDIR /app
 
+# Copy requirements first for layer caching
+COPY requirements.txt .
+
+# Install any new dependencies not in base image
+RUN pip install --no-cache-dir -r requirements.txt
+
 # Copy application code
 COPY . .
 

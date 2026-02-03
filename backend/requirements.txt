@@ -13,6 +13,7 @@ python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
 cryptography
+argon2-cffi==25.1.0  # Argon2id hashing for API key verification
 
 # HTTP client for API calls
 httpx

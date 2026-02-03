@@ -44,6 +44,7 @@ class User(Base):
     analyses = relationship("Analysis", back_populates="user")
     rootly_integrations = relationship("RootlyIntegration", back_populates="user")
     oauth_providers = relationship("OAuthProvider", back_populates="user", cascade="all, delete-orphan")
+    api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
     emails = relationship("UserEmail", back_populates="user", cascade="all, delete-orphan")
     github_integrations = relationship("GitHubIntegration", back_populates="user", cascade="all, delete-orphan")
     slack_integrations = relationship("SlackIntegration", back_populates="user", cascade="all, delete-orphan")

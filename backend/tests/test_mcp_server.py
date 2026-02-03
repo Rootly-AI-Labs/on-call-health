@@ -123,16 +123,16 @@ class TestAnalysisTools:
 
     @pytest.mark.asyncio
     async def test_analysis_start_requires_auth(self):
-        """Test that analysis_start requires authentication."""
+        """Test that analysis_start requires API key authentication."""
         mock_ctx = SimpleNamespace()
 
         with patch("app.mcp.server._get_db") as mock_get_db, \
-             patch("app.mcp.server.require_user") as mock_require_user:
+             patch("app.mcp.server.require_user_api_key") as mock_require_user_api_key:
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
-            mock_require_user.side_effect = PermissionError("Missing bearer token")
+            mock_require_user_api_key.side_effect = PermissionError("Missing API key")
 
-            with pytest.raises(PermissionError, match="Missing bearer token"):
+            with pytest.raises(PermissionError, match="Missing API key"):
                 await analysis_start(mock_ctx)
 
     @pytest.mark.asyncio
@@ -144,13 +144,13 @@ class TestAnalysisTools:
         mock_analysis = MagicMock(id=100)
 
         with patch("app.mcp.server._get_db") as mock_get_db, \
-             patch("app.mcp.server.require_user") as mock_require_user, \
+             patch("app.mcp.server.require_user_api_key") as mock_require_user_api_key, \
              patch("app.mcp.server._get_integration_for_user") as mock_get_integration, \
              patch("app.mcp.server.Analysis") as mock_analysis_cls, \
              patch("app.mcp.server.run_analysis_task") as mock_run_task:
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
-            mock_require_user.return_value = mock_user
+            mock_require_user_api_key.return_value = mock_user
             mock_get_integration.return_value = mock_integration
             mock_analysis_cls.return_value = mock_analysis
             mock_run_task.return_value = AsyncMock()()
@@ -178,10 +178,10 @@ class TestAnalysisTools:
         )
 
         with patch("app.mcp.server._get_db") as mock_get_db, \
-             patch("app.mcp.server.require_user") as mock_require_user:
+             patch("app.mcp.server.require_user_api_key") as mock_require_user_api_key:
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
-            mock_require_user.return_value = mock_user
+            mock_require_user_api_key.return_value = mock_user
             mock_db.query.return_value.filter.return_value.first.return_value = mock_analysis
 
             result = await analysis_status(mock_ctx, analysis_id=100)
@@ -197,10 +197,10 @@ class TestAnalysisTools:
         mock_user = MagicMock(id=1)
 
         with patch("app.mcp.server._get_db") as mock_get_db, \
-             patch("app.mcp.server.require_user") as mock_require_user:
+             patch("app.mcp.server.require_user_api_key") as mock_require_user_api_key:
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
-            mock_require_user.return_value = mock_user
+            mock_require_user_api_key.return_value = mock_user
             mock_db.query.return_value.filter.return_value.first.return_value = None
 
             with pytest.raises(LookupError, match="Analysis not found"):
@@ -214,10 +214,10 @@ class TestAnalysisTools:
         mock_analysis = MagicMock(id=100, status="pending")
 
         with patch("app.mcp.server._get_db") as mock_get_db, \
-             patch("app.mcp.server.require_user") as mock_require_user:
+             patch("app.mcp.server.require_user_api_key") as mock_require_user_api_key:
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
-            mock_require_user.return_value = mock_user
+            mock_require_user_api_key.return_value = mock_user
             mock_db.query.return_value.filter.return_value.first.return_value = mock_analysis
 
             with pytest.raises(ValueError, match="Analysis not completed yet"):
@@ -238,10 +238,10 @@ class TestAnalysisTools:
         )
 
         with patch("app.mcp.server._get_db") as mock_get_db, \
-             patch("app.mcp.server.require_user") as mock_require_user:
+             patch("app.mcp.server.require_user_api_key") as mock_require_user_api_key:
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
-            mock_require_user.return_value = mock_user
+            mock_require_user_api_key.return_value = mock_user
             mock_db.query.return_value.filter.return_value.order_by.return_value.first.return_value = mock_analysis
 
             result = await analysis_current(mock_ctx)
@@ -255,10 +255,10 @@ class TestAnalysisTools:
         mock_user = MagicMock(id=1)
 
         with patch("app.mcp.server._get_db") as mock_get_db, \
-             patch("app.mcp.server.require_user") as mock_require_user:
+             patch("app.mcp.server.require_user_api_key") as mock_require_user_api_key:
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
-            mock_require_user.return_value = mock_user
+            mock_require_user_api_key.return_value = mock_user
             mock_db.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
 
             with pytest.raises(LookupError, match="No analyses found"):
@@ -275,7 +275,7 @@ class TestIntegrationsListTool:
         mock_user = MagicMock(id=1)
 
         with patch("app.mcp.server._get_db") as mock_get_db, \
-             patch("app.mcp.server.require_user") as mock_require_user, \
+             patch("app.mcp.server.require_user_api_key") as mock_require_user_api_key, \
              patch("app.mcp.server.serialize_rootly_integration") as mock_serialize_rootly, \
              patch("app.mcp.server.serialize_github_integration") as mock_serialize_github, \
              patch("app.mcp.server.serialize_slack_integration") as mock_serialize_slack, \
@@ -283,7 +283,7 @@ class TestIntegrationsListTool:
              patch("app.mcp.server.serialize_linear_integration") as mock_serialize_linear:
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
-            mock_require_user.return_value = mock_user
+            mock_require_user_api_key.return_value = mock_user
 
             # Mock each query to return empty list
             mock_db.query.return_value.filter.return_value.all.return_value = []
@@ -298,14 +298,14 @@ class TestIntegrationsListTool:
 
     @pytest.mark.asyncio
     async def test_integrations_list_requires_auth(self):
-        """Test that integrations_list requires authentication."""
+        """Test that integrations_list requires API key authentication."""
         mock_ctx = SimpleNamespace()
 
         with patch("app.mcp.server._get_db") as mock_get_db, \
-             patch("app.mcp.server.require_user") as mock_require_user:
+             patch("app.mcp.server.require_user_api_key") as mock_require_user_api_key:
             mock_db = MagicMock()
             mock_get_db.return_value = mock_db
-            mock_require_user.side_effect = PermissionError("Invalid or expired token")
+            mock_require_user_api_key.side_effect = PermissionError("Invalid API key")
 
-            with pytest.raises(PermissionError, match="Invalid or expired token"):
+            with pytest.raises(PermissionError, match="Invalid API key"):
                 await integrations_list(mock_ctx)
