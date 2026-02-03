@@ -8,6 +8,7 @@ on:
       - 'backend/Dockerfile.mcp'
       - 'backend/requirements-mcp.txt'
       - 'infra/ecs/**'
+      - '.github/workflows/deploy-mcp.yml'
 
 jobs:
   deploy:
