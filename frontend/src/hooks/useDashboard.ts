@@ -439,18 +439,12 @@ export default function useDashboard() {
     const savedStartTime = localStorage.getItem('running_analysis_start')
 
     if (savedAnalysisId && savedStartTime) {
-      // Validate saved values
-      const startTime = parseInt(savedStartTime)
+      // Validate saved values with explicit radix
+      const startTime = parseInt(savedStartTime, 10)
+      const analysisId = parseInt(savedAnalysisId, 10)
 
-      if (isNaN(startTime)) {
-        clearRunningAnalysisState()
-        return
-      }
-
-      // Parse analysis ID - should be numeric for persistence
-      const analysisId = parseInt(savedAnalysisId)
-      if (isNaN(analysisId)) {
-        // Invalid or corrupted ID
+      if (isNaN(startTime) || isNaN(analysisId)) {
+        // Invalid or corrupted data
         clearRunningAnalysisState()
         return
       }
@@ -1804,12 +1798,21 @@ export default function useDashboard() {
             setCurrentRunningAnalysisId(null)
             return
           }
-          
+
+          // Refresh token on each poll to handle long-running analyses
+          const currentAuthToken = getValidToken()
+          if (!currentAuthToken) {
+            clearRunningAnalysisState()
+            toast.error('Session expired. Please log in again.')
+            router.push('/auth/login')
+            return
+          }
+
           let pollResponse
           try {
             pollResponse = await fetch(`${API_BASE}/analyses/${analysis_id}`, {
               headers: {
-                'Authorization': `Bearer ${authToken}`
+                'Authorization': `Bearer ${currentAuthToken}`
               }
             })
           } catch (networkError) {
@@ -1985,9 +1988,7 @@ export default function useDashboard() {
           pollRetryCount++
           
           if (pollRetryCount >= maxRetries) {
-            setAnalysisRunning(false)
-      setCurrentRunningAnalysisId(null)
-            setCurrentRunningAnalysisId(null)
+            clearRunningAnalysisState()
             toast.error("Analysis polling failed - please try again")
             return
           }
