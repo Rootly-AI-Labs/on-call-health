@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 
-// Load environment variables from .env file
+// Load environment variables from .env.test file
 dotenv.config();
 
 /**
@@ -9,6 +9,12 @@ dotenv.config();
  */
 export default defineConfig({
   testDir: './e2e',
+  /* Global test timeout - prevents hanging tests in CI */
+  timeout: 60 * 1000, // 60 seconds per test
+  expect: {
+    /* Timeout for expect assertions */
+    timeout: 30 * 1000, // 30 seconds for assertions
+  },
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
