@@ -414,11 +414,20 @@ async def connect_jira_manual(
     # Encrypt token using Fernet
     enc_token = encrypt_token(token)
 
-    # Get user info from validation result
+    # Get user info and cloud_id from validation result
     validated_user_info = result.get("user_info", {})
     jira_account_id = validated_user_info.get("account_id")
     jira_display_name = validated_user_info.get("display_name")
     jira_email = validated_user_info.get("email")
+    jira_cloud_id = result.get("cloud_id")
+
+    # cloud_id is required for Jira integrations
+    if not jira_cloud_id:
+        logger.error(f"[Jira] Failed to get cloud_id for site: {normalized_site_url}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to determine Jira cloud ID. Please try again."
+        )
 
     # Upsert integration
     integration = db.query(JiraIntegration).filter(
@@ -432,6 +441,7 @@ async def connect_jira_manual(
         integration.access_token = enc_token
         integration.token_source = "manual"
         integration.token_expires_at = None  # Manual tokens don't auto-expire
+        integration.jira_cloud_id = jira_cloud_id
         integration.jira_site_url = normalized_site_url
         integration.jira_account_id = jira_account_id
         integration.jira_display_name = jira_display_name
@@ -446,6 +456,7 @@ async def connect_jira_manual(
             access_token=enc_token,
             token_source="manual",
             token_expires_at=None,
+            jira_cloud_id=jira_cloud_id,
             jira_site_url=normalized_site_url,
             jira_account_id=jira_account_id,
             jira_display_name=jira_display_name,
@@ -493,6 +504,7 @@ async def connect_jira_manual(
             "id": integration.id,
             "token_source": "manual",
             "token_valid": True,
+            "jira_cloud_id": integration.jira_cloud_id,
             "jira_site_url": integration.jira_site_url,
             "jira_account_id": integration.jira_account_id,
             "jira_display_name": integration.jira_display_name,

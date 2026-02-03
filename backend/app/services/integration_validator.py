@@ -226,10 +226,28 @@ class IntegrationValidator:
 
                 if response.status_code == 200:
                     data = response.json()
+
+                    # Fetch the cloud_id from tenant_info endpoint (public, no auth needed)
+                    cloud_id = None
+                    try:
+                        tenant_response = await client.get(
+                            f"{site_url}/_edge/tenant_info",
+                            headers={"Accept": "application/json"}
+                        )
+                        if tenant_response.status_code == 200:
+                            tenant_data = tenant_response.json()
+                            cloud_id = tenant_data.get("cloudId")
+                            logger.info(f"Jira tenant_info: cloudId={cloud_id}")
+                        else:
+                            logger.warning(f"Failed to get tenant_info: {tenant_response.status_code}")
+                    except Exception as tenant_error:
+                        logger.warning(f"Error fetching tenant_info: {tenant_error}")
+
                     return {
                         "valid": True,
                         "error": None,
                         "error_type": None,
+                        "cloud_id": cloud_id,
                         "user_info": {
                             "display_name": data.get("displayName"),
                             "email": data.get("emailAddress"),
