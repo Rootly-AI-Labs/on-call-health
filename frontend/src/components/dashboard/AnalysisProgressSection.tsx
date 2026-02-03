@@ -71,9 +71,11 @@ export function AnalysisProgressSection({
                 <div className="w-2 h-2 bg-purple-700 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                 <div className="w-2 h-2 bg-purple-700 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
-              <p className="text-lg font-semibold text-neutral-900">
-                {Math.round(analysisProgress)}% complete
-              </p>
+              {analysisProgress > 0 && (
+                <p className="text-lg font-semibold text-neutral-900">
+                  {Math.round(analysisProgress)}% complete
+                </p>
+              )}
             </div>
             
             <Button variant="outline" onClick={cancelRunningAnalysis} className="border-purple-300 hover:bg-purple-50 text-purple-700">
