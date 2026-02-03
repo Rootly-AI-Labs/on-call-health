@@ -155,6 +155,7 @@ import { GitHubDisconnectDialog } from "./dialogs/GitHubDisconnectDialog"
 import { SlackDisconnectDialog } from "./dialogs/SlackDisconnectDialog"
 import { JiraDisconnectDialog } from "./dialogs/JiraDisconnectDialog"
 import { LinearDisconnectDialog } from "./dialogs/LinearDisconnectDialog"
+import { AuthMethodSwitchDialog } from "./dialogs/AuthMethodSwitchDialog"
 import { JiraWorkspaceSelector } from "./dialogs/JiraWorkspaceSelector"
 import { NewMappingDialog } from "./dialogs/NewMappingDialog"
 import { OrganizationManagementDialog } from "./dialogs/OrganizationManagementDialog"
@@ -291,6 +292,10 @@ export default function IntegrationsPage() {
   const [slackDisconnectDialogOpen, setSlackDisconnectDialogOpen] = useState(false)
   const [jiraDisconnectDialogOpen, setJiraDisconnectDialogOpen] = useState(false)
   const [linearDisconnectDialogOpen, setLinearDisconnectDialogOpen] = useState(false)
+
+  // Auth method switch dialog state
+  const [jiraSwitchDialogOpen, setJiraSwitchDialogOpen] = useState(false)
+  const [linearSwitchDialogOpen, setLinearSwitchDialogOpen] = useState(false)
   const [slackSurveyDisconnectDialogOpen, setSlackSurveyDisconnectDialogOpen] = useState(false)
   const [slackSurveyConfirmDisconnectOpen, setSlackSurveyConfirmDisconnectOpen] = useState(false)
   const [isDisconnectingGithub, setIsDisconnectingGithub] = useState(false)
@@ -2163,6 +2168,20 @@ export default function IntegrationsPage() {
     )
   }
 
+  const handleJiraSwitch = async () => {
+    // Disconnect first (reuses existing handler)
+    await JiraHandlers.handleJiraDisconnect(
+      setIsDisconnectingJira,
+      setJiraIntegration,
+      setActiveEnhancementTab
+    )
+    setJiraSwitchDialogOpen(false)
+    // User will manually reconnect with new method
+    // Toast message guides them
+    const newMethod = jiraIntegration?.token_source === 'oauth' ? 'API Token' : 'OAuth'
+    toast.success(`Jira disconnected. Ready to reconnect with ${newMethod}.`)
+  }
+
   const handleJiraTest = async () => {
     return JiraHandlers.handleJiraTest(toast)
   }
@@ -2190,6 +2209,19 @@ export default function IntegrationsPage() {
       setLinearIntegration,
       setActiveEnhancementTab
     )
+  }
+
+  const handleLinearSwitch = async () => {
+    // Disconnect first (reuses existing handler)
+    await LinearHandlers.handleLinearDisconnect(
+      setIsDisconnectingLinear,
+      setLinearIntegration,
+      setActiveEnhancementTab
+    )
+    setLinearSwitchDialogOpen(false)
+    // User will manually reconnect with new method
+    const newMethod = linearIntegration?.token_source === 'oauth' ? 'API Token' : 'OAuth'
+    toast.success(`Linear disconnected. Ready to reconnect with ${newMethod}.`)
   }
 
   const handleLinearTest = async () => {
@@ -3463,6 +3495,7 @@ export default function IntegrationsPage() {
               <JiraConnectedCard
                 integration={jiraIntegration}
                 onDisconnect={() => setJiraDisconnectDialogOpen(true)}
+                onSwitchAuth={() => setJiraSwitchDialogOpen(true)}
                 onTest={handleJiraTest}
                 isLoading={isDisconnectingJira}
               />
@@ -3482,6 +3515,7 @@ export default function IntegrationsPage() {
               <LinearConnectedCard
                 integration={linearIntegration}
                 onDisconnect={() => setLinearDisconnectDialogOpen(true)}
+                onSwitchAuth={() => setLinearSwitchDialogOpen(true)}
                 onTest={handleLinearTest}
                 isLoading={isDisconnectingLinear}
               />
@@ -4424,6 +4458,33 @@ export default function IntegrationsPage() {
           setLinearDisconnectDialogOpen(false)
         }}
       />
+
+      {/* Jira Switch Dialog */}
+      {jiraIntegration && (
+        <AuthMethodSwitchDialog
+          open={jiraSwitchDialogOpen}
+          onOpenChange={setJiraSwitchDialogOpen}
+          fromMethod={jiraIntegration.token_source as "oauth" | "manual"}
+          toMethod={jiraIntegration.token_source === 'oauth' ? 'manual' : 'oauth'}
+          integrationName="Jira"
+          isDisconnecting={isDisconnectingJira}
+          onConfirmSwitch={handleJiraSwitch}
+        />
+      )}
+
+      {/* Linear Switch Dialog */}
+      {linearIntegration && (
+        <AuthMethodSwitchDialog
+          open={linearSwitchDialogOpen}
+          onOpenChange={setLinearSwitchDialogOpen}
+          fromMethod={linearIntegration.token_source as "oauth" | "manual"}
+          toMethod={linearIntegration.token_source === 'oauth' ? 'manual' : 'oauth'}
+          integrationName="Linear"
+          isDisconnecting={isDisconnectingLinear}
+          onConfirmSwitch={handleLinearSwitch}
+        />
+      )}
+
       {/* Jira Workspace Selector Dialog */}
       <JiraWorkspaceSelector
         open={jiraWorkspaceSelectorOpen}
