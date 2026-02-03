@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -14,18 +15,19 @@ import { StatusIndicator } from "./StatusIndicator";
 interface JiraManualSetupFormData {
   siteUrl: string;
   token: string;
-  nickname?: string;
 }
 
 interface JiraManualSetupFormProps {
   form: UseFormReturn<JiraManualSetupFormData>;
-  onSave: (data: { token: string; siteUrl: string; nickname?: string; userInfo?: { displayName: string | null; email: string | null } }) => Promise<void>;
-  isSaving: boolean;
+  onSave: (data: { token: string; siteUrl: string; userInfo?: { displayName: string | null; email: string | null } }) => Promise<boolean>;
+  onClose: () => void;
 }
 
-export function JiraManualSetupForm({ form, onSave, isSaving }: JiraManualSetupFormProps) {
+export function JiraManualSetupForm({ form, onSave, onClose }: JiraManualSetupFormProps) {
   const [showInstructions, setShowInstructions] = useState(false);
   const [showToken, setShowToken] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveAttempted = useRef(false);
 
   const {
     status,
@@ -50,14 +52,43 @@ export function JiraManualSetupForm({ form, onSave, isSaving }: JiraManualSetupF
     }
   }, [tokenValue, siteUrlValue, validateToken]);
 
-  const handleSave = async () => {
-    if (!isConnected) return;
-    await onSave({
-      token: tokenValue,
-      siteUrl: siteUrlValue,
-      nickname: form.getValues("nickname"),
-      userInfo,
-    });
+  // Reset save attempt flag when inputs change
+  useEffect(() => {
+    saveAttempted.current = false;
+  }, [tokenValue, siteUrlValue]);
+
+  // Auto-save when validation succeeds
+  useEffect(() => {
+    const shouldSave = isConnected && userInfo && !isSaving && !saveAttempted.current;
+
+    if (shouldSave) {
+      saveAttempted.current = true;
+      handleAutoSave();
+    }
+  }, [isConnected, userInfo, isSaving]);
+
+  const handleAutoSave = async () => {
+    setIsSaving(true);
+    try {
+      const success = await onSave({
+        token: tokenValue,
+        siteUrl: siteUrlValue,
+        userInfo,
+      });
+
+      if (success) {
+        toast.success("Jira connected!", { duration: 3000 });
+        onClose();
+      } else {
+        // Save failed, allow retry
+        saveAttempted.current = false;
+      }
+    } catch (error) {
+      toast.error("Failed to save integration");
+      saveAttempted.current = false;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -91,12 +122,15 @@ export function JiraManualSetupForm({ form, onSave, isSaving }: JiraManualSetupF
             <div className="mt-4">
               <Alert className="border-blue-200 bg-blue-50">
                 <AlertDescription>
-                  <ol className="space-y-2 text-sm">
-                    <li><strong>1.</strong> Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Atlassian API Tokens</a></li>
-                    <li><strong>2.</strong> Click <strong>Create API token</strong></li>
-                    <li><strong>3.</strong> Give it a label (e.g., "On-Call Health") and click <strong>Create</strong></li>
-                    <li><strong>4.</strong> Copy the generated token</li>
-                  </ol>
+                  <a
+                    href="https://id.atlassian.com/manage-profile/security/api-tokens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-blue-600 hover:text-blue-700"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Create your API token at Atlassian
+                  </a>
                 </AlertDescription>
               </Alert>
             </div>
@@ -170,34 +204,20 @@ export function JiraManualSetupForm({ form, onSave, isSaving }: JiraManualSetupF
 
             {/* Success Status */}
             {isConnected && userInfo && (
-              <>
-                <Alert className="border-green-200 bg-green-50">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    <div className="space-y-2">
-                      <p className="font-semibold">Token validated!</p>
-                      <div className="space-y-1 text-sm">
-                        {userInfo.displayName && <p><span className="font-medium">Name:</span> {userInfo.displayName}</p>}
-                        {userInfo.email && <p><span className="font-medium">Email:</span> {userInfo.email}</p>}
-                      </div>
+              <Alert className="border-green-200 bg-green-50">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  <div className="space-y-2">
+                    <p className="font-semibold">
+                      {isSaving ? "Saving..." : "Token validated!"}
+                    </p>
+                    <div className="space-y-1 text-sm">
+                      {userInfo.displayName && <p><span className="font-medium">Name:</span> {userInfo.displayName}</p>}
+                      {userInfo.email && <p><span className="font-medium">Email:</span> {userInfo.email}</p>}
                     </div>
-                  </AlertDescription>
-                </Alert>
-
-                <FormField
-                  control={form.control}
-                  name="nickname"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Integration Name (optional)</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder={`Jira - ${userInfo.displayName || "Your Workspace"}`} />
-                      </FormControl>
-                      <FormDescription>Give this integration a custom name</FormDescription>
-                    </FormItem>
-                  )}
-                />
-              </>
+                  </div>
+                </AlertDescription>
+              </Alert>
             )}
 
             {/* Error Status */}
@@ -222,28 +242,6 @@ export function JiraManualSetupForm({ form, onSave, isSaving }: JiraManualSetupF
                   </div>
                 </AlertDescription>
               </Alert>
-            )}
-
-            {/* Save Button - only enabled when validation passes */}
-            {isConnected && (
-              <Button
-                type="button"
-                onClick={handleSave}
-                disabled={isSaving}
-                className="bg-blue-600 hover:bg-blue-700 w-full"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Save Integration
-                  </>
-                )}
-              </Button>
             )}
           </form>
         </Form>
