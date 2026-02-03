@@ -188,8 +188,12 @@ class IntegrationValidator:
 
         # Normalize site URL
         site_url = site_url.strip().rstrip("/")
-        if not site_url.startswith("https://"):
+        # Replace http:// with https:// or add https:// if missing
+        if site_url.startswith("http://"):
+            site_url = site_url.replace("http://", "https://", 1)
+        elif not site_url.startswith("https://"):
             site_url = f"https://{site_url}"
+        logger.info(f"Jira validation: normalized site_url={site_url}")
 
         # Basic format check - Jira tokens are base64-ish alphanumeric
         token = token.strip()
