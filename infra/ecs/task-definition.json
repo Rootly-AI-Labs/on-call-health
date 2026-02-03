@@ -27,12 +27,6 @@
           "value": "INFO"
         }
       ],
-      "secrets": [
-        {
-          "name": "ONCALLHEALTH_API_KEY",
-          "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:mcp/api-key"
-        }
-      ],
       "healthCheck": {
         "command": [
           "CMD-SHELL",
