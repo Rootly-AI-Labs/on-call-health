@@ -5,6 +5,7 @@ This module provides a resilient HTTP client for MCP server to API communication
 with connection pooling, API key injection, configurable timeouts, and typed
 exception handling.
 """
+from .base import OnCallHealthClient
 from .config import ClientConfig
 from .exceptions import (
     AuthenticationError,
@@ -18,6 +19,7 @@ from .exceptions import (
 )
 
 __all__ = [
+    "OnCallHealthClient",
     "ClientConfig",
     "MCPError",
     "MCPErrorCode",
