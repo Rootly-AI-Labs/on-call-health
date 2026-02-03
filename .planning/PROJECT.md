@@ -8,6 +8,21 @@ On-Call Health is a burnout detection platform that analyzes on-call patterns ac
 
 Catch exhaustion before it burns out team members by analyzing cross-platform activity patterns, on-call load, and workload distribution.
 
+## Current Milestone: v1.1 MCP Distribution
+
+**Goal:** Enable zero-installation MCP server access via SSE-hosted endpoint and PyPI distribution, replacing direct database access with REST API calls.
+
+**Target features:**
+- SSE transport endpoint at `https://mcp.oncallhealth.com/sse` (or similar)
+- REST API client layer (calls oncallhealth.ai APIs instead of direct DB)
+- PyPI package `on-call-health-mcp` for self-hosted users
+- Rate limiting and connection limits for hosted SSE
+- Documentation for both deployment methods (SSE hosted + PyPI/uvx)
+
+**Architecture shift:**
+- **Before (v1.0)**: MCP server → stdio transport → direct database access
+- **After (v1.1)**: MCP server → SSE/stdio transport → REST API calls → oncallhealth.ai
+
 ## Requirements
 
 ### Validated
@@ -81,4 +96,4 @@ Catch exhaustion before it burns out team members by analyzing cross-platform ac
 | Show both options in modal | Clear choice for users, discoverability of token option for blocked users | ✓ Implemented v1.1 |
 
 ---
-*Last updated: 2026-02-03 after v1.1 milestone completion*
+*Last updated: 2026-02-03 after v1.1 (Token Auth) completion and v1.2 (MCP Distribution) Phase 11 deployment*

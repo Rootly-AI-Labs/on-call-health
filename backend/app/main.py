@@ -180,17 +180,33 @@ async def startup_event():
     from app.models import SessionLocal
 
     survey_scheduler.start()
-    print("✅ Survey scheduler started")
+    print("Survey scheduler started")
 
     # Load existing schedules from database
     db = SessionLocal()
     try:
         survey_scheduler.schedule_organization_surveys(db)
-        print("✅ Loaded survey schedules from database")
+        print("Loaded survey schedules from database")
     except Exception as e:
-        print(f"⚠️ Error loading survey schedules: {str(e)}")
+        print(f"Error loading survey schedules: {str(e)}")
     finally:
         db.close()
+
+    # Start MCP connection cleanup scheduler
+    # Uses same AsyncIOScheduler pattern as survey_scheduler
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from app.mcp.infrastructure.cleanup import get_cleanup_job_config
+
+    mcp_cleanup_scheduler = AsyncIOScheduler()
+    job_config = get_cleanup_job_config()
+    mcp_cleanup_scheduler.add_job(
+        job_config["func"],
+        trigger=job_config["trigger"],
+        id=job_config["id"],
+        replace_existing=job_config["replace_existing"],
+    )
+    mcp_cleanup_scheduler.start()
+    print("MCP connection cleanup scheduler started (every 5 minutes)")
 
 
 # Include API routers
@@ -213,3 +229,14 @@ app.include_router(invitations.router, prefix="/api", tags=["invitations"])
 app.include_router(api_keys.router, prefix="/api", tags=["api-keys"])
 app.include_router(surveys.router, prefix="/api/surveys", tags=["surveys"])
 logger.debug("Surveys router registered successfully")
+
+# Mount MCP transport endpoints
+# Streamable HTTP at /mcp/mcp, SSE at /mcp/sse, health at /mcp/health
+# MCP transport has its own CORS middleware configured for web-based MCP clients
+# Lazy import to avoid loading MCP dependencies unless actually needed
+try:
+    from .mcp.transport import mcp_http_app
+    app.mount("/mcp", mcp_http_app)
+    logger.debug("MCP transport mounted at /mcp")
+except ImportError as e:
+    logger.warning(f"MCP transport not available: {e}. MCP endpoints will not be mounted.")
