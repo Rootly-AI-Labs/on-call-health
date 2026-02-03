@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 5 of 5 (User Experience)
-Plan: 1 of 3 (In progress)
+Plan: 2 of 3 (In progress)
 Status: In progress
-Last activity: 2026-02-02 - Completed 05-01-PLAN.md
+Last activity: 2026-02-03 - Completed 05-02-PLAN.md
 
-Progress: [████████████████████░] 92%
+Progress: [████████████████████░] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: 2.8 min
-- Total execution time: 0.52 hours
+- Total plans completed: 12
+- Average duration: 2.7 min
+- Total execution time: 0.57 hours
 
 **By Phase:**
 
@@ -31,11 +31,11 @@ Progress: [████████████████████░] 92%
 | 02-validation-infrastructure | 4/4 | 14 min | 3.5 min |
 | 03-jira-token-integration | 2/2 | 6 min | 3.0 min |
 | 04-linear-token-integration | 2/2 | 5 min | 2.5 min |
-| 05-user-experience | 1/3 | 4 min | 4.0 min |
+| 05-user-experience | 2/3 | 7 min | 3.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-01 (4 min), 04-02 (4 min), 04-01 (1 min), 03-02 (4 min), 03-01 (2 min)
-- Trend: Consistent 1-5 min per plan
+- Last 5 plans: 05-02 (3 min), 05-01 (4 min), 04-02 (4 min), 04-01 (1 min), 03-02 (4 min)
+- Trend: Consistent 1-4 min per plan
 
 *Updated after each plan completion*
 
@@ -92,6 +92,10 @@ Recent decisions affecting current work:
 | Disconnect button moved to footer alongside switch button | 05-01 | Implemented |
 | Blue color for OAuth badge (RefreshCw icon indicates auto-renewal) | 05-01 | Implemented |
 | Neutral gray for API Token badge (Key icon) | 05-01 | Implemented |
+| Switch flow disconnects and shows toast, user manually reconnects (not automatic) | 05-02 | Implemented |
+| Data preservation message uses consistent blue info box styling across all dialogs | 05-02 | Implemented |
+| Toast message specifies new auth method (OAuth or API Token) to guide user | 05-02 | Implemented |
+| Switch handlers reuse existing disconnect logic | 05-02 | Implemented |
 | Support tokens alongside OAuth (not replacement) | - | Implemented |
 | Trust user for token permissions | - | Implemented |
 | Validate token works, not permissions | - | Implemented |
@@ -108,8 +112,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-02T22:39:34Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-02-03T03:46:56Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
 
-**Phase 5 Plan 1 complete - Auth method visibility components created**
+**Phase 5 Plan 2 complete - Auth method switch flow wired with data preservation messaging**
