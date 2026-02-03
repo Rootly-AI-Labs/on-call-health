@@ -8,7 +8,10 @@ For full authentication with database validation, see auth.py.
 """
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Iterable, Optional
+
+if TYPE_CHECKING:
+    from fastmcp import Context
 
 
 def _normalize_header_value(value: Optional[str]) -> Optional[str]:
@@ -52,7 +55,22 @@ def _get_header(headers: Any, name: str) -> Optional[str]:
 
 
 def extract_bearer_token(ctx: Any) -> Optional[str]:
-    """Extract bearer token from various MCP context shapes."""
+    """Extract bearer token from various MCP context shapes.
+
+    Supports both FastMCP Context objects and legacy SimpleNamespace test mocks.
+    """
+    # Try FastMCP Context.get_http_request() first (production)
+    if hasattr(ctx, "get_http_request"):
+        try:
+            request = ctx.get_http_request()
+            if request is not None and hasattr(request, "headers"):
+                token = _parse_bearer_token(_get_header(request.headers, "Authorization"))
+                if token:
+                    return token
+        except Exception:
+            pass
+
+    # Legacy paths for test mocks (SimpleNamespace with request_headers)
     headers = getattr(ctx, "request_headers", None)
     token = _parse_bearer_token(_get_header(headers, "Authorization"))
     if token:
@@ -74,8 +92,22 @@ def extract_bearer_token(ctx: Any) -> Optional[str]:
 
 
 def extract_api_key_header(ctx: Any) -> Optional[str]:
-    """Extract X-API-Key header from various MCP context shapes."""
-    # Try request_headers
+    """Extract X-API-Key header from various MCP context shapes.
+
+    Supports both FastMCP Context objects and legacy SimpleNamespace test mocks.
+    """
+    # Try FastMCP Context.get_http_request() first (production)
+    if hasattr(ctx, "get_http_request"):
+        try:
+            request = ctx.get_http_request()
+            if request is not None and hasattr(request, "headers"):
+                key = _get_header(request.headers, "X-API-Key")
+                if key:
+                    return _normalize_header_value(key)
+        except Exception:
+            pass
+
+    # Legacy paths for test mocks (SimpleNamespace with request_headers)
     headers = getattr(ctx, "request_headers", None)
     key = _get_header(headers, "X-API-Key")
     if key:

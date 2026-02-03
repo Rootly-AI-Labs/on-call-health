@@ -7,8 +7,8 @@ from typing import Any, Dict, Optional
 
 from fastmcp import FastMCP
 
-from app.mcp.auth_helpers import extract_api_key_header
 from app.mcp.client import NotFoundError, OnCallHealthClient
+from app.mcp.context import get_api_key
 from app.mcp.normalizers import (
     normalize_analysis_response,
     normalize_analysis_start_response,
@@ -46,13 +46,12 @@ mcp_app = _resolve_asgi_app(mcp_server)
 
 @mcp_server.tool()
 async def analysis_start(
-    ctx: Any,
     days_back: int = 30,
     include_weekends: bool = True,
     integration_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Start a new burnout analysis."""
-    api_key = extract_api_key_header(ctx)
+    api_key = get_api_key()
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
 
@@ -80,9 +79,9 @@ async def analysis_start(
 
 
 @mcp_server.tool()
-async def analysis_status(ctx: Any, analysis_id: int) -> Dict[str, Any]:
+async def analysis_status(analysis_id: int) -> Dict[str, Any]:
     """Get the status of an analysis."""
-    api_key = extract_api_key_header(ctx)
+    api_key = get_api_key()
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
 
@@ -96,9 +95,9 @@ async def analysis_status(ctx: Any, analysis_id: int) -> Dict[str, Any]:
 
 
 @mcp_server.tool()
-async def analysis_results(ctx: Any, analysis_id: int) -> Dict[str, Any]:
+async def analysis_results(analysis_id: int) -> Dict[str, Any]:
     """Get full results for a completed analysis."""
-    api_key = extract_api_key_header(ctx)
+    api_key = get_api_key()
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
 
@@ -115,9 +114,9 @@ async def analysis_results(ctx: Any, analysis_id: int) -> Dict[str, Any]:
 
 
 @mcp_server.tool()
-async def analysis_current(ctx: Any) -> Dict[str, Any]:
+async def analysis_current() -> Dict[str, Any]:
     """Get the most recent analysis for the current user."""
-    api_key = extract_api_key_header(ctx)
+    api_key = get_api_key()
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
 
@@ -132,9 +131,9 @@ async def analysis_current(ctx: Any) -> Dict[str, Any]:
 
 
 @mcp_server.tool()
-async def integrations_list(ctx: Any) -> Dict[str, Any]:
+async def integrations_list() -> Dict[str, Any]:
     """List connected integrations for the current user."""
-    api_key = extract_api_key_header(ctx)
+    api_key = get_api_key()
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
 
