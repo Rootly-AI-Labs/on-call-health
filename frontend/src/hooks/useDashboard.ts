@@ -437,32 +437,58 @@ export default function useDashboard() {
     const savedStartTime = localStorage.getItem('running_analysis_start')
 
     if (savedAnalysisId && savedStartTime) {
-      const elapsedMs = Date.now() - parseInt(savedStartTime)
+      // Validate saved values
+      const startTime = parseInt(savedStartTime)
+      const analysisId = parseInt(savedAnalysisId)
+
+      if (isNaN(startTime) || isNaN(analysisId)) {
+        clearRunningAnalysisState()
+        return
+      }
+
+      const elapsedMs = Date.now() - startTime
       const maxAnalysisTime = 30 * 60 * 1000 // 30 minutes max
 
       // If less than 30 minutes elapsed, assume analysis might still be running
       if (elapsedMs < maxAnalysisTime) {
         setAnalysisRunning(true)
-        setCurrentRunningAnalysisId(parseInt(savedAnalysisId))
+        setCurrentRunningAnalysisId(analysisId)
         setAnalysisStage("loading")
         setAnalysisProgress(50) // Show mid-progress since we don't know exact state
         toast.info("Analysis still running...")
 
+        // Polling state
+        let pollCount = 0
+        const maxPollAttempts = 360 // 30 minutes at 5s intervals
+        let errorCount = 0
+        const maxErrors = 3
+        let timeoutId: NodeJS.Timeout | null = null
+
         // Start polling this analysis
         const pollAnalysis = async () => {
           try {
+            pollCount++
+
+            // Stop polling after max attempts
+            if (pollCount > maxPollAttempts) {
+              clearRunningAnalysisState()
+              toast.warning("Analysis is taking longer than expected. Please check back later.")
+              return
+            }
+
             const authToken = getValidToken()
             if (!authToken) {
               clearRunningAnalysisState()
               return
             }
 
-            const pollResponse = await fetch(`${API_BASE}/analyses/${savedAnalysisId}`, {
+            const pollResponse = await fetch(`${API_BASE}/analyses/${analysisId}`, {
               headers: { 'Authorization': `Bearer ${authToken}` }
             })
 
             if (pollResponse.ok) {
               const analysisData = await pollResponse.json()
+              errorCount = 0 // Reset error count on success
 
               if (analysisData.status === 'completed') {
                 clearRunningAnalysisState()
@@ -471,22 +497,42 @@ export default function useDashboard() {
                 toast.success("Analysis completed!")
               } else if (analysisData.status === 'running' || analysisData.status === 'pending') {
                 // Continue polling
-                setTimeout(pollAnalysis, 5000)
+                timeoutId = setTimeout(pollAnalysis, 5000)
               } else if (analysisData.status === 'failed') {
                 clearRunningAnalysisState()
                 toast.error("Analysis failed")
               }
-            } else {
-              // Analysis not found or error
+            } else if (pollResponse.status === 404) {
+              // Analysis not found
               clearRunningAnalysisState()
+              toast.error("Analysis no longer exists")
+            } else {
+              // Other HTTP errors - retry with backoff
+              throw new Error(`HTTP ${pollResponse.status}`)
             }
           } catch (error) {
             console.error('Error polling restored analysis:', error)
-            clearRunningAnalysisState()
+            errorCount++
+
+            if (errorCount >= maxErrors) {
+              clearRunningAnalysisState()
+              toast.error("Unable to check analysis status. Please refresh the page.")
+            } else {
+              // Retry with exponential backoff
+              const backoffMs = 5000 * Math.pow(2, errorCount - 1)
+              timeoutId = setTimeout(pollAnalysis, backoffMs)
+            }
           }
         }
 
         pollAnalysis()
+
+        // Cleanup on unmount
+        return () => {
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+          }
+        }
       } else {
         // Too much time has passed, clear stale state
         clearRunningAnalysisState()
