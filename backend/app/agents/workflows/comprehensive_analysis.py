@@ -4,7 +4,7 @@ Comprehensive Burnout Analysis Workflow
 Orchestrates multi-step analysis using smolagents for team-wide burnout detection.
 """
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import asyncio
 
@@ -55,8 +55,8 @@ class ComprehensiveBurnoutWorkflow:
         self.logger.info(f"Starting comprehensive workflow for {len(team_data)} team members")
         
         workflow_results = {
-            "workflow_id": f"workflow_{datetime.utcnow().isoformat()}",
-            "analysis_timestamp": datetime.utcnow().isoformat(),
+            "workflow_id": f"workflow_{datetime.now(timezone.utc).isoformat()}",
+            "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
             "team_size": len(team_data),
             "data_sources": available_data_sources,
             "phases": {}

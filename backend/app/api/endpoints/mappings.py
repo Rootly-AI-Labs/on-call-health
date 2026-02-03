@@ -4,7 +4,7 @@ API endpoints for integration mapping data.
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -433,7 +433,7 @@ async def get_github_api_health(
         health_status = github_api_manager.get_health_status()
         
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "github_api_health": health_status,
             "recommendations": _generate_health_recommendations(health_status)
         }
@@ -453,7 +453,7 @@ async def get_github_cache_stats(
         cache_stats = mapping_service.get_cache_statistics(current_user.id)
         
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "cache_statistics": cache_stats,
             "performance_insights": _generate_cache_insights(cache_stats)
         }
