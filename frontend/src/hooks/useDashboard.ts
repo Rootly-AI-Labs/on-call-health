@@ -56,10 +56,12 @@ export default function useDashboard() {
   const [trendsCache, setTrendsCache] = useState<Map<string, any>>(new Map())
   const [githubTimelineCache, setGithubTimelineCache] = useState<Map<string, any>>(new Map())
 
-  // Debug function to inspect cache (accessible in browser console)
+  // Debug function to inspect cache (accessible in browser console) - only in development
   useEffect(() => {
-    (window as any).debugAnalysisCache = () => {
-      return { analysisCache, trendsCache, githubTimelineCache }
+    if (process.env.NODE_ENV === 'development') {
+      (window as any).debugAnalysisCache = () => {
+        return { analysisCache, trendsCache, githubTimelineCache }
+      }
     }
   }, [analysisCache, trendsCache, githubTimelineCache])
 
@@ -123,6 +125,13 @@ export default function useDashboard() {
     router.push(`/dashboard?${params.toString()}`, { scroll: false })
   }
 
+  // Helper function to clear running analysis state
+  const clearRunningAnalysisState = () => {
+    setAnalysisRunning(false)
+    setCurrentRunningAnalysisId(null)
+    localStorage.removeItem('running_analysis_id')
+    localStorage.removeItem('running_analysis_start')
+  }
 
   const cancelRunningAnalysis = async () => {
     try {
@@ -153,8 +162,7 @@ export default function useDashboard() {
       toast.error("Error canceling analysis")
     } finally {
       // Reset all analysis state
-      setAnalysisRunning(false)
-      setCurrentRunningAnalysisId(null)
+      clearRunningAnalysisState()
       setAnalysisProgress(0)
       setAnalysisStage("loading")
       setCurrentStageIndex(0)
@@ -424,6 +432,128 @@ export default function useDashboard() {
       }
     }
   }, [previousAnalyses, redirectingToSuggested])
+
+  // Restore running analysis state on mount (if user navigated away during analysis)
+  useEffect(() => {
+    const savedAnalysisId = localStorage.getItem('running_analysis_id')
+    const savedStartTime = localStorage.getItem('running_analysis_start')
+
+    if (savedAnalysisId && savedStartTime) {
+      // Validate saved values with explicit radix
+      // Note: currentRunningAnalysisId is typed as number | null
+      // Backend only returns numeric IDs for running analyses
+      const startTime = parseInt(savedStartTime, 10)
+      const analysisId = parseInt(savedAnalysisId, 10)
+
+      if (isNaN(startTime) || isNaN(analysisId)) {
+        // Invalid or corrupted data
+        clearRunningAnalysisState()
+        return
+      }
+
+      const elapsedMs = Date.now() - startTime
+      const maxAnalysisTime = 30 * 60 * 1000 // 30 minutes max
+
+      // If less than 30 minutes elapsed, assume analysis might still be running
+      if (elapsedMs < maxAnalysisTime) {
+        setAnalysisRunning(true)
+        setCurrentRunningAnalysisId(analysisId)
+        setAnalysisStage("loading")
+        setAnalysisProgress(50) // Show mid-progress since we don't know exact state
+        toast.info("Analysis still running...")
+
+        // Polling state
+        let pollCount = 0
+        const maxPollAttempts = 360 // 30 minutes at 5s intervals
+        let errorCount = 0
+        const maxErrors = 3
+        let timeoutIdRef: NodeJS.Timeout | null = null
+
+        // Start polling this analysis
+        const pollAnalysis = async () => {
+          try {
+            pollCount++
+
+            // Stop polling after max attempts
+            if (pollCount > maxPollAttempts) {
+              clearRunningAnalysisState()
+              toast.warning("Analysis is taking longer than expected. Please check back later.")
+              return
+            }
+
+            const authToken = getValidToken()
+            if (!authToken) {
+              clearRunningAnalysisState()
+              return
+            }
+
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+
+            try {
+              const pollResponse = await fetch(`${API_BASE}/analyses/${analysisId}`, {
+                headers: { 'Authorization': `Bearer ${authToken}` },
+                signal: controller.signal
+              })
+              clearTimeout(timeoutId)
+
+              if (pollResponse.ok) {
+                const analysisData = await pollResponse.json()
+                errorCount = 0 // Reset error count on success
+
+                if (analysisData.status === 'completed') {
+                  clearRunningAnalysisState()
+                  setCurrentAnalysis(analysisData)
+                  updateURLWithAnalysis(analysisData.uuid || analysisData.id)
+                  toast.success("Analysis completed!")
+                } else if (analysisData.status === 'running' || analysisData.status === 'pending') {
+                  // Continue polling
+                  timeoutIdRef = setTimeout(pollAnalysis, 5000)
+                } else if (analysisData.status === 'failed') {
+                  clearRunningAnalysisState()
+                  toast.error("Analysis failed")
+                }
+              } else if (pollResponse.status === 404) {
+                // Analysis not found
+                clearRunningAnalysisState()
+                toast.error("Analysis no longer exists")
+              } else {
+                // Other HTTP errors - retry with backoff
+                throw new Error(`HTTP ${pollResponse.status}`)
+              }
+            } catch (fetchError) {
+              clearTimeout(timeoutId)
+              throw fetchError
+            }
+          } catch (error) {
+            console.error('Error polling restored analysis:', error)
+            errorCount++
+
+            if (errorCount >= maxErrors) {
+              clearRunningAnalysisState()
+              toast.error("Unable to check analysis status. Please refresh the page.")
+            } else {
+              // Retry with exponential backoff
+              const backoffMs = 5000 * Math.pow(2, errorCount - 1)
+              timeoutIdRef = setTimeout(pollAnalysis, backoffMs)
+            }
+          }
+        }
+
+        pollAnalysis()
+
+        // Cleanup on unmount
+        return () => {
+          if (timeoutIdRef) {
+            clearTimeout(timeoutIdRef)
+          }
+        }
+      } else {
+        // Too much time has passed, clear stale state
+        clearRunningAnalysisState()
+      }
+    }
+  }, []) // Run only once on mount
 
   // Load specific analysis from URL - with delay to ensure auth token is available
   useEffect(() => {
@@ -1641,10 +1771,14 @@ export default function useDashboard() {
 
       const { id: analysis_id } = responseData
       setCurrentRunningAnalysisId(analysis_id)
-      
+
       if (!analysis_id) {
         throw new Error('No analysis ID returned from server')
       }
+
+      // Persist running analysis state to survive navigation
+      localStorage.setItem('running_analysis_id', analysis_id.toString())
+      localStorage.setItem('running_analysis_start', Date.now().toString())
 
 
       // Refresh the analyses list to show the new running analysis in sidebar
@@ -1663,19 +1797,33 @@ export default function useDashboard() {
         try {
           if (!analysis_id) {
             setAnalysisRunning(false)
-      setCurrentRunningAnalysisId(null)
             setCurrentRunningAnalysisId(null)
             return
           }
-          
+
+          // Refresh token on each poll to handle long-running analyses
+          const currentAuthToken = getValidToken()
+          if (!currentAuthToken) {
+            clearRunningAnalysisState()
+            toast.error('Session expired. Please log in again.')
+            router.push('/auth/login')
+            return
+          }
+
+          const controller = new AbortController()
+          const fetchTimeout = setTimeout(() => controller.abort(), 10000) // 10s timeout
+
           let pollResponse
           try {
             pollResponse = await fetch(`${API_BASE}/analyses/${analysis_id}`, {
               headers: {
-                'Authorization': `Bearer ${authToken}`
-              }
+                'Authorization': `Bearer ${currentAuthToken}`
+              },
+              signal: controller.signal
             })
+            clearTimeout(fetchTimeout)
           } catch (networkError) {
+            clearTimeout(fetchTimeout)
             // Network error (including CORS errors from 502) - retry with backoff
             pollRetryCount++
 
@@ -1735,10 +1883,7 @@ export default function useDashboard() {
               setTimeout(() => {
                 setTargetProgress(100)
                 setTimeout(() => {
-                  setAnalysisRunning(false)
-      setCurrentRunningAnalysisId(null)
-            setCurrentRunningAnalysisId(null)
-                  setCurrentRunningAnalysisId(null)
+                  clearRunningAnalysisState()
                   setCurrentAnalysis(analysisData)
                   setRedirectingToSuggested(false) // Turn off redirect loader
                   updateURLWithAnalysis(analysisData.uuid || analysisData.id)
@@ -1752,9 +1897,8 @@ export default function useDashboard() {
               return
             } else if (analysisData.status === 'failed') {
               setAnalysisRunning(false)
-      setCurrentRunningAnalysisId(null)
-            setCurrentRunningAnalysisId(null)
-              
+              setCurrentRunningAnalysisId(null)
+
               // Check if we have partial data to display
               if (analysisData.analysis_data?.partial_data) {
                 setCurrentAnalysis(analysisData)
@@ -1852,9 +1996,7 @@ export default function useDashboard() {
           pollRetryCount++
           
           if (pollRetryCount >= maxRetries) {
-            setAnalysisRunning(false)
-      setCurrentRunningAnalysisId(null)
-            setCurrentRunningAnalysisId(null)
+            clearRunningAnalysisState()
             toast.error("Analysis polling failed - please try again")
             return
           }
