@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from app.mcp.auth import extract_api_key_header
+from app.mcp.auth_helpers import extract_api_key_header
 from app.mcp.client import NotFoundError, OnCallHealthClient
 from app.mcp.normalizers import (
     normalize_analysis_response,

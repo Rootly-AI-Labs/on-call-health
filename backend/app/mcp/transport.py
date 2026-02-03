@@ -73,15 +73,24 @@ cors_middleware = Middleware(
     allow_credentials=True,
 )
 
-# Import infrastructure middleware for connection/rate limiting
-from app.mcp.infrastructure import MCPInfrastructureMiddleware
-
-infrastructure_middleware = Middleware(MCPInfrastructureMiddleware)
-
 if TYPE_CHECKING:
     from starlette.requests import Request
 
 logger = logging.getLogger(__name__)
+
+# Infrastructure middleware for connection/rate limiting
+# Only available when running with full backend (database access required)
+# Standalone Docker deployments skip this middleware
+infrastructure_middleware = None
+try:
+    from app.mcp.infrastructure import MCPInfrastructureMiddleware
+    infrastructure_middleware = Middleware(MCPInfrastructureMiddleware)
+    logger.info("MCP infrastructure middleware enabled (database available)")
+except ImportError:
+    logger.warning(
+        "MCP infrastructure middleware disabled (standalone mode - "
+        "connection/rate limiting requires database)"
+    )
 
 
 async def health_check(request: "Request") -> JSONResponse:
@@ -138,12 +147,18 @@ def _create_mcp_http_app() -> Starlette:
     # Add routes from SSE transport (provides /sse and /messages)
     routes.extend(sse_transport.routes)
 
-    # Infrastructure middleware runs first (connection/rate limits),
+    # Build middleware list
+    # Infrastructure middleware runs first (connection/rate limits) if available,
     # then CORS middleware handles preflight and response headers
+    middleware_list = []
+    if infrastructure_middleware is not None:
+        middleware_list.append(infrastructure_middleware)
+    middleware_list.append(cors_middleware)
+
     app = Starlette(
         routes=routes,
         lifespan=lifespan,
-        middleware=[infrastructure_middleware, cors_middleware],
+        middleware=middleware_list,
     )
 
     logger.info(
