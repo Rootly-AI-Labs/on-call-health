@@ -2,13 +2,10 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import logging
 import os
 import sys
 from typing import NoReturn
-
-from oncallhealth_mcp.server import mcp_server
 
 
 def parse_args() -> argparse.Namespace:
@@ -76,6 +73,9 @@ def main() -> NoReturn:
     args = parse_args()
     setup_logging(args.verbose)
     validate_config()
+
+    # Import server lazily to avoid import errors before validation
+    from oncallhealth_mcp.server import mcp_server
 
     logger = logging.getLogger(__name__)
     logger.info(f"Starting On-Call Health MCP server (transport={args.transport})")
