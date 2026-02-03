@@ -331,12 +331,9 @@ export function UnifiedSlackCard({
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="space-y-2 text-sm">
-                  <p className="font-semibold text-amber-900">⚠️ Workspace Admin/Owner Required</p>
+                  <p className="font-semibold text-amber-900">⚠️ Admin Approval May Be Required</p>
                   <p className="text-amber-800">
-                    This app requests sensitive permissions (reading channel history, slash commands) that <strong>typically require approval from a Workspace Owner or Admin</strong> to install.
-                  </p>
-                  <p className="text-amber-700 text-xs mt-2">
-                    If you're not an admin, clicking "Add to Slack" will send an approval request to your workspace admins.
+                    If you're not a Workspace Admin, clicking "Add to Slack" will send an approval request to your admins.
                   </p>
                   <div className="mt-3 pt-3 border-t border-amber-300">
                     <p className="text-amber-900 font-medium mb-2">Required permissions:</p>
@@ -397,10 +394,6 @@ export function UnifiedSlackCard({
                   </div>
                 </div>
               )}
-
-              <div className="text-xs text-neutral-500 text-center">
-                <p>Both features will be enabled by default. You can toggle them on/off after connecting.</p>
-              </div>
             </div>
           </>
         ) : (
