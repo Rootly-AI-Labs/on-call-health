@@ -19,6 +19,10 @@ argon2-cffi==25.1.0  # Argon2id hashing for API key verification
 httpx
 aiohttp
 
+# Resilience patterns for HTTP client
+tenacity>=9.0.0
+aiobreaker>=1.2.0
+
 # Rate limiting and security
 slowapi
 redis
