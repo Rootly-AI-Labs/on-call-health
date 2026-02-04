@@ -124,7 +124,10 @@ class JiraUserSyncService:
                 users_page = response.json()
 
                 if not users_page:
+                    logger.debug(f"[Jira] Empty page returned at startAt={start_at}")
                     break
+
+                logger.debug(f"[Jira] Processing {len(users_page)} users from page at startAt={start_at}")
 
                 # Extract relevant user data - only real users with accountId and displayName
                 for user in users_page:

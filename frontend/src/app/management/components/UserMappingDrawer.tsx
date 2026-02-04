@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { toast } from "sonner"
 import { Pencil, Check, Loader2, X } from "lucide-react"
 import {
@@ -89,8 +90,13 @@ export function UserMappingDrawer({
     setLoadingOptions(true)
     try {
       const users = await fetchJiraUsers(selectedOrganization)
+      console.log("[UserMappingDrawer] Jira users loaded:", users.length, "users")
+      users.forEach((user, index) => {
+        console.log(`[UserMappingDrawer] User ${index + 1}:`, user)
+      })
       setJiraUsers(users)
     } catch (error) {
+      console.error("[UserMappingDrawer] Error loading Jira users:", error)
       toast.error("Failed to load Jira users")
     } finally {
       setLoadingOptions(false)
@@ -109,7 +115,11 @@ export function UserMappingDrawer({
     }
   }
 
-  const handleSelectMapping = async (integration: IntegrationType, value: string) => {
+  const handleSelectMapping = async (
+    integration: IntegrationType,
+    value: string,
+    additionalData?: { email?: string }
+  ) => {
     if (!user) return
 
     setSaving(true)
@@ -119,6 +129,9 @@ export function UserMappingDrawer({
         updates.github_username = value
       } else if (integration === "jira") {
         updates.jira_account_id = value
+        if (additionalData?.email) {
+          updates.jira_email = additionalData.email
+        }
       } else if (integration === "linear") {
         updates.linear_user_id = value
       }
@@ -175,7 +188,7 @@ export function UserMappingDrawer({
   const filterJiraOptions = (query: string) => {
     if (!query) return jiraUsers
     return jiraUsers.filter((jiraUser) => {
-      const displayName = jiraUser.displayName || jiraUser.email || ""
+      const displayName = jiraUser.display_name || jiraUser.email || ""
       return displayName.toLowerCase().includes(query.toLowerCase())
     })
   }
@@ -252,30 +265,32 @@ export function UserMappingDrawer({
                     <Loader2 className="w-5 h-5 animate-spin text-neutral-500" />
                   </div>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto space-y-1">
-                    <button
-                      onClick={() => handleClearMapping("github")}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded italic text-neutral-500"
-                      disabled={saving}
-                    >
-                      Clear mapping
-                    </button>
-                    {filterGithubOptions(searchQuery).map((username) => (
+                  <div className="border-t pt-2">
+                    <div className="max-h-96 overflow-y-auto space-y-1">
                       <button
-                        key={username}
-                        onClick={() => handleSelectMapping("github", username)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded flex items-center justify-between"
+                        onClick={() => handleClearMapping("github")}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded italic text-neutral-500"
                         disabled={saving}
                       >
-                        <span>{username}</span>
-                        {user.github_username === username && (
-                          <Check className="w-4 h-4 text-green-600" />
-                        )}
+                        Clear mapping
                       </button>
-                    ))}
-                    {filterGithubOptions(searchQuery).length === 0 && (
-                      <p className="text-sm text-neutral-400 py-2 px-3">No users found</p>
-                    )}
+                      {filterGithubOptions(searchQuery).map((username) => (
+                        <button
+                          key={username}
+                          onClick={() => handleSelectMapping("github", username)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded flex items-center justify-between"
+                          disabled={saving}
+                        >
+                          <span>{username}</span>
+                          {user.github_username === username && (
+                            <Check className="w-4 h-4 text-green-600" />
+                          )}
+                        </button>
+                      ))}
+                      {filterGithubOptions(searchQuery).length === 0 && (
+                        <p className="text-sm text-neutral-400 py-2 px-3">No users found</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -333,30 +348,36 @@ export function UserMappingDrawer({
                     <Loader2 className="w-5 h-5 animate-spin text-neutral-500" />
                   </div>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto space-y-1">
-                    <button
-                      onClick={() => handleClearMapping("jira")}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded italic text-neutral-500"
-                      disabled={saving}
-                    >
-                      Clear mapping
-                    </button>
-                    {filterJiraOptions(searchQuery).map((jiraUser) => (
+                  <div className="border-t pt-2">
+                    <div className="max-h-96 overflow-y-auto space-y-1">
                       <button
-                        key={jiraUser.accountId}
-                        onClick={() => handleSelectMapping("jira", jiraUser.accountId)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded flex items-center justify-between"
+                        onClick={() => handleClearMapping("jira")}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded italic text-neutral-500"
                         disabled={saving}
                       >
-                        <span>{jiraUser.displayName || jiraUser.email}</span>
-                        {user.jira_account_id === jiraUser.accountId && (
-                          <Check className="w-4 h-4 text-green-600" />
-                        )}
+                        Clear mapping
                       </button>
-                    ))}
-                    {filterJiraOptions(searchQuery).length === 0 && (
-                      <p className="text-sm text-neutral-400 py-2 px-3">No users found</p>
-                    )}
+                      {filterJiraOptions(searchQuery).map((jiraUser, index) => (
+                        <button
+                          key={jiraUser.account_id || `jira-${index}`}
+                          onClick={() =>
+                            handleSelectMapping("jira", jiraUser.account_id, {
+                              email: jiraUser.email,
+                            })
+                          }
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded flex items-center justify-between"
+                          disabled={saving}
+                        >
+                          <span>{jiraUser.display_name || jiraUser.email}</span>
+                          {user.jira_account_id === jiraUser.account_id && (
+                            <Check className="w-4 h-4 text-green-600" />
+                          )}
+                        </button>
+                      ))}
+                      {filterJiraOptions(searchQuery).length === 0 && (
+                        <p className="text-sm text-neutral-400 py-2 px-3">No users found</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -368,9 +389,7 @@ export function UserMappingDrawer({
             <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-purple-600" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M2.5 1.5v21h21v-21h-21zm19.5 19.5h-18v-18h18v18zm-16-2h14v-2h-14v2zm0-4h14v-2h-14v2zm0-4h14v-2h-14v2zm0-4h14v-2h-14v2z"/>
-                  </svg>
+                  <Image src="/images/linear-logo.png" alt="Linear" width={24} height={24} />
                 </div>
                 <div>
                   <p className="text-sm font-medium">Linear</p>
@@ -414,30 +433,32 @@ export function UserMappingDrawer({
                     <Loader2 className="w-5 h-5 animate-spin text-neutral-500" />
                   </div>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto space-y-1">
-                    <button
-                      onClick={() => handleClearMapping("linear")}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded italic text-neutral-500"
-                      disabled={saving}
-                    >
-                      Clear mapping
-                    </button>
-                    {filterLinearOptions(searchQuery).map((linearUser) => (
+                  <div className="border-t pt-2">
+                    <div className="max-h-96 overflow-y-auto space-y-1">
                       <button
-                        key={linearUser.id}
-                        onClick={() => handleSelectMapping("linear", linearUser.id)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded flex items-center justify-between"
+                        onClick={() => handleClearMapping("linear")}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded italic text-neutral-500"
                         disabled={saving}
                       >
-                        <span>{linearUser.name || linearUser.email}</span>
-                        {user.linear_user_id === linearUser.id && (
-                          <Check className="w-4 h-4 text-green-600" />
-                        )}
+                        Clear mapping
                       </button>
-                    ))}
-                    {filterLinearOptions(searchQuery).length === 0 && (
-                      <p className="text-sm text-neutral-400 py-2 px-3">No users found</p>
-                    )}
+                      {filterLinearOptions(searchQuery).map((linearUser) => (
+                        <button
+                          key={linearUser.id}
+                          onClick={() => handleSelectMapping("linear", linearUser.id)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded flex items-center justify-between"
+                          disabled={saving}
+                        >
+                          <span>{linearUser.name || linearUser.email}</span>
+                          {user.linear_user_id === linearUser.id && (
+                            <Check className="w-4 h-4 text-green-600" />
+                          )}
+                        </button>
+                      ))}
+                      {filterLinearOptions(searchQuery).length === 0 && (
+                        <p className="text-sm text-neutral-400 py-2 px-3">No users found</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

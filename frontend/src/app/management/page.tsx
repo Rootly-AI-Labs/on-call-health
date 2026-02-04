@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, Suspense } from "react"
+import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { TopPanel } from "@/components/TopPanel"
 import { toast } from "sonner"
@@ -559,9 +560,7 @@ function TeamPageContent() {
                                           </svg>
                                         )}
                                         {integration === 'linear' && (
-                                          <svg className="w-5 h-5 text-purple-600" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M2.5 1.5v21h21v-21h-21zm19.5 19.5h-18v-18h18v18zm-16-2h14v-2h-14v2zm0-4h14v-2h-14v2zm0-4h14v-2h-14v2zm0-4h14v-2h-14v2z"/>
-                                          </svg>
+                                          <Image src="/images/linear-logo.png" alt="Linear" width={20} height={20} />
                                         )}
                                       </div>
                                     ))

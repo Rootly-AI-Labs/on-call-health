@@ -9,6 +9,7 @@ export async function updateUserCorrelation(
   updates: {
     github_username?: string
     jira_account_id?: string
+    jira_email?: string
     linear_user_id?: string
   }
 ): Promise<boolean> {
@@ -19,25 +20,63 @@ export async function updateUserCorrelation(
   }
 
   try {
-    const response = await fetch(
-      `${API_BASE}/rootly/user-correlation/${userId}`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updates),
-      }
-    )
+    // Update each integration field with separate PATCH requests
+    const promises: Promise<Response>[] = []
 
-    if (response.ok) {
-      return true
-    } else {
-      const error = await response.json()
-      toast.error(error.detail || "Failed to update mappings")
-      return false
+    if (updates.github_username !== undefined) {
+      promises.push(
+        fetch(
+          `${API_BASE}/rootly/user-correlation/${userId}/github-username?github_username=${encodeURIComponent(updates.github_username)}`,
+          {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${authToken}` },
+          }
+        )
+      )
     }
+
+    if (updates.jira_account_id !== undefined) {
+      const params = new URLSearchParams()
+      params.append("jira_account_id", updates.jira_account_id)
+      if (updates.jira_email) {
+        params.append("jira_email", updates.jira_email)
+      }
+      promises.push(
+        fetch(
+          `${API_BASE}/rootly/user-correlation/${userId}/jira-mapping?${params}`,
+          {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${authToken}` },
+          }
+        )
+      )
+    }
+
+    if (updates.linear_user_id !== undefined) {
+      promises.push(
+        fetch(
+          `${API_BASE}/rootly/user-correlation/${userId}/linear-mapping?linear_user_id=${encodeURIComponent(updates.linear_user_id)}`,
+          {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${authToken}` },
+          }
+        )
+      )
+    }
+
+    // Wait for all requests to complete
+    const responses = await Promise.all(promises)
+
+    // Check if all responses are OK
+    for (const response of responses) {
+      if (!response.ok) {
+        const error = await response.json()
+        toast.error(error.detail || "Failed to update mappings")
+        return false
+      }
+    }
+
+    return true
   } catch (error) {
     console.error("Error updating user correlation:", error)
     toast.error("Error updating mappings")
@@ -56,7 +95,7 @@ export async function fetchGithubUsers(
 
   try {
     const response = await fetch(
-      `${API_BASE}/rootly/integrations/${organizationId}/github-members`,
+      `${API_BASE}/integrations/github/org-members`,
       {
         headers: { Authorization: `Bearer ${authToken}` },
       }
@@ -84,7 +123,7 @@ export async function fetchJiraUsers(
 
   try {
     const response = await fetch(
-      `${API_BASE}/rootly/integrations/${integrationId}/jira-users`,
+      `${API_BASE}/integrations/jira/jira-users`,
       {
         headers: { Authorization: `Bearer ${authToken}` },
       }
@@ -92,8 +131,16 @@ export async function fetchJiraUsers(
 
     if (response.ok) {
       const data = await response.json()
+      console.log("[Jira Users] API Response:", data)
+      console.log("[Jira Users] Number of users:", data.users?.length || 0)
+      if (data.users?.length) {
+        data.users.forEach((user: any, index: number) => {
+          console.log(`[Jira Users] User ${index + 1}:`, user.display_name, `(${user.account_id})`)
+        })
+      }
       return data.users || []
     }
+    console.error("[Jira Users] API returned non-OK status:", response.status)
     return []
   } catch (error) {
     console.error("Error fetching Jira users:", error)
@@ -112,7 +159,7 @@ export async function fetchLinearUsers(
 
   try {
     const response = await fetch(
-      `${API_BASE}/rootly/integrations/${integrationId}/linear-users`,
+      `${API_BASE}/integrations/linear/linear-users`,
       {
         headers: { Authorization: `Bearer ${authToken}` },
       }
