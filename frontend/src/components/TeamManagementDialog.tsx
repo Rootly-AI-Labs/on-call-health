@@ -15,16 +15,23 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
   const [isInviting, setIsInviting] = useState(false)
   const [orgMembers, setOrgMembers] = useState([])
   const [pendingInvitations, setPendingInvitations] = useState([])
+  const [receivedInvitations, setReceivedInvitations] = useState([])
   const [loadingOrgData, setLoadingOrgData] = useState(false)
-  const [userInfo, setUserInfo] = useState<{ name: string; email: string; role: string } | null>(null)
+  const [userInfo, setUserInfo] = useState<{ name: string; email: string; role: string; organization_id?: number } | null>(null)
 
   // Load user info from localStorage
   useEffect(() => {
     const userName = localStorage.getItem("user_name")
     const userEmail = localStorage.getItem("user_email")
     const userRole = localStorage.getItem("user_role")
+    const orgId = localStorage.getItem("user_organization_id")
     if (userName && userEmail) {
-      setUserInfo({ name: userName, email: userEmail, role: userRole || "member" })
+      setUserInfo({
+        name: userName,
+        email: userEmail,
+        role: userRole || "member",
+        organization_id: orgId ? parseInt(orgId, 10) : undefined
+      })
     }
   }, [])
 
@@ -58,7 +65,17 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
       )
       if (invitationsResponse.ok) {
         const invitationsData = await invitationsResponse.json()
-        setPendingInvitations(invitationsData)
+        setPendingInvitations(invitationsData.invitations || [])
+      }
+
+      // Fetch invitations received by current user
+      const myInvitationsResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/invitations/my-invitations`,
+        { headers }
+      )
+      if (myInvitationsResponse.ok) {
+        const myInvitationsData = await myInvitationsResponse.json()
+        setReceivedInvitations(myInvitationsData.invitations || [])
       }
     } catch (error) {
       console.error("Error fetching organization data:", error)
@@ -155,8 +172,10 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
       loadingOrgData={loadingOrgData}
       orgMembers={orgMembers}
       pendingInvitations={pendingInvitations}
+      receivedInvitations={receivedInvitations}
       userInfo={userInfo}
       onRoleChange={handleRoleChange}
+      onRefreshOrgData={fetchOrganizationData}
       onClose={handleClose}
     />
   )
