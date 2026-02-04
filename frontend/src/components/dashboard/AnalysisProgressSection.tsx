@@ -58,7 +58,7 @@ export function AnalysisProgressSection({
                 <div className="w-full h-4 bg-neutral-200 rounded-full border border-neutral-300 overflow-hidden">
                   <div
                     className="h-full bg-purple-700 rounded-full transition-all duration-1000 ease-out relative"
-                    style={{ width: `${analysisProgress}%` }}
+                    style={{ width: `${analysisProgress < 0 ? 0 : analysisProgress}%` }}
                   >
                   </div>
                 </div>
@@ -71,7 +71,7 @@ export function AnalysisProgressSection({
                 <div className="w-2 h-2 bg-purple-700 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                 <div className="w-2 h-2 bg-purple-700 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
-              {analysisProgress > 0 && (
+              {analysisProgress >= 0 && (
                 <p className="text-lg font-semibold text-neutral-900">
                   {Math.round(analysisProgress)}% complete
                 </p>

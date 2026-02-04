@@ -459,7 +459,7 @@ export default function useDashboard() {
         setAnalysisRunning(true)
         setCurrentRunningAnalysisId(analysisId)
         setAnalysisStage("loading")
-        setAnalysisProgress(0) // Use 0 to show indeterminate progress (we don't know actual state)
+        setAnalysisProgress(-1) // Use -1 to show indeterminate progress (navigated away, unknown state)
         toast.info("Analysis still running...")
 
         // Polling state
