@@ -123,7 +123,7 @@ export function TopPanel() {
                     : "text-neutral-700 hover:text-white hover:bg-purple-800"
                 }`}
               >
-                Team
+                Team Members
               </Link>
             </nav>
           </div>
