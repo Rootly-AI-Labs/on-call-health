@@ -253,25 +253,10 @@ async def accept_invitation_page(
 
     # Process acceptance
     try:
-        # If switching organizations, clean up org-specific tokens for security
+        # User keeps all their data (analyses, integrations) when switching orgs
+        # All integrations are user-level accounts, not org-specific
         if leaving_org:
-            from ...models.rootly_integration import RootlyIntegration
-
-            # Delete old integrations (API tokens were for old org's systems)
-            # User keeps their analyses as historical data
-            old_integrations_count = db.query(RootlyIntegration).filter(
-                RootlyIntegration.user_id == current_user.id
-            ).count()
-
-            db.query(RootlyIntegration).filter(
-                RootlyIntegration.user_id == current_user.id
-            ).delete(synchronize_session=False)
-
-            # Note: Analyses are kept - they're historical data the user created
-            # Note: GitHub/Slack/Jira integrations are user-level, not org-level
-            # They stay with the user when switching orgs
-
-            logger.info(f"User {current_user.id} switching orgs: deleted {old_integrations_count} Rootly/PagerDuty integrations, kept analyses")
+            logger.info(f"User {current_user.id} switching from org {leaving_org['id']} to {invitation.organization_id}, keeping all user data")
 
         # Update user's organization (will leave old org if switching)
         current_user.organization_id = invitation.organization_id
@@ -305,7 +290,7 @@ async def accept_invitation_page(
 
         message = f"Successfully joined {invitation.organization.name}!"
         if leaving_org:
-            message = f"You have left {leaving_org['name']} and joined {invitation.organization.name}. Your API tokens have been removed for security, but you can still view your old analyses."
+            message = f"You have left {leaving_org['name']} and joined {invitation.organization.name}"
 
         return {
             "success": True,
@@ -362,25 +347,10 @@ async def accept_invitation_api(
 
     # Process acceptance
     try:
-        # If switching organizations, clean up org-specific tokens for security
+        # User keeps all their data (analyses, integrations) when switching orgs
+        # All integrations are user-level accounts, not org-specific
         if leaving_org:
-            from ...models.rootly_integration import RootlyIntegration
-
-            # Delete old integrations (API tokens were for old org's systems)
-            # User keeps their analyses as historical data
-            old_integrations_count = db.query(RootlyIntegration).filter(
-                RootlyIntegration.user_id == current_user.id
-            ).count()
-
-            db.query(RootlyIntegration).filter(
-                RootlyIntegration.user_id == current_user.id
-            ).delete(synchronize_session=False)
-
-            # Note: Analyses are kept - they're historical data the user created
-            # Note: GitHub/Slack/Jira integrations are user-level, not org-level
-            # They stay with the user when switching orgs
-
-            logger.info(f"User {current_user.id} switching orgs: deleted {old_integrations_count} Rootly/PagerDuty integrations, kept analyses")
+            logger.info(f"User {current_user.id} switching from org {leaving_org['id']} to {invitation.organization_id}, keeping all user data")
 
         # Update user's organization (will leave old org if switching)
         current_user.organization_id = invitation.organization_id
@@ -402,7 +372,7 @@ async def accept_invitation_api(
 
         message = f"Successfully joined {invitation.organization.name}!"
         if leaving_org:
-            message = f"You have left {leaving_org['name']} and joined {invitation.organization.name}. Your API tokens have been removed for security, but you can still view your old analyses."
+            message = f"You have left {leaving_org['name']} and joined {invitation.organization.name}"
 
         return {
             "success": True,
