@@ -44,11 +44,11 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
 
   const fetchOrganizationData = async () => {
     setLoadingOrgData(true)
-    try {
-      const token = localStorage.getItem("auth_token")
-      const headers = { Authorization: `Bearer ${token}` }
+    const token = localStorage.getItem("auth_token")
+    const headers = { Authorization: `Bearer ${token}` }
 
-      // Fetch organization members
+    // Fetch organization members (may fail if not in org)
+    try {
       const membersResponse = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/auth/organizations/members`,
         { headers }
@@ -57,8 +57,12 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
         const membersData = await membersResponse.json()
         setOrgMembers(membersData)
       }
+    } catch (error) {
+      console.log("Could not load org members")
+    }
 
-      // Fetch pending invitations
+    // Fetch pending invitations (may fail if not admin)
+    try {
       const invitationsResponse = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/invitations/pending`,
         { headers }
@@ -67,8 +71,12 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
         const invitationsData = await invitationsResponse.json()
         setPendingInvitations(invitationsData.invitations || [])
       }
+    } catch (error) {
+      console.log("Could not load pending invitations")
+    }
 
-      // Fetch invitations received by current user
+    // Fetch invitations received by current user (should always work)
+    try {
       const myInvitationsResponse = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/invitations/my-invitations`,
         { headers }
@@ -78,11 +86,10 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
         setReceivedInvitations(myInvitationsData.invitations || [])
       }
     } catch (error) {
-      console.error("Error fetching organization data:", error)
-      toast.error("Failed to load team data")
-    } finally {
-      setLoadingOrgData(false)
+      console.error("Error fetching received invitations:", error)
     }
+
+    setLoadingOrgData(false)
   }
 
   const handleInvite = async () => {

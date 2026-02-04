@@ -126,8 +126,9 @@ export async function loadOrganizationData(
   if (!authToken) return
 
   setLoadingOrgData(true)
+
+  // Load organization members (may fail if not in org)
   try {
-    // Load organization members
     const membersResponse = await fetch(`${API_BASE}/api/invitations/organization/members`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
@@ -138,8 +139,12 @@ export async function loadOrganizationData(
       const membersData = await membersResponse.json()
       setOrgMembers(membersData.members || [])
     }
+  } catch (error) {
+    console.log('Could not load org members (user may not be in an org)')
+  }
 
-    // Load pending invitations (sent by org)
+  // Load pending invitations sent by org (may fail if not admin)
+  try {
     const invitationsResponse = await fetch(`${API_BASE}/api/invitations/pending`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
@@ -150,9 +155,13 @@ export async function loadOrganizationData(
       const invitationsData = await invitationsResponse.json()
       setPendingInvitations(invitationsData.invitations || [])
     }
+  } catch (error) {
+    console.log('Could not load pending invitations (user may not be admin)')
+  }
 
-    // Load invitations received by current user
-    if (setReceivedInvitations) {
+  // Load invitations received by current user (should always work)
+  if (setReceivedInvitations) {
+    try {
       const myInvitationsResponse = await fetch(`${API_BASE}/api/invitations/my-invitations`, {
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -163,11 +172,10 @@ export async function loadOrganizationData(
         const myInvitationsData = await myInvitationsResponse.json()
         setReceivedInvitations(myInvitationsData.invitations || [])
       }
+    } catch (error) {
+      console.error('Error fetching received invitations:', error)
     }
-
-  } catch (error) {
-    console.error('Failed to load organization data:', error)
-  } finally {
-    setLoadingOrgData(false)
   }
+
+  setLoadingOrgData(false)
 }
