@@ -119,14 +119,16 @@ export async function handleRoleChange(
 export async function loadOrganizationData(
   setLoadingOrgData: (loading: boolean) => void,
   setOrgMembers: (members: any[]) => void,
-  setPendingInvitations: (invitations: any[]) => void
+  setPendingInvitations: (invitations: any[]) => void,
+  setReceivedInvitations?: (invitations: any[]) => void
 ): Promise<void> {
   const authToken = localStorage.getItem('auth_token')
   if (!authToken) return
 
   setLoadingOrgData(true)
+
+  // Load organization members (may fail if not in org)
   try {
-    // Load organization members
     const membersResponse = await fetch(`${API_BASE}/api/invitations/organization/members`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
@@ -137,8 +139,12 @@ export async function loadOrganizationData(
       const membersData = await membersResponse.json()
       setOrgMembers(membersData.members || [])
     }
+  } catch (error) {
+    console.log('Could not load org members (user may not be in an org)')
+  }
 
-    // Load pending invitations
+  // Load pending invitations sent by org (may fail if not admin)
+  try {
     const invitationsResponse = await fetch(`${API_BASE}/api/invitations/pending`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
@@ -148,11 +154,32 @@ export async function loadOrganizationData(
     if (invitationsResponse.ok) {
       const invitationsData = await invitationsResponse.json()
       setPendingInvitations(invitationsData.invitations || [])
+    } else if (invitationsResponse.status === 403) {
+      // Not an admin - this is expected, silently skip
+      setPendingInvitations([])
     }
-
   } catch (error) {
-    console.error('Failed to load organization data:', error)
-  } finally {
-    setLoadingOrgData(false)
+    // Silently handle - non-admins can't see sent invitations
+    setPendingInvitations([])
   }
+
+  // Load invitations received by current user (should always work)
+  if (setReceivedInvitations) {
+    try {
+      const myInvitationsResponse = await fetch(`${API_BASE}/api/invitations/my-invitations`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        }
+      })
+
+      if (myInvitationsResponse.ok) {
+        const myInvitationsData = await myInvitationsResponse.json()
+        setReceivedInvitations(myInvitationsData.invitations || [])
+      }
+    } catch (error) {
+      console.error('Error fetching received invitations:', error)
+    }
+  }
+
+  setLoadingOrgData(false)
 }

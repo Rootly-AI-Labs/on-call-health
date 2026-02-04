@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/sheet'
 import { useNotifications } from '@/hooks/useNotifications'
 import NotificationItem from './NotificationItem'
-import { InvitationAcceptanceModal } from '@/components/InvitationAcceptanceModal'
 
 export function NotificationDrawer() {
   const [isOpen, setIsOpen] = useState(false)
@@ -25,9 +24,7 @@ export function NotificationDrawer() {
     dismiss,
     markAllAsRead,
     clearAll,
-    handleAction,
-    invitationModalId,
-    setInvitationModalId
+    handleAction
   } = useNotifications()
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -167,18 +164,6 @@ export function NotificationDrawer() {
           </div>
         </div>
       </SheetContent>
-
-      {/* Invitation Acceptance Modal */}
-      <InvitationAcceptanceModal
-        invitationId={invitationModalId}
-        isOpen={!!invitationModalId}
-        onClose={() => setInvitationModalId(null)}
-        onAccepted={() => {
-          setInvitationModalId(null)
-          // Refresh notifications after accepting
-          loadMoreNotifications()
-        }}
-      />
     </Sheet>
   )
 }

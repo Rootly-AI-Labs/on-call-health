@@ -911,6 +911,126 @@ async def get_organization_members(
 
     return members
 
+@router.delete("/organizations/members/{user_id}")
+async def remove_organization_member(
+    user_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Remove a member from the organization. Admin only.
+
+    Safety checks:
+    - Only admins can remove members
+    - Cannot remove yourself
+    - Cannot remove if you're the last admin
+    - Sets user's organization_id to NULL (user becomes org-less)
+    - Deletes user's API keys for security
+    """
+    # Safety check 1: Must be in an organization
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=400,
+            detail="You must be part of an organization to remove members"
+        )
+
+    # Safety check 2: Must be an admin
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=403,
+            detail="Only organization admins can remove members"
+        )
+
+    # Safety check 3: Cannot remove yourself
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot remove yourself from the organization. Use the leave organization feature instead."
+        )
+
+    # Get the target user
+    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+    target_user = db.query(User).filter(
+        User.id == user_id,
+        User.status == 'active'
+    ).first()
+
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Safety check 4: Target user must be in the same organization
+    if target_user.organization_id != current_user.organization_id:
+        raise HTTPException(
+            status_code=403,
+            detail="User is not in your organization"
+        )
+
+    # Safety check 5: If removing an admin, ensure there's at least one other admin
+    if target_user.role == 'admin':
+        # Count other admins in the organization
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+        other_admin_count = db.query(User).filter(
+            User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None),
+            User.role == 'admin',
+            User.id != user_id,
+            User.status == 'active'
+        ).count()
+
+        if other_admin_count == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot remove the last admin. Promote another member to admin first."
+            )
+
+    try:
+        # Log the action for audit trail
+        logger.info(
+            f"Admin {current_user.id} ({current_user.email}) removing user {user_id} "
+            f"({target_user.email}) from organization {current_user.organization_id}"
+        )
+
+        # Remove user from organization
+        target_user.organization_id = None
+        target_user.role = 'member'  # Reset to default role
+
+        # Delete user's API keys for security
+        from ...models.api_key import APIKey
+        deleted_keys = db.query(APIKey).filter(
+            APIKey.user_id == user_id
+        ).delete()
+
+        if deleted_keys > 0:
+            logger.info(f"Deleted {deleted_keys} API key(s) for removed user {user_id}")
+
+        # Mark user correlations as inactive (for audit trail)
+        from ...models.user_correlation import UserCorrelation
+        updated_correlations = db.query(UserCorrelation).filter(
+            UserCorrelation.user_id == user_id,
+            UserCorrelation.organization_id == current_user.organization_id
+        ).update({
+            "is_active": 0
+        })
+
+        if updated_correlations > 0:
+            logger.info(f"Marked {updated_correlations} user correlation(s) as inactive for user {user_id}")
+
+        db.commit()
+
+        return {
+            "success": True,
+            "message": f"{target_user.name} has been removed from the organization",
+            "user_id": user_id
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error removing user {user_id} from organization: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to remove member: {str(e)}"
+        )
+
 # Password Login Endpoint (for E2E testing only)
 @router.post("/login/password")
 @auth_rate_limit("password_login")

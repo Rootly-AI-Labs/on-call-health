@@ -1,8 +1,13 @@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Users, Mail, Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Users, Mail, Loader2, Check, X, Building2, AlertCircle, Trash2 } from "lucide-react"
 import { UserInfo } from "../types"
+import { useState } from "react"
+import { toast } from "sonner"
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 interface OrganizationMember {
   id: number | string
@@ -27,6 +32,18 @@ interface PendingInvitation {
   is_expired: boolean
 }
 
+interface ReceivedInvitation {
+  id: number
+  organization_id: number
+  organization_name: string
+  email: string
+  role: string
+  status: string
+  created_at: string
+  expires_at: string
+  invited_by: { name: string } | null
+}
+
 interface OrganizationManagementDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -39,8 +56,10 @@ interface OrganizationManagementDialogProps {
   loadingOrgData: boolean
   orgMembers: OrganizationMember[]
   pendingInvitations: PendingInvitation[]
+  receivedInvitations: ReceivedInvitation[]
   userInfo: UserInfo | null
   onRoleChange: (userId: number, newRole: string) => void
+  onRefreshOrgData: () => Promise<void>
   onClose: () => void
 }
 
@@ -56,10 +75,130 @@ export function OrganizationManagementDialog({
   loadingOrgData,
   orgMembers,
   pendingInvitations,
+  receivedInvitations,
   userInfo,
   onRoleChange,
+  onRefreshOrgData,
   onClose
 }: OrganizationManagementDialogProps) {
+  const [processingInvitationId, setProcessingInvitationId] = useState<number | null>(null)
+  const [confirmingInvitationId, setConfirmingInvitationId] = useState<number | null>(null)
+  const [removingUserId, setRemovingUserId] = useState<number | null>(null)
+  const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<number | null>(null)
+
+  const handleAcceptInvitation = async (invitationId: number, skipWarning = false) => {
+    // Check if user is already in an org and show warning first
+    if (!skipWarning && userInfo?.organization_id) {
+      setConfirmingInvitationId(invitationId)
+      return
+    }
+
+    setProcessingInvitationId(invitationId)
+    setConfirmingInvitationId(null)
+    try {
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`${API_BASE}/api/invitations/accept/${invitationId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.detail || 'Failed to accept invitation')
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(data.message || 'Successfully joined organization!')
+
+        // Update localStorage if org info returned
+        if (data.organization) {
+          localStorage.setItem('user_organization_id', data.organization.id)
+          localStorage.setItem('user_organization_name', data.organization.name)
+        }
+        if (data.role) {
+          localStorage.setItem('user_role', data.role)
+        }
+
+        // Close modal and refresh page to reflect new org membership
+        onClose()
+        setTimeout(() => {
+          window.location.reload()
+        }, 500)
+      }
+    } catch (error: any) {
+      console.error('Error accepting invitation:', error)
+      toast.error(error.message || 'Failed to accept invitation')
+    } finally {
+      setProcessingInvitationId(null)
+    }
+  }
+
+  const handleRejectInvitation = async (invitationId: number) => {
+    setProcessingInvitationId(invitationId)
+    setConfirmingInvitationId(null)
+    try {
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`${API_BASE}/api/invitations/reject/${invitationId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.detail || 'Failed to reject invitation')
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.info('Invitation declined')
+        await onRefreshOrgData()
+      }
+    } catch (error: any) {
+      console.error('Error rejecting invitation:', error)
+      toast.error(error.message || 'Failed to reject invitation')
+    } finally {
+      setProcessingInvitationId(null)
+    }
+  }
+
+  const handleRemoveMember = async (userId: number, userName: string) => {
+    setRemovingUserId(userId)
+    setConfirmRemoveUserId(null)
+    try {
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`${API_BASE}/api/organizations/members/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.detail || 'Failed to remove member')
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(`${userName} has been removed from the organization`)
+        await onRefreshOrgData()
+      }
+    } catch (error: any) {
+      console.error('Error removing member:', error)
+      toast.error(error.message || 'Failed to remove member')
+    } finally {
+      setRemovingUserId(null)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -88,6 +227,108 @@ export function OrganizationManagementDialog({
         </div>
 
         <div className="space-y-6">
+          {/* Received Invitations - Show at top if user has any */}
+          {receivedInvitations.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <Mail className="w-4 h-4 text-neutral-500" />
+                <h3 className="text-sm font-medium text-neutral-700">
+                  Pending Invitation{receivedInvitations.length > 1 ? 's' : ''}
+                </h3>
+              </div>
+
+              <div className="space-y-2">
+                {receivedInvitations.map((invitation) => (
+                  <div key={invitation.id} className="group relative rounded-lg border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm transition-all">
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-medium text-neutral-900 truncate">{invitation.organization_name}</h4>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-700 capitalize">
+                              {invitation.role}
+                            </span>
+                          </div>
+                          <p className="text-sm text-neutral-600">
+                            From {invitation.invited_by?.name || 'Unknown'}
+                          </p>
+                          <p className="text-xs text-neutral-500 mt-1">
+                            Expires {new Date(invitation.expires_at).toLocaleDateString()}
+                          </p>
+
+                          {/* Warning when confirming org switch */}
+                          {confirmingInvitationId === invitation.id && userInfo?.organization_id && (
+                            <div className="mt-3 flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
+                              <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <p className="text-xs text-amber-900">
+                                You will leave your current organization to join <span className="font-medium">{invitation.organization_name}</span>
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {confirmingInvitationId === invitation.id ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleAcceptInvitation(invitation.id, true)}
+                                disabled={processingInvitationId !== null}
+                                className="bg-neutral-900 hover:bg-neutral-800 text-white"
+                              >
+                                {processingInvitationId === invitation.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  'Confirm'
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setConfirmingInvitationId(null)}
+                                disabled={processingInvitationId !== null}
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleRejectInvitation(invitation.id)}
+                                disabled={processingInvitationId !== null}
+                                className="text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
+                              >
+                                {processingInvitationId === invitation.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  'Decline'
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleAcceptInvitation(invitation.id)}
+                                disabled={processingInvitationId !== null}
+                                className="bg-neutral-900 hover:bg-neutral-800 text-white"
+                              >
+                                {processingInvitationId === invitation.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  'Accept'
+                                )}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Invite New Member Section - Only visible to admins */}
           {(userInfo?.role === 'admin') && (
             <div className="p-6 border rounded-lg bg-white">
@@ -170,17 +411,18 @@ export function OrganizationManagementDialog({
                   </h3>
                   <div className="border rounded-lg overflow-hidden">
                     <div className="bg-neutral-100 px-4 py-2 border-b">
-                      <div className="grid grid-cols-4 gap-4 text-sm font-medium text-neutral-700">
+                      <div className="grid grid-cols-5 gap-4 text-sm font-medium text-neutral-700">
                         <div>Name</div>
                         <div>Email</div>
                         <div>Status</div>
                         <div>Role</div>
+                        <div></div>
                       </div>
                     </div>
                     <div className="max-h-60 overflow-y-auto">
                       {orgMembers.map((member) => (
                         <div key={member.id} className={`px-4 py-3 border-b last:border-b-0 hover:bg-neutral-100 ${member.status === 'pending' ? 'bg-yellow-50' : 'bg-white'}`}>
-                          <div className="grid grid-cols-4 gap-4 text-sm items-center">
+                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
                             <div className="font-medium text-neutral-900">
                               {member.name}
                               {member.is_current_user && (
@@ -225,6 +467,47 @@ export function OrganizationManagementDialog({
                                     </div>
                                   )}
                                 </div>
+                              )}
+                            </div>
+                            <div className="flex justify-end">
+                              {!member.is_current_user && member.status === 'active' && userInfo?.role === 'admin' && (
+                                confirmRemoveUserId === member.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleRemoveMember(member.id as number, member.name)}
+                                      disabled={removingUserId !== null}
+                                      className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      {removingUserId === member.id ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        'Confirm'
+                                      )}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setConfirmRemoveUserId(null)}
+                                      disabled={removingUserId !== null}
+                                      className="h-7 text-xs"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setConfirmRemoveUserId(member.id as number)}
+                                    disabled={removingUserId !== null}
+                                    className="h-7 text-xs text-neutral-500 hover:text-red-600 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="w-3 h-3 mr-1" />
+                                    Remove
+                                  </Button>
+                                )
                               )}
                             </div>
                           </div>
