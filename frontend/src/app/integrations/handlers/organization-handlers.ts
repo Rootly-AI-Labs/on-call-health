@@ -122,6 +122,7 @@ export async function loadOrganizationData(
   setPendingInvitations: (invitations: any[]) => void,
   setReceivedInvitations?: (invitations: any[]) => void
 ): Promise<void> {
+  console.log('🔍 loadOrganizationData called, setReceivedInvitations exists:', !!setReceivedInvitations)
   const authToken = localStorage.getItem('auth_token')
   if (!authToken) return
 
