@@ -725,28 +725,35 @@ async def delete_current_user_account(
         from ...models.user_notification import UserNotification
         from ...models.survey_schedule import UserSurveyPreference
         from ...models.organization_invitation import OrganizationInvitation
+        from ...models.survey_period import SurveyPeriod
 
         # 1. Delete analyses (will cascade to integration_mappings via relationship)
         analyses_count = db.query(Analysis).filter(Analysis.user_id == current_user.id).count()
         db.query(Analysis).filter(Analysis.user_id == current_user.id).delete(synchronize_session=False)
         logger.info(f"Deleted {analyses_count} analyses for user {current_user.id}")
 
-        # 2. Delete user burnout reports (self-reported assessments)
+        # 2. Delete survey periods for this user (must be done before deleting burnout reports)
+        # because survey_periods has a FK reference to user_burnout_reports
+        survey_periods_count = db.query(SurveyPeriod).filter(SurveyPeriod.user_id == current_user.id).count()
+        db.query(SurveyPeriod).filter(SurveyPeriod.user_id == current_user.id).delete(synchronize_session=False)
+        logger.info(f"Deleted {survey_periods_count} survey periods for user {current_user.id}")
+
+        # 3. Delete user burnout reports (self-reported assessments)
         burnout_reports_count = db.query(UserBurnoutReport).filter(UserBurnoutReport.user_id == current_user.id).count()
         db.query(UserBurnoutReport).filter(UserBurnoutReport.user_id == current_user.id).delete(synchronize_session=False)
         logger.info(f"Deleted {burnout_reports_count} burnout reports for user {current_user.id}")
 
-        # 3. Delete user notifications
+        # 4. Delete user notifications
         notifications_count = db.query(UserNotification).filter(UserNotification.user_id == current_user.id).count()
         db.query(UserNotification).filter(UserNotification.user_id == current_user.id).delete(synchronize_session=False)
         logger.info(f"Deleted {notifications_count} notifications for user {current_user.id}")
 
-        # 4. Delete user survey preferences
+        # 5. Delete user survey preferences
         survey_prefs_count = db.query(UserSurveyPreference).filter(UserSurveyPreference.user_id == current_user.id).count()
         db.query(UserSurveyPreference).filter(UserSurveyPreference.user_id == current_user.id).delete(synchronize_session=False)
         logger.info(f"Deleted {survey_prefs_count} survey preferences for user {current_user.id}")
 
-        # 5. Nullify organization invitations sent by this user
+        # 6. Nullify organization invitations sent by this user
         invitations_count = db.query(OrganizationInvitation).filter(OrganizationInvitation.invited_by == current_user.id).count()
         db.query(OrganizationInvitation).filter(OrganizationInvitation.invited_by == current_user.id).update(
             {"invited_by": None},
@@ -754,12 +761,12 @@ async def delete_current_user_account(
         )
         logger.info(f"Nullified {invitations_count} organization invitations for user {current_user.id}")
 
-        # 6. Delete Rootly/PagerDuty integrations
+        # 7. Delete Rootly/PagerDuty integrations
         rootly_count = db.query(RootlyIntegration).filter(RootlyIntegration.user_id == current_user.id).count()
         db.query(RootlyIntegration).filter(RootlyIntegration.user_id == current_user.id).delete(synchronize_session=False)
         logger.info(f"Deleted {rootly_count} Rootly/PagerDuty integrations for user {current_user.id}")
 
-        # 3. Relationships with cascade="all, delete-orphan" will auto-delete when we delete the user:
+        # 8. Relationships with cascade="all, delete-orphan" will auto-delete when we delete the user:
         # - oauth_providers
         # - emails
         # - github_integrations
@@ -769,7 +776,7 @@ async def delete_current_user_account(
         # - integration_mappings (if not already deleted via analyses)
         # - user_mappings_owned
 
-        # 4. Handle workspace ownerships - transfer or delete
+        # 9. Handle workspace ownerships - transfer or delete
         # For workspaces owned by this user, set owner_user_id to NULL (allow orphaned workspaces)
         slack_workspaces_count = db.query(SlackWorkspaceMapping).filter(
             SlackWorkspaceMapping.owner_user_id == current_user.id
@@ -787,12 +794,12 @@ async def delete_current_user_account(
 
         logger.info(f"Cleared {slack_workspaces_count} Slack workspace ownerships and {jira_workspaces_count} Jira workspace ownerships for user {current_user.id}")
 
-        # 5. Handle user_mappings_created (created_by foreign key)
+        # 10. Handle user_mappings_created (created_by foreign key)
         db.query(UserMapping).filter(
             UserMapping.created_by == current_user.id
         ).delete(synchronize_session=False)
 
-        # 6. Finally, delete the user (cascades will handle remaining relationships)
+        # 11. Finally, delete the user (cascades will handle remaining relationships)
         db.delete(current_user)
 
         # Commit the transaction

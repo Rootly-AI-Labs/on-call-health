@@ -14,12 +14,13 @@ import { StatusIndicator } from "./StatusIndicator";
 
 interface JiraManualSetupFormData {
   siteUrl: string;
+  email: string;
   token: string;
 }
 
 interface JiraManualSetupFormProps {
   form: UseFormReturn<JiraManualSetupFormData>;
-  onSave: (data: { token: string; siteUrl: string; userInfo?: { displayName: string | null; email: string | null } }) => Promise<boolean>;
+  onSave: (data: { token: string; siteUrl: string; email: string; userInfo?: { displayName: string | null; email: string | null } }) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -44,52 +45,49 @@ export function JiraManualSetupForm({ form, onSave, onClose }: JiraManualSetupFo
 
   const tokenValue = form.watch("token");
   const siteUrlValue = form.watch("siteUrl");
+  const emailValue = form.watch("email");
 
-  // Auto-validate when both token and siteUrl are provided
+  // Auto-validate when token, siteUrl, and email are all provided
   useEffect(() => {
-    if (tokenValue && tokenValue.trim() && siteUrlValue && siteUrlValue.trim()) {
-      validateToken({ token: tokenValue, siteUrl: siteUrlValue });
+    if (tokenValue && tokenValue.trim() && siteUrlValue && siteUrlValue.trim() && emailValue && emailValue.trim()) {
+      validateToken({ token: tokenValue, siteUrl: siteUrlValue, email: emailValue });
     }
-  }, [tokenValue, siteUrlValue, validateToken]);
+  }, [tokenValue, siteUrlValue, emailValue, validateToken]);
 
   // Reset save attempt flag when inputs change
   useEffect(() => {
     saveAttempted.current = false;
-  }, [tokenValue, siteUrlValue]);
+  }, [tokenValue, siteUrlValue, emailValue]);
 
   // Auto-save when validation succeeds
   useEffect(() => {
-    const shouldSave = isConnected && userInfo && !isSaving && !saveAttempted.current;
+    const hasValidInputs = tokenValue && tokenValue.trim() && siteUrlValue && siteUrlValue.trim() && emailValue && emailValue.trim();
+    const shouldSave = hasValidInputs && isConnected && userInfo && !isSaving && !saveAttempted.current;
 
-    if (shouldSave) {
-      saveAttempted.current = true;
-      handleAutoSave();
+    if (!shouldSave) {
+      return;
     }
-  }, [isConnected, userInfo, isSaving]);
 
-  const handleAutoSave = async () => {
+    saveAttempted.current = true;
     setIsSaving(true);
-    try {
-      const success = await onSave({
-        token: tokenValue,
-        siteUrl: siteUrlValue,
-        userInfo,
-      });
 
-      if (success) {
-        toast.success("Jira connected!", { duration: 3000 });
-        onClose();
-      } else {
-        // Save failed, allow retry
+    onSave({ token: tokenValue, siteUrl: siteUrlValue, email: emailValue, userInfo })
+      .then((success) => {
+        if (success) {
+          toast.success("Jira connected!", { duration: 3000 });
+          onClose();
+        } else {
+          saveAttempted.current = false;
+        }
+      })
+      .catch(() => {
+        toast.error("Failed to save integration");
         saveAttempted.current = false;
-      }
-    } catch (error) {
-      toast.error("Failed to save integration");
-      saveAttempted.current = false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
+      })
+      .finally(() => {
+        setIsSaving(false);
+      });
+  }, [isConnected, userInfo, isSaving, tokenValue, siteUrlValue, emailValue, onSave, onClose]);
 
   return (
     <Card className="border-blue-200 max-w-2xl mx-auto">
@@ -155,6 +153,27 @@ export function JiraManualSetupForm({ form, onSave, onClose }: JiraManualSetupFo
                   </FormControl>
                   <FormDescription>
                     Your Atlassian site URL (e.g., https://acme.atlassian.net)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Atlassian Account Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="email"
+                      placeholder="you@company.com"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    The email address associated with your Atlassian account
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

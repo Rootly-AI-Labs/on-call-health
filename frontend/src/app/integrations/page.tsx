@@ -822,8 +822,8 @@ export default function IntegrationsPage() {
     },
   })
 
-  const jiraManualForm = useForm<{ siteUrl: string; token: string }>({
-    defaultValues: { siteUrl: "", token: "" }
+  const jiraManualForm = useForm<{ siteUrl: string; email: string; token: string }>({
+    defaultValues: { siteUrl: "", email: "", token: "" }
   })
 
   const linearManualForm = useForm<{ token: string }>({

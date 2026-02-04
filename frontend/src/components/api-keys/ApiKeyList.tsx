@@ -49,10 +49,10 @@ export function ApiKeyList({ keys, onRevokeClick }: ApiKeyListProps) {
       <div className="bg-neutral-100 px-4 py-3 border-b">
         <div className="grid grid-cols-12 gap-4 text-sm font-medium text-neutral-700">
           <div className="col-span-3">Name</div>
-          <div className="col-span-3">Key</div>
+          <div className="col-span-2">Key</div>
           <div className="col-span-2">Created</div>
           <div className="col-span-2">Last Used</div>
-          <div className="col-span-1">Expires</div>
+          <div className="col-span-2">Expires</div>
           <div className="col-span-1 text-right">Actions</div>
         </div>
       </div>
@@ -73,7 +73,7 @@ export function ApiKeyList({ keys, onRevokeClick }: ApiKeyListProps) {
                 </div>
 
                 {/* Masked Key */}
-                <div className="col-span-3">
+                <div className="col-span-2">
                   <code className="font-mono text-xs bg-neutral-100 px-2 py-1 rounded text-neutral-700">
                     {key.masked_key}
                   </code>
@@ -90,8 +90,8 @@ export function ApiKeyList({ keys, onRevokeClick }: ApiKeyListProps) {
                 </div>
 
                 {/* Expires */}
-                <div className="col-span-1">
-                  <Badge variant={expStatus.variant} className="text-xs whitespace-nowrap">
+                <div className="col-span-2">
+                  <Badge variant={expStatus.variant} className="text-xs">
                     {expStatus.text}
                   </Badge>
                 </div>

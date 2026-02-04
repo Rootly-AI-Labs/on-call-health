@@ -2,12 +2,13 @@
 Authentication dependencies for FastAPI.
 """
 from typing import Optional
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status, Request, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from ..models import get_db, User
 from .jwt import decode_access_token
+from .api_key_auth import get_current_user_from_api_key, api_key_header
 
 security = HTTPBearer(auto_error=False)  # Don't auto-error, we'll check cookies too
 
@@ -75,3 +76,45 @@ async def get_current_user_optional(
     except HTTPException:
         # If authentication fails, return None instead of raising exception
         return None
+
+
+async def get_current_user_flexible(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    api_key: Optional[str] = Depends(api_key_header),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Flexible authentication: accepts both API keys and JWT tokens.
+
+    This dependency enables endpoints to accept authentication from:
+    1. X-API-Key header (for MCP and programmatic access)
+    2. Authorization: Bearer header (for web app with JWT)
+    3. auth_token cookie (for web app with httpOnly cookie)
+
+    Priority order:
+    - If X-API-Key header present → use API key authentication
+    - Otherwise → use JWT authentication (header or cookie)
+
+    Args:
+        request: FastAPI request object
+        background_tasks: Background tasks for async last_used update
+        credentials: Optional JWT credentials from Authorization header
+        api_key: Optional API key from X-API-Key header
+        db: Database session
+
+    Returns:
+        User: The authenticated user
+
+    Raises:
+        HTTPException: 401 if both authentication methods fail
+    """
+    # Priority 1: Try API key authentication if X-API-Key header present
+    if api_key:
+        return await get_current_user_from_api_key(
+            request, background_tasks, api_key, db
+        )
+
+    # Priority 2: Fall back to JWT authentication (Authorization header or cookie)
+    return await get_current_user(request, credentials, db)

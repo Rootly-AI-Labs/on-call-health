@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta, timezone as dt_timezone, date
+import asyncio
 import logging
 import base64
 import secrets
@@ -469,6 +470,7 @@ async def validate_linear_token(
             "error_type": "format"
         }
 
+    from ...services.integration_validator import IntegrationValidator
     validator = IntegrationValidator(db)
     result = await validator.validate_manual_token(
         provider="linear",
@@ -659,6 +661,73 @@ async def connect_linear_manual(
         )
 
     logger.info(f"[Linear] Manual token saved for user {current_user.id}")
+
+    # Capture values before background task (avoid DetachedInstanceError)
+    bg_user_id = current_user.id
+    bg_org_id = current_user.organization_id
+
+    # Trigger background sync immediately after successful save
+    async def sync_in_background():
+        """Background task to sync Linear users after manual token save."""
+        from ...models import get_db
+        # Properly consume generator to ensure cleanup
+        db_gen = get_db()
+        bg_db = next(db_gen)
+        try:
+            if not bg_org_id:
+                return
+
+            bg_integration = bg_db.query(LinearIntegration).filter(
+                LinearIntegration.user_id == bg_user_id
+            ).first()
+            if not bg_integration:
+                return
+
+            bg_token = await _get_valid_token(bg_integration, bg_db)
+            all_users = await _fetch_all_linear_users(bg_token)
+            active_users = [u for u in all_users if u.get("active", True)]
+
+            synced = 0
+            for linear_user in active_users:
+                linear_id = linear_user.get("id")
+                linear_email = linear_user.get("email")
+                linear_name = linear_user.get("name")
+                if not linear_email:
+                    continue
+
+                corr = bg_db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == bg_org_id,
+                    UserCorrelation.email == linear_email,
+                ).first()
+                if corr:
+                    corr.linear_user_id = linear_id
+                    corr.linear_email = linear_email
+                    if linear_name and not corr.name:
+                        corr.name = linear_name
+                else:
+                    bg_db.add(UserCorrelation(
+                        user_id=bg_user_id,
+                        organization_id=bg_org_id,
+                        email=linear_email,
+                        name=linear_name,
+                        linear_user_id=linear_id,
+                        linear_email=linear_email,
+                    ))
+                synced += 1
+
+            bg_db.commit()
+            logger.info(f"[Linear] Background sync completed for user {bg_user_id}: {synced} users synced")
+        except Exception as e:
+            logger.error(f"[Linear] Background sync failed for user {bg_user_id}: {e}")
+        finally:
+            # Properly close generator to trigger cleanup
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass
+
+    # Fire and forget background sync
+    asyncio.create_task(sync_in_background())
 
     return {
         "success": True,
@@ -943,27 +1012,8 @@ async def sync_linear_users(
 
     access_token = await _get_valid_token(integration, db)
 
-    # Fetch all users with pagination
-    all_users = []
-    cursor = None
-    max_pages = 20
-
-    for _ in range(max_pages):
-        result = await linear_integration_oauth.get_users(
-            access_token,
-            first=100,
-            after=cursor,
-        )
-
-        nodes = result.get("nodes", [])
-        all_users.extend(nodes)
-
-        page_info = result.get("pageInfo", {})
-        if not page_info.get("hasNextPage"):
-            break
-        cursor = page_info.get("endCursor")
-
-    # Filter active users
+    # Fetch all users
+    all_users = await _fetch_all_linear_users(access_token)
     active_users = [u for u in all_users if u.get("active", True)]
 
     matched = 0
@@ -1181,6 +1231,37 @@ def _priority_to_name(priority: int) -> str:
     return mapping.get(priority, "Unknown")
 
 
+async def _fetch_all_linear_users(access_token: str, max_pages: int = 20) -> List[Dict[str, Any]]:
+    """Fetch all Linear users with pagination.
+
+    Args:
+        access_token: Valid Linear API token
+        max_pages: Maximum pages to fetch (default 20, 100 users per page)
+
+    Returns:
+        List of all user dictionaries from Linear API
+    """
+    all_users = []
+    cursor = None
+
+    for _ in range(max_pages):
+        result = await linear_integration_oauth.get_users(
+            access_token,
+            first=100,
+            after=cursor,
+        )
+
+        nodes = result.get("nodes", [])
+        all_users.extend(nodes)
+
+        page_info = result.get("pageInfo", {})
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+
+    return all_users
+
+
 # -------------------------------
 # Linear Users (for dropdown)
 # -------------------------------
@@ -1208,26 +1289,7 @@ async def get_linear_users(
             )
 
         access_token = await _get_valid_token(integration, db)
-
-        # Fetch all users with pagination
-        all_users = []
-        cursor = None
-        max_pages = 20
-
-        for _ in range(max_pages):
-            result = await linear_integration_oauth.get_users(
-                access_token,
-                first=100,
-                after=cursor,
-            )
-
-            nodes = result.get("nodes", [])
-            all_users.extend(nodes)
-
-            page_info = result.get("pageInfo", {})
-            if not page_info.get("hasNextPage"):
-                break
-            cursor = page_info.get("endCursor")
+        all_users = await _fetch_all_linear_users(access_token)
 
         # Filter to valid users with id and name
         valid_users = [
@@ -1471,26 +1533,7 @@ async def get_unmapped_linear_users(
             )
 
         access_token = await _get_valid_token(integration, db)
-
-        # Fetch all Linear users
-        all_users = []
-        cursor = None
-        max_pages = 20
-
-        for _ in range(max_pages):
-            result = await linear_integration_oauth.get_users(
-                access_token,
-                first=100,
-                after=cursor,
-            )
-
-            nodes = result.get("nodes", [])
-            all_users.extend(nodes)
-
-            page_info = result.get("pageInfo", {})
-            if not page_info.get("hasNextPage"):
-                break
-            cursor = page_info.get("endCursor")
+        all_users = await _fetch_all_linear_users(access_token)
 
         # Get all mapped Linear user IDs
         mapped_ids = set()

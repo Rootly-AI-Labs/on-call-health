@@ -131,7 +131,8 @@ export function AccountSettingsDialog({
         throw new Error(errorMessage)
       }
 
-      // Success - clear all localStorage and redirect
+      // Success - show success message, clear all localStorage and redirect
+      alert("Account successfully deleted. All analyses and API keys have been permanently removed.")
       localStorage.clear()
 
       // Redirect to home page with full reload to clear Dialog state
