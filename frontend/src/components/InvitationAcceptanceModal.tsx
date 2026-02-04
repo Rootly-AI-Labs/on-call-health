@@ -261,8 +261,6 @@ export function InvitationAcceptanceModal({
                   <strong>Warning:</strong> You are currently a member of <strong>{currentOrgName}</strong>.
                   <br /><br />
                   By accepting this invitation, you will leave {currentOrgName} and join {invitation.organization_name}.
-                  <br /><br />
-                  All your data (analyses and integrations) will be kept.
                 </AlertDescription>
               </Alert>
             )}
