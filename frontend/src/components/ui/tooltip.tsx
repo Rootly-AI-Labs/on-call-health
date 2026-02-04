@@ -71,7 +71,7 @@ export function Tooltip({
         <div
           ref={tooltipRef}
           className={cn(
-            "absolute z-50 px-3 py-2 text-sm text-white bg-neutral-900 rounded-lg shadow-lg w-48 break-words",
+            "absolute z-[80] px-3 py-2 text-sm text-white bg-neutral-900 rounded-lg shadow-lg w-48 break-words",
             sideClasses[side],
             className
           )}
