@@ -15,7 +15,6 @@ export function useNotifications() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [invitationModalId, setInvitationModalId] = useState<number | null>(null)
   const { toast } = useToast()
   const pathname = usePathname()
   const previousPathnameRef = useRef<string | null>(null)
@@ -178,12 +177,12 @@ export function useNotifications() {
   async function handleAction(notification: Notification): Promise<void> {
     if (!notification.action_url) return
 
-    // Check if it's an invitation acceptance action
+    // Check if it's an invitation action - navigate to integrations page with org modal open
     const invitationMatch = notification.action_url.match(/\/invitations\/accept\/(\d+)/)
     if (invitationMatch) {
-      const invitationId = parseInt(invitationMatch[1])
-      setInvitationModalId(invitationId)
-      // Mark as read when modal opens
+      // Navigate to integrations page which will show org management modal with invitations
+      window.location.href = '/integrations?openOrgModal=true'
+      // Mark as read when navigating
       await markAsRead(notification.id)
       return
     }
@@ -248,8 +247,6 @@ export function useNotifications() {
     dismiss,
     markAllAsRead,
     clearAll,
-    handleAction,
-    invitationModalId,
-    setInvitationModalId
+    handleAction
   }
 }

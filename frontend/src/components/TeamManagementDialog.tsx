@@ -15,16 +15,23 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
   const [isInviting, setIsInviting] = useState(false)
   const [orgMembers, setOrgMembers] = useState([])
   const [pendingInvitations, setPendingInvitations] = useState([])
+  const [receivedInvitations, setReceivedInvitations] = useState([])
   const [loadingOrgData, setLoadingOrgData] = useState(false)
-  const [userInfo, setUserInfo] = useState<{ name: string; email: string; role: string } | null>(null)
+  const [userInfo, setUserInfo] = useState<{ name: string; email: string; role: string; organization_id?: number } | null>(null)
 
   // Load user info from localStorage
   useEffect(() => {
     const userName = localStorage.getItem("user_name")
     const userEmail = localStorage.getItem("user_email")
     const userRole = localStorage.getItem("user_role")
+    const orgId = localStorage.getItem("user_organization_id")
     if (userName && userEmail) {
-      setUserInfo({ name: userName, email: userEmail, role: userRole || "member" })
+      setUserInfo({
+        name: userName,
+        email: userEmail,
+        role: userRole || "member",
+        organization_id: orgId ? parseInt(orgId, 10) : undefined
+      })
     }
   }, [])
 
@@ -37,11 +44,11 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
 
   const fetchOrganizationData = async () => {
     setLoadingOrgData(true)
-    try {
-      const token = localStorage.getItem("auth_token")
-      const headers = { Authorization: `Bearer ${token}` }
+    const token = localStorage.getItem("auth_token")
+    const headers = { Authorization: `Bearer ${token}` }
 
-      // Fetch organization members
+    // Fetch organization members (may fail if not in org)
+    try {
       const membersResponse = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/auth/organizations/members`,
         { headers }
@@ -50,22 +57,39 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
         const membersData = await membersResponse.json()
         setOrgMembers(membersData)
       }
+    } catch (error) {
+      console.log("Could not load org members")
+    }
 
-      // Fetch pending invitations
+    // Fetch pending invitations (may fail if not admin)
+    try {
       const invitationsResponse = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/invitations/pending`,
         { headers }
       )
       if (invitationsResponse.ok) {
         const invitationsData = await invitationsResponse.json()
-        setPendingInvitations(invitationsData)
+        setPendingInvitations(invitationsData.invitations || [])
       }
     } catch (error) {
-      console.error("Error fetching organization data:", error)
-      toast.error("Failed to load team data")
-    } finally {
-      setLoadingOrgData(false)
+      console.log("Could not load pending invitations")
     }
+
+    // Fetch invitations received by current user (should always work)
+    try {
+      const myInvitationsResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/invitations/my-invitations`,
+        { headers }
+      )
+      if (myInvitationsResponse.ok) {
+        const myInvitationsData = await myInvitationsResponse.json()
+        setReceivedInvitations(myInvitationsData.invitations || [])
+      }
+    } catch (error) {
+      console.error("Error fetching received invitations:", error)
+    }
+
+    setLoadingOrgData(false)
   }
 
   const handleInvite = async () => {
@@ -155,8 +179,10 @@ export function TeamManagementDialog({ isOpen, onClose }: TeamManagementDialogPr
       loadingOrgData={loadingOrgData}
       orgMembers={orgMembers}
       pendingInvitations={pendingInvitations}
+      receivedInvitations={receivedInvitations}
       userInfo={userInfo}
       onRoleChange={handleRoleChange}
+      onRefreshOrgData={fetchOrganizationData}
       onClose={handleClose}
     />
   )

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { INTEGRATION_TIMEOUTS, getModalDelay } from "./constants"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -161,7 +162,9 @@ import { NewMappingDialog } from "./dialogs/NewMappingDialog"
 import { OrganizationManagementDialog } from "./dialogs/OrganizationManagementDialog"
 import { PostIntegrationSyncModal } from "./dialogs/PostIntegrationSyncModal"
 
-export default function IntegrationsPage() {
+function IntegrationsPageContent() {
+  const searchParams = useSearchParams()
+
   // State management
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loadingRootly, setLoadingRootly] = useState(true)
@@ -226,6 +229,7 @@ export default function IntegrationsPage() {
   // Organization members and invitations state
   const [orgMembers, setOrgMembers] = useState([])
   const [pendingInvitations, setPendingInvitations] = useState([])
+  const [receivedInvitations, setReceivedInvitations] = useState([])
   const [loadingOrgData, setLoadingOrgData] = useState(false)
 
   // Sorting state
@@ -845,6 +849,16 @@ export default function IntegrationsPage() {
     // Accept both numeric IDs and beta string IDs (like "beta-rootly")
     if (savedOrg) {
       setSelectedOrganization(savedOrg)
+    }
+
+    // Check if we should open org management modal (from notification)
+    if (searchParams.get('openOrgModal') === 'true') {
+      // Small delay to ensure data is loaded
+      setTimeout(() => {
+        setShowInviteModal(true)
+        // Clean up URL
+        window.history.replaceState({}, '', '/integrations')
+      }, 500)
     }
 
     // Load user info from localStorage first for immediate display
@@ -1548,7 +1562,8 @@ export default function IntegrationsPage() {
     return OrganizationHandlers.loadOrganizationData(
       setLoadingOrgData,
       setOrgMembers,
-      setPendingInvitations
+      setPendingInvitations,
+      setReceivedInvitations
     )
   }
 
@@ -4735,8 +4750,10 @@ export default function IntegrationsPage() {
         loadingOrgData={loadingOrgData}
         orgMembers={orgMembers}
         pendingInvitations={pendingInvitations}
+        receivedInvitations={receivedInvitations}
         userInfo={userInfo}
         onRoleChange={handleRoleChange}
+        onRefreshOrgData={loadOrganizationData}
         onClose={() => {
           setShowInviteModal(false)
           setInviteEmail("")
@@ -5527,5 +5544,13 @@ export default function IntegrationsPage() {
         missingPermissions={tokenErrorMissingPermissions}
       />
     </div>
+  )
+}
+
+export default function IntegrationsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <IntegrationsPageContent />
+    </Suspense>
   )
 }
