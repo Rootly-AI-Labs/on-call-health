@@ -30,8 +30,8 @@ class NotificationService:
             type='invitation',
             title=f"Invitation to join {invitation.organization.name}",
             message=f"You've been invited to join {invitation.organization.name} as a {invitation.role}.",
-            action_url=f"/invitations/accept/{invitation.id}",
-            action_text="Accept Invitation",
+            action_url=f"/integrations?openOrgModal=true",
+            action_text="View Invitation",
             organization_invitation_id=invitation.id,
             priority='high',
             expires_at=invitation.expires_at
