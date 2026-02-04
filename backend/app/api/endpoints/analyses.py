@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, load_only
 from sqlalchemy.exc import OperationalError
 
 from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
-from ...auth.dependencies import get_current_active_user
+from ...auth.dependencies import get_current_active_user, get_current_user_flexible
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
@@ -169,7 +169,7 @@ async def _warm_cache_background_task(user_id: int) -> None:
 async def warm_permissions_cache(
     request: Request,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
 ) -> WarmCacheResponse:
     """
     Warm the permissions cache for all integrations in the background.
@@ -192,7 +192,7 @@ async def warm_permissions_cache(
 async def validate_integrations(
     request: Request,
     force_refresh: bool = Query(False, description="Force fresh validation, bypassing cache"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """
@@ -244,7 +244,7 @@ async def run_burnout_analysis(
     req: Request,
     request: ValidatedAnalysisRequest,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """Run a new burnout analysis for a specific integration and time range."""
@@ -408,7 +408,7 @@ async def list_analyses(
     limit: int = Query(20, gt=0, le=100, description="Results per page"),
     offset: int = Query(0, ge=0, description="Results offset"),
     filter_status: Optional[str] = Query(None, alias="status", regex="^(pending|running|completed|failed)$", description="Filter by status"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """List all previous analyses for the current user.
@@ -503,7 +503,7 @@ async def list_analyses(
 @router.get("/uuid/{analysis_uuid}", response_model=AnalysisResponse)
 async def get_analysis_by_uuid(
     analysis_uuid: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """Get a specific analysis result by UUID."""
@@ -575,7 +575,7 @@ async def get_analysis_by_uuid(
 @router.get("/{analysis_id}", response_model=AnalysisResponse)
 async def get_analysis(
     analysis_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """Get a specific analysis result."""
@@ -745,7 +745,7 @@ def is_uuid(value: str) -> bool:
 @router.get("/by-id/{analysis_identifier}", response_model=AnalysisResponse)
 async def get_analysis_by_identifier(
     analysis_identifier: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """Get a specific analysis result by UUID or integer ID."""
@@ -832,7 +832,7 @@ async def get_analysis_by_identifier(
 @router.delete("/{analysis_id}")
 async def delete_analysis(
     analysis_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """Delete a specific analysis."""
@@ -861,7 +861,7 @@ async def delete_analysis(
 @router.post("/{analysis_id}/regenerate-trends")
 async def regenerate_analysis_trends(
     analysis_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """Regenerate daily trends data for an existing analysis."""
@@ -1010,7 +1010,7 @@ async def regenerate_analysis_trends(
 @router.get("/{analysis_id}/verify-consistency")
 async def verify_analysis_consistency(
     analysis_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """Verify data consistency for an analysis across all components."""
@@ -1198,7 +1198,7 @@ async def verify_analysis_consistency(
 async def get_historical_trends(
     integration_id: Optional[int] = None,
     days_back: int = 14,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """Get daily incident trends from the most recent analysis period."""
@@ -1589,7 +1589,7 @@ class DailyIncidentTrendsResponse(BaseModel):
 @router.get("/{analysis_id}/daily-trends", response_model=DailyIncidentTrendsResponse)
 async def get_analysis_daily_trends(
     analysis_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """Get daily incident trends from a specific analysis."""
@@ -1703,7 +1703,7 @@ async def get_analysis_daily_trends(
 async def get_user_github_daily_commits(
     user_email: str,
     analysis_id: int = Query(..., description="Analysis ID to get date range from"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """
@@ -1832,7 +1832,7 @@ async def get_user_github_daily_commits(
 @router.get("/{analysis_id}/github-commits-timeline")
 async def get_analysis_github_commits_timeline(
     analysis_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """
@@ -2138,7 +2138,7 @@ def _generate_daily_tooltip(incident_count, severity_breakdown, daily_summary, d
 async def get_member_daily_health(
     analysis_id: int,
     member_email: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
     """
