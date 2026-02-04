@@ -402,26 +402,25 @@ export function OrganizationManagementDialog({
           ) : (
             <div className="space-y-6">
               {/* Current Members */}
-              {orgMembers.length > 0 && (
+              {orgMembers.filter(m => m.status === 'active').length > 0 && (
                 <div>
                   <h3 className="text-lg font-medium mb-3 flex items-center space-x-2">
                     <Users className="w-5 h-5" />
-                    <span>Organization Members ({orgMembers.length})</span>
+                    <span>Organization Members ({orgMembers.filter(m => m.status === 'active').length})</span>
                   </h3>
                   <div className="border rounded-lg overflow-hidden">
                     <div className="bg-neutral-100 px-4 py-2 border-b">
-                      <div className="grid grid-cols-5 gap-4 text-sm font-medium text-neutral-700">
+                      <div className="grid grid-cols-4 gap-4 text-sm font-medium text-neutral-700">
                         <div>Name</div>
                         <div>Email</div>
-                        <div>Status</div>
                         <div>Role</div>
                         <div></div>
                       </div>
                     </div>
                     <div className="max-h-60 overflow-y-auto">
-                      {orgMembers.map((member) => (
-                        <div key={member.id} className={`px-4 py-3 border-b last:border-b-0 hover:bg-neutral-100 ${member.status === 'pending' ? 'bg-yellow-50' : 'bg-white'}`}>
-                          <div className="grid grid-cols-5 gap-4 text-sm items-center">
+                      {orgMembers.filter(m => m.status === 'active').map((member) => (
+                        <div key={member.id} className="px-4 py-3 border-b last:border-b-0 hover:bg-neutral-100 bg-white">
+                          <div className="grid grid-cols-4 gap-4 text-sm items-center">
                             <div className="font-medium text-neutral-900">
                               {member.name}
                               {member.is_current_user && (
@@ -430,22 +429,7 @@ export function OrganizationManagementDialog({
                             </div>
                             <div className="text-neutral-700">{member.email}</div>
                             <div>
-                              {member.status === 'pending' ? (
-                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
-                                  Pending
-                                </span>
-                              ) : (
-                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                                  Active
-                                </span>
-                              )}
-                            </div>
-                            <div>
-                              {member.status === 'pending' ? (
-                                <span className="text-xs text-neutral-500 capitalize">
-                                  {member.role?.replace('_', ' ') || 'member'}
-                                </span>
-                              ) : member.is_current_user ? (
+                              {member.is_current_user ? (
                                 <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800 capitalize">
                                   {member.role?.replace('_', ' ') || 'member'}
                                 </span>
@@ -469,7 +453,7 @@ export function OrganizationManagementDialog({
                               )}
                             </div>
                             <div className="flex justify-end">
-                              {!member.is_current_user && member.status === 'active' && userInfo?.role === 'admin' && (
+                              {!member.is_current_user && userInfo?.role === 'admin' && (
                                 confirmRemoveUserId === member.id ? (
                                   <div className="flex items-center gap-2">
                                     <Button
