@@ -259,8 +259,15 @@ export function InvitationAcceptanceModal({
                 <AlertCircle className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-amber-900">
                   <strong>Warning:</strong> You are currently a member of <strong>{currentOrgName}</strong>.
-                  By accepting this invitation, you will leave {currentOrgName} and join {invitation.organization_name}.
-                  All data associated with {currentOrgName} will no longer be accessible to you.
+                  <br /><br />
+                  By accepting this invitation, you will:
+                  <ul className="list-disc ml-5 mt-2 space-y-1">
+                    <li>Leave {currentOrgName} and join {invitation.organization_name}</li>
+                    <li><strong>Permanently lose all analyses</strong> from {currentOrgName}</li>
+                    <li><strong>Lose all API keys</strong> (Rootly/PagerDuty) for {currentOrgName}</li>
+                  </ul>
+                  <br />
+                  This action cannot be undone.
                 </AlertDescription>
               </Alert>
             )}
