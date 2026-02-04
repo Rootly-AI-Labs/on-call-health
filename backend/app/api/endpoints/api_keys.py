@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, Field, field_validator
 
 from ...models import get_db, User
@@ -83,6 +84,12 @@ async def create_api_key(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"An API key named '{body.name}' already exists. Please choose a different name."
+        )
 
     return {
         "id": api_key.id,
@@ -138,8 +145,7 @@ async def revoke_api_key(
     """
     Revoke an API key.
 
-    This is a soft delete - the key is marked as revoked but not removed.
-    Revoked keys cannot be used for authentication.
+    The key is permanently deleted from the database.
     """
     service = APIKeyService(db)
 

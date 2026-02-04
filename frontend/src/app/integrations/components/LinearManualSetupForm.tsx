@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { HelpCircle, ChevronDown, CheckCircle, AlertCircle, Loader2, Eye, EyeOff, ExternalLink } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 import { useValidation } from "../hooks/useValidation";
@@ -57,36 +57,33 @@ export function LinearManualSetupForm({ form, onSave, onClose }: LinearManualSet
 
   // Auto-save when validation succeeds
   useEffect(() => {
-    const shouldSave = isConnected && userInfo && !isSaving && !saveAttempted.current;
+    const hasValidToken = tokenValue && tokenValue.trim();
+    const shouldSave = hasValidToken && isConnected && userInfo && !isSaving && !saveAttempted.current;
 
-    if (shouldSave) {
-      saveAttempted.current = true;
-      handleAutoSave();
+    if (!shouldSave) {
+      return;
     }
-  }, [isConnected, userInfo, isSaving]);
 
-  const handleAutoSave = async () => {
+    saveAttempted.current = true;
     setIsSaving(true);
-    try {
-      const success = await onSave({
-        token: tokenValue,
-        userInfo,
-      });
 
-      if (success) {
-        toast.success("Linear connected!", { duration: 3000 });
-        onClose();
-      } else {
-        // Save failed, allow retry
+    onSave({ token: tokenValue, userInfo })
+      .then((success) => {
+        if (success) {
+          toast.success("Linear connected!", { duration: 3000 });
+          onClose();
+        } else {
+          saveAttempted.current = false;
+        }
+      })
+      .catch(() => {
+        toast.error("Failed to save integration");
         saveAttempted.current = false;
-      }
-    } catch (error) {
-      toast.error("Failed to save integration");
-      saveAttempted.current = false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
+      })
+      .finally(() => {
+        setIsSaving(false);
+      });
+  }, [isConnected, userInfo, isSaving, tokenValue, onSave, onClose]);
 
   return (
     <Card className="border-neutral-200 max-w-2xl mx-auto">
