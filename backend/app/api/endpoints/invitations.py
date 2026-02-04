@@ -85,6 +85,54 @@ async def create_invitation(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create invitation: {str(e)}")
 
+@router.get("/my-invitations")
+async def get_my_invitations(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Get pending invitations sent to the current user's email.
+    """
+    try:
+        invitations = db.query(OrganizationInvitation).filter(
+            OrganizationInvitation.email.ilike(current_user.email),
+            OrganizationInvitation.status == "pending"
+        ).order_by(OrganizationInvitation.created_at.desc()).all()
+
+        invitation_list = []
+        for invitation in invitations:
+            if not invitation.is_expired:
+                # Get organization info
+                org = invitation.organization
+                # Get who invited
+                invited_by_user = db.query(User).filter(User.id == invitation.invited_by).first()
+
+                invitation_data = {
+                    "id": invitation.id,
+                    "organization_id": invitation.organization_id,
+                    "organization_name": org.name if org else "Unknown",
+                    "email": invitation.email,
+                    "role": invitation.role,
+                    "status": invitation.status,
+                    "created_at": invitation.created_at.isoformat(),
+                    "expires_at": invitation.expires_at.isoformat(),
+                    "invited_by": {
+                        "id": invited_by_user.id if invited_by_user else None,
+                        "name": invited_by_user.name if invited_by_user else "Unknown",
+                        "email": invited_by_user.email if invited_by_user else "Unknown"
+                    }
+                }
+                invitation_list.append(invitation_data)
+
+        return {
+            "invitations": invitation_list,
+            "total": len(invitation_list)
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to fetch user invitations: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch invitations: {str(e)}")
+
 @router.get("/pending")
 async def list_pending_invitations(
     current_user: User = Depends(get_current_active_user),

@@ -1,8 +1,12 @@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Users, Mail, Loader2 } from "lucide-react"
+import { Users, Mail, Loader2, Check, X, Building2 } from "lucide-react"
 import { UserInfo } from "../types"
+import { useState } from "react"
+import { toast } from "sonner"
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 interface OrganizationMember {
   id: number | string
@@ -27,6 +31,18 @@ interface PendingInvitation {
   is_expired: boolean
 }
 
+interface ReceivedInvitation {
+  id: number
+  organization_id: number
+  organization_name: string
+  email: string
+  role: string
+  status: string
+  created_at: string
+  expires_at: string
+  invited_by: { name: string } | null
+}
+
 interface OrganizationManagementDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -39,8 +55,10 @@ interface OrganizationManagementDialogProps {
   loadingOrgData: boolean
   orgMembers: OrganizationMember[]
   pendingInvitations: PendingInvitation[]
+  receivedInvitations: ReceivedInvitation[]
   userInfo: UserInfo | null
   onRoleChange: (userId: number, newRole: string) => void
+  onRefreshOrgData: () => Promise<void>
   onClose: () => void
 }
 
@@ -56,10 +74,88 @@ export function OrganizationManagementDialog({
   loadingOrgData,
   orgMembers,
   pendingInvitations,
+  receivedInvitations,
   userInfo,
   onRoleChange,
+  onRefreshOrgData,
   onClose
 }: OrganizationManagementDialogProps) {
+  const [processingInvitationId, setProcessingInvitationId] = useState<number | null>(null)
+
+  const handleAcceptInvitation = async (invitationId: number) => {
+    setProcessingInvitationId(invitationId)
+    try {
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`${API_BASE}/api/invitations/accept/${invitationId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to accept invitation')
+      }
+
+      if (data.success) {
+        toast.success(data.message || 'Successfully joined organization!')
+
+        // Update localStorage if org info returned
+        if (data.organization) {
+          localStorage.setItem('user_organization_id', data.organization.id)
+          localStorage.setItem('user_organization_name', data.organization.name)
+        }
+        if (data.role) {
+          localStorage.setItem('user_role', data.role)
+        }
+
+        // Refresh org data
+        await onRefreshOrgData()
+
+        // Reload page to reflect new org membership
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
+      }
+    } catch (error: any) {
+      console.error('Error accepting invitation:', error)
+      toast.error(error.message || 'Failed to accept invitation')
+    } finally {
+      setProcessingInvitationId(null)
+    }
+  }
+
+  const handleRejectInvitation = async (invitationId: number) => {
+    setProcessingInvitationId(invitationId)
+    try {
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`${API_BASE}/api/invitations/reject/${invitationId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to reject invitation')
+      }
+
+      if (data.success) {
+        toast.info('Invitation declined')
+        await onRefreshOrgData()
+      }
+    } catch (error: any) {
+      console.error('Error rejecting invitation:', error)
+      toast.error(error.message || 'Failed to reject invitation')
+    } finally {
+      setProcessingInvitationId(null)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -88,6 +184,74 @@ export function OrganizationManagementDialog({
         </div>
 
         <div className="space-y-6">
+          {/* Received Invitations - Show at top if user has any */}
+          {receivedInvitations.length > 0 && (
+            <div className="p-6 border-2 border-blue-200 rounded-lg bg-blue-50">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-blue-900">You Have Pending Invitations!</h3>
+                    <p className="text-sm text-blue-700 mt-1">You've been invited to join {receivedInvitations.length === 1 ? 'an organization' : `${receivedInvitations.length} organizations`}</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {receivedInvitations.map((invitation) => (
+                      <div key={invitation.id} className="bg-white rounded-lg p-4 border border-blue-200">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-neutral-900">{invitation.organization_name}</h4>
+                            <p className="text-sm text-neutral-600 mt-1">
+                              Invited by {invitation.invited_by?.name || 'Unknown'} as <span className="font-medium capitalize">{invitation.role}</span>
+                            </p>
+                            <p className="text-xs text-neutral-500 mt-1">
+                              Sent {new Date(invitation.created_at).toLocaleDateString()} • Expires {new Date(invitation.expires_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-2 ml-4">
+                            <Button
+                              size="sm"
+                              onClick={() => handleAcceptInvitation(invitation.id)}
+                              disabled={processingInvitationId !== null}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              {processingInvitationId === invitation.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Check className="w-4 h-4 mr-1" />
+                                  Accept
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRejectInvitation(invitation.id)}
+                              disabled={processingInvitationId !== null}
+                              className="border-red-300 text-red-600 hover:bg-red-50"
+                            >
+                              {processingInvitationId === invitation.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <X className="w-4 h-4 mr-1" />
+                                  Decline
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Invite New Member Section - Only visible to admins */}
           {(userInfo?.role === 'admin') && (
             <div className="p-6 border rounded-lg bg-white">
