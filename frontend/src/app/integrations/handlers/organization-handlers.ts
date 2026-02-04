@@ -161,7 +161,10 @@ export async function loadOrganizationData(
 
       if (myInvitationsResponse.ok) {
         const myInvitationsData = await myInvitationsResponse.json()
+        console.log('Received invitations:', myInvitationsData)
         setReceivedInvitations(myInvitationsData.invitations || [])
+      } else {
+        console.error('Failed to fetch received invitations:', myInvitationsResponse.status)
       }
     }
 
