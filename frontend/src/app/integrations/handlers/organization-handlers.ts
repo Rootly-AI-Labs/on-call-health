@@ -154,9 +154,13 @@ export async function loadOrganizationData(
     if (invitationsResponse.ok) {
       const invitationsData = await invitationsResponse.json()
       setPendingInvitations(invitationsData.invitations || [])
+    } else if (invitationsResponse.status === 403) {
+      // Not an admin - this is expected, silently skip
+      setPendingInvitations([])
     }
   } catch (error) {
-    console.log('Could not load pending invitations (user may not be admin)')
+    // Silently handle - non-admins can't see sent invitations
+    setPendingInvitations([])
   }
 
   // Load invitations received by current user (should always work)
