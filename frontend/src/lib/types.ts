@@ -157,9 +157,9 @@ export interface OrganizationMember {
   email: string
   role?: string
   avatar?: string
-  cbiScore: number // CBI score (0-100)
+  cbiScore: number // OCH score (0-100, based on Copenhagen Burnout Inventory)
   cbi_score?: number // API returns snake_case
-  riskLevel: 'critical' | 'poor' | 'fair' | 'healthy' // CBI-based risk levels
+  riskLevel: 'critical' | 'poor' | 'fair' | 'healthy' // OCH-based risk levels
   trend: 'up' | 'down' | 'stable'
   incidentsHandled: number
   incident_count?: number // API returns this

@@ -26,9 +26,10 @@ class BurnoutConfig:
 
     # Copenhagen Burnout Inventory Dimension Weights (must sum to 1.0)
     # Based on OCH methodology - only 2 dimensions for software engineers
+    # Research shows personal factors (work-life balance) contribute more to burnout
     OCH_WEIGHTS = {
-        'personal_burnout': 0.50,        # Physical/psychological fatigue and exhaustion
-        'work_related_burnout': 0.50     # Fatigue/exhaustion specifically tied to work
+        'personal_burnout': 0.65,        # Physical/psychological fatigue and exhaustion (65%)
+        'work_related_burnout': 0.35     # Fatigue/exhaustion specifically tied to work (35%)
         # Note: client_related_burnout omitted - not applicable to software engineers
     }
     

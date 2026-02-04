@@ -2,14 +2,13 @@
 GitHub-Only Burnout Analyzer
 
 Scientifically rigorous burnout analysis using only GitHub data, based on established
-burnout research methodology. Implements flow state detection to distinguish healthy 
+burnout research methodology. Implements flow state detection to distinguish healthy
 high-productivity from burnout patterns.
 
 This analyzer can provide a complete burnout assessment (100% scoring) when GitHub is the
 only available data source, with appropriate confidence intervals and baseline comparisons.
 """
 import logging
-import math
 import statistics
 import os
 from datetime import datetime, timedelta, timezone
@@ -161,25 +160,22 @@ class GitHubOnlyBurnoutAnalyzer:
                 logger.warning(f"No GitHub metrics for {email}")
                 return None
             
-            # Calculate burnout dimensions using OCH methodology (inspired by Copenhagen Burnout Inventory)
+            # Calculate burnout dimensions using OCH methodology (Copenhagen Burnout Inventory)
+            # OCH uses 2 dimensions for software engineers (65/35 split)
             logger.debug(f"Using OCH methodology for {email}")
             personal_burnout = self._calculate_personal_burnout_och(
                 metrics, baselines, time_range_days
             )
-            
+
             work_related_burnout = self._calculate_work_burnout_och(
                 metrics, baselines, activity_data
             )
-            
-            accomplishment_burnout = self._calculate_accomplishment_burnout_och(
-                metrics, baselines, activity_data
-            )
-            
-            # Calculate overall burnout score using equal weights (OCH methodology)
+
+            # Calculate overall burnout score using OCH weights (65% personal, 35% work-related)
+            # Research shows personal factors (work-life balance) contribute more to burnout
             burnout_score = (
-                personal_burnout * 0.333 +
-                work_related_burnout * 0.333 + 
-                accomplishment_burnout * 0.334
+                personal_burnout * 0.65 +
+                work_related_burnout * 0.35
             )
             burnout_score = max(0, min(10, burnout_score))
             
