@@ -172,7 +172,7 @@ export function OrganizationManagementDialog({
     setConfirmRemoveUserId(null)
     try {
       const token = localStorage.getItem('auth_token')
-      const response = await fetch(`${API_BASE}/api/organizations/members/${userId}`, {
+      const response = await fetch(`${API_BASE}/auth/organizations/members/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
