@@ -1546,6 +1546,7 @@ export default function IntegrationsPage() {
 
   // Load organization members and pending invitations
   const loadOrganizationData = async () => {
+    console.log('🚨 LOADING ORG DATA - page.tsx calling handler')
     return OrganizationHandlers.loadOrganizationData(
       setLoadingOrgData,
       setOrgMembers,
