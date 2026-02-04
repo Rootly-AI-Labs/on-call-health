@@ -116,14 +116,14 @@ export function TopPanel() {
                 Integrations
               </Link>
               <Link
-                href="/team"
+                href="/management"
                 className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                  isActive("/team")
+                  isActive("/management")
                     ? "bg-purple-700 text-white shadow-sm"
                     : "text-neutral-700 hover:text-white hover:bg-purple-800"
                 }`}
               >
-                Team Members
+                Management
               </Link>
             </nav>
           </div>

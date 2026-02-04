@@ -593,9 +593,6 @@ export default function IntegrationsPage() {
       // Convert __clear__ sentinel to empty string
       const usernameToSave = editingUsername === '__clear__' ? '' : editingUsername
 
-      // Get old username before update
-      const oldUsername = userBeforeUpdate?.github_username
-
       const response = await fetch(
         `${API_BASE}/rootly/user-correlation/${userId}/github-username?github_username=${encodeURIComponent(usernameToSave)}`,
         {
@@ -3132,6 +3129,13 @@ export default function IntegrationsPage() {
                 userInfo={userInfo}
                 selectedOrganization={selectedOrganization}
                 integrations={integrations}
+                teamMembers={[]}
+                loadingTeamMembers={false}
+                loadingSyncedUsers={false}
+                syncedUsers={[]}
+                fetchTeamMembers={() => {}}
+                syncUsersToCorrelation={() => {}}
+                fetchSyncedUsers={() => {}}
                 setShowManualSurveyModal={setShowManualSurveyModal}
                 loadSlackPermissions={loadSlackPermissions}
                 loadSlackStatus={loadSlackIntegration}
@@ -4374,8 +4378,8 @@ export default function IntegrationsPage() {
         onClose={() => setShowPostIntegrationSyncModal(false)}
         onSyncNow={() => {
           setShowPostIntegrationSyncModal(false)
-          // Navigate to the Team page
-          router.push(`/team?org=${selectedOrganization}`)
+          // Navigate to the Management page
+          router.push(`/management?org=${selectedOrganization}`)
         }}
         integrationType={postIntegrationModalType || 'github'}
       />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { TopPanel } from "@/components/TopPanel"
 import { toast } from "sonner"
@@ -28,17 +28,17 @@ import {
   ChevronRight,
   Loader2,
   RefreshCw,
-  UserPlus,
   Search,
-  CheckCircle,
   Pencil,
+  CheckCircle,
 } from "lucide-react"
 import * as TeamHandlers from "@/app/integrations/handlers/team-handlers"
 import { API_BASE, type Integration } from "@/app/integrations/types"
+import { UserMappingDrawer } from "./components/UserMappingDrawer"
 
 const TEAM_MEMBERS_PER_PAGE = 20
 
-export default function TeamPage() {
+function TeamPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -66,6 +66,10 @@ export default function TeamPage() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
+
+  // User mapping drawer state
+  const [selectedUserForMapping, setSelectedUserForMapping] = useState<any | null>(null)
+  const [mappingDrawerOpen, setMappingDrawerOpen] = useState(false)
 
   // Sync confirmation modal state
   const [showSyncConfirmModal, setShowSyncConfirmModal] = useState(false)
@@ -189,20 +193,20 @@ export default function TeamPage() {
         syncedUsersCache.current.set(selectedOrganization, users)
 
         // Load saved recipients
-        const recipientIds = new Set(users.filter((u: any) => u.is_survey_recipient).map((u: any) => u.id))
+        const recipientIds = new Set<number>(users.filter((u: any) => u.is_survey_recipient).map((u: any) => u.id as number))
         setSelectedRecipients(recipientIds)
         setSavedRecipients(recipientIds)
         recipientsCache.current.set(selectedOrganization, recipientIds)
 
         if (showToast) {
-          toast.success(`Loaded ${users.length} team members`)
+          toast.success(`Loaded ${users.length} users`)
         }
       } else {
-        toast.error("Failed to load team members")
+        toast.error("Failed to load users")
       }
     } catch (error) {
       console.error("Error fetching synced users:", error)
-      toast.error("Error loading team members")
+      toast.error("Error loading users")
     } finally {
       setLoadingSyncedUsers(false)
     }
@@ -242,7 +246,7 @@ export default function TeamPage() {
 
       setSyncProgress({
         stage: "Sync Complete!",
-        details: "Your team members have been successfully synced",
+        details: "Your users have been successfully synced",
         isLoading: false,
         results: {
           created: syncResults.created,
@@ -264,7 +268,7 @@ export default function TeamPage() {
     }
   }
 
-  // Refresh on-call status for team members
+  // Refresh on-call status for users
   const refreshOnCallStatus = async () => {
     if (!selectedOrganization) return
 
@@ -297,6 +301,22 @@ export default function TeamPage() {
     } finally {
       setRefreshingOnCall(false)
     }
+  }
+
+  // Open mapping drawer
+  const openMappingDrawer = (user: any) => {
+    setSelectedUserForMapping(user)
+    setMappingDrawerOpen(true)
+  }
+
+  const closeMappingDrawer = () => {
+    setSelectedUserForMapping(null)
+    setMappingDrawerOpen(false)
+  }
+
+  const handleMappingUpdated = async () => {
+    // Refresh the user data to show updated mappings
+    await fetchSyncedUsers(false, false, true)
   }
 
   // Save recipient selections to database
@@ -361,13 +381,12 @@ export default function TeamPage() {
     setCurrentPage(1)
   }, [searchQuery])
 
-  // Get integration badges for a user
+  // Get integration logos for a user
   const getUserIntegrations = (user: any) => {
     const integrations = []
-    if (user.github_username) integrations.push({ name: 'GitHub', color: 'bg-blue-100 text-blue-800' })
-    if (user.jira_username) integrations.push({ name: 'Jira', color: 'bg-purple-100 text-purple-800' })
-    if (user.linear_username) integrations.push({ name: 'Linear', color: 'bg-indigo-100 text-indigo-800' })
-    if (user.slack_user_id) integrations.push({ name: 'Slack', color: 'bg-pink-100 text-pink-800' })
+    if (user.github_username) integrations.push('github')
+    if (user.jira_account_id) integrations.push('jira')
+    if (user.linear_user_id) integrations.push('linear')
     return integrations
   }
 
@@ -399,71 +418,48 @@ export default function TeamPage() {
             </div>
           </div>
 
-          {/* Team Members Section */}
+          {/* Organization Management Section */}
           {selectedOrganization && (
             <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
               {/* Header with Search and Actions */}
               <div className="p-6 border-b border-neutral-200">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-neutral-900">Team Members</h2>
+                  <h2 className="text-xl font-semibold text-neutral-900">Organization Management</h2>
                   <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                      <Input
-                        type="text"
-                        placeholder="Search members..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 w-64"
-                      />
-                    </div>
-                    <Button variant="outline" disabled>
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Invite
+                    <Button
+                      onClick={() => setShowSyncConfirmModal(true)}
+                      disabled={loadingSyncedUsers}
+                      className="bg-purple-700 hover:bg-purple-800"
+                    >
+                      Sync Now
+                    </Button>
+                    <Button
+                      onClick={refreshOnCallStatus}
+                      disabled={refreshingOnCall}
+                      variant="outline"
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-2 ${refreshingOnCall ? 'animate-spin' : ''}`} />
+                      Refresh On-Call
                     </Button>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex items-center gap-3">
-                  <Button
-                    onClick={() => setShowSyncConfirmModal(true)}
-                    disabled={loadingSyncedUsers}
-                    className="bg-purple-700 hover:bg-purple-800"
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${loadingSyncedUsers ? 'animate-spin' : ''}`} />
-                    Sync Now
-                  </Button>
-                  <Button
-                    onClick={refreshOnCallStatus}
-                    disabled={refreshingOnCall}
-                    variant="outline"
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${refreshingOnCall ? 'animate-spin' : ''}`} />
-                    Refresh On-Call
-                  </Button>
-                  <Button
-                    onClick={saveRecipientSelections}
-                    disabled={!hasUnsavedChanges() || savingRecipients}
-                    variant="outline"
-                    className="disabled:opacity-50"
-                  >
-                    {savingRecipients ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Save Recipients
-                      </>
-                    )}
-                  </Button>
+                {/* Search Bar */}
+                <div className="mb-4">
+                  <div className="relative max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    <Input
+                      type="text"
+                      placeholder="Search members..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 w-full"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Team Members Table */}
+              {/* Management Table */}
               {loadingSyncedUsers ? (
                 <div className="flex items-center justify-center h-96">
                   <Loader2 className="w-8 h-8 animate-spin text-purple-700" />
@@ -472,7 +468,7 @@ export default function TeamPage() {
                 <div className="flex items-center justify-center h-96">
                   <div className="text-center">
                     <p className="text-neutral-600">
-                      {syncedUsers.length === 0 ? 'No team members synced yet' : 'No members found'}
+                      {syncedUsers.length === 0 ? 'No users synced yet' : 'No members found'}
                     </p>
                     {syncedUsers.length === 0 && (
                       <Button
@@ -491,24 +487,6 @@ export default function TeamPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-neutral-200 bg-neutral-50">
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">
-                            <input
-                              type="checkbox"
-                              checked={paginatedUsers.length > 0 && paginatedUsers.every(u => selectedRecipients.has(u.id))}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  const newRecipients = new Set(selectedRecipients)
-                                  paginatedUsers.forEach(u => newRecipients.add(u.id))
-                                  setSelectedRecipients(newRecipients)
-                                } else {
-                                  const newRecipients = new Set(selectedRecipients)
-                                  paginatedUsers.forEach(u => newRecipients.delete(u.id))
-                                  setSelectedRecipients(newRecipients)
-                                }
-                              }}
-                              className="w-4 h-4 cursor-pointer"
-                            />
-                          </th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Name</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">On-Call Status</th>
@@ -524,22 +502,6 @@ export default function TeamPage() {
 
                           return (
                             <tr key={user.id} className={`border-b border-neutral-100 hover:bg-neutral-50 ${index === paginatedUsers.length - 1 ? 'border-b-0' : ''}`}>
-                              <td className="py-4 px-6">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedRecipients.has(user.id)}
-                                  onChange={(e) => {
-                                    const newRecipients = new Set(selectedRecipients)
-                                    if (e.target.checked) {
-                                      newRecipients.add(user.id)
-                                    } else {
-                                      newRecipients.delete(user.id)
-                                    }
-                                    setSelectedRecipients(newRecipients)
-                                  }}
-                                  className="w-4 h-4 cursor-pointer"
-                                />
-                              </td>
                               <td className="py-4 px-6">
                                 <div className="flex items-center gap-3">
                                   <Avatar className="w-9 h-9">
@@ -578,24 +540,42 @@ export default function TeamPage() {
                                 <span className="text-sm text-neutral-900">Member</span>
                               </td>
                               <td className="py-4 px-6">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {integrations.slice(0, 2).map((int, idx) => (
-                                    <Badge key={idx} className={`text-xs ${int.color}`}>
-                                      {int.name}
-                                    </Badge>
-                                  ))}
-                                  {integrations.length > 2 && (
-                                    <span className="text-xs text-neutral-500">
-                                      {integrations.length - 2} more
-                                    </span>
-                                  )}
-                                  {integrations.length === 0 && (
+                                <div className="flex items-center gap-2">
+                                  {integrations.length > 0 ? (
+                                    integrations.map((integration) => (
+                                      <div
+                                        key={integration}
+                                        className="w-6 h-6 flex items-center justify-center"
+                                        title={integration.charAt(0).toUpperCase() + integration.slice(1)}
+                                      >
+                                        {integration === 'github' && (
+                                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                                          </svg>
+                                        )}
+                                        {integration === 'jira' && (
+                                          <svg className="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z"/>
+                                          </svg>
+                                        )}
+                                        {integration === 'linear' && (
+                                          <svg className="w-5 h-5 text-purple-600" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M2.5 1.5v21h21v-21h-21zm19.5 19.5h-18v-18h18v18zm-16-2h14v-2h-14v2zm0-4h14v-2h-14v2zm0-4h14v-2h-14v2zm0-4h14v-2h-14v2z"/>
+                                          </svg>
+                                        )}
+                                      </div>
+                                    ))
+                                  ) : (
                                     <span className="text-xs text-neutral-400">None</span>
                                   )}
                                 </div>
                               </td>
                               <td className="py-4 px-6">
-                                <button className="text-neutral-400 hover:text-neutral-600" disabled>
+                                <button
+                                  className="text-neutral-400 hover:text-neutral-600 transition-colors"
+                                  onClick={() => openMappingDrawer(user)}
+                                  title="Edit integration mappings"
+                                >
                                   <Pencil className="w-4 h-4" />
                                 </button>
                               </td>
@@ -642,7 +622,7 @@ export default function TeamPage() {
 
           {!selectedOrganization && !loadingIntegrations && (
             <div className="flex items-center justify-center h-96">
-              <p className="text-neutral-600">Please select an organization to view team members</p>
+              <p className="text-neutral-600">Please select an organization to view users</p>
             </div>
           )}
         </div>
@@ -654,9 +634,9 @@ export default function TeamPage() {
           {!syncProgress ? (
             <>
               <DialogHeader>
-                <DialogTitle>Sync Team Members</DialogTitle>
+                <DialogTitle>Sync Organization Users</DialogTitle>
                 <DialogDescription>
-                  This will sync all team members from your connected integrations and match them with GitHub, Jira, and Linear accounts
+                  This will sync all users from your connected integrations and match them with GitHub, Jira, and Linear accounts
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -717,6 +697,23 @@ export default function TeamPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* User Mapping Drawer */}
+      <UserMappingDrawer
+        isOpen={mappingDrawerOpen}
+        onClose={closeMappingDrawer}
+        user={selectedUserForMapping}
+        selectedOrganization={selectedOrganization}
+        onMappingUpdated={handleMappingUpdated}
+      />
     </>
+  )
+}
+
+export default function TeamPage() {
+  return (
+    <Suspense>
+      <TeamPageContent />
+    </Suspense>
   )
 }
