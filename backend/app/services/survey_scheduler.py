@@ -721,7 +721,8 @@ class SurveyScheduler:
             UserCorrelation.slack_user_id.isnot(None)  # Must have Slack ID
         ).order_by(UserCorrelation.id.desc()).all()
 
-        # Use a dict to deduplicate by correlation_id (in case user has multiple UserCorrelation records)
+        # Use a dict to deduplicate by email (prevents duplicate surveys to same person)
+        # Query is ordered by correlation.id DESC, so we keep the most recent correlation
         recipients_dict = {}
         for correlation, user, preference in users:
             # CRITICAL: Validate email matching to prevent wrong user mapping (only if user exists)
@@ -733,9 +734,9 @@ class SurveyScheduler:
                 )
                 continue
 
-            # Skip if we already processed this correlation
-            if correlation.id in recipients_dict:
-                logger.debug(f"Duplicate correlation {correlation.id}, keeping first (most recent)")
+            # Skip if we already processed this email (keep most recent correlation)
+            if correlation.email in recipients_dict:
+                logger.debug(f"Duplicate email {correlation.email}, keeping first correlation (most recent)")
                 continue
 
             # NEW: Filter by saved recipient selections if configured
@@ -753,7 +754,7 @@ class SurveyScheduler:
             if is_reminder and user and preference and not preference.receive_reminders:
                 continue
 
-            recipients_dict[correlation.id] = {
+            recipients_dict[correlation.email] = {
                 'user_id': user.id if user else None,
                 'slack_user_id': correlation.slack_user_id,
                 'email': correlation.email,
