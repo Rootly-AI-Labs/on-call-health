@@ -377,11 +377,6 @@ function TeamPageContent() {
   const startIndex = (currentPage - 1) * TEAM_MEMBERS_PER_PAGE
   const paginatedUsers = filteredUsers.slice(startIndex, startIndex + TEAM_MEMBERS_PER_PAGE)
 
-  // Reset to page 1 when search changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchQuery])
-
   // Get integration logos for a user
   const getUserIntegrations = (user: any) => {
     const integrations = []

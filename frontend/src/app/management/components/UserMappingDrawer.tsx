@@ -179,25 +179,42 @@ export function UserMappingDrawer({
   }
 
   const filterGithubOptions = (query: string) => {
-    if (!query) return githubUsers
-    return githubUsers.filter((username) =>
-      username.toLowerCase().includes(query.toLowerCase())
-    )
+    let filtered = githubUsers
+    if (query) {
+      filtered = githubUsers.filter((username) =>
+        username.toLowerCase().includes(query.toLowerCase())
+      )
+    }
+    return filtered.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
   }
 
   const filterJiraOptions = (query: string) => {
-    if (!query) return jiraUsers
-    return jiraUsers.filter((jiraUser) => {
-      const displayName = jiraUser.display_name || jiraUser.email || ""
-      return displayName.toLowerCase().includes(query.toLowerCase())
+    let filtered = jiraUsers
+    if (query) {
+      filtered = jiraUsers.filter((jiraUser) => {
+        const displayName = jiraUser.display_name || jiraUser.email || ""
+        return displayName.toLowerCase().includes(query.toLowerCase())
+      })
+    }
+    return filtered.sort((a, b) => {
+      const aName = (a.display_name || a.email || "").toLowerCase()
+      const bName = (b.display_name || b.email || "").toLowerCase()
+      return aName.localeCompare(bName)
     })
   }
 
   const filterLinearOptions = (query: string) => {
-    if (!query) return linearUsers
-    return linearUsers.filter((linearUser) => {
-      const displayName = linearUser.name || linearUser.email || ""
-      return displayName.toLowerCase().includes(query.toLowerCase())
+    let filtered = linearUsers
+    if (query) {
+      filtered = linearUsers.filter((linearUser) => {
+        const displayName = linearUser.name || linearUser.email || ""
+        return displayName.toLowerCase().includes(query.toLowerCase())
+      })
+    }
+    return filtered.sort((a, b) => {
+      const aName = (a.name || a.email || "").toLowerCase()
+      const bName = (b.name || b.email || "").toLowerCase()
+      return aName.localeCompare(bName)
     })
   }
 
