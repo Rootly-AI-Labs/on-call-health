@@ -281,7 +281,6 @@ class UnifiedBurnoutAnalyzer:
 
             # create map with user time zones
             self.user_tz_by_id = self._build_user_tz_map(users)
-            # print(self.user_tz_by_id)
 
             incidents = data.get("incidents", []) if data else []
             metadata = data.get("collection_metadata", {}) if data else {}
@@ -518,14 +517,6 @@ class UnifiedBurnoutAnalyzer:
                         total_prs = sum(len(data.get('pull_requests', [])) for data in github_data.values() if data)
                         users_with_data = sum(1 for data in github_data.values() if data and (data.get('commits') or data.get('pull_requests')))
                         logger.info(f"GitHub data summary: {users_with_data}/{len(github_data)} users with activity, {total_commits} total commits, {total_prs} total PRs")
-
-                        # # Write raw GitHub data to file
-                        # try:
-                        #     with open('github_raw.txt', 'w', encoding='utf-8') as f:
-                        #         f.write(json.dumps(github_data, indent=2, default=str))
-                        #     logger.info(f"Written raw GitHub data to github_raw.txt")
-                        # except Exception as e:
-                        #     logger.error(f"Failed to write GitHub raw data to file: {e}")
                     except Exception as e:
                         logger.error(f"GitHub data collection failed: {e}")
                         log_substep_skipped("STEP 2a: GitHub Data", f"Error: {str(e)[:100]}")
@@ -546,14 +537,6 @@ class UnifiedBurnoutAnalyzer:
                 #             user_id=user_id, analysis_id=analysis_id, source_platform=self.platform
                 #         )
                 #         logger.info(f"Collected Slack data for {len(slack_data)} users")
-                #
-                #         # # Write raw Slack data to file
-                #         # try:
-                #         #     with open('slack_raw.txt', 'w', encoding='utf-8') as f:
-                #         #         f.write(json.dumps(slack_data, indent=2, default=str))
-                #         #     logger.info(f"Written raw Slack data to slack_raw.txt")
-                #         # except Exception as e:
-                #         #     logger.error(f"Failed to write Slack raw data to file: {e}")
                 #     except Exception as e:
                 #         logger.error(f"❌ CHECKPOINT 2b: Slack data collection FAILED: {e}")
                 #         logger.error(f"Slack data collection failed: {e}")
@@ -1302,15 +1285,6 @@ class UnifiedBurnoutAnalyzer:
             
             logger.info(f"ANALYZER DATA RESULT: {days_back}-day analysis data fetched successfully")
             logger.info(f"ANALYZER DATA METRICS: {users_count} users, {incidents_count} incidents in {fetch_duration:.2f}s")
-
-            # # Write raw Rootly/PagerDuty data to file
-            # try:
-            #     filename = f"{self.platform}_raw.txt"
-            #     with open(filename, 'w', encoding='utf-8') as f:
-            #         f.write(json.dumps(data, indent=2, default=str))
-            #     logger.info(f"Written raw {self.platform} data to {filename}")
-            # except Exception as e:
-            #     logger.error(f"Failed to write {self.platform} raw data to file: {e}")
 
             # Log performance details if available
             if performance_metrics:
@@ -2146,7 +2120,6 @@ class UnifiedBurnoutAnalyzer:
         for incident in incidents:
             # Handle both Rootly (with attributes) and PagerDuty (normalized) formats
             if self.platform == "pagerduty":
-                # print("USING PAGERDUTY")
                 # PagerDuty normalized format
                 created_at = incident.get("created_at")
                 acknowledged_at = incident.get("acknowledged_at")
@@ -2154,7 +2127,6 @@ class UnifiedBurnoutAnalyzer:
                 status = incident.get("status", "unknown")
             else:
                 # Rootly format
-                # print("USING ROOTLY")
                 attrs = incident.get("attributes", {})
                 created_at = attrs.get("created_at")
                 # Try multiple timestamp fields for response time calculation
@@ -2182,11 +2154,6 @@ class UnifiedBurnoutAnalyzer:
             if created_at:
                 dt = self._parse_iso_utc(created_at)
                 dt_local = self._to_local(dt, user_tz)
-                # print("LOCAL pagerduty/rootly Weekday at: ", dt_local.weekday())
-
-                # # Uncomment to test and validate:
-                # print("PAGE DUTY or ROOTLY Regular: ", dt)
-                # print("PAGER DUTY or ROOTLY Local Timezone: ", user_tz, " now is: ", dt_local)
 
                 if dt_local:
                     # After hours: before 9 AM or after 6 PM
@@ -2294,7 +2261,6 @@ class UnifiedBurnoutAnalyzer:
                     continue
                 dt_local = self._to_local(dt_utc, user_tz)
                 commit_hours.append(dt_local.hour)
-                print("LOCAL Github weekday at: ", dt_local.weekday())
                 commit_weekdays.append(dt_local.weekday())
 
                 date_key = dt_local.date()
@@ -2422,8 +2388,6 @@ class UnifiedBurnoutAnalyzer:
         channels = slack_data.get("channels_active", 0)
         response_times = slack_data.get("response_times", [])
 
-        print("seeing slack mesages")
-
         if messages:
 
             message_hours = []
@@ -2435,9 +2399,6 @@ class UnifiedBurnoutAnalyzer:
                 if not dt_utc:
                     continue
                 dt_local = self._to_local(dt_utc, user_tz)
-                # Uncomment below to verify slack
-                # print("SLACK TIME UTC: ", dt_utc)
-                # print("AFTER TIME AFTER TZ ADJUSTMENT: ", dt_local)
                 message_hours.append(dt_local.hour)
 
                 message_weekdays.append(dt_local.weekday())
@@ -2645,10 +2606,6 @@ class UnifiedBurnoutAnalyzer:
                     if created_at:
                         dt_utc = self._parse_iso_utc(created_at)
                         dt_local = self._to_local(dt_utc, user_tz)
-
-                        # #uncomment for testing
-                        # print("CONFIDENCE INTERVAL IN UTC: ", dt_utc)
-                        # print("CONFIDENCE INTERVAL IN LOCAL TIME: ", dt_local)
                         incident_dates.add(dt_local.date())
                 except:
                     continue
@@ -2898,68 +2855,6 @@ class UnifiedBurnoutAnalyzer:
         
         # Real accomplishment calculation (lower = better sense of accomplishment)
         return (workload_impact * 0.5 + complexity_handling * 0.3 + (10 - response_performance) * 0.2)
-    
-    def _calculate_on_call_burden(self, user_email: str, shifts: List[Dict[str, Any]], 
-                                total_team_size: int) -> float:
-        """
-        Calculate on-call burden score based on research findings.
-        Returns base stress score (15-25 points) for being on-call during analysis period.
-        """
-        if not shifts or not user_email:
-            return 0.0
-            
-        # Check if this user was actually on-call during the analysis period
-        user_shifts = [shift for shift in shifts if 
-                      shift.get('user', {}).get('email', '').lower() == user_email.lower()]
-        
-        if not user_shifts:
-            return 0.0  # User wasn't on-call during this period
-            
-        from backend.app.core.burnout_config import BurnoutConfig
-        config = BurnoutConfig()
-        
-        # Calculate shift frequency to determine base stress level
-        total_shift_hours = 0
-        for shift in user_shifts:
-            start_time = shift.get('start_time')
-            end_time = shift.get('end_time')
-            if start_time and end_time:
-                try:
-                    from datetime import datetime, timezone
-                    start = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-                    end = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
-                    hours = (end - start).total_seconds() / 3600
-                    total_shift_hours += hours
-                except:
-                    # Fallback: assume 8-hour shift
-                    total_shift_hours += 8
-                    
-        # Estimate rotation frequency based on total hours
-        days_in_period = 30  # Analysis period
-        hours_per_week = (total_shift_hours / days_in_period) * 7
-        
-        if hours_per_week >= 40:  # Weekly rotation or more
-            base_stress = config.ON_CALL_BURDEN['base_stress']['weekly_rotation']
-        elif hours_per_week >= 20:  # Bi-weekly rotation  
-            base_stress = config.ON_CALL_BURDEN['base_stress']['bi_weekly_rotation']
-        else:  # Monthly rotation
-            base_stress = config.ON_CALL_BURDEN['base_stress']['monthly_rotation']
-            
-        # Apply team size modifier (smaller teams = higher individual burden)
-        if total_team_size < 5:
-            team_modifier = config.ON_CALL_BURDEN['team_size_modifiers']['understaffed']
-        elif total_team_size < 8:
-            team_modifier = config.ON_CALL_BURDEN['team_size_modifiers']['minimal']
-        else:
-            team_modifier = config.ON_CALL_BURDEN['team_size_modifiers']['adequate']
-            
-        final_score = base_stress * team_modifier
-        
-        logger.info(f"On-call burden for {user_email}: {len(user_shifts)} shifts, "
-                        f"{total_shift_hours:.1f}h total, base={base_stress}, "
-                        f"team_modifier={team_modifier}, final={final_score}")
-        
-        return final_score
 
     def _calculate_burnout_factors(self, metrics: Dict[str, Any]) -> Dict[str, float]:
         """Calculate individual burnout factors for UI display, including GitHub after-hours data."""
@@ -3009,34 +2904,6 @@ class UnifiedBurnoutAnalyzer:
         }
         
         return {k: round(v, 2) for k, v in factors.items()}
-
-    def _calculate_compound_trauma_factor(self, critical_incident_count: int) -> float:
-        """
-        Calculate compound trauma factor based on research showing exponential psychological impact.
-
-        Research basis: Multiple critical incidents create compound trauma, not just additive impact.
-        - 5-10 critical incidents: 10% compound effect
-        - 10+ critical incidents: 15% compound effect per additional incident (capped at 2.0x)
-
-        Args:
-            critical_incident_count: Number of SEV0/SEV1 incidents
-
-        Returns:
-            Compound factor (1.0-2.0)
-
-        Note: This method uses raw counts. For rate-based calculation (recommended),
-        use _calculate_compound_trauma_factor_rate() instead.
-        """
-        if critical_incident_count < 5:
-            return 1.0  # No compound effect for low counts
-        elif critical_incident_count <= 10:
-            # Moderate compound effect: 10% increase
-            return 1.0 + (critical_incident_count - 5) * 0.02  # 10% over 5 incidents
-        else:
-            # High compound effect: 15% per additional incident, capped at 2.0x
-            base_compound = 1.1  # 10% for first 10 incidents
-            additional_compound = (critical_incident_count - 10) * 0.15
-            return min(2.0, base_compound + additional_compound)
 
     def _calculate_compound_trauma_factor_rate(self, critical_per_week: float) -> float:
         """
@@ -3243,44 +3110,11 @@ class UnifiedBurnoutAnalyzer:
             if not tz_utc:
                 return None
             tz_local =  self._to_local(tz_utc, user_tz)
-
-            # # For testing purposes, uncomment to view
-            # print("UTC TIMEZONE:", tz_utc)
-            # print("LOCAL TIMEZONE:", tz_local, " for the time zone: ", user_tz)
             return tz_local
         except Exception as e:
             logger.warning(f"Failed to parse incident time: {e}")
         return None
 
-    def _calculate_burnout_score(self, factors: Dict[str, float]) -> float:
-        """Calculate overall burnout score using three-factor methodology."""
-        # First get the metrics to calculate proper dimensions
-        # For now, we'll use the factors to approximate dimensions
-        
-        # Emotional Exhaustion - workload and time pressure
-        emotional_exhaustion = (factors.get("workload", 0) * 0.5 +
-                              factors.get("after_hours", 0) * 0.3 +
-                              factors.get("incident_load", 0) * 0.2)
-
-        # Depersonalization/Cynicism - stress response and withdrawal
-        depersonalization = (factors.get("response_time", 0) * 0.5 +
-                           factors.get("weekend_work", 0) * 0.5)
-
-        # Personal Accomplishment (inverted) - effectiveness under pressure
-        personal_accomplishment = 10 - (factors.get("response_time", 0) * 0.4 +
-                                       factors.get("incident_load", 0) * 0.6)
-        personal_accomplishment = max(0, personal_accomplishment)
-        
-        # Calculate final score using equal weights
-        # Ensure personal accomplishment is properly bounded to prevent negative scores
-        pa_score = min(10, max(0, personal_accomplishment))
-        burnout_score = (emotional_exhaustion * 0.4 + 
-                        depersonalization * 0.3 + 
-                        (10 - pa_score) * 0.3)
-        
-        # Ensure overall score is never negative
-        return max(0, burnout_score)
-    
     def _determine_risk_level(self, burnout_score: float) -> str:
         """Determine risk level based on burnout score using standardized thresholds."""
         from ..core.burnout_config import determine_risk_level
@@ -3482,7 +3316,7 @@ class UnifiedBurnoutAnalyzer:
             avg_after_hours = sum(after_hours_values) / len(after_hours_values) if after_hours_values and len(after_hours_values) > 0 else 0
             if avg_after_hours > 0.25:
                 recommendations.append({
-                    "type": "emotional_exhaustion",
+                    "type": "personal_burnout",
                     "priority": "high",
                     "message": "Implement follow-the-sun support or adjust business hours coverage"
                 })
@@ -3507,7 +3341,7 @@ class UnifiedBurnoutAnalyzer:
             avg_weekend = sum(weekend_values) / len(weekend_values) if weekend_values and len(weekend_values) > 0 else 0
             if avg_weekend > 0.15:
                 recommendations.append({
-                    "type": "emotional_exhaustion", 
+                    "type": "personal_burnout",
                     "priority": "medium",
                     "message": "Review weekend on-call compensation and rotation frequency"
                 })
@@ -3516,8 +3350,8 @@ class UnifiedBurnoutAnalyzer:
             workload_variance = self._calculate_workload_variance(members)
             if workload_variance > 0.5:
                 recommendations.append({
-                    "type": "depersonalization",
-                    "priority": "medium", 
+                    "type": "work_related_burnout",
+                    "priority": "medium",
                     "message": "Incident load is unevenly distributed - consider load balancing strategies"
                 })
             
@@ -3541,7 +3375,7 @@ class UnifiedBurnoutAnalyzer:
             avg_response = sum(response_values) / len(response_values) if response_values and len(response_values) > 0 else 0
             if avg_response > 30:
                 recommendations.append({
-                    "type": "personal_accomplishment",
+                    "type": "work_related_burnout",
                     "priority": "medium",
                     "message": "Review alerting and escalation procedures to improve response times"
                 })
@@ -3549,8 +3383,8 @@ class UnifiedBurnoutAnalyzer:
         # Include research-based recommendations
         if health_status in ["excellent", "good"]:
             recommendations.append({
-                "type": "personal_accomplishment",
-                "priority": "low", 
+                "type": "general",
+                "priority": "low",
                 "message": "Continue current practices and monitor for changes in team health metrics"
             })
         
@@ -3559,7 +3393,7 @@ class UnifiedBurnoutAnalyzer:
             high_burnout_members = [m for m in members if m.get("burnout_score", 0) >= 7.0]
             if high_burnout_members:
                 recommendations.append({
-                    "type": "emotional_exhaustion",
+                    "type": "personal_burnout",
                     "priority": "high",
                     "message": "Provide stress management training and consider workload redistribution for high-burnout individuals"
                 })
@@ -5129,7 +4963,6 @@ class UnifiedBurnoutAnalyzer:
             logger.error(f"JIRA CORRELATION: Error correlating Jira data: {e}")
             return members
 
-    # TODO: adjust if needed
     def _recalculate_burnout_with_jira(self, members: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Recalculate OCH scores incorporating Jira ticket workload data.
@@ -5221,9 +5054,6 @@ class UnifiedBurnoutAnalyzer:
             logger.error(f"Error in _recalculate_burnout_with_jira: {e}")
             return members
 
-
-
-        # TODO: finetune - fix so that we use deadline date, priority and number of tickets for user to contribute to the score
     def _calculate_jira_och_contribution(
         self,
         tickets: Optional[List[Dict[str, Any]]]
@@ -5747,40 +5577,28 @@ class UnifiedBurnoutAnalyzer:
             
             # Cap exhaustion score at 10
             exhaustion_score = min(10.0, exhaustion_score)
-            
-            # Depersonalization Score (0-10, based on work patterns)
-            # High volume with poor work-life balance suggests cynicism
-            depersonalization_score = 0.0
-            if commits_per_week >= 100:  # Extreme activity often leads to cynicism
-                depersonalization_score = 8.0
+
+            # Work-Related Burnout Score (0-10, based on work patterns)
+            # High volume with poor work-life balance indicates work stress
+            work_burnout_score = 0.0
+            if commits_per_week >= 100:  # Extreme activity
+                work_burnout_score = 8.0
             elif commits_per_week >= 80:  # Very extreme activity
-                depersonalization_score = 6.0
+                work_burnout_score = 6.0
             elif commits_per_week >= 60:
-                depersonalization_score = 5.0
+                work_burnout_score = 5.0
             elif commits_per_week >= 40:
-                depersonalization_score = 2.5
+                work_burnout_score = 2.5
             elif commits_per_week > 30 and (after_hours_commits + weekend_commits) > (commits_count * 0.2):
-                depersonalization_score = 3.0
+                work_burnout_score = 3.0
             elif commits_per_week > 20:
-                depersonalization_score = 1.0
-            
-            # Personal Accomplishment Score (0-10, higher = better accomplishment)
-            # Assume reasonable accomplishment for active developers
-            accomplishment_score = 7.0  # Default good accomplishment for active devs
-            
-            # Reduce if showing signs of overwork (quality may suffer)
-            if commits_per_week > 50:
-                accomplishment_score = 5.0  # May indicate rushed work
-            elif commits_per_week > 30:
-                accomplishment_score = 6.0
-            
-            # Calculate final burnout score using equal weighting
-            # Personal Burnout (33.3%), Work-Related Burnout (33.3%), Client-Related Burnout (33.4%)
-            # Slightly increased exhaustion weight for GitHub-based scoring
+                work_burnout_score = 1.0
+
+            # Calculate final burnout score using OCH methodology
+            # Personal Burnout (65%), Work-Related Burnout (35%)
             burnout_score = (
-                exhaustion_score * 0.45 +
-                depersonalization_score * 0.35 +
-                (10 - accomplishment_score) * 0.20
+                exhaustion_score * 0.65 +
+                work_burnout_score * 0.35
             )
             
             # Ensure score is between 0 and 10
@@ -5902,33 +5720,7 @@ class UnifiedBurnoutAnalyzer:
                 "factors": {},
                 "error": f"Calculation error: {str(e)}"
             }
-    
-    def _get_user_email_from_user(self, user: Dict) -> str:
-        """Extract user email from user data, handling different formats."""
-        if isinstance(user, dict):
-            # Handle JSONAPI format
-            if "attributes" in user:
-                attrs = user["attributes"]
-                return attrs.get("email", "").strip().lower() if attrs.get("email") else ""
-            # Handle direct format
-            elif "email" in user:
-                return user["email"].strip().lower() if user["email"] else ""
-        return ""
-    
-    def _get_user_name_from_user(self, user: Dict) -> str:
-        """Extract user name from user data, handling different formats."""
-        if isinstance(user, dict):
-            # Handle JSONAPI format
-            if "attributes" in user:
-                attrs = user["attributes"]
-                return attrs.get("name", attrs.get("full_name", "Unknown User"))
-            # Handle direct format
-            elif "name" in user:
-                return user["name"]
-            elif "full_name" in user:
-                return user["full_name"]
-        return "Unknown User"
-    
+
     def _create_error_response(self, error_message: str) -> Dict[str, Any]:
         """Create a standardized error response for failed analysis."""
         return {

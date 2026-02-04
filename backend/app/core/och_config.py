@@ -2,7 +2,8 @@
 On-Call Health (OCH) Configuration Module
 
 This module implements the On-Call Health methodology for burnout assessment.
-OCH is inspired by the Copenhagen Burnout Inventory (CBI) which is scientifically validated and more applicable to software engineers than the Maslach approach.
+OCH is inspired by the Copenhagen Burnout Inventory (CBI) which is scientifically validated
+and specifically adapted for software engineers and on-call work.
 
 OCH uses two dimensions for software engineers:
 1. Personal Burnout (6 items) - Physical and psychological fatigue/exhaustion

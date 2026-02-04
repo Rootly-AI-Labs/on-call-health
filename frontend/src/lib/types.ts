@@ -157,9 +157,9 @@ export interface OrganizationMember {
   email: string
   role?: string
   avatar?: string
-  cbiScore: number // CBI score (0-100)
+  cbiScore: number // OCH score (0-100, based on Copenhagen Burnout Inventory)
   cbi_score?: number // API returns snake_case
-  riskLevel: 'critical' | 'poor' | 'fair' | 'healthy' // CBI-based risk levels
+  riskLevel: 'critical' | 'poor' | 'fair' | 'healthy' // OCH-based risk levels
   trend: 'up' | 'down' | 'stable'
   incidentsHandled: number
   incident_count?: number // API returns this
@@ -198,10 +198,16 @@ export interface OrganizationMember {
     }
   }
   github_burnout_breakdown?: {
-    exhaustion_score: number
-    depersonalization_score: number
-    accomplishment_score: number
+    github_score: number
+    original_score: number
     final_score: number
+    score_source: string
+    github_indicators: {
+      high_commit_volume: boolean
+      excessive_commits: boolean
+      after_hours_work: boolean
+      weekend_work: boolean
+    }
   }
   // Additional fields from API response
   user_id?: string

@@ -2,14 +2,13 @@
 GitHub-Only Burnout Analyzer
 
 Scientifically rigorous burnout analysis using only GitHub data, based on established
-burnout research methodology. Implements flow state detection to distinguish healthy 
+burnout research methodology. Implements flow state detection to distinguish healthy
 high-productivity from burnout patterns.
 
 This analyzer can provide a complete burnout assessment (100% scoring) when GitHub is the
 only available data source, with appropriate confidence intervals and baseline comparisons.
 """
 import logging
-import math
 import statistics
 import os
 from datetime import datetime, timedelta, timezone
@@ -161,25 +160,22 @@ class GitHubOnlyBurnoutAnalyzer:
                 logger.warning(f"No GitHub metrics for {email}")
                 return None
             
-            # Calculate burnout dimensions using OCH methodology (inspired by Copenhagen Burnout Inventory)
+            # Calculate burnout dimensions using OCH methodology (Copenhagen Burnout Inventory)
+            # OCH uses 2 dimensions for software engineers (65/35 split)
             logger.debug(f"Using OCH methodology for {email}")
             personal_burnout = self._calculate_personal_burnout_och(
                 metrics, baselines, time_range_days
             )
-            
+
             work_related_burnout = self._calculate_work_burnout_och(
                 metrics, baselines, activity_data
             )
-            
-            accomplishment_burnout = self._calculate_accomplishment_burnout_och(
-                metrics, baselines, activity_data
-            )
-            
-            # Calculate overall burnout score using equal weights (OCH methodology)
+
+            # Calculate overall burnout score using OCH weights (65% personal, 35% work-related)
+            # Research shows personal factors (work-life balance) contribute more to burnout
             burnout_score = (
-                personal_burnout * 0.333 +
-                work_related_burnout * 0.333 + 
-                accomplishment_burnout * 0.334
+                personal_burnout * 0.65 +
+                work_related_burnout * 0.35
             )
             burnout_score = max(0, min(10, burnout_score))
             
@@ -200,8 +196,7 @@ class GitHubOnlyBurnoutAnalyzer:
                 "confidence_level": individual_confidence,
                 "burnout_dimensions": {
                     "personal_burnout": round(personal_burnout, 2),
-                    "work_related_burnout": round(work_related_burnout, 2),
-                    "accomplishment_burnout": round(accomplishment_burnout, 2)
+                    "work_related_burnout": round(work_related_burnout, 2)
                 },
                 "github_metrics": metrics,
                 "flow_state_analysis": flow_state_analysis,
@@ -823,7 +818,7 @@ class GitHubOnlyBurnoutAnalyzer:
         commits_pw = metrics.get("commits_per_week", 0)
         if commits_pw > self.thresholds["commits_per_week_high"]:
             indicators.append({
-                "type": "emotional_exhaustion",
+                "type": "personal_burnout",
                 "severity": "high",
                 "indicator": "excessive_commits",
                 "value": commits_pw,
@@ -831,51 +826,51 @@ class GitHubOnlyBurnoutAnalyzer:
             })
         elif commits_pw > self.thresholds["commits_per_week_medium"]:
             indicators.append({
-                "type": "emotional_exhaustion", 
+                "type": "personal_burnout",
                 "severity": "medium",
                 "indicator": "high_commits",
                 "value": commits_pw,
                 "message": f"High commit frequency ({commits_pw}/week) - monitor for sustainability"
             })
-        
+
         # After-hours activity
         after_hours = metrics.get("after_hours_commit_percentage", 0)
         if after_hours > self.thresholds["after_hours_commits_high"]:
             indicators.append({
-                "type": "emotional_exhaustion",
-                "severity": "high", 
+                "type": "personal_burnout",
+                "severity": "high",
                 "indicator": "excessive_after_hours",
                 "value": f"{after_hours:.1%}",
                 "message": f"High after-hours activity ({after_hours:.1%}) suggests poor work-life boundaries"
             })
-        
+
         # Weekend work
         weekend_pct = metrics.get("weekend_commit_percentage", 0)
         if weekend_pct > self.thresholds["weekend_commits_high"]:
             indicators.append({
-                "type": "depersonalization",
+                "type": "work_related_burnout",
                 "severity": "high",
                 "indicator": "weekend_work",
                 "value": f"{weekend_pct:.1%}",
                 "message": f"Frequent weekend work ({weekend_pct:.1%}) indicates unsustainable patterns"
             })
-        
+
         # Large PR patterns
         avg_pr_size = metrics.get("avg_pr_size", 0)
         if avg_pr_size > self.thresholds["pr_size_large"]:
             indicators.append({
-                "type": "depersonalization",
+                "type": "work_related_burnout",
                 "severity": "medium",
                 "indicator": "large_prs",
                 "value": avg_pr_size,
                 "message": f"Large PRs ({avg_pr_size} lines avg) may indicate reduced collaboration"
             })
-        
+
         # Low review participation
         review_rate = metrics.get("review_participation_rate", 1.0)
         if review_rate < self.thresholds["pr_review_participation_low"]:
             indicators.append({
-                "type": "depersonalization",
+                "type": "work_related_burnout",
                 "severity": "medium",
                 "indicator": "low_review_participation",
                 "value": f"{review_rate:.1%}",
@@ -1086,9 +1081,8 @@ class GitHubOnlyBurnoutAnalyzer:
         return {
             "analysis_type": "github_only",
             "burnout_dimensions": {
-                "personal_burnout": "33.3% weight - commit frequency, after-hours activity, work intensity",
-                "work_related_burnout": "33.3% weight - collaboration decline, communication quality, detachment signs", 
-                "accomplishment_burnout": "33.4% weight - code quality, review participation, knowledge sharing"
+                "personal_burnout": "65% weight - commit frequency, after-hours activity, work intensity",
+                "work_related_burnout": "35% weight - collaboration decline, communication quality, detachment signs"
             },
             "flow_state_detection": "Distinguishes healthy high productivity from frantic burnout patterns",
             "baseline_comparison": "Individual metrics compared to team and industry baselines",
