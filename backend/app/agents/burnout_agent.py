@@ -192,7 +192,7 @@ Step 3: Temporal Pattern Detection
 
 Step 4: Communication Health (if Slack data available)
 - Use sentiment_analyzer to assess communication stress
-- Look for negative sentiment patterns, stress keywords, emotional exhaustion
+- Look for negative sentiment patterns, stress keywords, signs of exhaustion
 
 Step 5: Cross-Platform Correlation
 - Use cross_platform_correlator to find hidden relationships
@@ -204,7 +204,7 @@ Step 6: Predictive Analysis
 
 Step 7: Synthesis and Recommendations
 - Integrate findings across all tools
-- Consider Maslach dimensions: Emotional Exhaustion, Depersonalization, Personal Accomplishment
+- Consider OCH dimensions: Personal Burnout (work-life balance, recovery) and Work-Related Burnout (on-call burden, workload)
 - Generate specific, time-sensitive interventions
 
 REASONING APPROACH:

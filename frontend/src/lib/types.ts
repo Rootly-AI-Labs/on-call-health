@@ -198,10 +198,16 @@ export interface OrganizationMember {
     }
   }
   github_burnout_breakdown?: {
-    exhaustion_score: number
-    depersonalization_score: number
-    accomplishment_score: number
+    github_score: number
+    original_score: number
     final_score: number
+    score_source: string
+    github_indicators: {
+      high_commit_volume: boolean
+      excessive_commits: boolean
+      after_hours_work: boolean
+      weekend_work: boolean
+    }
   }
   // Additional fields from API response
   user_id?: string
