@@ -223,6 +223,7 @@ export default function IntegrationsPage() {
   // Organization members and invitations state
   const [orgMembers, setOrgMembers] = useState([])
   const [pendingInvitations, setPendingInvitations] = useState([])
+  const [receivedInvitations, setReceivedInvitations] = useState([])
   const [loadingOrgData, setLoadingOrgData] = useState(false)
 
   // Sorting state
@@ -1531,7 +1532,8 @@ export default function IntegrationsPage() {
     return OrganizationHandlers.loadOrganizationData(
       setLoadingOrgData,
       setOrgMembers,
-      setPendingInvitations
+      setPendingInvitations,
+      setReceivedInvitations
     )
   }
 
@@ -4615,8 +4617,10 @@ export default function IntegrationsPage() {
         loadingOrgData={loadingOrgData}
         orgMembers={orgMembers}
         pendingInvitations={pendingInvitations}
+        receivedInvitations={receivedInvitations}
         userInfo={userInfo}
         onRoleChange={handleRoleChange}
+        onRefreshOrgData={loadOrganizationData}
         onClose={() => {
           setShowInviteModal(false)
           setInviteEmail("")

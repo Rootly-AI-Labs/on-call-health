@@ -119,7 +119,8 @@ export async function handleRoleChange(
 export async function loadOrganizationData(
   setLoadingOrgData: (loading: boolean) => void,
   setOrgMembers: (members: any[]) => void,
-  setPendingInvitations: (invitations: any[]) => void
+  setPendingInvitations: (invitations: any[]) => void,
+  setReceivedInvitations?: (invitations: any[]) => void
 ): Promise<void> {
   const authToken = localStorage.getItem('auth_token')
   if (!authToken) return
@@ -138,7 +139,7 @@ export async function loadOrganizationData(
       setOrgMembers(membersData.members || [])
     }
 
-    // Load pending invitations
+    // Load pending invitations (sent by org)
     const invitationsResponse = await fetch(`${API_BASE}/api/invitations/pending`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
@@ -148,6 +149,20 @@ export async function loadOrganizationData(
     if (invitationsResponse.ok) {
       const invitationsData = await invitationsResponse.json()
       setPendingInvitations(invitationsData.invitations || [])
+    }
+
+    // Load invitations received by current user
+    if (setReceivedInvitations) {
+      const myInvitationsResponse = await fetch(`${API_BASE}/api/invitations/my-invitations`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        }
+      })
+
+      if (myInvitationsResponse.ok) {
+        const myInvitationsData = await myInvitationsResponse.json()
+        setReceivedInvitations(myInvitationsData.invitations || [])
+      }
     }
 
   } catch (error) {
