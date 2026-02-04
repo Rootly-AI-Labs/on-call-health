@@ -347,23 +347,14 @@ def create_demo_analysis_for_new_user(db: Session, user: User) -> bool:
         config['demo_created_at'] = datetime.now().isoformat()
         config['demo_note'] = 'This is a sample analysis to help you explore the platform'
 
-        # Get or create an organization for the demo analysis
-        # This ensures survey data can be fetched (requires organization_id)
-        organization_id = _get_or_create_demo_organization(db)
-
-        # Assign user to the demo organization
-        # This ensures the API query succeeds: organization_id == organization_id
-        # Previously, new OAuth users had organization_id=NULL, causing 404 errors
-        user.organization_id = organization_id
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        logger.info(f"Assigned user {user.id} to demo organization {organization_id}")
+        # Do NOT assign user to demo organization - users should be org-less until they join/create one
+        # Demo analyses work fine with organization_id=NULL
+        logger.info(f"Creating org-less demo analysis for new user {user.id}")
 
         # Create the demo analysis
         analysis = Analysis(
             user_id=user.id,
-            organization_id=organization_id,  # Use demo organization for survey data
+            organization_id=None,  # Demo analyses are org-less
             rootly_integration_id=None,  # Demo doesn't need real integration
             integration_name="Demo Analysis",
             platform=original_analysis.get('platform', 'pagerduty'),
@@ -384,20 +375,9 @@ def create_demo_analysis_for_new_user(db: Session, user: User) -> bool:
             f"UUID: {analysis.uuid}"
         )
 
-        # Load health check-in data (burnout reports) for the user
-        try:
-            checkins_result = _load_health_checkins_for_user(db, user.id, organization_id, mock_data)
-            if checkins_result['created'] > 0 or checkins_result['skipped'] > 0:
-                db.commit()
-                logger.info(f"Committed {checkins_result['created']} new and {checkins_result['skipped']} "
-                            f"duplicate health check-ins for user {user.id}")
-        except Exception as e:
-            logger.warning(f"Failed to load health check-ins for user {user.id}: {e}")
-            # Don't fail the entire operation if health check-ins fail
-            try:
-                db.rollback()
-            except Exception as rollback_error:
-                logger.error(f"Failed to rollback health check-in transaction: {rollback_error}")
+        # Skip health check-in data for org-less demo analyses
+        # Health check-ins require organization_id, so we don't load them for demos anymore
+        logger.info(f"Skipping health check-ins for org-less demo user {user.id}")
 
         return True
 
