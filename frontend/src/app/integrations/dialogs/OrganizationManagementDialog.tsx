@@ -1,7 +1,8 @@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Users, Mail, Loader2, Check, X, Building2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Users, Mail, Loader2, Check, X, Building2, AlertCircle } from "lucide-react"
 import { UserInfo } from "../types"
 import { useState } from "react"
 import { toast } from "sonner"
@@ -81,9 +82,17 @@ export function OrganizationManagementDialog({
   onClose
 }: OrganizationManagementDialogProps) {
   const [processingInvitationId, setProcessingInvitationId] = useState<number | null>(null)
+  const [confirmingInvitationId, setConfirmingInvitationId] = useState<number | null>(null)
 
-  const handleAcceptInvitation = async (invitationId: number) => {
+  const handleAcceptInvitation = async (invitationId: number, skipWarning = false) => {
+    // Check if user is already in an org and show warning first
+    if (!skipWarning && userInfo?.organization_id) {
+      setConfirmingInvitationId(invitationId)
+      return
+    }
+
     setProcessingInvitationId(invitationId)
+    setConfirmingInvitationId(null)
     try {
       const token = localStorage.getItem('auth_token')
       const response = await fetch(`${API_BASE}/api/invitations/accept/${invitationId}`, {
@@ -93,11 +102,12 @@ export function OrganizationManagementDialog({
         }
       })
 
-      const data = await response.json()
-
       if (!response.ok) {
+        const data = await response.json()
         throw new Error(data.detail || 'Failed to accept invitation')
       }
+
+      const data = await response.json()
 
       if (data.success) {
         toast.success(data.message || 'Successfully joined organization!')
@@ -111,13 +121,11 @@ export function OrganizationManagementDialog({
           localStorage.setItem('user_role', data.role)
         }
 
-        // Refresh org data
-        await onRefreshOrgData()
-
-        // Reload page to reflect new org membership
+        // Close modal and refresh page to reflect new org membership
+        onClose()
         setTimeout(() => {
           window.location.reload()
-        }, 1000)
+        }, 500)
       }
     } catch (error: any) {
       console.error('Error accepting invitation:', error)
@@ -129,6 +137,7 @@ export function OrganizationManagementDialog({
 
   const handleRejectInvitation = async (invitationId: number) => {
     setProcessingInvitationId(invitationId)
+    setConfirmingInvitationId(null)
     try {
       const token = localStorage.getItem('auth_token')
       const response = await fetch(`${API_BASE}/api/invitations/reject/${invitationId}`, {
@@ -138,11 +147,12 @@ export function OrganizationManagementDialog({
         }
       })
 
-      const data = await response.json()
-
       if (!response.ok) {
+        const data = await response.json()
         throw new Error(data.detail || 'Failed to reject invitation')
       }
+
+      const data = await response.json()
 
       if (data.success) {
         toast.info('Invitation declined')
@@ -209,39 +219,79 @@ export function OrganizationManagementDialog({
                             <p className="text-xs text-neutral-500 mt-1">
                               Sent {new Date(invitation.created_at).toLocaleDateString()} • Expires {new Date(invitation.expires_at).toLocaleDateString()}
                             </p>
+
+                            {/* Warning when confirming org switch */}
+                            {confirmingInvitationId === invitation.id && userInfo?.organization_id && (
+                              <Alert className="mt-3 bg-amber-50 border-amber-200">
+                                <AlertCircle className="h-4 w-4 text-amber-600" />
+                                <AlertDescription className="text-amber-900 text-xs">
+                                  <strong>Warning:</strong> You will leave your current organization and join {invitation.organization_name}.
+                                </AlertDescription>
+                              </Alert>
+                            )}
                           </div>
                           <div className="flex items-center space-x-2 ml-4">
-                            <Button
-                              size="sm"
-                              onClick={() => handleAcceptInvitation(invitation.id)}
-                              disabled={processingInvitationId !== null}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              {processingInvitationId === invitation.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <Check className="w-4 h-4 mr-1" />
-                                  Accept
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleRejectInvitation(invitation.id)}
-                              disabled={processingInvitationId !== null}
-                              className="border-red-300 text-red-600 hover:bg-red-50"
-                            >
-                              {processingInvitationId === invitation.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <X className="w-4 h-4 mr-1" />
-                                  Decline
-                                </>
-                              )}
-                            </Button>
+                            {confirmingInvitationId === invitation.id ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAcceptInvitation(invitation.id, true)}
+                                  disabled={processingInvitationId !== null}
+                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  {processingInvitationId === invitation.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Check className="w-4 h-4 mr-1" />
+                                      Confirm
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setConfirmingInvitationId(null)}
+                                  disabled={processingInvitationId !== null}
+                                >
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAcceptInvitation(invitation.id)}
+                                  disabled={processingInvitationId !== null}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  {processingInvitationId === invitation.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Check className="w-4 h-4 mr-1" />
+                                      Accept
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRejectInvitation(invitation.id)}
+                                  disabled={processingInvitationId !== null}
+                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                >
+                                  {processingInvitationId === invitation.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <X className="w-4 h-4 mr-1" />
+                                      Decline
+                                    </>
+                                  )}
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
