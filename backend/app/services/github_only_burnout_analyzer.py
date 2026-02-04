@@ -196,8 +196,7 @@ class GitHubOnlyBurnoutAnalyzer:
                 "confidence_level": individual_confidence,
                 "burnout_dimensions": {
                     "personal_burnout": round(personal_burnout, 2),
-                    "work_related_burnout": round(work_related_burnout, 2),
-                    "accomplishment_burnout": round(accomplishment_burnout, 2)
+                    "work_related_burnout": round(work_related_burnout, 2)
                 },
                 "github_metrics": metrics,
                 "flow_state_analysis": flow_state_analysis,
@@ -1082,9 +1081,8 @@ class GitHubOnlyBurnoutAnalyzer:
         return {
             "analysis_type": "github_only",
             "burnout_dimensions": {
-                "personal_burnout": "33.3% weight - commit frequency, after-hours activity, work intensity",
-                "work_related_burnout": "33.3% weight - collaboration decline, communication quality, detachment signs", 
-                "accomplishment_burnout": "33.4% weight - code quality, review participation, knowledge sharing"
+                "personal_burnout": "65% weight - commit frequency, after-hours activity, work intensity",
+                "work_related_burnout": "35% weight - collaboration decline, communication quality, detachment signs"
             },
             "flow_state_detection": "Distinguishes healthy high productivity from frantic burnout patterns",
             "baseline_comparison": "Individual metrics compared to team and industry baselines",
