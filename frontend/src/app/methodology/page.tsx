@@ -207,29 +207,23 @@ const content = {
 
   // Dimensions section
   dimensions: {
-    title: "On-Call Burnout Dimensions",
-    description: "How the five factors map to the three scientifically validated burnout dimensions",
+    title: "On-Call Burnout Dimensions (OCH Methodology)",
+    description: "Based on the Copenhagen Burnout Inventory - two dimensions specifically adapted for software engineers",
     items: [
       {
         color: "red",
-        title: "Emotional Exhaustion (40% weight)",
-        description: `Physical and psychological fatigue from work demands. This dimension measures the core stress experience and depletion of emotional resources that characterizes burnout.`,
-        calculation: "Workload Factor (50%) + After Hours Factor (30%) + Incident Load (20%)",
+        title: "Personal Burnout (65% weight)",
+        description: `Physical and psychological fatigue and exhaustion experienced by the person. This dimension measures recovery time interference, work-life balance erosion, and psychological impact from high-stress incidents.`,
+        calculation: "After-Hours Activity (30%) + High-Severity Incident Impact (25%) + Task Load (10%)",
       },
       {
         color: "yellow",
-        title: "Depersonalization/Cynicism (30% weight)",
-        description: `Detached, callous attitudes toward work and colleagues. This reflects the psychological distancing and defensive coping mechanisms that develop under chronic stress.`,
-        calculation: "Response Time Pressure (50%) + Weekend Work Factor (50%)",
-      },
-      {
-        color: "blue",
-        title: "Reduced Personal Accomplishment (30% weight)",
-        description: `Feelings of ineffectiveness and lack of achievement at work. This dimension captures the erosion of professional self-efficacy and satisfaction with one's contributions.`,
-        calculation: "Inverted measure of effectiveness under pressure, derived from response time pressure and incident load factors.",
+        title: "Work-Related Burnout (35% weight)",
+        description: `Fatigue and exhaustion specifically attributed to work demands. This dimension captures on-call burden, sustained stress from consecutive incident days, and workload pressure.`,
+        calculation: "On-Call Load (20%) + Consecutive Incident Days (15%)",
       },
     ],
-    footer: `<strong>Final Score:</strong> The three dimensions are weighted and combined to produce a final burnout score from 0-100, with higher scores indicating greater burnout risk. The weighting reflects the relative importance of each dimension based on burnout research.`,
+    footer: `<strong>Final Score:</strong> The two dimensions are weighted and combined to produce a final burnout score from 0-100, with higher scores indicating greater burnout risk. The OCH methodology reflects research showing that personal factors (work-life balance) contribute more to burnout than work-specific factors alone.`,
   },
 }
 

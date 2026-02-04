@@ -823,7 +823,7 @@ class GitHubOnlyBurnoutAnalyzer:
         commits_pw = metrics.get("commits_per_week", 0)
         if commits_pw > self.thresholds["commits_per_week_high"]:
             indicators.append({
-                "type": "emotional_exhaustion",
+                "type": "personal_burnout",
                 "severity": "high",
                 "indicator": "excessive_commits",
                 "value": commits_pw,
@@ -831,51 +831,51 @@ class GitHubOnlyBurnoutAnalyzer:
             })
         elif commits_pw > self.thresholds["commits_per_week_medium"]:
             indicators.append({
-                "type": "emotional_exhaustion", 
+                "type": "personal_burnout",
                 "severity": "medium",
                 "indicator": "high_commits",
                 "value": commits_pw,
                 "message": f"High commit frequency ({commits_pw}/week) - monitor for sustainability"
             })
-        
+
         # After-hours activity
         after_hours = metrics.get("after_hours_commit_percentage", 0)
         if after_hours > self.thresholds["after_hours_commits_high"]:
             indicators.append({
-                "type": "emotional_exhaustion",
-                "severity": "high", 
+                "type": "personal_burnout",
+                "severity": "high",
                 "indicator": "excessive_after_hours",
                 "value": f"{after_hours:.1%}",
                 "message": f"High after-hours activity ({after_hours:.1%}) suggests poor work-life boundaries"
             })
-        
+
         # Weekend work
         weekend_pct = metrics.get("weekend_commit_percentage", 0)
         if weekend_pct > self.thresholds["weekend_commits_high"]:
             indicators.append({
-                "type": "depersonalization",
+                "type": "work_related_burnout",
                 "severity": "high",
                 "indicator": "weekend_work",
                 "value": f"{weekend_pct:.1%}",
                 "message": f"Frequent weekend work ({weekend_pct:.1%}) indicates unsustainable patterns"
             })
-        
+
         # Large PR patterns
         avg_pr_size = metrics.get("avg_pr_size", 0)
         if avg_pr_size > self.thresholds["pr_size_large"]:
             indicators.append({
-                "type": "depersonalization",
+                "type": "work_related_burnout",
                 "severity": "medium",
                 "indicator": "large_prs",
                 "value": avg_pr_size,
                 "message": f"Large PRs ({avg_pr_size} lines avg) may indicate reduced collaboration"
             })
-        
+
         # Low review participation
         review_rate = metrics.get("review_participation_rate", 1.0)
         if review_rate < self.thresholds["pr_review_participation_low"]:
             indicators.append({
-                "type": "depersonalization",
+                "type": "work_related_burnout",
                 "severity": "medium",
                 "indicator": "low_review_participation",
                 "value": f"{review_rate:.1%}",

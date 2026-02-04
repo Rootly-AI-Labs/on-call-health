@@ -5,7 +5,7 @@ This module provides a single source of truth for all burnout calculation parame
 risk thresholds, scoring weights, and factor calculations. This ensures consistency
 across all analyzers and components.
 
-Inspired by the Maslach Burnout Inventory methodology and scientific validation.
+Based on the Copenhagen Burnout Inventory (CBI) and On-Call Health (OCH) methodology.
 """
 from typing import Dict, Tuple, Any
 from dataclasses import dataclass
@@ -16,42 +16,20 @@ class BurnoutConfig:
     """Centralized configuration for burnout analysis."""
     
     # Risk Level Thresholds (0-10 scale where higher = more burnout)
-    # Inspired by MBI percentile distributions and clinical research
+    # Based on clinical research and Copenhagen Burnout Inventory percentile distributions
     RISK_THRESHOLDS = {
         'low': (0.0, 3.0),        # 0-30% - Healthy work patterns
-        'medium': (3.0, 5.5),     # 30-55% - Some stress signals 
+        'medium': (3.0, 5.5),     # 30-55% - Some stress signals
         'high': (5.5, 7.5),       # 55-75% - Significant burnout risk
         'critical': (7.5, 10.0)   # 75-100% - Severe burnout indicators
     }
-    
+
     # Copenhagen Burnout Inventory Dimension Weights (must sum to 1.0)
     # Based on OCH methodology - only 2 dimensions for software engineers
     OCH_WEIGHTS = {
         'personal_burnout': 0.50,        # Physical/psychological fatigue and exhaustion
         'work_related_burnout': 0.50     # Fatigue/exhaustion specifically tied to work
         # Note: client_related_burnout omitted - not applicable to software engineers
-    }
-    
-    # Legacy Maslach weights (deprecated - will be removed in future version)
-    MASLACH_WEIGHTS = {
-        'emotional_exhaustion': 0.40,    # Maps to personal_burnout
-        'depersonalization': 0.35,       # Maps to work_related_burnout  
-        'personal_accomplishment': 0.25  # Removed - not in OCH framework
-    }
-    
-    # Factor Calculation Weights
-    EMOTIONAL_EXHAUSTION_FACTORS = {
-        'workload': 0.50,         # Incident/task frequency
-        'after_hours': 0.50       # Work-life balance
-    }
-    
-    DEPERSONALIZATION_FACTORS = {
-        'workload': 0.60,         # Shared with exhaustion but lower weight
-        'after_hours': 0.40       # Boundary violations (includes weekend work)
-    }
-
-    PERSONAL_ACCOMPLISHMENT_FACTORS = {
-        'workload': 1.00          # Ability to handle tasks (inverted)
     }
     
     # GitHub-Specific Thresholds
@@ -255,21 +233,7 @@ def validate_config(config: BurnoutConfig = None) -> Dict[str, bool]:
     # Check OCH weights sum to 1.0
     och_sum = sum(config.OCH_WEIGHTS.values())
     results['och_weights_sum'] = abs(och_sum - 1.0) < 0.001
-    
-    # Check Maslach weights sum to 1.0 (legacy)
-    maslach_sum = sum(config.MASLACH_WEIGHTS.values())
-    results['maslach_weights_sum'] = abs(maslach_sum - 1.0) < 0.001
-    
-    # Check factor weights sum to 1.0 for each dimension
-    ee_sum = sum(config.EMOTIONAL_EXHAUSTION_FACTORS.values())
-    results['emotional_exhaustion_weights'] = abs(ee_sum - 1.0) < 0.001
-    
-    dp_sum = sum(config.DEPERSONALIZATION_FACTORS.values())
-    results['depersonalization_weights'] = abs(dp_sum - 1.0) < 0.001
-    
-    pa_sum = sum(config.PERSONAL_ACCOMPLISHMENT_FACTORS.values())
-    results['personal_accomplishment_weights'] = abs(pa_sum - 1.0) < 0.001
-    
+
     # Check risk thresholds are properly ordered
     thresholds = config.RISK_THRESHOLDS
     results['risk_thresholds_ordered'] = (
@@ -281,9 +245,9 @@ def validate_config(config: BurnoutConfig = None) -> Dict[str, bool]:
     return results
 
 
-def convert_och_to_legacy_scale(och_score: float) -> float:
+def convert_och_to_risk_scale(och_score: float) -> float:
     """
-    Convert OCH score (0-100) to legacy Maslach scale (0-10) for compatibility.
+    Convert OCH score (0-100) to risk scale (0-10) for risk level determination.
 
     Args:
         och_score: OCH score on 0-100 scale
@@ -294,17 +258,17 @@ def convert_och_to_legacy_scale(och_score: float) -> float:
     return (och_score / 100.0) * 10.0
 
 
-def convert_legacy_to_och_scale(legacy_score: float) -> float:
+def convert_risk_to_och_scale(risk_score: float) -> float:
     """
-    Convert legacy Maslach score (0-10) to OCH scale (0-100) for comparison.
-    
+    Convert risk score (0-10) to OCH scale (0-100).
+
     Args:
-        legacy_score: Legacy score on 0-10 scale
-        
+        risk_score: Risk score on 0-10 scale
+
     Returns:
         Equivalent score on 0-100 scale
     """
-    return (legacy_score / 10.0) * 100.0
+    return (risk_score / 10.0) * 100.0
 
 
 # Global singleton instance
