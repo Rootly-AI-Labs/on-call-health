@@ -38,12 +38,39 @@ export function InvitationAcceptanceModal({
   const [accepting, setAccepting] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [currentOrgName, setCurrentOrgName] = useState<string | null>(null)
+  const [showOrgSwitchWarning, setShowOrgSwitchWarning] = useState(false)
 
   useEffect(() => {
     if (isOpen && invitationId) {
       fetchInvitation()
+      checkCurrentOrganization()
     }
   }, [isOpen, invitationId])
+
+  const checkCurrentOrganization = async () => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) return
+
+      const response = await fetch(`${API_BASE}/api/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        const userData = await response.json()
+        if (userData.organization_id) {
+          // User is already in an organization
+          const orgName = localStorage.getItem('user_organization_name') || 'your current organization'
+          setCurrentOrgName(orgName)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking current organization:', error)
+    }
+  }
 
   const fetchInvitation = async () => {
     if (!invitationId) return
@@ -80,6 +107,12 @@ export function InvitationAcceptanceModal({
   const handleAccept = async () => {
     if (!invitation) return
 
+    // If user has a current org and hasn't confirmed, show warning
+    if (currentOrgName && !showOrgSwitchWarning) {
+      setShowOrgSwitchWarning(true)
+      return
+    }
+
     setAccepting(true)
     setError(null)
 
@@ -99,7 +132,11 @@ export function InvitationAcceptanceModal({
       }
 
       if (data.success) {
-        toast.success(`🎉 Welcome to ${invitation.organization_name}!`, {
+        const message = data.left_organization
+          ? `You have left ${data.left_organization.name} and joined ${invitation.organization_name}`
+          : `Welcome to ${invitation.organization_name}!`
+
+        toast.success(message, {
           description: `You've successfully joined as a ${invitation.role}.`,
           duration: 4000,
         })
@@ -217,16 +254,33 @@ export function InvitationAcceptanceModal({
               </div>
             )}
 
+            {currentOrgName && showOrgSwitchWarning && (
+              <Alert className="bg-amber-50 border-amber-200">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-900">
+                  <strong>Warning:</strong> You are currently a member of <strong>{currentOrgName}</strong>.
+                  By accepting this invitation, you will leave {currentOrgName} and join {invitation.organization_name}.
+                  All data associated with {currentOrgName} will no longer be accessible to you.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex space-x-3">
               <Button
                 onClick={handleAccept}
                 disabled={accepting || rejecting}
                 className="flex-1"
+                variant={showOrgSwitchWarning ? "destructive" : "default"}
               >
                 {accepting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Accepting...
+                  </>
+                ) : showOrgSwitchWarning ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirm & Accept
                   </>
                 ) : (
                   <>
@@ -237,7 +291,7 @@ export function InvitationAcceptanceModal({
               </Button>
               <Button
                 variant="outline"
-                onClick={handleReject}
+                onClick={showOrgSwitchWarning ? () => setShowOrgSwitchWarning(false) : handleReject}
                 disabled={accepting || rejecting}
                 className="flex-1"
               >
@@ -246,6 +300,8 @@ export function InvitationAcceptanceModal({
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Declining...
                   </>
+                ) : showOrgSwitchWarning ? (
+                  'Cancel'
                 ) : (
                   'Decline'
                 )}

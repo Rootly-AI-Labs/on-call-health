@@ -37,10 +37,9 @@ async def create_invitation(
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can invite users")
 
-    # Check if user already exists with this email
+    # Allow inviting users even if they're in another organization
+    # They will be warned when accepting that they'll leave their current org
     existing_user = db.query(User).filter(User.email.ilike(request.email)).first()
-    if existing_user and existing_user.organization_id:
-        raise HTTPException(status_code=400, detail="User with this email already belongs to an organization")
 
     # Check for pending invitation with same email to same org
     # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
@@ -240,16 +239,18 @@ async def accept_invitation_page(
             detail="This invitation is for a different email address"
         )
 
-    # Check if user is already in an organization
+    # Check if user is already in a different organization
+    leaving_org = None
     if current_user.organization_id and current_user.organization_id != invitation.organization_id:
-        raise HTTPException(
-            status_code=400,
-            detail="You are already a member of another organization"
-        )
+        # User is switching organizations - store old org info
+        leaving_org = {
+            "id": current_user.organization_id,
+            "name": current_user.organization.name if current_user.organization else "Unknown"
+        }
 
     # Process acceptance
     try:
-        # Update user's organization
+        # Update user's organization (will leave old org if switching)
         current_user.organization_id = invitation.organization_id
         current_user.role = invitation.role
         current_user.joined_org_at = datetime.now(timezone.utc)
@@ -279,14 +280,19 @@ async def accept_invitation_page(
             original_notification.mark_as_acted()
             db.commit()
 
+        message = f"Successfully joined {invitation.organization.name}!"
+        if leaving_org:
+            message = f"You have left {leaving_org['name']} and joined {invitation.organization.name}"
+
         return {
             "success": True,
-            "message": f"Successfully joined {invitation.organization.name}!",
+            "message": message,
             "organization": {
                 "id": invitation.organization.id,
                 "name": invitation.organization.name
             },
             "role": invitation.role,
+            "left_organization": leaving_org,
             "redirect_url": "/dashboard"  # Frontend can redirect here
         }
 
@@ -322,16 +328,18 @@ async def accept_invitation_api(
             detail="This invitation is for a different email address"
         )
 
-    # Check if user is already in an organization
+    # Check if user is already in a different organization
+    leaving_org = None
     if current_user.organization_id and current_user.organization_id != invitation.organization_id:
-        raise HTTPException(
-            status_code=400,
-            detail="You are already a member of another organization"
-        )
+        # User is switching organizations - store old org info
+        leaving_org = {
+            "id": current_user.organization_id,
+            "name": current_user.organization.name if current_user.organization else "Unknown"
+        }
 
     # Process acceptance
     try:
-        # Update user's organization
+        # Update user's organization (will leave old org if switching)
         current_user.organization_id = invitation.organization_id
         current_user.role = invitation.role
         current_user.joined_org_at = datetime.now(timezone.utc)
@@ -349,14 +357,19 @@ async def accept_invitation_api(
         # Notify admins about the acceptance
         notification_service.create_invitation_accepted_notification(invitation, current_user)
 
+        message = f"Successfully joined {invitation.organization.name}!"
+        if leaving_org:
+            message = f"You have left {leaving_org['name']} and joined {invitation.organization.name}"
+
         return {
             "success": True,
-            "message": f"Successfully joined {invitation.organization.name}!",
+            "message": message,
             "organization": {
                 "id": invitation.organization.id,
                 "name": invitation.organization.name
             },
-            "role": invitation.role
+            "role": invitation.role,
+            "left_organization": leaving_org
         }
 
     except Exception as e:
