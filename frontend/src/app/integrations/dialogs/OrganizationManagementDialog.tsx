@@ -123,10 +123,9 @@ export function OrganizationManagementDialog({
           localStorage.setItem('user_role', data.role)
         }
 
-        // Close modal and refresh page to reflect new org membership
-        onClose()
+        // Reload page with modal open to reflect new org membership
         setTimeout(() => {
-          window.location.reload()
+          window.location.href = '/integrations?openOrgModal=true'
         }, 500)
       }
     } catch (error: any) {
