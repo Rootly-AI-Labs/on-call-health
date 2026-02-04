@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { INTEGRATION_TIMEOUTS, getModalDelay } from "./constants"
 import { Button } from "@/components/ui/button"
@@ -159,7 +159,7 @@ import { NewMappingDialog } from "./dialogs/NewMappingDialog"
 import { OrganizationManagementDialog } from "./dialogs/OrganizationManagementDialog"
 import { PostIntegrationSyncModal } from "./dialogs/PostIntegrationSyncModal"
 
-export default function IntegrationsPage() {
+function IntegrationsPageContent() {
   const searchParams = useSearchParams()
 
   // State management
@@ -5424,5 +5424,13 @@ export default function IntegrationsPage() {
         missingPermissions={tokenErrorMissingPermissions}
       />
     </div>
+  )
+}
+
+export default function IntegrationsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <IntegrationsPageContent />
+    </Suspense>
   )
 }
