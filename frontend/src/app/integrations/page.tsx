@@ -223,6 +223,10 @@ export default function IntegrationsPage() {
   const [inviteRole, setInviteRole] = useState("member")
   const [isInviting, setIsInviting] = useState(false)
 
+  // Post-integration sync modal state
+  const [showPostIntegrationSyncModal, setShowPostIntegrationSyncModal] = useState(false)
+  const [postIntegrationModalType, setPostIntegrationModalType] = useState<'github' | 'slack' | 'jira' | 'linear' | 'rootly' | 'pagerduty' | null>(null)
+
   // Organization members and invitations state
   const [orgMembers, setOrgMembers] = useState([])
   const [pendingInvitations, setPendingInvitations] = useState([])
@@ -241,28 +245,6 @@ export default function IntegrationsPage() {
   const [loadingManualMappings, setLoadingManualMappings] = useState(false)
   const [newMappingDialogOpen, setNewMappingDialogOpen] = useState(false)
 
-  // Sync confirmation modal state
-  const [showSyncConfirmModal, setShowSyncConfirmModal] = useState(false)
-
-  // Post-integration sync modal state
-  const [showPostIntegrationSyncModal, setShowPostIntegrationSyncModal] = useState(false)
-  const [postIntegrationModalType, setPostIntegrationModalType] = useState<'github' | 'slack' | 'jira' | 'linear' | 'rootly' | 'pagerduty' | null>(null)
-
-  const [syncProgress, setSyncProgress] = useState<{
-    stage: string
-    details: string
-    isLoading: boolean
-    results?: {
-      created?: number
-      updated?: number
-      github_matched?: number
-      github_total?: number
-      slack_synced?: number
-      slack_skipped?: number
-      jira_matched?: number
-      linear_matched?: number
-    }
-  } | null>(null)
   const [editingMapping, setEditingMapping] = useState<ManualMapping | null>(null)
   const [newMappingForm, setNewMappingForm] = useState({
     source_platform: 'rootly' as string,
@@ -307,20 +289,6 @@ export default function IntegrationsPage() {
   const [slackPermissions, setSlackPermissions] = useState<any>(null)
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
 
-  // Team members state
-  const [teamMembers, setTeamMembers] = useState<any[]>([])
-  const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
-  const [teamMembersError, setTeamMembersError] = useState<string | null>(null)
-  const [syncedUsers, setSyncedUsers] = useState<any[]>([])
-  const [loadingSyncedUsers, setLoadingSyncedUsers] = useState(false)
-  const [showSyncedUsers, setShowSyncedUsers] = useState(false)
-  const [teamMembersDrawerOpen, setTeamMembersDrawerOpen] = useState(false)
-  const [refreshingOnCall, setRefreshingOnCall] = useState(false)
-  const [oncallCacheInfo, setOncallCacheInfo] = useState<any>(null)
-
-  // Cache to track which integrations have already been loaded
-  const syncedUsersCache = useRef<Map<string, any[]>>(new Map())
-  const recipientsCache = useRef<Map<string, Set<number>>>(new Map())
   const permissionsCache = useRef<{data: any, timestamp: number} | null>(null)
   const PERMISSIONS_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
@@ -352,23 +320,6 @@ export default function IntegrationsPage() {
   // Manual survey delivery modal state
   const [showManualSurveyModal, setShowManualSurveyModal] = useState(false)
 
-  // Survey recipient selection state
-  const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
-  const [savedRecipients, setSavedRecipients] = useState<Set<number>>(new Set()) // Track what's saved in DB
-  const [savingRecipients, setSavingRecipients] = useState(false)
-
-  // Team members drawer pagination
-  const [teamMembersPage, setTeamMembersPage] = useState(1)
-  const TEAM_MEMBERS_PER_PAGE = 10
-
-  // Check if there are unsaved changes
-  const hasUnsavedChanges = () => {
-    if (selectedRecipients.size !== savedRecipients.size) return true
-    for (const id of Array.from(selectedRecipients)) {
-      if (!savedRecipients.has(id)) return true
-    }
-    return false
-  }
 
   // GitHub org members handlers
   const fetchGitHubOrgMembers = async () => {
@@ -466,9 +417,6 @@ export default function IntegrationsPage() {
       const accountIdToSave = editingJiraAccountId === '__clear__' ? '' : editingJiraAccountId
 
       // Get old account ID before update
-      const userBeforeUpdate = syncedUsers.find(u => u.id === userId)
-      const oldAccountId = userBeforeUpdate?.jira_account_id
-      const oldJiraEmail = userBeforeUpdate?.jira_email
 
       const jiraUser = jiraUsers.find(u => u.account_id === accountIdToSave)
 
@@ -498,9 +446,7 @@ export default function IntegrationsPage() {
         // This ensures all deduplication from backend is reflected in UI
         const selectedOrg = selectedOrganization || integrations.find(i => i.is_default)?.id?.toString()
         if (selectedOrg) {
-          syncedUsersCache.current.delete(selectedOrg)
           // Force a full refresh to get the latest state from backend
-          await fetchSyncedUsers(false, false, true)
         }
         cancelEditingJiraMapping()
       } else {
@@ -598,8 +544,6 @@ export default function IntegrationsPage() {
 
         const selectedOrg = selectedOrganization || integrations.find(i => i.is_default)?.id?.toString()
         if (selectedOrg) {
-          syncedUsersCache.current.delete(selectedOrg)
-          await fetchSyncedUsers(false, false, true)
         }
         cancelEditingLinearMapping()
       } else {
@@ -650,7 +594,6 @@ export default function IntegrationsPage() {
       const usernameToSave = editingUsername === '__clear__' ? '' : editingUsername
 
       // Get old username before update
-      const userBeforeUpdate = syncedUsers.find(u => u.id === userId)
       const oldUsername = userBeforeUpdate?.github_username
 
       const response = await fetch(
@@ -679,9 +622,7 @@ export default function IntegrationsPage() {
         // This ensures all deduplication from backend is reflected in UI
         const selectedOrg = selectedOrganization || integrations.find(i => i.is_default)?.id?.toString()
         if (selectedOrg) {
-          syncedUsersCache.current.delete(selectedOrg)
           // Force a full refresh to get the latest state from backend
-          await fetchSyncedUsers(false, false, true)
         }
 
         cancelEditingGitHubUsername()
@@ -697,67 +638,7 @@ export default function IntegrationsPage() {
     }
   }
 
-  // Survey recipient handlers
-  const saveSurveyRecipients = async () => {
-    if (!selectedOrganization) {
-      toast.error('No organization selected')
-      return
-    }
 
-    setSavingRecipients(true)
-    try {
-      const authToken = localStorage.getItem('auth_token')
-      if (!authToken) {
-        toast.error('Please log in to save recipients')
-        return
-      }
-
-      const recipientIds = Array.from(selectedRecipients)
-      const response = await fetch(
-        `${API_BASE}/rootly/integrations/${selectedOrganization}/survey-recipients`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(recipientIds)
-        }
-      )
-
-      if (response.ok) {
-        const data = await response.json()
-        // Update savedRecipients to match what was just saved
-        setSavedRecipients(new Set(selectedRecipients))
-        // Update cache
-        recipientsCache.current.set(selectedOrganization, new Set(selectedRecipients))
-        toast.success(data.message || 'Survey recipients saved successfully')
-      } else {
-        const error = await response.json()
-        toast.error(error.detail || 'Failed to save recipients')
-      }
-    } catch (error) {
-      console.error('Error saving recipients:', error)
-      toast.error('Failed to save recipients')
-    } finally {
-      setSavingRecipients(false)
-    }
-  }
-
-  // Discard changes and revert to saved state
-  const discardRecipientChanges = () => {
-    setSelectedRecipients(new Set(savedRecipients))
-    toast.info('Changes discarded')
-  }
-
-  // Handle drawer close - reset selections if there are unsaved changes
-  const handleDrawerClose = (open: boolean) => {
-    if (!open && hasUnsavedChanges()) {
-      // Reset to saved state when closing with unsaved changes
-      setSelectedRecipients(new Set(savedRecipients))
-    }
-    setTeamMembersDrawerOpen(open)
-  }
 
   // AI Integration state
   const [llmToken, setLlmToken] = useState('')
@@ -972,30 +853,8 @@ export default function IntegrationsPage() {
   }, [showInviteModal])
 
   // Fetch GitHub org members when GitHub is connected
-  useEffect(() => {
-    if (githubIntegration && teamMembersDrawerOpen && showSyncedUsers) {
-      fetchGitHubOrgMembers()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [githubIntegration, teamMembersDrawerOpen, showSyncedUsers])
 
-  // Clear drawer data when organization changes to prevent showing stale data
-  useEffect(() => {
-    if (teamMembersDrawerOpen) {
-      // Close drawer when org changes to prevent showing wrong data
-      setTeamMembersDrawerOpen(false)
-      setSyncedUsers([])
-      setShowSyncedUsers(false)
-      setSelectedRecipients(new Set())
-      setSavedRecipients(new Set())
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedOrganization])
 
-  // Reset pagination when drawer opens or syncedUsers changes
-  useEffect(() => {
-    setTeamMembersPage(1)
-  }, [teamMembersDrawerOpen, syncedUsers.length])
 
   // Auto-select first integration if none selected
   useEffect(() => {
@@ -1013,52 +872,6 @@ export default function IntegrationsPage() {
     }
   }, [integrations, selectedOrganization])
 
-  // Load saved survey recipients when drawer opens (only if no unsaved changes)
-  useEffect(() => {
-    const loadSavedRecipients = async () => {
-      if (!teamMembersDrawerOpen || !selectedOrganization) return
-
-      try {
-        const authToken = localStorage.getItem('auth_token')
-        if (!authToken) return
-
-        const response = await fetch(
-          `${API_BASE}/rootly/integrations/${selectedOrganization}/survey-recipients`,
-          {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          }
-        )
-
-        if (response.ok) {
-          const data = await response.json()
-          const recipientIds = new Set<number>(data.recipient_ids || [])
-          // Update both current and saved state
-          setSelectedRecipients(recipientIds)
-          setSavedRecipients(recipientIds)
-        }
-      } catch (error) {
-        console.error('Error loading saved recipients:', error)
-      }
-    }
-
-    loadSavedRecipients()
-  }, [teamMembersDrawerOpen, selectedOrganization])
-
-  // Fetch Jira users when drawer opens
-  useEffect(() => {
-    if (jiraIntegration && teamMembersDrawerOpen && showSyncedUsers) {
-      fetchJiraUsers()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jiraIntegration, teamMembersDrawerOpen, showSyncedUsers])
-
-  // Fetch Linear users when drawer opens
-  useEffect(() => {
-    if (linearIntegration && teamMembersDrawerOpen && showSyncedUsers) {
-      fetchLinearUsers()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linearIntegration, teamMembersDrawerOpen, showSyncedUsers])
 
   // Handle Slack/Jira/Linear OAuth success redirect
   useEffect(() => {
@@ -1990,8 +1803,8 @@ export default function IntegrationsPage() {
       setIntegrations,
       setDeleteDialogOpen,
       setIntegrationToDelete,
-      syncedUsersCache.current,
-      recipientsCache.current,
+      new Map(), // Empty cache since team management is on separate page
+      new Map(), // Empty cache since team management is on separate page
       setSelectedOrganization
     )
   }
@@ -2190,7 +2003,6 @@ export default function IntegrationsPage() {
     return JiraHandlers.syncJiraUsers(
       setIsSyncingJira,
       undefined, // No progress callback needed
-      () => fetchSyncedUsers(false, false, true) // Refresh synced users after sync
     )
   }
 
@@ -2248,142 +2060,6 @@ export default function IntegrationsPage() {
     )
   }
 
-  // Fetch team members from selected organization
-  const fetchTeamMembers = async (suppressToast?: boolean) => {
-    return TeamHandlers.fetchTeamMembers(
-      selectedOrganization,
-      setLoadingTeamMembers,
-      setTeamMembersError,
-      setTeamMembers,
-      setTeamMembersDrawerOpen,
-      suppressToast
-    )
-  }
-
-  // Sync users to UserCorrelation table
-  const syncUsersToCorrelation = async (suppressToast?: boolean) => {
-    // Clear cache for this integration before syncing
-    if (selectedOrganization) {
-      syncedUsersCache.current.delete(selectedOrganization)
-    }
-
-    return TeamHandlers.syncUsersToCorrelation(
-      selectedOrganization,
-      setLoadingTeamMembers,
-      setTeamMembersError,
-      () => fetchTeamMembers(suppressToast),
-      () => fetchSyncedUsers(true, true, true), // Force refresh after sync
-      undefined,
-      suppressToast
-    )
-  }
-
-  // Perform full team sync with progress tracking
-  const performTeamSync = async () => {
-    try {
-      setSyncProgress({ stage: 'Starting sync...', details: 'Preparing to sync users', isLoading: true })
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      setSyncProgress({ stage: 'Fetching users...', details: 'Retrieving users from API with IR role filtering', isLoading: true })
-      const syncResults = await TeamHandlers.syncUsersToCorrelation(
-        selectedOrganization,
-        setLoadingTeamMembers,
-        setTeamMembersError,
-        fetchTeamMembers,
-        () => fetchSyncedUsers(false, false, true),
-        (message: string) => {
-          setSyncProgress({ stage: 'Syncing users...', details: message, isLoading: true })
-        },
-        true // suppressToast
-      )
-
-      let slackResults
-      if (slackIntegration?.workspace_id) {
-        setSyncProgress({ stage: 'Syncing Slack...', details: 'Matching Slack user IDs', isLoading: true })
-        slackResults = await TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers, true)
-      }
-
-      setSyncProgress({
-        stage: 'Sync Complete!',
-        details: 'Your team members have been successfully synced',
-        isLoading: false,
-        results: {
-          created: syncResults.created,
-          updated: syncResults.updated,
-          github_matched: syncResults.github_matched,
-          jira_matched: syncResults.jira_matched,
-          linear_matched: syncResults.linear_matched,
-          slack_synced: slackResults?.updated,
-          slack_skipped: slackResults?.skipped,
-        }
-      })
-    } catch (error) {
-      setSyncProgress({ stage: 'Error', details: 'Failed to sync. Please try again.', isLoading: false })
-      setTimeout(() => {
-        setShowSyncConfirmModal(false)
-        setSyncProgress(null)
-      }, 2000)
-    }
-  }
-
-  // Sync Slack user IDs to UserCorrelation records
-  const syncSlackUserIds = async (suppressToast?: boolean) => {
-    return TeamHandlers.syncSlackUserIds(setLoadingTeamMembers, fetchSyncedUsers, suppressToast)
-  }
-
-  // Fetch synced users from database
-  const fetchSyncedUsers = async (showToast = true, autoSync = true, forceRefresh = false, openDrawer = true) => {
-    return TeamHandlers.fetchSyncedUsers(
-      selectedOrganization,
-      setLoadingSyncedUsers,
-      setSyncedUsers,
-      setShowSyncedUsers,
-      setTeamMembersDrawerOpen,
-      syncUsersToCorrelation,
-      showToast,
-      autoSync,
-      setSelectedRecipients,
-      setSavedRecipients,
-      syncedUsersCache.current,
-      forceRefresh,
-      recipientsCache.current,
-      openDrawer
-    )
-  }
-
-  // Refresh on-call status
-  const refreshOnCallStatus = async () => {
-    if (!selectedOrganization) {
-      toast.error('Please select an organization first')
-      return
-    }
-
-    setRefreshingOnCall(true)
-    try {
-      const authToken = localStorage.getItem('auth_token')
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
-      const response = await fetch(`${apiBase}/rootly/integrations/${selectedOrganization}/refresh-oncall`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
-      })
-
-      if (response.ok) {
-        toast.success('On-call status refreshed')
-        // Reload synced users with fresh on-call data
-        await fetchSyncedUsers(false, false, true)
-      } else {
-        toast.error('Failed to refresh on-call status')
-      }
-    } catch (error) {
-      console.error('Error refreshing on-call status:', error)
-      toast.error('Failed to refresh on-call status')
-    } finally {
-      setRefreshingOnCall(false)
-    }
-  }
 
   // Inline mapping edit handlers
   const startInlineEdit = (mappingId: number | string, currentValue: string = '') => {
@@ -3456,13 +3132,6 @@ export default function IntegrationsPage() {
                 userInfo={userInfo}
                 selectedOrganization={selectedOrganization}
                 integrations={integrations}
-                teamMembers={teamMembers}
-                loadingTeamMembers={loadingTeamMembers}
-                loadingSyncedUsers={loadingSyncedUsers}
-                syncedUsers={syncedUsers}
-                fetchTeamMembers={fetchTeamMembers}
-                syncUsersToCorrelation={syncUsersToCorrelation}
-                fetchSyncedUsers={fetchSyncedUsers}
                 setShowManualSurveyModal={setShowManualSurveyModal}
                 loadSlackPermissions={loadSlackPermissions}
                 loadSlackStatus={loadSlackIntegration}
@@ -3716,80 +3385,6 @@ export default function IntegrationsPage() {
           </div>
         )}
 
-        {/* Team Management Section */}
-        <div className="mt-16 space-y-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-3">Team Management</h2>
-            <p className="text-lg text-neutral-600 mb-2">
-              Sync and manage your team members for an analysis
-            </p>
-          </div>
-
-          {/* Team Members Card */}
-          <div className="max-w-2xl mx-auto">
-            <Card className={`border-2 ${selectedOrganization ? 'border-purple-300 bg-white' : 'border-neutral-300 bg-white'}`}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${selectedOrganization ? 'bg-purple-700' : 'bg-neutral-300'}`}>
-                      <Users className={`w-6 h-6 ${selectedOrganization ? 'text-white' : 'text-neutral-500'}`} />
-                    </div>
-                    <div>
-                      <h3 className={`text-lg font-semibold ${selectedOrganization ? 'text-neutral-900' : 'text-neutral-900'}`}>
-                        Team Member Sync
-                      </h3>
-                      <p className={`text-sm ${selectedOrganization ? 'text-neutral-600' : 'text-neutral-700'}`}>
-                        {selectedOrganization ? (
-                          <>Sync team members from connected integrations {syncedUsers.length > 0 && `(${syncedUsers.length} synced)`}</>
-                        ) : (
-                          'Select an organization above to sync team members'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      if (!selectedOrganization) {
-                        toast.error('Please select an organization first')
-                        return
-                      }
-
-                      // Open drawer immediately for better UX
-                      setTeamMembersDrawerOpen(true)
-
-                      // If we have cached data, show it immediately
-                      if (selectedOrganization && syncedUsersCache.current.has(selectedOrganization)) {
-                        const cachedUsers = syncedUsersCache.current.get(selectedOrganization)!
-                        setSyncedUsers(cachedUsers)
-                        setShowSyncedUsers(true)
-
-                        // Also restore cached recipient selections (validate IDs still exist)
-                        if (recipientsCache.current.has(selectedOrganization)) {
-                          const cachedRecipients = recipientsCache.current.get(selectedOrganization)!
-                          const validUserIds = new Set(cachedUsers.map(u => u.id))
-                          const validCachedRecipients = new Set(
-                            Array.from(cachedRecipients).filter(id => validUserIds.has(id))
-                          )
-                          setSelectedRecipients(validCachedRecipients)
-                          setSavedRecipients(validCachedRecipients)
-                        }
-                      } else {
-                        // Otherwise fetch from API
-                        fetchSyncedUsers(false, false)
-                      }
-                    }}
-                    disabled={!selectedOrganization}
-                    className="bg-purple-700 hover:bg-purple-800 disabled:bg-neutral-300 disabled:cursor-not-allowed"
-                    title={!selectedOrganization ? 'Please select an organization first' : ''}
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    Sync Members
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
       </main>
 
       {/* Data Mapping Drawer */}
@@ -4763,565 +4358,6 @@ export default function IntegrationsPage() {
         </a>
       </div>
 
-      {/* Team Members Drawer */}
-      <Sheet open={teamMembersDrawerOpen} onOpenChange={handleDrawerClose}>
-        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto flex flex-col">
-          <SheetHeader>
-            <div className="flex items-start justify-between pr-10 gap-4">
-              <div>
-                <SheetTitle>Team Members</SheetTitle>
-                <SheetDescription>
-                  Sync will match {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'organization'} users with Enhanced Integrations mappings.
-                  {syncedUsers.length > 0 && ` • ${syncedUsers.length} synced`}
-                </SheetDescription>
-              </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <Button
-                  onClick={refreshOnCallStatus}
-                  disabled={refreshingOnCall || loadingSyncedUsers}
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                  title="Refresh on-call status"
-                >
-                  {refreshingOnCall ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4" />
-                  )}
-                </Button>
-                <Button
-                  onClick={() => {
-                    setSyncProgress(null) // Clear any previous sync progress
-                    setShowSyncConfirmModal(true)
-                  }}
-                  disabled={loadingTeamMembers || loadingSyncedUsers}
-                  className="bg-purple-700 hover:bg-purple-800 text-white"
-                  size="default"
-                >
-                  {loadingTeamMembers ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : loadingSyncedUsers ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <Users className="w-4 h-4 mr-2" />
-                      Sync Members
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </SheetHeader>
-
-          <div className="mt-6 space-y-4">
-            {/* Show synced users only */}
-            {loadingSyncedUsers ? (
-              <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
-                <p className="text-sm text-neutral-700">Loading team members...</p>
-              </div>
-            ) : syncedUsers.length > 0 ? (
-              <div>
-                <div className="space-y-2">
-                  {syncedUsers
-                    .slice((teamMembersPage - 1) * TEAM_MEMBERS_PER_PAGE, teamMembersPage * TEAM_MEMBERS_PER_PAGE)
-                    .map((user: any) => {
-                    return (
-                      <div
-                        key={user.id}
-                        className="bg-white border border-neutral-200 rounded-lg p-3"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-3">
-
-                            {/* Avatar with on-call indicator */}
-                            <div className="relative">
-                              <Avatar className="h-10 w-10">
-                                <AvatarFallback className="bg-purple-100 text-purple-700 text-sm font-medium">
-                                  {user.name?.substring(0, 2).toUpperCase() || user.email?.substring(0, 2).toUpperCase() || '??'}
-                                </AvatarFallback>
-                              </Avatar>
-                              {user.is_oncall && (
-                                <div
-                                  className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
-                                  title="Currently on-call"
-                                />
-                              )}
-                            </div>
-
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-neutral-900">
-                                  {user.name || 'Unknown'}
-                                </span>
-                                {/* GitHub, Slack, Jira, and Linear logos */}
-                                {user.platforms?.map((platform: string) => {
-                                  const platformLower = platform.toLowerCase()
-                                  const isGitHub = platformLower === 'github'
-                                  const isSlack = platformLower === 'slack'
-                                  const isJira = platformLower === 'jira'
-                                  const isLinear = platformLower === 'linear'
-
-                                  if (isGitHub || isSlack || isJira || isLinear) {
-                                    const logoSrc = isGitHub ? '/images/github-logo.png' :
-                                                    isSlack ? '/images/slack-logo.png' :
-                                                    isJira ? '/images/jira-logo.png' :
-                                                    '/images/linear-logo.png'
-                                    return (
-                                      <div
-                                        key={platform}
-                                        className="flex items-center justify-center w-4 h-4"
-                                        title={platform}
-                                      >
-                                        <Image
-                                          src={logoSrc}
-                                          alt={platform}
-                                          width={14}
-                                          height={14}
-                                          className="object-contain"
-                                          quality={100}
-                                        />
-                                      </div>
-                                    )
-                                  }
-                                  return null
-                                })}
-                                {user.is_oncall && (
-                                  <Badge className="text-xs bg-green-100 text-green-700 border-green-300">
-                                    On-Call
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-xs text-neutral-700">
-                                {user.email}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            {/* Rootly and PagerDuty badges */}
-                            {user.platforms?.map((platform: string) => {
-                              const platformLower = platform.toLowerCase()
-                              const isPagerDuty = platformLower === 'pagerduty'
-                              const isRootly = platformLower === 'rootly'
-
-                              if (isPagerDuty || isRootly) {
-                                return (
-                                  <Badge
-                                    key={platform}
-                                    variant="secondary"
-                                    className={`text-xs ${
-                                      isPagerDuty ? 'bg-green-100 text-green-700 border-green-300' :
-                                      isRootly ? 'bg-purple-100 text-purple-700 border-purple-500' :
-                                      ''
-                                    }`}
-                                  >
-                                    {platform}
-                                  </Badge>
-                                )
-                              }
-                              return null
-                            })}
-                          </div>
-                        </div>
-                      {/* GitHub username section - only show if GitHub connected */}
-                      {githubIntegration && (
-                        <div className="pl-13 mt-2" onClick={(e) => e.stopPropagation()}>
-                          {editingUserId === user.id ? (
-                            // Edit mode
-                            <div className="flex items-center space-x-2">
-                            <Select
-                              value={editingUsername}
-                              onValueChange={setEditingUsername}
-                              disabled={savingUsername}
-                            >
-                              <SelectTrigger className="h-8 text-xs flex-1">
-                                <SelectValue placeholder="Select GitHub username..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__clear__">
-                                  <span className="text-neutral-500 italic">Clear mapping</span>
-                                </SelectItem>
-                                {githubOrgMembers.length > 0 ? (
-                                  [...githubOrgMembers].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).map(username => (
-                                    <SelectItem key={username} value={username}>
-                                      {username}
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <div className="text-xs text-neutral-500 p-2">
-                                    {loadingOrgMembers ? 'Loading...' : 'No GitHub members found'}
-                                  </div>
-                                )}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                saveGitHubUsername(user.id)
-                              }}
-                              disabled={savingUsername}
-                              className="h-8 px-2"
-                            >
-                              {savingUsername ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Check className="w-3 h-3" />
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                cancelEditingGitHubUsername()
-                              }}
-                              disabled={savingUsername}
-                              className="h-8 px-2"
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          // Display mode
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="text-neutral-500 flex items-center gap-2">
-                              <span>GitHub: {user.github_username ? (
-                                <span className="font-mono text-neutral-700">{user.github_username}</span>
-                              ) : (
-                                <span className="text-neutral-500 italic">Not mapped</span>
-                              )}</span>
-                              {user.github_is_manual && user.github_username && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                  Manual
-                                </span>
-                              )}
-                            </div>
-                            {githubIntegration && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  startEditingGitHubUsername(user.id, user.github_username)
-                                }}
-                                className="h-6 px-2 text-neutral-500 hover:text-neutral-700"
-                              >
-                                <Edit3 className="w-3 h-3" />
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                        </div>
-                      )}
-
-                        {/* Jira mapping section - always show if Jira connected */}
-                        {jiraIntegration && (
-                          <div className="pl-13 mt-2" onClick={(e) => e.stopPropagation()}>
-                            {editingJiraUserId === user.id ? (
-                              // Jira Edit mode
-                              <div className="flex items-center space-x-2">
-                                <Select
-                                  value={editingJiraAccountId}
-                                  onValueChange={setEditingJiraAccountId}
-                                  disabled={savingJiraMapping}
-                                >
-                                  <SelectTrigger className="h-8 text-xs flex-1">
-                                    <SelectValue placeholder="Select Jira user..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__clear__">
-                                      <span className="text-neutral-500 italic">Clear mapping</span>
-                                    </SelectItem>
-                                    {jiraUsers.length > 0 ? (
-                                      [...jiraUsers].sort((a, b) => (a.display_name || '').toLowerCase().localeCompare((b.display_name || '').toLowerCase())).map((jiraUser) => (
-                                        <SelectItem key={jiraUser.account_id} value={jiraUser.account_id}>
-                                          <div className="space-y-0.5">
-                                            <div className="font-medium">{jiraUser.display_name}</div>
-                                            <div className="text-xs text-neutral-500">
-                                              {jiraUser.email ? jiraUser.email : '<no-email>'}
-                                            </div>
-                                          </div>
-                                        </SelectItem>
-                                      ))
-                                    ) : (
-                                      <div className="text-xs text-neutral-500 p-2">
-                                        {loadingJiraUsers ? 'Loading...' : 'No Jira users found'}
-                                      </div>
-                                    )}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    saveJiraMapping(user.id)
-                                  }}
-                                  disabled={savingJiraMapping}
-                                  className="h-8 px-2"
-                                >
-                                  {savingJiraMapping ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    <Check className="w-3 h-3" />
-                                  )}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    cancelEditingJiraMapping()
-                                  }}
-                                  disabled={savingJiraMapping}
-                                  className="h-8 px-2"
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              // Jira Display mode
-                              <div className="flex items-center justify-between text-xs">
-                                <div className="text-neutral-500">
-                                  Jira: {user.jira_account_id ? (
-                                    <div className="space-y-0.5">
-                                      <div className="font-mono text-neutral-700">
-                                        {jiraUsers.find(u => u.account_id === user.jira_account_id)?.display_name ||
-                                         user.jira_account_id.substring(0, 8) + '...'}
-                                      </div>
-                                      {user.jira_email ? (
-                                        <div className="text-xs text-neutral-500">{user.jira_email}</div>
-                                      ) : (
-                                        <div className="text-xs text-neutral-500">&lt;no-email&gt;</div>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span className="text-neutral-500 italic">Not mapped</span>
-                                  )}
-                                </div>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    startEditingJiraMapping(user.id, user.jira_account_id)
-                                  }}
-                                  className="h-6 px-2 text-neutral-500 hover:text-neutral-700"
-                                >
-                                  <Edit3 className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Linear mapping section - always show if Linear connected */}
-                        {linearIntegration && (
-                          <div className="pl-13 mt-2" onClick={(e) => e.stopPropagation()}>
-                            {editingLinearUserId === user.id ? (
-                              // Linear Edit mode
-                              <div className="flex items-center space-x-2">
-                                <Select
-                                  value={editingLinearUserValue}
-                                  onValueChange={setEditingLinearUserValue}
-                                  disabled={savingLinearMapping}
-                                >
-                                  <SelectTrigger className="h-8 text-xs flex-1">
-                                    <SelectValue placeholder="Select Linear user..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__clear__">
-                                      <span className="text-neutral-500 italic">Clear mapping</span>
-                                    </SelectItem>
-                                    {linearUsers.length > 0 ? (
-                                      linearUsers
-                                        .filter(u => u.active !== false)
-                                        .sort((a, b) => (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()))
-                                        .map((linearUser) => (
-                                          <SelectItem key={linearUser.id} value={linearUser.id}>
-                                            <div className="space-y-0.5">
-                                              <div className="font-medium">{linearUser.name}</div>
-                                              <div className="text-xs text-neutral-500">
-                                                {linearUser.email || '<no-email>'}
-                                              </div>
-                                            </div>
-                                          </SelectItem>
-                                        ))
-                                    ) : (
-                                      <div className="text-xs text-neutral-500 p-2">
-                                        {loadingLinearUsers ? 'Loading...' : 'No Linear users found'}
-                                      </div>
-                                    )}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    saveLinearMapping(user.id)
-                                  }}
-                                  disabled={savingLinearMapping}
-                                  className="h-8 px-2"
-                                >
-                                  {savingLinearMapping ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    <Check className="w-3 h-3" />
-                                  )}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    cancelEditingLinearMapping()
-                                  }}
-                                  disabled={savingLinearMapping}
-                                  className="h-8 px-2"
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              // Linear Display mode
-                              <div className="flex items-center justify-between text-xs">
-                                <div className="text-neutral-500">
-                                  Linear: {user.linear_user_id ? (
-                                    <div className="space-y-0.5">
-                                      <div className="font-mono text-neutral-700">
-                                        {linearUsers.find(u => u.id === user.linear_user_id)?.name ||
-                                         user.linear_user_id.substring(0, 8) + '...'}
-                                      </div>
-                                      {user.linear_email ? (
-                                        <div className="text-xs text-neutral-500">{user.linear_email}</div>
-                                      ) : (
-                                        <div className="text-xs text-neutral-500">&lt;no-email&gt;</div>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span className="text-neutral-500 italic">Not mapped</span>
-                                  )}
-                                </div>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    startEditingLinearMapping(user.id, user.linear_user_id)
-                                  }}
-                                  className="h-6 px-2 text-neutral-500 hover:text-neutral-700"
-                                >
-                                  <Edit3 className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                    </div>
-                    )
-                  })}
-                </div>
-
-                {/* Pagination Controls */}
-                {(() => {
-                  const totalPages = Math.ceil(syncedUsers.length / TEAM_MEMBERS_PER_PAGE)
-                  const startIndex = (teamMembersPage - 1) * TEAM_MEMBERS_PER_PAGE + 1
-                  const endIndex = Math.min(teamMembersPage * TEAM_MEMBERS_PER_PAGE, syncedUsers.length)
-
-                  return totalPages > 1 ? (
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                      <div className="text-sm text-neutral-700">
-                        Showing {startIndex}-{endIndex} of {syncedUsers.length} members
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => setTeamMembersPage(teamMembersPage - 1)}
-                          disabled={teamMembersPage === 1}
-                          className="bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-300 disabled:text-neutral-500"
-                        >
-                          <ChevronLeft className="w-4 h-4 mr-1" />
-                          Previous
-                        </Button>
-                        <span className="text-sm px-3">
-                          Page {teamMembersPage} of {totalPages}
-                        </span>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => setTeamMembersPage(teamMembersPage + 1)}
-                          disabled={teamMembersPage === totalPages}
-                          className="bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-300 disabled:text-neutral-500"
-                        >
-                          Next
-                          <ChevronRight className="w-4 h-4 ml-1" />
-                        </Button>
-                      </div>
-                    </div>
-                  ) : null
-                })()}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-neutral-500">
-                <Users className="w-12 h-12 mx-auto mb-4 opacity-40" />
-                <p className="text-sm font-medium mb-2">No team members synced yet</p>
-                <p className="text-xs">Close this drawer and click "Sync Members" to add team members who can submit surveys</p>
-              </div>
-            )}
-          </div>
-
-          {/* Sticky Footer with Save/Cancel buttons */}
-          {selectedOrganization && !['beta-rootly', 'beta-pagerduty'].includes(selectedOrganization) && hasUnsavedChanges() && (
-            <div className="sticky bottom-0 left-0 right-0 border-t bg-white p-4 mt-auto">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm text-orange-600 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>You have unsaved changes ({Math.abs(selectedRecipients.size - savedRecipients.size)} member{Math.abs(selectedRecipients.size - savedRecipients.size) !== 1 ? 's' : ''} updated)</span>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={discardRecipientChanges}
-                    disabled={savingRecipients}
-                    variant="outline"
-                    size="default"
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={saveSurveyRecipients}
-                    disabled={savingRecipients}
-                    variant="default"
-                    size="default"
-                    className="bg-purple-700 hover:bg-purple-800"
-                  >
-                    {savingRecipients ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-
       {/* Manual Survey Delivery Modal */}
       <ManualSurveyDeliveryModal
         isOpen={showManualSurveyModal}
@@ -5338,185 +4374,11 @@ export default function IntegrationsPage() {
         onClose={() => setShowPostIntegrationSyncModal(false)}
         onSyncNow={() => {
           setShowPostIntegrationSyncModal(false)
-          // Open drawer first, then sync modal after drawer renders
-          setTeamMembersDrawerOpen(true)
-
-          // Load cached data if available, otherwise fetch
-          if (selectedOrganization && syncedUsersCache.current.has(selectedOrganization)) {
-            const cachedUsers = syncedUsersCache.current.get(selectedOrganization)!
-            setSyncedUsers(cachedUsers)
-            setShowSyncedUsers(true)
-
-            // Also restore cached recipient selections
-            if (recipientsCache.current.has(selectedOrganization)) {
-              const cachedRecipients = recipientsCache.current.get(selectedOrganization)!
-              const validUserIds = new Set(cachedUsers.map(u => u.id))
-              const validCachedRecipients = new Set(
-                Array.from(cachedRecipients).filter(id => validUserIds.has(id))
-              )
-              setSelectedRecipients(validCachedRecipients)
-              setSavedRecipients(validCachedRecipients)
-            }
-          } else {
-            // Otherwise fetch from API
-            fetchSyncedUsers(false, false)
-          }
-
-          // Wait for drawer to render before showing sync modal
-          setTimeout(() => {
-            setShowSyncConfirmModal(true)
-          }, 300)
+          // Navigate to the Team page
+          router.push(`/team?org=${selectedOrganization}`)
         }}
         integrationType={postIntegrationModalType || 'github'}
       />
-
-      {/* Sync Confirmation Modal */}
-      <Dialog open={showSyncConfirmModal} onOpenChange={(open) => {
-        if (!syncProgress?.isLoading) {
-          setShowSyncConfirmModal(open)
-          if (!open) {
-            // Reset sync progress when closing modal
-            setSyncProgress(null)
-          }
-        }
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {syncProgress?.isLoading ? 'Syncing Team Members...' : 'Sync Team Members'}
-            </DialogTitle>
-            <DialogDescription asChild>
-              <div className="space-y-3 text-left">
-                {syncProgress?.results ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="w-6 h-6 text-green-600" />
-                      <div className="flex-1">
-                        <div className="text-lg font-semibold text-neutral-900">{syncProgress.stage}</div>
-                        <div className="text-sm text-neutral-700">{syncProgress.details}</div>
-                      </div>
-                    </div>
-
-                    <div className="bg-neutral-100 border border-neutral-200 rounded-md p-4 space-y-3">
-                      <div className="font-semibold text-neutral-900 text-base">Sync Results</div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between py-2 border-b border-neutral-200">
-                          <span className="text-sm text-neutral-700">New users synced</span>
-                          <span className="font-semibold text-neutral-900">{syncProgress.results.created}</span>
-                        </div>
-                        <div className="flex items-center justify-between py-2 border-b border-neutral-200">
-                          <span className="text-sm text-neutral-700">Existing users updated</span>
-                          <span className="font-semibold text-neutral-900">{syncProgress.results.updated}</span>
-                        </div>
-                        {syncProgress.results.github_matched !== undefined && (
-                          <div className="flex items-center justify-between py-2 border-b border-neutral-200">
-                            <span className="text-sm text-neutral-700">
-                              GitHub accounts matched
-                              {syncProgress.results.github_total !== undefined && (
-                                <span className="text-xs text-neutral-500 ml-1">
-                                  ({syncProgress.results.github_matched} new, {syncProgress.results.github_total} total)
-                                </span>
-                              )}
-                            </span>
-                            <span className="font-semibold text-neutral-900">
-                              {syncProgress.results.github_total !== undefined
-                                ? syncProgress.results.github_total
-                                : syncProgress.results.github_matched}
-                            </span>
-                          </div>
-                        )}
-                        {syncProgress.results.slack_synced !== undefined && (
-                          <div className="flex items-center justify-between py-2 border-b border-neutral-200">
-                            <span className="text-sm text-neutral-700">Slack accounts matched</span>
-                            <span className="font-semibold text-neutral-900">{syncProgress.results.slack_synced}</span>
-                          </div>
-                        )}
-                        {syncProgress.results.jira_matched !== undefined && (
-                          <div className="flex items-center justify-between py-2 border-b border-neutral-200">
-                            <span className="text-sm text-neutral-700">Jira accounts matched</span>
-                            <span className="font-semibold text-neutral-900">{syncProgress.results.jira_matched}</span>
-                          </div>
-                        )}
-                        {syncProgress.results.linear_matched !== undefined && (
-                          <div className="flex items-center justify-between py-2 border-b border-neutral-200">
-                            <span className="text-sm text-neutral-700">Linear accounts matched</span>
-                            <span className="font-semibold text-neutral-900">{syncProgress.results.linear_matched}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : syncProgress?.isLoading ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
-                      <div className="flex-1">
-                        <div className="font-medium text-neutral-900">{syncProgress.stage}</div>
-                        <div className="text-sm text-neutral-700">{syncProgress.details}</div>
-                      </div>
-                    </div>
-
-                    <div className="bg-purple-200 border border-purple-200 rounded-md p-3">
-                      <span className="text-sm text-purple-800">Please wait while we sync your team members. This may take a few moments...</span>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <span>This will sync your team members from {integrations.find(i => i.id.toString() === selectedOrganization)?.name || 'your integration'}.</span>
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
-                      <div className="font-medium text-blue-900">What happens during sync:</div>
-                      <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
-                        {integrations.find(i => i.id.toString() === selectedOrganization)?.platform === 'rootly' && (
-                          <li><strong>Incident Responders Only:</strong> Only users with Incident Response (IR) roles will be synced (admin, owner, user). Observers and users without IR access are excluded.</li>
-                        )}
-                        {integrations.find(i => i.id.toString() === selectedOrganization)?.platform === 'pagerduty' && (
-                          <li><strong>All Users:</strong> All users from your PagerDuty account will be synced.</li>
-                        )}
-                        <li><strong>Clean Sync:</strong> All existing users from this integration will be removed and replaced with the fresh list.</li>
-                        <li><strong>Used in Analysis:</strong> These synced users will be used when running an analysis.</li>
-                        <li><strong>Cross-Platform Matching:</strong> Users will be matched across GitHub, Slack, and Jira accounts when possible.</li>
-                      </ul>
-                    </div>
-
-                    <span className="text-sm text-neutral-700 block">
-                      {syncedUsers.length > 0
-                        ? `This will replace your current ${syncedUsers.length} synced users.`
-                        : 'This is your first sync for this integration.'}
-                    </span>
-                  </>
-                )}
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            {syncProgress?.results ? (
-              <Button
-                onClick={() => {
-                  setShowSyncConfirmModal(false)
-                  setSyncProgress(null)
-                }}
-                className="bg-purple-700 hover:bg-purple-800"
-              >
-                Done
-              </Button>
-            ) : !syncProgress?.isLoading ? (
-              <>
-                <Button variant="outline" onClick={() => setShowSyncConfirmModal(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={performTeamSync}
-                  className="bg-purple-700 hover:bg-purple-800"
-                >
-                  Sync Now
-                </Button>
-              </>
-            ) : null}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Token Error Modal */}
       <TokenErrorModal
