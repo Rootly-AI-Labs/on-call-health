@@ -253,24 +253,12 @@ async def accept_invitation_page(
 
     # Process acceptance
     try:
-        # If switching organizations, clean up old org data for security
+        # If switching organizations, clean up org-specific tokens for security
         if leaving_org:
-            from ...models.analysis import Analysis
             from ...models.rootly_integration import RootlyIntegration
 
-            # Delete old analyses from previous organization
-            # This prevents data leakage between organizations
-            old_analyses_count = db.query(Analysis).filter(
-                Analysis.user_id == current_user.id,
-                Analysis.organization_id == leaving_org['id']
-            ).count()
-
-            db.query(Analysis).filter(
-                Analysis.user_id == current_user.id,
-                Analysis.organization_id == leaving_org['id']
-            ).delete(synchronize_session=False)
-
-            # Delete old integrations (tokens were for old org)
+            # Delete old integrations (API tokens were for old org's systems)
+            # User keeps their analyses as historical data
             old_integrations_count = db.query(RootlyIntegration).filter(
                 RootlyIntegration.user_id == current_user.id
             ).count()
@@ -279,10 +267,11 @@ async def accept_invitation_page(
                 RootlyIntegration.user_id == current_user.id
             ).delete(synchronize_session=False)
 
+            # Note: Analyses are kept - they're historical data the user created
             # Note: GitHub/Slack/Jira integrations are user-level, not org-level
             # They stay with the user when switching orgs
 
-            logger.info(f"User {current_user.id} switching orgs: deleted {old_analyses_count} analyses and {old_integrations_count} integrations")
+            logger.info(f"User {current_user.id} switching orgs: deleted {old_integrations_count} Rootly/PagerDuty integrations, kept analyses")
 
         # Update user's organization (will leave old org if switching)
         current_user.organization_id = invitation.organization_id
@@ -316,7 +305,7 @@ async def accept_invitation_page(
 
         message = f"Successfully joined {invitation.organization.name}!"
         if leaving_org:
-            message = f"You have left {leaving_org['name']} and joined {invitation.organization.name}. Your old analyses and API keys have been removed."
+            message = f"You have left {leaving_org['name']} and joined {invitation.organization.name}. Your API tokens have been removed for security, but you can still view your old analyses."
 
         return {
             "success": True,
@@ -373,23 +362,12 @@ async def accept_invitation_api(
 
     # Process acceptance
     try:
-        # If switching organizations, clean up old org data for security
+        # If switching organizations, clean up org-specific tokens for security
         if leaving_org:
-            from ...models.analysis import Analysis
             from ...models.rootly_integration import RootlyIntegration
 
-            # Delete old analyses from previous organization
-            old_analyses_count = db.query(Analysis).filter(
-                Analysis.user_id == current_user.id,
-                Analysis.organization_id == leaving_org['id']
-            ).count()
-
-            db.query(Analysis).filter(
-                Analysis.user_id == current_user.id,
-                Analysis.organization_id == leaving_org['id']
-            ).delete(synchronize_session=False)
-
-            # Delete old integrations (tokens were for old org)
+            # Delete old integrations (API tokens were for old org's systems)
+            # User keeps their analyses as historical data
             old_integrations_count = db.query(RootlyIntegration).filter(
                 RootlyIntegration.user_id == current_user.id
             ).count()
@@ -398,7 +376,11 @@ async def accept_invitation_api(
                 RootlyIntegration.user_id == current_user.id
             ).delete(synchronize_session=False)
 
-            logger.info(f"User {current_user.id} switching orgs: deleted {old_analyses_count} analyses and {old_integrations_count} integrations")
+            # Note: Analyses are kept - they're historical data the user created
+            # Note: GitHub/Slack/Jira integrations are user-level, not org-level
+            # They stay with the user when switching orgs
+
+            logger.info(f"User {current_user.id} switching orgs: deleted {old_integrations_count} Rootly/PagerDuty integrations, kept analyses")
 
         # Update user's organization (will leave old org if switching)
         current_user.organization_id = invitation.organization_id
@@ -420,7 +402,7 @@ async def accept_invitation_api(
 
         message = f"Successfully joined {invitation.organization.name}!"
         if leaving_org:
-            message = f"You have left {leaving_org['name']} and joined {invitation.organization.name}. Your old analyses and API keys have been removed."
+            message = f"You have left {leaving_org['name']} and joined {invitation.organization.name}. Your API tokens have been removed for security, but you can still view your old analyses."
 
         return {
             "success": True,

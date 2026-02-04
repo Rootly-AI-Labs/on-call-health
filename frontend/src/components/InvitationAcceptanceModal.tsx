@@ -263,11 +263,11 @@ export function InvitationAcceptanceModal({
                   By accepting this invitation, you will:
                   <ul className="list-disc ml-5 mt-2 space-y-1">
                     <li>Leave {currentOrgName} and join {invitation.organization_name}</li>
-                    <li><strong>Permanently lose all analyses</strong> from {currentOrgName}</li>
-                    <li><strong>Lose all API keys</strong> (Rootly/PagerDuty) for {currentOrgName}</li>
+                    <li><strong>Keep all your analyses</strong> from {currentOrgName} (viewable as history)</li>
+                    <li><strong>Lose all API tokens</strong> (Rootly/PagerDuty) for security</li>
                   </ul>
                   <br />
-                  This action cannot be undone.
+                  You'll need to re-add API tokens for {invitation.organization_name}.
                 </AlertDescription>
               </Alert>
             )}
