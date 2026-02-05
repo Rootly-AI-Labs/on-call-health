@@ -4,7 +4,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronRight, Users, Loader2, TrendingUp, TrendingDown, Minus, ChevronsUp, ChevronsDown } from "lucide-react"
+import { ChevronDown, ChevronRight, Users, Loader2, TrendingUp, TrendingDown, Minus, ChevronsUp, ChevronsDown, Info } from "lucide-react"
 import { useState } from "react"
 import Image from "next/image"
 
@@ -126,8 +126,8 @@ function getTrendConfig(trend: UserTrend) {
       }
     case 'significantly_worsening':
       return {
-        label: 'Needs Attention',
-        icon: <ChevronsUp className="w-4 h-4" />,
+        label: 'Critical',
+        icon: <TrendingUp className="w-4 h-4" />,
         className: 'bg-red-100 text-red-700 border-red-200',
         tooltip: 'Workload increased significantly'
       }
@@ -148,6 +148,7 @@ export function TeamMembersList({
   getProgressColor
 }: TeamMembersListProps) {
   const [showMembersWithoutIncidents, setShowMembersWithoutIncidents] = useState(false);
+  const [sortBy, setSortBy] = useState<'risk' | 'trend'>('risk');
   const dataSources = currentAnalysis?.analysis_data?.data_sources;
   const analysisConfig = currentAnalysis?.config;
   const individualDailyData = currentAnalysis?.analysis_data?.individual_daily_data;
@@ -186,29 +187,18 @@ export function TeamMembersList({
     return false;
   };
 
-  const isGithubEnabled = isDataSourceEnabled('github');
-  const isSlackEnabled = isDataSourceEnabled('slack');
   const isJiraEnabled = isDataSourceEnabled('jira');
-  const isLinearEnabled = isDataSourceEnabled('linear');
   
   const isLoading = !currentAnalysis || !currentAnalysis.analysis_data
 
-  // OCH risk level from score (0-100 scale, higher = more burnout)
-  function getOCHRiskLevel(score: number | undefined | null): string {
-    if (score === undefined || score === null) return 'low'
-    if (score < 25) return 'healthy'
-    if (score < 50) return 'fair'
-    if (score < 75) return 'poor'
-    return 'critical'
-  }
-
   // OCH 4-color system for progress bars (0-100 scale, higher = more burnout)
+  // Using softer colors to match badge opacity
   function getOCHProgressColor(score: number): string {
     const clampedScore = Math.max(0, Math.min(100, score))
-    if (clampedScore < 25) return '#10b981'  // Green - Low/minimal burnout (0-24)
-    if (clampedScore < 50) return '#eab308'  // Yellow - Mild burnout symptoms (25-49)
-    if (clampedScore < 75) return '#f97316'  // Orange - Moderate/significant burnout (50-74)
-    return '#dc2626'                          // Red - High/severe burnout (75-100)
+    if (clampedScore < 25) return '#86efac'  // Green-300 - Low/minimal burnout (0-24)
+    if (clampedScore < 50) return '#fde047'  // Yellow-300 - Mild burnout symptoms (25-49)
+    if (clampedScore < 75) return '#fdba74'  // Orange-300 - Moderate/significant burnout (50-74)
+    return '#fca5a5'                          // Red-300 - High/severe burnout (75-100)
   }
 
   const renderMemberCard = (member: any) => {
@@ -306,70 +296,79 @@ export function TeamMembersList({
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            {/* Trend badge - most important, shown first */}
+          {member.is_oncall && (
+            <Badge className="bg-purple-50 text-purple-700 border border-purple-200">
+              ON-CALL
+            </Badge>
+          )}
+        </div>
+
+        {/* Two equal sub-sections: Trend (left) and Risk (right) */}
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          {/* Left sub-section: Trend */}
+          <div className="bg-neutral-50 rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Trend (30-day)</span>
+              <div className="relative group">
+                <Info className="w-3 h-3 text-neutral-400 cursor-help" />
+                <div className="absolute bottom-full left-0 mb-1 px-2 py-1 bg-neutral-900/95 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  How the risk score changed over the past 30 days
+                </div>
+              </div>
+            </div>
             <div className="relative group">
-              <Badge className={`flex items-center gap-1 ${trendConfig.className} border`}>
+              <Badge className={`flex items-center justify-center gap-2 ${trendConfig.className} border w-full py-2 text-sm`}>
                 {trendConfig.icon}
                 {trendConfig.label}
               </Badge>
               {trendInfo.percentage > 0 && (
-                <div className="absolute top-full right-0 mt-1 px-2 py-1 bg-neutral-900/95 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="absolute top-full left-0 mt-1 px-2 py-1 bg-neutral-900/95 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   {trendInfo.trend.includes('improving')
-                    ? `Workload down ${trendInfo.percentage}%`
+                    ? `Down ${trendInfo.percentage}% (${Math.round(trendInfo.firstHalfScore)} → ${Math.round(trendInfo.secondHalfScore)})`
                     : trendInfo.trend.includes('worsening')
-                    ? `Workload up ${trendInfo.percentage}%`
-                    : 'No significant change'}
+                    ? `Up ${trendInfo.percentage}% (${Math.round(trendInfo.firstHalfScore)} → ${Math.round(trendInfo.secondHalfScore)})`
+                    : `Stable (${Math.round(trendInfo.firstHalfScore)} → ${Math.round(trendInfo.secondHalfScore)})`}
                 </div>
               )}
             </div>
-            {member.is_oncall && (
-              <Badge className="bg-purple-50 text-purple-700 border border-purple-200">
-                ON-CALL
-              </Badge>
+            <div className="flex items-center gap-1 text-xs text-neutral-500">
+              <span>Avg risk: {Math.round(trendInfo.firstHalfScore)} → {Math.round(trendInfo.secondHalfScore)}</span>
+              <div className="relative group">
+                <Info className="w-3 h-3 text-neutral-400 cursor-help" />
+                <div className="absolute bottom-full left-0 mb-1 px-2 py-1 bg-neutral-900/95 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  Average weekly risk score: first weeks → last weeks
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right sub-section: Current Risk Level */}
+          <div className="bg-neutral-50 rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Risk Level</span>
+              <div className="relative group">
+                <Info className="w-3 h-3 text-neutral-400 cursor-help" />
+                <div className="absolute bottom-full left-0 mb-1 px-2 py-1 bg-neutral-900/95 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  Current on-call health score based on workload factors
+                </div>
+              </div>
+            </div>
+            {member?.och_score !== undefined ? (
+              <>
+                <div className="relative h-9 w-full overflow-hidden rounded-full bg-neutral-300">
+                  <div
+                    className="h-full transition-all"
+                    style={{
+                      width: `${member.och_score}%`,
+                      backgroundColor: getOCHProgressColor(member.och_score)
+                    }}
+                  />
+                </div>
+                <div className="text-xs text-neutral-500">Score: {Math.round(member.och_score)}/100</div>
+              </>
+            ) : (
+              <div className="text-sm text-neutral-500">No data</div>
             )}
-            {member?.och_score !== undefined && (() => {
-              const getOCHRiskLevel = (och_score: number): string => {
-                if (och_score < 25) return 'healthy';
-                if (och_score < 50) return 'fair';
-                if (och_score < 75) return 'poor';
-                return 'critical';
-              };
-
-              const riskLevel = getOCHRiskLevel(member.och_score);
-              const displayLabel = riskLevel === 'healthy' ? 'HEALTHY' :
-                                 riskLevel === 'fair' ? 'FAIR' :
-                                 riskLevel === 'poor' ? 'POOR' :
-                                 'CRITICAL';
-
-              return <Badge className={getRiskColor(riskLevel)}>{displayLabel}</Badge>;
-            })()}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          {member?.och_score !== undefined ? (
-            <div className="text-sm">
-              <span>Risk Level</span>
-            </div>
-          ) : (
-            <div className="text-sm">
-              <span>No Risk Level Available</span>
-            </div>
-          )}
-          <div className="relative h-2 w-full overflow-hidden rounded-full bg-neutral-300">
-            <div 
-              className="h-full transition-all"
-              style={{ 
-                width: `${member?.och_score || 0}%`,
-                backgroundColor: member?.och_score !== undefined 
-                  ? getOCHProgressColor(member.och_score)
-                  : undefined
-              }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-neutral-500">
-            <span>{member.incident_count} incidents</span>
           </div>
         </div>
       </CardContent>
@@ -380,9 +379,36 @@ export function TeamMembersList({
     <>
       {/* Organization Members Grid */}
       <Card>
-        <CardHeader>
-          <CardTitle>Team Member Risk Levels</CardTitle>
-          <CardDescription>Click on a member to view detailed analysis</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Team Member Risk Levels</CardTitle>
+            <CardDescription>Click on a member to view detailed analysis</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-neutral-500">Sort by:</span>
+            <div className="flex items-center bg-neutral-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setSortBy('risk')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  sortBy === 'risk'
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                Risk Level
+              </button>
+              <button
+                onClick={() => setSortBy('trend')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  sortBy === 'trend'
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                Trend
+              </button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {(() => {
@@ -412,12 +438,35 @@ export function TeamMembersList({
               (member.incident_count || 0) === 0 && (member.och_score || 0) === 0
             )
 
-            
-            // Sort members by score (highest risk first)
-            const sortMembers = (members: any[]) => members.sort((a, b) => {
-              // Sort by OCH risk level only (higher score = higher risk)
-              return (b.och_score || 0) - (a.och_score || 0);
-            })
+            // Sort members by selected criteria
+            const sortMembers = (members: any[]) => {
+              if (sortBy === 'risk') {
+                // Sort by OCH risk level (higher score = higher risk)
+                return [...members].sort((a, b) => (b.och_score || 0) - (a.och_score || 0));
+              } else {
+                // Sort by trend (worsening first, then stable, then improving)
+                // For same trend level, sort by risk level (higher risk first)
+                const trendOrder: Record<string, number> = {
+                  'significantly_worsening': 0,
+                  'worsening': 1,
+                  'stable': 2,
+                  'improving': 3,
+                  'significantly_improving': 4
+                };
+
+                return [...members].sort((a, b) => {
+                  const trendA = calculateUserTrend(a.user_email, individualDailyData);
+                  const trendB = calculateUserTrend(b.user_email, individualDailyData);
+                  // Use ?? instead of || because 0 is a valid order value (significantly_worsening)
+                  const trendComparison = (trendOrder[trendA.trend] ?? 2) - (trendOrder[trendB.trend] ?? 2);
+                  // If same trend level, sort by risk level (higher risk first)
+                  if (trendComparison === 0) {
+                    return (b.och_score || 0) - (a.och_score || 0);
+                  }
+                  return trendComparison;
+                });
+              }
+            }
 
             // Sort members alphabetically by name
             const sortMembersAlphabetically = (members: any[]) => members.sort((a, b) => {
