@@ -58,11 +58,11 @@ Requirements for MCP server distribution milestone. Each maps to roadmap phases.
 
 ### AWS Deployment
 
-- [ ] **AWS-01**: Dockerfile for containerizing MCP server SSE endpoint
-- [ ] **AWS-02**: Multi-stage Docker build for optimized image size
-- [ ] **AWS-03**: Docker image pushed to AWS ECR (Elastic Container Registry)
-- [ ] **AWS-04**: ECS task definition with environment variables (API_KEY, BASE_URL)
-- [ ] **AWS-05**: ECS service deployment (Fargate or EC2)
+- [x] **AWS-01**: Dockerfile for containerizing MCP server SSE endpoint
+- [x] **AWS-02**: Multi-stage Docker build for optimized image size
+- [x] **AWS-03**: Docker image pushed to AWS ECR (Elastic Container Registry)
+- [x] **AWS-04**: ECS task definition with environment variables (API_KEY, BASE_URL)
+- [x] **AWS-05**: ECS service deployment (Fargate or EC2)
 - [ ] **AWS-06**: Application Load Balancer with health check routing
 - [ ] **AWS-07**: Auto-scaling configuration based on CPU/connection count
 - [ ] **AWS-08**: Domain name configuration (mcp.oncallhealth.com or similar)
@@ -157,11 +157,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-04 | Phase 10 | Complete |
 | DOCS-05 | Phase 10 | Complete |
 | DOCS-06 | Phase 10 | Complete |
-| AWS-01 | Phase 11 | Pending |
-| AWS-02 | Phase 11 | Pending |
-| AWS-03 | Phase 11 | Pending |
-| AWS-04 | Phase 11 | Pending |
-| AWS-05 | Phase 11 | Pending |
+| AWS-01 | Phase 11 | Complete |
+| AWS-02 | Phase 11 | Complete |
+| AWS-03 | Phase 11 | Complete |
+| AWS-04 | Phase 11 | Complete |
+| AWS-05 | Phase 11 | Complete |
 | AWS-06 | Phase 11 | Pending |
 | AWS-07 | Phase 11 | Pending |
 | AWS-08 | Phase 11 | Pending |
@@ -171,8 +171,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 **Coverage:**
 - v1.1 requirements: 44 total
 - Mapped to phases: 44
+- Complete: 40 (34 from phases 5-10 + 5 from AWS + 6 from DOCS)
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after roadmap revision (added AWS deployment)*
+*Last updated: 2026-02-04 after Phase 12 documentation cleanup (AWS-01 through AWS-05 complete)*
