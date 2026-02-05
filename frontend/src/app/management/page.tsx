@@ -171,14 +171,6 @@ function TeamPageContent() {
     }
   }, [])
 
-  // Auto-fetch synced users when organization changes
-  // fetchSyncedUsers is memoized based on selectedOrganization, so we only need selectedOrganization in deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (selectedOrganization) {
-      fetchSyncedUsers(false, false, false)
-    }
-  }, [selectedOrganization])
 
   // Auto-open sync modal if redirected from integrations page
   useEffect(() => {
@@ -250,6 +242,13 @@ function TeamPageContent() {
       setLoadingSyncedUsers(false)
     }
   }, [selectedOrganization])
+
+  // Auto-fetch synced users when organization changes (moved after fetchSyncedUsers definition)
+  useEffect(() => {
+    if (selectedOrganization) {
+      fetchSyncedUsers(false, false, false)
+    }
+  }, [selectedOrganization, fetchSyncedUsers])
 
   // Perform full team sync with progress tracking
   const performTeamSync = async () => {
