@@ -2133,32 +2133,32 @@ export default function useDashboard() {
         return memberWithOch.och_score !== undefined && memberWithOch.och_score !== null && memberWithOch.och_score > 0
       })
       ?.map((member) => {
-        // Use OCH scoring system (0-100 scale, higher = more burnout)
+        // Use OCH scoring system (0-100 scale, higher = more health risk)
         const score = (member as any).och_score || 0
-        
-        const burnoutScore = Math.max(0, score);
-        
-        // Official OCH 4-color system based on burnout score (higher = worse)
-        const getRiskFromBurnoutScore = (burnoutScore: number) => {
-          if (burnoutScore < 25) return { level: 'low', color: '#10b981' };      // Green - Low/minimal burnout (0-24)
-          if (burnoutScore < 50) return { level: 'mild', color: '#eab308' };     // Yellow - Mild burnout symptoms (25-49)  
-          if (burnoutScore < 75) return { level: 'moderate', color: '#f97316' }; // Orange - Moderate/significant burnout (50-74)
-          return { level: 'high', color: '#dc2626' };                           // Red - High/severe burnout (75-100)
+
+        const healthScore = Math.max(0, score);
+
+        // Official OCH 4-color system based on health score (higher = worse)
+        const getRiskFromHealthScore = (healthScore: number) => {
+          if (healthScore < 25) return { level: 'low', color: '#10b981' };      // Green - Low/minimal health risk (0-24)
+          if (healthScore < 50) return { level: 'mild', color: '#eab308' };     // Yellow - Mild health risk (25-49)
+          if (healthScore < 75) return { level: 'moderate', color: '#f97316' }; // Orange - Moderate/significant health risk (50-74)
+          return { level: 'high', color: '#dc2626' };                           // Red - High/severe health risk (75-100)
         };
-        
-        const riskInfo = getRiskFromBurnoutScore(burnoutScore);
-        
+
+        const riskInfo = getRiskFromHealthScore(healthScore);
+
         return {
           name: member.user_name.split(" ")[0],
           fullName: member.user_name,
-          score: burnoutScore,
+          score: healthScore,
           riskLevel: riskInfo.level,
           backendRiskLevel: member.risk_level, // Keep original for reference
           scoreType: 'OCH',
           fill: riskInfo.color,
         }
       })
-      ?.sort((a, b) => b.score - a.score) // Sort by score descending (highest burnout first)
+      ?.sort((a, b) => b.score - a.score) // Sort by score descending (highest health risk first)
       || []
   })();
   

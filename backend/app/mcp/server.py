@@ -50,7 +50,7 @@ async def analysis_start(
     include_weekends: bool = True,
     integration_id: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Start a new burnout analysis."""
+    """Start a new health analysis."""
     api_key = get_api_key()
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
@@ -190,10 +190,9 @@ async def integrations_list() -> Dict[str, Any]:
 def methodology_resource() -> str:
     """Provide a short methodology description."""
     return (
-        "On-Call Health measures overwork risk using a two-dimensional model inspired by the "
-        "Copenhagen Burnout Inventory. It combines objective workload signals (incidents, "
-        "communications, commits) with self-reported data to surface risk patterns without "
-        "providing medical diagnosis."
+        "On-Call Health measures overwork risk using a scientifically informed two-dimensional "
+        "model. It combines objective workload signals (incidents, communications, commits) "
+        "with self-reported data to surface risk patterns without providing medical diagnosis."
     )
 
 

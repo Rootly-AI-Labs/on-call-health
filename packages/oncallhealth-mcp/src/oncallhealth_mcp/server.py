@@ -63,7 +63,7 @@ async def analysis_start(
     include_weekends: bool = True,
     integration_id: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Start a new burnout analysis."""
+    """Start a new health analysis."""
     api_key = _validate_api_key(ctx)
 
     if days_back <= 0:
@@ -297,7 +297,7 @@ async def get_at_risk_users(
     min_och_score: float = 50.0,
     include_risk_levels: Optional[str] = "medium,high"
 ) -> Dict[str, Any]:
-    """Get users at or above burnout threshold with their external IDs.
+    """Get users at or above health risk threshold with their external IDs.
 
     Use this to identify at-risk responders and correlate with external
     systems (Rootly, PagerDuty, Slack) using their platform-specific IDs.
@@ -310,9 +310,9 @@ async def get_at_risk_users(
 
     Returns:
         - total_at_risk: count of users at or above threshold (och_score >= min_och_score)
-        - users: list of {user_name, och_score, risk_level, incident_count,
-                         rootly_user_id, pagerduty_user_id, slack_user_id,
-                         github_username}
+        - users: list of {user_name, och_score, risk_level, health_score,
+                         incident_count, rootly_user_id, pagerduty_user_id,
+                         slack_user_id, github_username}
 
     Example:
         >>> result = await get_at_risk_users(ctx, 1226, min_och_score=60)
@@ -354,10 +354,16 @@ async def get_at_risk_users(
                     continue
 
                 # Build compact user object with external IDs
+                health_score = member.get("health_score")
+                if health_score is None:
+                    logger.warning(f"Member {member.get('user_name', 'Unknown')} missing health_score, defaulting to 0")
+                    health_score = 0
+
                 at_risk_users.append({
                     "user_name": member.get("user_name", "Unknown"),
                     "och_score": och_score,
                     "risk_level": member.get("risk_level", "unknown"),
+                    "health_score": health_score,
                     "incident_count": member.get("incident_count", 0),
                     "rootly_user_id": member.get("rootly_user_id"),
                     "pagerduty_user_id": member.get("pagerduty_user_id"),
@@ -383,7 +389,7 @@ async def get_safe_responders(
     max_och_score: float = 30.0,
     limit: int = 10
 ) -> Dict[str, Any]:
-    """Get users with low burnout risk suitable for additional on-call.
+    """Get users with low health risk suitable for additional on-call.
 
     Use this to find replacement responders when removing at-risk users
     from schedules.
@@ -460,7 +466,7 @@ async def check_users_risk(
     rootly_user_ids: str,
     min_och_score: float = 50.0
 ) -> Dict[str, Any]:
-    """Check burnout risk for specific users by their Rootly user IDs.
+    """Check health risk for specific users by their Rootly user IDs.
 
     Use this after fetching a schedule from Rootly to check if any
     scheduled responders are at risk.
@@ -564,10 +570,9 @@ async def check_users_risk(
 def methodology_resource() -> str:
     """Provide a short methodology description."""
     return (
-        "On-Call Health measures overwork risk using a two-dimensional model inspired by the "
-        "Copenhagen Burnout Inventory. It combines objective workload signals (incidents, "
-        "communications, commits) with self-reported data to surface risk patterns without "
-        "providing medical diagnosis."
+        "On-Call Health measures overwork risk using a scientifically informed two-dimensional "
+        "model. It combines objective workload signals (incidents, communications, commits) "
+        "with self-reported data to surface risk patterns without providing medical diagnosis."
     )
 
 

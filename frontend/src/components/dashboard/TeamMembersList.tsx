@@ -193,7 +193,7 @@ export function TeamMembersList({
   
   const isLoading = !currentAnalysis || !currentAnalysis.analysis_data
 
-  // OCH risk level from score (0-100 scale, higher = more burnout)
+  // OCH risk level from score (0-100 scale, higher = more health risk)
   function getOCHRiskLevel(score: number | undefined | null): string {
     if (score === undefined || score === null) return 'low'
     if (score < 25) return 'healthy'
@@ -202,30 +202,30 @@ export function TeamMembersList({
     return 'critical'
   }
 
-  // OCH 4-color system for progress bars (0-100 scale, higher = more burnout)
+  // OCH 4-color system for progress bars (0-100 scale, higher = more health risk)
   function getOCHProgressColor(score: number): string {
     const clampedScore = Math.max(0, Math.min(100, score))
-    if (clampedScore < 25) return '#10b981'  // Green - Low/minimal burnout (0-24)
-    if (clampedScore < 50) return '#eab308'  // Yellow - Mild burnout symptoms (25-49)
-    if (clampedScore < 75) return '#f97316'  // Orange - Moderate/significant burnout (50-74)
-    return '#dc2626'                          // Red - High/severe burnout (75-100)
+    if (clampedScore < 25) return '#10b981'  // Green - Low/minimal health risk (0-24)
+    if (clampedScore < 50) return '#eab308'  // Yellow - Mild health risk (25-49)
+    if (clampedScore < 75) return '#f97316'  // Orange - Moderate/significant health risk (50-74)
+    return '#dc2626'                          // Red - High/severe health risk (75-100)
   }
 
-  const renderMemberCard = (member: any) => {
+  const renderMemberCard = (member: any, index: number) => {
     // Calculate user trend from individual daily data
     const trendInfo = calculateUserTrend(member.user_email, individualDailyData)
     const trendConfig = getTrendConfig(trendInfo.trend)
 
     return (
     <Card
-      key={member.user_email || member.user_id}
+      key={`member-${index}-${member.user_email}`}
       className="cursor-pointer hover:shadow-md transition-shadow"
       onClick={() => setSelectedMember({
         id: member.user_id || '',
         name: member.user_name || 'Unknown',
         email: member.user_email || '',
         avatar_url: member.avatar_url || null,
-        burnoutScore: member.och_score || 0,
+        healthScore: member.och_score || 0,
         riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
         trend: trendInfo.trend,
         trendPercentage: trendInfo.percentage,
@@ -402,7 +402,7 @@ export function TeamMembersList({
               return member.och_score !== undefined && member.och_score !== null
             })
             
-            // Separate members with incidents/burnout and those with neither
+            // Separate members with incidents/health risk and those with neither
             // Include members with incidents OR OCH risk level (e.g., from Jira) in main section
             const membersWithIncidents = validMembers.filter(member =>
               (member.incident_count || 0) > 0 || (member.och_score || 0) > 0
@@ -428,14 +428,14 @@ export function TeamMembersList({
 
             return (
               <>
-                {/* Members with incidents or burnout (from Jira, GitHub, etc.) */}
+                {/* Members with incidents or health risk (from Jira, GitHub, etc.) */}
                 {membersWithIncidents.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     {sortMembers(membersWithIncidents).map(renderMemberCard)}
                   </div>
                 )}
 
-                {/* Collapsible section for members with no activity (no incidents and no burnout) */}
+                {/* Collapsible section for members with no activity (no incidents and no health risk) */}
                 {(membersWithoutIncidents.length > 0 || isLoading) && (
                   <div className="mt-6">
                     <Button
