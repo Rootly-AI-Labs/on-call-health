@@ -35,6 +35,7 @@ See `.planning/milestones/v1.0-ROADMAP.md` for archived v1.0 phases.
 - [x] **Phase 9: Infrastructure** - Connection limits, rate limiting, graceful cleanup
 - [x] **Phase 10: Documentation** - User guides for SSE and PyPI deployment
 - [ ] **Phase 11: AWS Deployment** - Docker containerization and ECS/Fargate production deployment
+- [ ] **Phase 12: Documentation Cleanup** - Complete milestone documentation and sync requirements
 
 ## Phase Details
 
@@ -148,14 +149,29 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 11-01: Docker containerization and ECR setup
-- [ ] 11-02: ECS/Fargate deployment with ALB
-- [ ] 11-03: Domain, SSL, and auto-scaling configuration
+- [x] 11-01: Docker containerization and ECR setup
+- [ ] 11-02: ECS/Fargate deployment (executed but not documented)
+
+### Phase 12: Documentation and Requirements Cleanup
+**Goal**: Complete v1.1 milestone documentation and synchronize requirements status with actual implementation
+**Depends on**: Phase 11
+**Requirements**: AWS-01, AWS-02, AWS-03, AWS-04, AWS-05 (status update)
+**Gap Closure**: Addresses gaps from v1.1 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 11-02-SUMMARY.md exists documenting ECS deployment execution
+  2. REQUIREMENTS.md accurately reflects AWS-01 through AWS-05 as Complete
+  3. API key authentication model is documented (client-side X-API-Key header pattern)
+  4. Task definition secrets configuration is documented or implemented
+  5. Current AWS deployment state is documented (what exists, what's planned)
+**Plans**: 1 plan
+
+Plans:
+- [ ] 12-01: Complete v1.1 documentation and requirements synchronization
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11
+Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -166,7 +182,8 @@ Phases execute in numeric order: 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11
 | 8. PyPI Distribution | v1.1 | 2/2 | Complete | 2026-02-03 |
 | 9. Infrastructure | v1.1 | 2/2 | Complete | 2026-02-03 |
 | 10. Documentation | v1.1 | 3/3 | Complete | 2026-02-03 |
-| 11. AWS Deployment | v1.1 | 0/3 | Not started | - |
+| 11. AWS Deployment | v1.1 | 1/2 | In progress | 2026-02-03 |
+| 12. Documentation Cleanup | v1.1 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-02*
