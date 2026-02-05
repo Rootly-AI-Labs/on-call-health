@@ -254,25 +254,42 @@ async def run_analysis_with_checkpoints(
                 except Exception as e:
                     logger.error(f"Failed to collect GitHub data: {e}")
 
-            # Fetch user correlations for Jira mapping
+            # Fetch user correlations for incident matching
+            # CRITICAL: Must include 'id' field with platform-specific user ID
             synced_users = []
             try:
                 user_correlations = db.query(UserCorrelation).filter(
                     UserCorrelation.organization_id == user.organization_id
                 ).all()
 
-                synced_users = [
-                    {
+                for uc in user_correlations:
+                    # Get platform-specific user ID for incident matching
+                    if integration.platform == "pagerduty":
+                        platform_user_id = uc.pagerduty_user_id
+                        if not platform_user_id:
+                            logger.warning(f"Skipping user {uc.email} - missing pagerduty_user_id")
+                            continue
+                    else:  # rootly
+                        platform_user_id = uc.rootly_user_id or uc.email
+                        if not platform_user_id:
+                            logger.warning(f"Skipping user - missing both rootly_user_id and email")
+                            continue
+
+                    synced_users.append({
+                        "id": platform_user_id,  # CRITICAL: Required for incident matching
                         "email": uc.email,
                         "name": uc.name,
                         "github_username": uc.github_username,
                         "slack_user_id": uc.slack_user_id,
                         "rootly_user_id": uc.rootly_user_id,
+                        "pagerduty_user_id": uc.pagerduty_user_id,
                         "jira_account_id": uc.jira_account_id,
                         "jira_email": uc.jira_email,
-                    }
-                    for uc in user_correlations
-                ]
+                        "avatar_url": uc.avatar_url,
+                        "synced": True,
+                    })
+
+                logger.info(f"Loaded {len(synced_users)} synced users for {integration.platform}")
             except Exception as e:
                 logger.error(f"Failed to fetch user correlations: {e}")
 
