@@ -370,17 +370,31 @@ export function ObjectiveDataCard({
         <div className="space-y-1.5">
           <div className="flex items-center gap-3">
             <CardTitle>Team Trends</CardTitle>
-            {viewMode === 'weekly' && hasData && (
-              <div className="relative group">
-                <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 cursor-help ${getTrendStatusClass(overallTrend.direction)}`}>
-                  {getTrendIcon(overallTrend.direction)}
-                  {getTrendLabel(overallTrend.direction)}
+            {viewMode === 'weekly' && hasData && (() => {
+              // Use vsLastWeek for recent direction (more actionable), fall back to overallTrend
+              const trendToShow = vsLastWeek || overallTrend
+              return (
+                <div className="relative group">
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 cursor-help ${getTrendStatusClass(trendToShow.direction)}`}>
+                    {getTrendIcon(trendToShow.direction)}
+                    {getTrendLabel(trendToShow.direction)}
+                  </div>
+                  <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    {vsLastWeek ? (
+                      <span>
+                        {trendToShow.direction === 'down'
+                          ? `Down ${trendToShow.percentage}% vs last week`
+                          : trendToShow.direction === 'up'
+                          ? `Up ${trendToShow.percentage}% vs last week`
+                          : 'No significant change vs last week'}
+                      </span>
+                    ) : (
+                      <span>{getTrendTooltipMessage(overallTrend.direction, overallTrend.percentage, firstHalfAvg, secondHalfAvg, weeklyMean)}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  {getTrendTooltipMessage(overallTrend.direction, overallTrend.percentage, firstHalfAvg, secondHalfAvg, weeklyMean)}
-                </div>
-              </div>
-            )}
+              )
+            })()}
           </div>
           <CardDescription>{description}</CardDescription>
         </div>
