@@ -302,6 +302,18 @@ async def accept_invitation_page(
         current_user.role = invitation.role
         current_user.joined_org_at = datetime.now(timezone.utc)
 
+        # If joining as admin and no other super admins exist, become super admin
+        if invitation.role == 'admin':
+            other_super_admins = db.query(User).filter(
+                User.organization_id == invitation.organization_id,
+                User.is_super_admin == True,
+                User.status == 'active'
+            ).count()
+
+            if other_super_admins == 0:
+                current_user.is_super_admin = True
+                logger.info(f"User {current_user.email} became first super admin in org {invitation.organization_id} via invitation")
+
         # Mark invitation as accepted
         invitation.status = "accepted"
         invitation.used_at = datetime.now(timezone.utc)
@@ -383,6 +395,18 @@ async def accept_invitation_api(
         current_user.organization_id = invitation.organization_id
         current_user.role = invitation.role
         current_user.joined_org_at = datetime.now(timezone.utc)
+
+        # If joining as admin and no other super admins exist, become super admin
+        if invitation.role == 'admin':
+            other_super_admins = db.query(User).filter(
+                User.organization_id == invitation.organization_id,
+                User.is_super_admin == True,
+                User.status == 'active'
+            ).count()
+
+            if other_super_admins == 0:
+                current_user.is_super_admin = True
+                logger.info(f"User {current_user.email} became first super admin in org {invitation.organization_id} via invitation")
 
         # Mark invitation as accepted
         invitation.status = "accepted"
