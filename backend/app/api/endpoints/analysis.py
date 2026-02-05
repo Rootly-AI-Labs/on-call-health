@@ -18,6 +18,7 @@ from ...services.slack_token_service import get_slack_token_for_user, SlackToken
 from ...core.rate_limiting import analysis_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest
 from ...middleware.logging_context import set_analysis_context, clear_analysis_context
+from .analyses import sanitize_burnout_score_from_response
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -177,8 +178,9 @@ async def get_analysis_results(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Analysis not completed yet. Current status: {analysis.status}"
         )
-    
-    return analysis.results
+
+    # Sanitize burnout_score from response (use och_score only)
+    return sanitize_burnout_score_from_response(analysis.results)
 
 @router.get("/current")
 async def get_current_analysis(
