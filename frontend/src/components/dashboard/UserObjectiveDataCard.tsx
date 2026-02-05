@@ -157,7 +157,7 @@ function calculateTrend(current: number, previous: number): TrendDirection {
   if (previous === 0) return { direction: 'stable', percentage: 0 }
 
   const change = ((current - previous) / previous) * 100
-  if (Math.abs(change) < 5) return { direction: 'stable', percentage: Math.round(change) }
+  if (Math.abs(change) < 15) return { direction: 'stable', percentage: Math.round(change) }
 
   return {
     direction: change > 0 ? 'up' : 'down',
@@ -167,9 +167,9 @@ function calculateTrend(current: number, previous: number): TrendDirection {
 
 function getTrendStatusClass(direction: 'up' | 'down' | 'stable'): string {
   switch (direction) {
-    case 'down': return 'bg-green-100 text-green-700'
-    case 'up': return 'bg-red-100 text-red-700'
-    default: return 'bg-neutral-100 text-neutral-600'
+    case 'down': return 'bg-green-100 text-green-700 border border-green-200'
+    case 'up': return 'bg-red-100 text-red-700 border border-red-200'
+    default: return 'bg-purple-50 text-purple-600 border border-purple-200'
   }
 }
 
@@ -183,9 +183,9 @@ function getTrendLabel(direction: 'up' | 'down' | 'stable'): string {
 
 function getTrendIcon(direction: 'up' | 'down' | 'stable') {
   switch (direction) {
-    case 'down': return <TrendingDown className="w-3 h-3" />
-    case 'up': return <TrendingUp className="w-3 h-3" />
-    default: return <Minus className="w-3 h-3" />
+    case 'down': return <TrendingDown className="w-4 h-4" />
+    case 'up': return <TrendingUp className="w-4 h-4" />
+    default: return <Minus className="w-4 h-4" />
   }
 }
 
@@ -363,12 +363,31 @@ export function UserObjectiveDataCard({
         <div className="space-y-1.5">
           <div className="flex items-center gap-3">
             <CardTitle>User Trends</CardTitle>
-            {viewMode === 'weekly' && hasData && (
-              <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getTrendStatusClass(weeklyStats.overallTrend.direction)}`}>
-                {getTrendIcon(weeklyStats.overallTrend.direction)}
-                {getTrendLabel(weeklyStats.overallTrend.direction)}
-              </div>
-            )}
+            {viewMode === 'weekly' && hasData && weeklyData.length >= 2 && (() => {
+              // Compare first week(s) to last week(s) for true overall direction
+              const numWeeksToCompare = Math.min(2, Math.floor(weeklyData.length / 2))
+              const firstWeeksAvg = weeklyData.slice(0, numWeeksToCompare).reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / numWeeksToCompare
+              const lastWeeksAvg = weeklyData.slice(-numWeeksToCompare).reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / numWeeksToCompare
+              const overallDirection = calculateTrend(lastWeeksAvg, firstWeeksAvg)
+
+              return (
+                <div className="relative group">
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 cursor-help ${getTrendStatusClass(overallDirection.direction)}`}>
+                    {getTrendIcon(overallDirection.direction)}
+                    {getTrendLabel(overallDirection.direction)}
+                  </div>
+                  <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <span>
+                      {overallDirection.direction === 'down'
+                        ? `Down ${overallDirection.percentage}% from start to end`
+                        : overallDirection.direction === 'up'
+                        ? `Up ${overallDirection.percentage}% from start to end`
+                        : `Returned to similar level (${Math.round(firstWeeksAvg)} → ${Math.round(lastWeeksAvg)})`}
+                    </span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
           <CardDescription>{description}</CardDescription>
         </div>

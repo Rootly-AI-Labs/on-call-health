@@ -4,9 +4,135 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronRight, Users, Loader2 } from "lucide-react"
+import { ChevronDown, ChevronRight, Users, Loader2, TrendingUp, TrendingDown, Minus, ChevronsUp, ChevronsDown } from "lucide-react"
 import { useState } from "react"
 import Image from "next/image"
+
+// User trend categories (5 levels)
+type UserTrend = 'significantly_worsening' | 'worsening' | 'stable' | 'improving' | 'significantly_improving'
+
+interface TrendInfo {
+  trend: UserTrend
+  percentage: number
+  firstHalfScore: number
+  secondHalfScore: number
+}
+
+// Get Monday of the week for a given date (same as UserObjectiveDataCard)
+function getWeekStartDate(date: Date): string {
+  const dayOfWeek = date.getDay()
+  const monday = new Date(date)
+  monday.setDate(date.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+  return monday.toISOString().split('T')[0]
+}
+
+// Aggregate daily data into weekly buckets using health_score (same as UserObjectiveDataCard)
+function aggregateToWeekly(dailyData: Record<string, any>): { weekStart: string; score: number }[] {
+  const dates = Object.keys(dailyData).sort()
+  if (dates.length === 0) return []
+
+  // Group by calendar week (Monday-Sunday) - same as UserObjectiveDataCard
+  const weeklyBuckets = new Map<string, number[]>()
+
+  for (const date of dates) {
+    const dayData = dailyData[date]
+    const dayScore = dayData.health_score || 0
+    const weekKey = getWeekStartDate(new Date(date))
+
+    const bucket = weeklyBuckets.get(weekKey) || []
+    bucket.push(dayScore)
+    weeklyBuckets.set(weekKey, bucket)
+  }
+
+  return Array.from(weeklyBuckets.entries())
+    .map(([weekStart, scores]) => ({
+      weekStart,
+      score: scores.reduce((a, b) => a + b, 0) / scores.length
+    }))
+    .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+}
+
+// Calculate user trend from their individual daily data (aggregated to weekly)
+function calculateUserTrend(
+  userEmail: string,
+  individualDailyData: Record<string, Record<string, any>> | undefined
+): TrendInfo {
+  const defaultTrend: TrendInfo = { trend: 'stable', percentage: 0, firstHalfScore: 0, secondHalfScore: 0 }
+
+  if (!individualDailyData || !userEmail) return defaultTrend
+
+  // Find user data (try both exact match and lowercase)
+  const userData = individualDailyData[userEmail] || individualDailyData[userEmail.toLowerCase()]
+  if (!userData) return defaultTrend
+
+  // Aggregate to weekly data
+  const weeklyData = aggregateToWeekly(userData)
+  if (weeklyData.length < 2) return defaultTrend
+
+  // Compare first week(s) to last week(s) - same logic as UserObjectiveDataCard
+  const numWeeksToCompare = Math.min(2, Math.floor(weeklyData.length / 2))
+  const firstWeeksAvg = weeklyData.slice(0, numWeeksToCompare).reduce((sum, w) => sum + w.score, 0) / numWeeksToCompare
+  const lastWeeksAvg = weeklyData.slice(-numWeeksToCompare).reduce((sum, w) => sum + w.score, 0) / numWeeksToCompare
+
+  // Calculate percentage change (positive = worsening, negative = improving)
+  if (firstWeeksAvg === 0 && lastWeeksAvg === 0) {
+    return { trend: 'stable', percentage: 0, firstHalfScore: 0, secondHalfScore: 0 }
+  }
+
+  const baseline = firstWeeksAvg || 0.1 // Avoid division by zero
+  const change = ((lastWeeksAvg - firstWeeksAvg) / baseline) * 100
+
+  // Use 15% threshold for stable (matches UserObjectiveDataCard)
+  let trend: UserTrend
+  if (change <= -30) trend = 'significantly_improving'
+  else if (change <= -15) trend = 'improving'
+  else if (change >= 30) trend = 'significantly_worsening'
+  else if (change >= 15) trend = 'worsening'
+  else trend = 'stable'
+
+  return { trend, percentage: Math.round(Math.abs(change)), firstHalfScore: firstWeeksAvg, secondHalfScore: lastWeeksAvg }
+}
+
+// Get trend display config
+function getTrendConfig(trend: UserTrend) {
+  switch (trend) {
+    case 'significantly_improving':
+      return {
+        label: 'Improving Fast',
+        icon: <ChevronsDown className="w-4 h-4" />,
+        className: 'bg-green-100 text-green-700 border-green-200',
+        tooltip: 'Workload decreased significantly'
+      }
+    case 'improving':
+      return {
+        label: 'Improving',
+        icon: <TrendingDown className="w-4 h-4" />,
+        className: 'bg-green-50 text-green-600 border-green-100',
+        tooltip: 'Workload trending down'
+      }
+    case 'stable':
+      return {
+        label: 'Stable',
+        icon: <Minus className="w-4 h-4" />,
+        className: 'bg-purple-50 text-purple-600 border-purple-200',
+        tooltip: 'Workload consistent'
+      }
+    case 'worsening':
+      return {
+        label: 'Worsening',
+        icon: <TrendingUp className="w-4 h-4" />,
+        className: 'bg-red-50 text-red-600 border-red-100',
+        tooltip: 'Workload trending up'
+      }
+    case 'significantly_worsening':
+      return {
+        label: 'Needs Attention',
+        icon: <ChevronsUp className="w-4 h-4" />,
+        className: 'bg-red-100 text-red-700 border-red-200',
+        tooltip: 'Workload increased significantly'
+      }
+  }
+}
 
 interface TeamMembersListProps {
   currentAnalysis: any
@@ -24,6 +150,7 @@ export function TeamMembersList({
   const [showMembersWithoutIncidents, setShowMembersWithoutIncidents] = useState(false);
   const dataSources = currentAnalysis?.analysis_data?.data_sources;
   const analysisConfig = currentAnalysis?.config;
+  const individualDailyData = currentAnalysis?.analysis_data?.individual_daily_data;
 
   const isDataSourceEnabled = (source: 'github' | 'slack' | 'jira' | 'linear') => {
     if (Array.isArray(dataSources)) {
@@ -84,7 +211,12 @@ export function TeamMembersList({
     return '#dc2626'                          // Red - High/severe burnout (75-100)
   }
 
-  const renderMemberCard = (member: any) => (
+  const renderMemberCard = (member: any) => {
+    // Calculate user trend from individual daily data
+    const trendInfo = calculateUserTrend(member.user_email, individualDailyData)
+    const trendConfig = getTrendConfig(trendInfo.trend)
+
+    return (
     <Card
       key={member.user_id}
       className="cursor-pointer hover:shadow-md transition-shadow"
@@ -93,9 +225,10 @@ export function TeamMembersList({
         name: member.user_name || 'Unknown',
         email: member.user_email || '',
         avatar_url: member.avatar_url || null,
-        burnoutScore: member.och_score || 0, // Use OCH risk level directly
+        burnoutScore: member.och_score || 0,
         riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
-        trend: 'stable' as const,
+        trend: trendInfo.trend,
+        trendPercentage: trendInfo.percentage,
         incidentsHandled: member.incident_count || 0,
         avgResponseTime: `${Math.round(member.metrics?.avg_response_time_minutes || 0)}m`,
         factors: {
@@ -174,8 +307,24 @@ export function TeamMembersList({
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {/* Trend badge - most important, shown first */}
+            <div className="relative group">
+              <Badge className={`flex items-center gap-1 ${trendConfig.className} border`}>
+                {trendConfig.icon}
+                {trendConfig.label}
+              </Badge>
+              {trendInfo.percentage > 0 && (
+                <div className="absolute top-full right-0 mt-1 px-2 py-1 bg-neutral-900/95 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  {trendInfo.trend.includes('improving')
+                    ? `Workload down ${trendInfo.percentage}%`
+                    : trendInfo.trend.includes('worsening')
+                    ? `Workload up ${trendInfo.percentage}%`
+                    : 'No significant change'}
+                </div>
+              )}
+            </div>
             {member.is_oncall && (
-              <Badge className="bg-purple-50 text-purple-700">
+              <Badge className="bg-purple-50 text-purple-700 border border-purple-200">
                 ON-CALL
               </Badge>
             )}
@@ -225,7 +374,7 @@ export function TeamMembersList({
         </div>
       </CardContent>
     </Card>
-  )
+  )}
 
   return (
     <>
