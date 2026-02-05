@@ -310,9 +310,9 @@ async def get_at_risk_users(
 
     Returns:
         - total_at_risk: count of users at or above threshold (och_score >= min_och_score)
-        - users: list of {user_name, och_score, risk_level, burnout_score,
-                         incident_count, rootly_user_id, pagerduty_user_id,
-                         slack_user_id, github_username}
+        - users: list of {user_name, och_score, risk_level, incident_count,
+                         rootly_user_id, pagerduty_user_id, slack_user_id,
+                         github_username}
 
     Example:
         >>> result = await get_at_risk_users(ctx, 1226, min_och_score=60)
@@ -358,7 +358,6 @@ async def get_at_risk_users(
                     "user_name": member.get("user_name", "Unknown"),
                     "och_score": och_score,
                     "risk_level": member.get("risk_level", "unknown"),
-                    "burnout_score": member.get("burnout_score", 0),
                     "incident_count": member.get("incident_count", 0),
                     "rootly_user_id": member.get("rootly_user_id"),
                     "pagerduty_user_id": member.get("pagerduty_user_id"),

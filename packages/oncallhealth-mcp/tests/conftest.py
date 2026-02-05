@@ -40,7 +40,6 @@ def sample_analysis_response() -> Dict[str, Any]:
                         "user_email": "quentin@example.com",
                         "och_score": 72.5,
                         "risk_level": "high",
-                        "burnout_score": 68.2,
                         "incident_count": 45,
                         "rootly_user_id": 2381,
                         "pagerduty_user_id": "P123ABC",
@@ -53,7 +52,6 @@ def sample_analysis_response() -> Dict[str, Any]:
                         "user_email": "alice@example.com",
                         "och_score": 12.3,
                         "risk_level": "low",
-                        "burnout_score": 10.5,
                         "incident_count": 15,
                         "rootly_user_id": 94178,
                         "slack_user_id": "U789XYZ"
@@ -64,7 +62,6 @@ def sample_analysis_response() -> Dict[str, Any]:
                         "user_email": "bob@example.com",
                         "och_score": 55.0,
                         "risk_level": "medium",
-                        "burnout_score": 52.0,
                         "incident_count": 30,
                         "rootly_user_id": 1234,
                         "pagerduty_user_id": "P456DEF"
@@ -75,7 +72,6 @@ def sample_analysis_response() -> Dict[str, Any]:
                         "user_email": "carol@example.com",
                         "och_score": 25.0,
                         "risk_level": "low",
-                        "burnout_score": 22.0,
                         "incident_count": 20,
                         "rootly_user_id": 5678
                     },
@@ -85,7 +81,6 @@ def sample_analysis_response() -> Dict[str, Any]:
                         "user_email": "diana@example.com",
                         "och_score": 68.0,
                         "risk_level": "HIGH",  # Test case-insensitivity
-                        "burnout_score": 65.0,
                         "incident_count": 40,
                         "rootly_user_id": 9101
                     }
