@@ -1,0 +1,34 @@
+# Railway Configuration for Backend Services
+# Defines both web service and ARQ worker service
+
+# Web Service
+[[services]]
+name = "rootly-burnout-detector-web"
+
+[services.build]
+builder = "DOCKERFILE"
+dockerfile_path = "Dockerfile"
+
+[services.deploy]
+start_command = "bash start.sh"
+restart_policy_type = "ON_FAILURE"
+restart_policy_max_retries = 10
+num_replicas = 1
+
+# ARQ Worker Service
+[[services]]
+name = "arq-worker"
+
+[services.source]
+branch = "testing"
+
+[services.build]
+builder = "DOCKERFILE"
+dockerfile_path = "Dockerfile"
+watch_patterns = []
+
+[services.deploy]
+start_command = "bash start_worker.sh"
+restart_policy_type = "ON_FAILURE"
+restart_policy_max_retries = 10
+num_replicas = 1
