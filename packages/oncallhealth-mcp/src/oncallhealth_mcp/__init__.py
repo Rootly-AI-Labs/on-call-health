@@ -1,8 +1,8 @@
 """
-oncallhealth-mcp: MCP server for On-Call Health burnout analysis.
+oncallhealth-mcp: MCP server for On-Call Health analysis.
 
 This package provides an MCP (Model Context Protocol) server that enables
-AI assistants to access On-Call Health burnout analysis features.
+AI assistants to access On-Call Health analysis features.
 
 Usage:
     # Run via uvx (recommended)
