@@ -151,12 +151,8 @@ async def analysis_summary(ctx: Any, analysis_id: int) -> Dict[str, Any]:
     Returns high-level overview instead of full 80+ member details to prevent
     context overflow. Use analysis_results() when you need complete data.
     """
-    api_key = extract_api_key_header(ctx)
-    if not api_key:
-        raise PermissionError("Missing API key. Provide X-API-Key header.")
-
-    if analysis_id <= 0:
-        raise ValueError(f"analysis_id must be positive, got {analysis_id}")
+    api_key = _validate_api_key(ctx)
+    _validate_analysis_id(analysis_id)
 
     async with OnCallHealthClient(api_key=api_key) as client:
         try:
