@@ -40,14 +40,6 @@ else
     echo "   Continuing startup anyway..."
 fi
 
-# Run survey message update migration (optional, non-critical)
-echo "🔄 Updating survey messages..."
-if python update_survey_messages.py; then
-    echo "✅ Survey messages updated successfully!"
-else
-    echo "⚠️  Survey message update failed, but continuing startup..."
-fi
-
 # Create tables (safe - won't recreate existing tables)
 echo "🏗️  Ensuring all database tables exist..."
 python -c "
