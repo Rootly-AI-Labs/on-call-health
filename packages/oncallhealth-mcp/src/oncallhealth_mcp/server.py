@@ -358,7 +358,7 @@ async def get_at_risk_users(
                     "user_name": member.get("user_name", "Unknown"),
                     "och_score": och_score,
                     "risk_level": member.get("risk_level", "unknown"),
-                    "health_score": member.get("burnout_score", 0),  # Legacy field name, represents health score
+                    "health_score": member.get("health_score", 0),
                     "incident_count": member.get("incident_count", 0),
                     "rootly_user_id": member.get("rootly_user_id"),
                     "pagerduty_user_id": member.get("pagerduty_user_id"),

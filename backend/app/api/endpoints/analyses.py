@@ -109,7 +109,7 @@ class AnalysisListResponse(BaseModel):
 class DailyTrendPoint(BaseModel):
     date: str
     overall_score: float
-    average_burnout_score: float
+    average_health_score: float
     members_at_risk: int
     total_members: int
     health_status: str
@@ -926,7 +926,7 @@ async def regenerate_analysis_trends(
         # Calculate some basic metrics from existing data
         total_members = len(members)
         members_with_incidents = [m for m in members if m.get("incident_count", 0) > 0]
-        avg_burnout_score = sum(m.get("burnout_score", 0) for m in members) / max(total_members, 1)
+        avg_health_score = sum(m.get("health_score", 0) for m in members) / max(total_members, 1)
         
         # Generate daily trends
         daily_trends = []
@@ -951,9 +951,9 @@ async def regenerate_analysis_trends(
             
             incidents_distributed += incidents_for_day
             
-            # Calculate health score based on burnout analysis
+            # Calculate health score based on health analysis
             # Higher incident days = lower health scores
-            base_score = avg_burnout_score / 10  # Convert to 0-10 scale
+            base_score = avg_health_score / 10  # Convert to 0-10 scale
             if incidents_for_day > 5:
                 daily_score = max(0.3, base_score - 0.2)
             elif incidents_for_day > 2:
@@ -1354,7 +1354,7 @@ async def get_historical_trends(
         daily_trends.append(DailyTrendPoint(
             date=trend_date,
             overall_score=float(overall_score),
-            average_burnout_score=float(trend_data.get("overall_score", 0.0)),  # Use same score for consistency
+            average_health_score=float(trend_data.get("overall_score", 0.0)),  # Use same score for consistency
             members_at_risk=int(members_at_risk),
             total_members=max(int(total_members), 1),  # Use actual total_members from analysis
             health_status=health_status,

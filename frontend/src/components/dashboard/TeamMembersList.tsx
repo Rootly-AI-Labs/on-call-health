@@ -225,7 +225,7 @@ export function TeamMembersList({
         name: member.user_name || 'Unknown',
         email: member.user_email || '',
         avatar_url: member.avatar_url || null,
-        burnoutScore: member.och_score || 0,
+        healthScore: member.och_score || 0,
         riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
         trend: trendInfo.trend,
         trendPercentage: trendInfo.percentage,

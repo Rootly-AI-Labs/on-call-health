@@ -1134,7 +1134,7 @@ class UnifiedBurnoutAnalyzer:
                         logger.info(f"Member details:")
                         for member in members[:5]:  # Show first 5
                             name = member.get('name', 'Unknown')
-                            score = member.get('burnout_score', 'N/A')
+                            score = member.get('health_score', 'N/A')
                             risk = member.get('risk_level', 'N/A')
                             has_github = 'github_insights' in member
                             has_slack = 'slack_insights' in member
@@ -1471,7 +1471,7 @@ class UnifiedBurnoutAnalyzer:
             member_analyses.append(user_analysis)
         
         # Sort by burnout score (highest first)
-        member_analyses.sort(key=lambda x: x["burnout_score"], reverse=True)
+        member_analyses.sort(key=lambda x: x["health_score"], reverse=True)
 
         # Count only incidents that were actually assigned to team members
         assigned_incident_ids = set()
@@ -1668,7 +1668,7 @@ class UnifiedBurnoutAnalyzer:
                 "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
                 "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
                 "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
-                "burnout_score": 0,
+                "health_score": 0,
                 "och_score": round(min(100, composite_och['composite_score']), 2),  # Cap display at 100 for UI
                 "risk_level": "low",
                 "incident_count": 0,
@@ -1945,7 +1945,7 @@ class UnifiedBurnoutAnalyzer:
             "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
             "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
             "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
-            "burnout_score": round(burnout_score, 2),
+            "health_score": round(burnout_score, 2),
             "och_score": round(min(100, composite_och['composite_score']), 2),  # Cap display at 100 for UI
             "risk_level": risk_level,
             "incident_count": len(incidents),
@@ -3152,7 +3152,7 @@ class UnifiedBurnoutAnalyzer:
             logger.info(f"Team health calculation using OCH scores: avg={avg_burnout:.1f}, count={len(och_scores)}")
         else:
             # Fallback to legacy burnout scores (0-10 scale where higher = more burnout)
-            legacy_scores = [m.get("burnout_score", 0) for m in eligible_members if m and isinstance(m, dict) and m.get("burnout_score") is not None]
+            legacy_scores = [m.get("health_score", 0) for m in eligible_members if m and isinstance(m, dict) and m.get("health_score") is not None]
             avg_burnout = sum(legacy_scores) / len(legacy_scores) if legacy_scores and len(legacy_scores) > 0 else 0
             using_och = False
             logger.info(f"Team health calculation using legacy scores: avg={avg_burnout:.1f}, count={len(legacy_scores)}")
@@ -3390,7 +3390,7 @@ class UnifiedBurnoutAnalyzer:
         
         # Add specific dimension-based recommendations
         if members:
-            high_burnout_members = [m for m in members if m.get("burnout_score", 0) >= 7.0]
+            high_burnout_members = [m for m in members if m.get("health_score", 0) >= 7.0]
             if high_burnout_members:
                 recommendations.append({
                     "type": "personal_burnout",
@@ -4680,7 +4680,7 @@ class UnifiedBurnoutAnalyzer:
                     continue
                 
                 # Get current burnout info
-                current_score = member.get("burnout_score", 0)
+                current_score = member.get("health_score", 0)
                 incident_count = member.get("incident_count", 0)
                 github_activity = member.get("github_activity", {})
                 
@@ -4734,7 +4734,7 @@ class UnifiedBurnoutAnalyzer:
                 
                 # Update member with new score
                 updated_member = member.copy()
-                updated_member["burnout_score"] = round(final_score, 2)
+                updated_member["health_score"] = round(final_score, 2)
                 updated_member["risk_level"] = self._determine_risk_level(final_score)
                 
                 # Add GitHub burnout breakdown for transparency
