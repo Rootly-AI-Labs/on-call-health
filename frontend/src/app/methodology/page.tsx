@@ -26,7 +26,7 @@ const content = {
   // Page header
   header: {
     title: "On-Call Health Methodology",
-    subtitle: "Research-enhanced Copenhagen Burnout Inventory with compound trauma, time impact, and recovery analysis",
+    subtitle: "Research-enhanced health assessment with compound trauma, time impact, and recovery analysis",
   },
 
   // Goal and Role section - redesigned with cards
@@ -40,7 +40,7 @@ const content = {
       iconColor: "text-blue-600",
       title: "What On-Call Health Is For",
       description: `The goal of On-Call Health is to help incident management organizations maintain a healthy and sustainable on-call and workload balance for incident responders. Instead of reacting once people are already exhausted, the tool is designed to surface early signs that teams or individuals may be drifting into overload.`,
-      callout: `On-Call Health is not a medical device and does not diagnose burnout or mental health conditions. Its role is to provide visibility into workload patterns and trends, so teams can notice issues sooner, ask better questions, and take corrective action before problems escalate.`,
+      callout: `On-Call Health is not a medical device and does not diagnose mental health conditions. Its role is to provide visibility into workload patterns and trends, so teams can notice issues sooner, ask better questions, and take corrective action before problems escalate.`,
       calloutColor: "blue",
     },
 
@@ -116,7 +116,7 @@ const content = {
     title: "The Method Behind <em>Risk Level</em>",
     description: "A baseline-driven overload signal inspired by established research",
     paragraphs: [
-      `On-Call Health computes a composite signal called <strong>Risk Level</strong>, derived from multiple <strong>Risk Signals</strong> and designed for engineering on-call and incident response work. The scoring approach is informed by established workload and burnout research, including the Copenhagen Burnout Inventory (CBI), but it is adapted to operational telemetry rather than survey-only measurement. Risk Level is not a medical tool and should not be used for diagnosis—its purpose is to surface <strong>trend drift</strong> that may indicate unsustainable on-call load.`,
+      `On-Call Health computes a composite signal called <strong>Risk Level</strong>, derived from multiple <strong>Risk Signals</strong> and designed for engineering on-call and incident response work. The scoring approach is informed by established workload and health research, adapted to operational telemetry rather than survey-only measurement. Risk Level is not a medical tool and should not be used for diagnosis—its purpose is to surface <strong>trend drift</strong> that may indicate unsustainable on-call load.`,
       `The composite signal incorporates factors such as incident volume and severity, after-hours and weekend interruptions, and sustained periods of elevated operational activity. These inputs are evaluated over time and interpreted relative to individual and team baselines, because what is "normal" varies significantly across organizations and responders.`,
     ],
     callout: `<strong>Multi-Source Analysis:</strong> On-Call Health can ingest signals from tools like Rootly and PagerDuty as primary sources, with additional context from GitHub, Slack, Linear, and Jira when available. The model adapts to whichever integrations you enable, providing visibility into workload patterns without requiring a single "perfect" data source.`,
@@ -198,7 +198,7 @@ const content = {
         iconColor: "text-blue-600",
         title: "Recovery Deficit Analysis",
         description: `Psychological recovery research shows that insufficient time between stressful incidents prevents proper mental restoration. Recovery periods under 48 hours significantly impair the brain's ability to process and recover from traumatic stress.`,
-        researchBasis: `Trauma psychology research demonstrates that recovery periods <48 hours prevent psychological restoration, leading to stress accumulation and increased burnout risk.`,
+        researchBasis: `Trauma psychology research demonstrates that recovery periods <48 hours prevent psychological restoration, leading to stress accumulation and increased health risk.`,
         researchColor: "blue",
         detail: `<strong>Scoring:</strong> Recovery Score 0-100 (higher = better) • Perfect recovery: 168+ hours between incidents • Each violation (<48 hours) reduces recovery adequacy • Sustained violations indicate chronic stress`,
       },
@@ -207,23 +207,23 @@ const content = {
 
   // Dimensions section
   dimensions: {
-    title: "On-Call Burnout Dimensions (OCH Methodology)",
-    description: "Based on the Copenhagen Burnout Inventory - two dimensions specifically adapted for software engineers",
+    title: "On-Call Health Dimensions (OCH Methodology)",
+    description: "Two dimensions specifically adapted for software engineers on-call work",
     items: [
       {
         color: "red",
-        title: "Personal Burnout (65% weight)",
+        title: "Personal Wellbeing (65% weight)",
         description: `Physical and psychological fatigue and exhaustion experienced by the person. This dimension measures recovery time interference, work-life balance erosion, and psychological impact from high-stress incidents.`,
         calculation: "After-Hours Activity (30%) + High-Severity Incident Impact (25%) + Task Load (10%)",
       },
       {
         color: "yellow",
-        title: "Work-Related Burnout (35% weight)",
+        title: "Work-Related Wellbeing (35% weight)",
         description: `Fatigue and exhaustion specifically attributed to work demands. This dimension captures on-call burden, sustained stress from consecutive incident days, and workload pressure.`,
         calculation: "On-Call Load (20%) + Consecutive Incident Days (15%)",
       },
     ],
-    footer: `<strong>Final Score:</strong> The two dimensions are weighted and combined to produce a final burnout score from 0-100, with higher scores indicating greater burnout risk. The OCH methodology reflects research showing that personal factors (work-life balance) contribute more to burnout than work-specific factors alone.`,
+    footer: `<strong>Final Score:</strong> The two dimensions are weighted and combined to produce a final health score from 0-100, with higher scores indicating greater health risk. The OCH methodology reflects research showing that personal factors (work-life balance) contribute more to health risk than work-specific factors alone.`,
   },
 }
 
@@ -252,7 +252,7 @@ const sections = [
   { id: "method", title: "The Method Behind Risk Level" },
   { id: "workload-signals", title: "Risk Signals" },
   { id: "research-enhancements", title: "Risk Level Formula" },
-  { id: "burnout-dimensions", title: "Burnout Dimensions" },
+  { id: "health-dimensions", title: "Health Dimensions" },
 ]
 
 export default function MethodologyPage() {
@@ -502,7 +502,7 @@ export default function MethodologyPage() {
         </div>
 
         {/* Three Dimensions */}
-        <Card id="burnout-dimensions" className="mb-8 scroll-mt-8">
+        <Card id="health-dimensions" className="mb-8 scroll-mt-8">
           <CardHeader>
             <CardTitle>{content.dimensions.title}</CardTitle>
             <CardDescription>{content.dimensions.description}</CardDescription>

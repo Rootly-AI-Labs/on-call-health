@@ -21,10 +21,10 @@ function truncateTitle(title: string, limit: number = TITLE_CHARACTER_LIMIT): st
   return title.substring(0, limit) + "..."
 }
 
-// Helper function to determine priority badge color (matches burnout analysis colors exactly)
+// Helper function to determine priority badge color (matches health analysis colors exactly)
 function getPriorityColor(priority: string | number): { backgroundColor: string; color: string } {
   if (typeof priority === "string") {
-    // Jira priority - matches burnout analysis severity colors
+    // Jira priority - matches health analysis severity colors
     switch (priority.toLowerCase()) {
       case "highest":
         return { backgroundColor: "#EF4444", color: "white" } // Critical
@@ -40,7 +40,7 @@ function getPriorityColor(priority: string | number): { backgroundColor: string;
         return { backgroundColor: "#9CA3AF", color: "white" }
     }
   } else {
-    // Linear priority (1=Urgent, 2=High, 3=Medium, 4=Low, 0=None) - matches burnout analysis severity colors
+    // Linear priority (1=Urgent, 2=High, 3=Medium, 4=Low, 0=None) - matches health analysis severity colors
     switch (priority) {
       case 1:
         return { backgroundColor: "#EF4444", color: "white" } // Critical
