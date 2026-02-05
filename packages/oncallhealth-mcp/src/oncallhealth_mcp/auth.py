@@ -1,6 +1,7 @@
 """Auth helpers for MCP tools/resources."""
 from __future__ import annotations
 
+import os
 from typing import Any, Iterable, Optional
 
 
@@ -67,7 +68,18 @@ def extract_bearer_token(ctx: Any) -> Optional[str]:
 
 
 def extract_api_key_header(ctx: Any) -> Optional[str]:
-    """Extract X-API-Key header from various MCP context shapes."""
+    """Extract API key from environment or X-API-Key header in context.
+
+    Priority:
+    1. Environment variable ONCALLHEALTH_API_KEY (for MCP clients like Claude Desktop)
+    2. Context headers X-API-Key (for multi-user hosted deployment)
+    """
+    # Priority 1: Environment variable (for MCP clients like Claude Desktop)
+    api_key = os.getenv("ONCALLHEALTH_API_KEY")
+    if api_key:
+        return api_key
+
+    # Priority 2: Context headers (if available)
     # Try request_headers
     headers = getattr(ctx, "request_headers", None)
     key = _get_header(headers, "X-API-Key")
