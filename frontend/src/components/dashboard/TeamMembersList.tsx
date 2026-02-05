@@ -18,47 +18,38 @@ interface TrendInfo {
   secondHalfScore: number
 }
 
+// Get Monday of the week for a given date (same as UserObjectiveDataCard)
+function getWeekStartDate(date: Date): string {
+  const dayOfWeek = date.getDay()
+  const monday = new Date(date)
+  monday.setDate(date.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+  return monday.toISOString().split('T')[0]
+}
+
 // Aggregate daily data into weekly buckets using health_score (same as UserObjectiveDataCard)
 function aggregateToWeekly(dailyData: Record<string, any>): { weekStart: string; score: number }[] {
   const dates = Object.keys(dailyData).sort()
   if (dates.length === 0) return []
 
-  const weeks: { weekStart: string; score: number }[] = []
-  let currentWeekStart = dates[0]
-  let currentWeekScores: number[] = []
+  // Group by calendar week (Monday-Sunday) - same as UserObjectiveDataCard
+  const weeklyBuckets = new Map<string, number[]>()
 
   for (const date of dates) {
     const dayData = dailyData[date]
-    // Use health_score directly (same metric as UserObjectiveDataCard)
     const dayScore = dayData.health_score || 0
+    const weekKey = getWeekStartDate(new Date(date))
 
-    // Check if we've moved to a new week (7 days)
-    const daysSinceWeekStart = Math.floor(
-      (new Date(date).getTime() - new Date(currentWeekStart).getTime()) / (1000 * 60 * 60 * 24)
-    )
-
-    if (daysSinceWeekStart >= 7 && currentWeekScores.length > 0) {
-      // Save current week and start new one
-      weeks.push({
-        weekStart: currentWeekStart,
-        score: currentWeekScores.reduce((a, b) => a + b, 0) / currentWeekScores.length
-      })
-      currentWeekStart = date
-      currentWeekScores = [dayScore]
-    } else {
-      currentWeekScores.push(dayScore)
-    }
+    const bucket = weeklyBuckets.get(weekKey) || []
+    bucket.push(dayScore)
+    weeklyBuckets.set(weekKey, bucket)
   }
 
-  // Don't forget the last week
-  if (currentWeekScores.length > 0) {
-    weeks.push({
-      weekStart: currentWeekStart,
-      score: currentWeekScores.reduce((a, b) => a + b, 0) / currentWeekScores.length
-    })
-  }
-
-  return weeks
+  return Array.from(weeklyBuckets.entries())
+    .map(([weekStart, scores]) => ({
+      weekStart,
+      score: scores.reduce((a, b) => a + b, 0) / scores.length
+    }))
+    .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
 }
 
 // Calculate user trend from their individual daily data (aggregated to weekly)
