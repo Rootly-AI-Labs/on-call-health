@@ -3129,7 +3129,7 @@ class UnifiedBurnoutAnalyzer:
             return {
                 "overall_score": 6.5,  # Neutral baseline if no data (not perfect health)
                 "risk_distribution": {"low": 0, "medium": 0, "high": 0, "critical": 0},
-                "average_burnout_score": 0,
+                "average_health_score": 0,
                 "health_status": "fair",
                 "members_at_risk": 0
             }
@@ -3209,7 +3209,7 @@ class UnifiedBurnoutAnalyzer:
             "overall_score": round(overall_score, 2),
             "scoring_method": "OCH" if using_och else "Legacy",
             "risk_distribution": risk_dist,
-            "average_burnout_score": round(avg_burnout, 2),
+            "average_health_score": round(avg_burnout, 2),
             "health_status": health_status,
             "members_at_risk": risk_dist["high"] + risk_dist["critical"]
         }
