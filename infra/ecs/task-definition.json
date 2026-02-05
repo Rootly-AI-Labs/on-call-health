@@ -25,10 +25,6 @@
         {
           "name": "LOG_LEVEL",
           "value": "INFO"
-        },
-        {
-          "name": "ONCALLHEALTH_API_KEY",
-          "value": "PLACEHOLDER_REPLACE_WITH_ACTUAL_KEY"
         }
       ],
       "healthCheck": {
