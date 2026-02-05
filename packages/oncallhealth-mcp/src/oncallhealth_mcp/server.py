@@ -36,6 +36,13 @@ async def analysis_start(
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
 
+    if days_back <= 0:
+        raise ValueError(f"days_back must be positive, got {days_back}")
+    if days_back > 365:
+        raise ValueError(f"days_back cannot exceed 365 days, got {days_back}")
+    if integration_id is not None and integration_id <= 0:
+        raise ValueError(f"integration_id must be positive, got {integration_id}")
+
     async with OnCallHealthClient(api_key=api_key) as client:
         # Build request body for /analyses/run
         request_body: Dict[str, Any] = {
@@ -66,6 +73,9 @@ async def analysis_status(ctx: Any, analysis_id: int) -> Dict[str, Any]:
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
 
+    if analysis_id <= 0:
+        raise ValueError(f"analysis_id must be positive, got {analysis_id}")
+
     async with OnCallHealthClient(api_key=api_key) as client:
         try:
             response = await client.get(f"/analyses/{analysis_id}")
@@ -86,6 +96,9 @@ async def analysis_results(ctx: Any, analysis_id: int) -> Dict[str, Any]:
     api_key = extract_api_key_header(ctx)
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
+
+    if analysis_id <= 0:
+        raise ValueError(f"analysis_id must be positive, got {analysis_id}")
 
     async with OnCallHealthClient(api_key=api_key) as client:
         try:
@@ -109,6 +122,9 @@ async def analysis_summary(ctx: Any, analysis_id: int) -> Dict[str, Any]:
     api_key = extract_api_key_header(ctx)
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
+
+    if analysis_id <= 0:
+        raise ValueError(f"analysis_id must be positive, got {analysis_id}")
 
     async with OnCallHealthClient(api_key=api_key) as client:
         try:

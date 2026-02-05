@@ -74,53 +74,42 @@ class ClientConfig:
 
         Returns:
             ClientConfig instance populated from environment
+
+        Raises:
+            ValueError: If environment variable has invalid value
         """
+        def safe_float(key: str, default: str) -> float:
+            """Safely parse float from environment variable."""
+            try:
+                return float(os.environ.get(key, default))
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Invalid value for {key}: {os.environ.get(key)}. Must be a number.") from e
+
+        def safe_int(key: str, default: str) -> int:
+            """Safely parse int from environment variable."""
+            try:
+                return int(os.environ.get(key, default))
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Invalid value for {key}: {os.environ.get(key)}. Must be an integer.") from e
+
         return cls(
             base_url=os.environ.get(
                 "ONCALLHEALTH_API_URL", "https://api.oncallhealth.ai"
             ),
-            connect_timeout=float(os.environ.get(
-                "ONCALLHEALTH_CONNECT_TIMEOUT", "5.0"
-            )),
-            read_timeout=float(os.environ.get(
-                "ONCALLHEALTH_READ_TIMEOUT", "30.0"
-            )),
-            write_timeout=float(os.environ.get(
-                "ONCALLHEALTH_WRITE_TIMEOUT", "10.0"
-            )),
-            pool_timeout=float(os.environ.get(
-                "ONCALLHEALTH_POOL_TIMEOUT", "5.0"
-            )),
-            max_connections=int(os.environ.get(
-                "ONCALLHEALTH_MAX_CONNECTIONS", "100"
-            )),
-            max_keepalive_connections=int(os.environ.get(
-                "ONCALLHEALTH_MAX_KEEPALIVE", "20"
-            )),
-            keepalive_expiry=float(os.environ.get(
-                "ONCALLHEALTH_KEEPALIVE_EXPIRY", "30.0"
-            )),
-            max_client_age_seconds=int(os.environ.get(
-                "ONCALLHEALTH_MAX_CLIENT_AGE", "14400"
-            )),
-            max_retries=int(os.environ.get(
-                "ONCALLHEALTH_MAX_RETRIES", "3"
-            )),
-            retry_initial_wait=float(os.environ.get(
-                "ONCALLHEALTH_RETRY_INITIAL_WAIT", "1.0"
-            )),
-            retry_max_wait=float(os.environ.get(
-                "ONCALLHEALTH_RETRY_MAX_WAIT", "30.0"
-            )),
-            retry_jitter=float(os.environ.get(
-                "ONCALLHEALTH_RETRY_JITTER", "1.0"
-            )),
-            circuit_breaker_fail_max=int(os.environ.get(
-                "ONCALLHEALTH_CB_FAIL_MAX", "5"
-            )),
-            circuit_breaker_timeout_seconds=int(os.environ.get(
-                "ONCALLHEALTH_CB_TIMEOUT", "30"
-            )),
+            connect_timeout=safe_float("ONCALLHEALTH_CONNECT_TIMEOUT", "5.0"),
+            read_timeout=safe_float("ONCALLHEALTH_READ_TIMEOUT", "30.0"),
+            write_timeout=safe_float("ONCALLHEALTH_WRITE_TIMEOUT", "10.0"),
+            pool_timeout=safe_float("ONCALLHEALTH_POOL_TIMEOUT", "5.0"),
+            max_connections=safe_int("ONCALLHEALTH_MAX_CONNECTIONS", "100"),
+            max_keepalive_connections=safe_int("ONCALLHEALTH_MAX_KEEPALIVE", "20"),
+            keepalive_expiry=safe_float("ONCALLHEALTH_KEEPALIVE_EXPIRY", "30.0"),
+            max_client_age_seconds=safe_int("ONCALLHEALTH_MAX_CLIENT_AGE", "14400"),
+            max_retries=safe_int("ONCALLHEALTH_MAX_RETRIES", "3"),
+            retry_initial_wait=safe_float("ONCALLHEALTH_RETRY_INITIAL_WAIT", "1.0"),
+            retry_max_wait=safe_float("ONCALLHEALTH_RETRY_MAX_WAIT", "30.0"),
+            retry_jitter=safe_float("ONCALLHEALTH_RETRY_JITTER", "1.0"),
+            circuit_breaker_fail_max=safe_int("ONCALLHEALTH_CB_FAIL_MAX", "5"),
+            circuit_breaker_timeout_seconds=safe_int("ONCALLHEALTH_CB_TIMEOUT", "30"),
         )
 
     def to_httpx_timeout(self) -> httpx.Timeout:
