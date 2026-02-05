@@ -905,6 +905,7 @@ async def get_organization_members(
             "name": user.name,
             "email": user.email,
             "role": user.role,
+            "is_super_admin": user.is_super_admin,
             "status": "active",
             "is_current_user": user.id == current_user.id,
             "joined_at": user.joined_org_at.isoformat() if user.joined_org_at else None
