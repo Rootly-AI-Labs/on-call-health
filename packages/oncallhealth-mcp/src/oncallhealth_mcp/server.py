@@ -77,7 +77,12 @@ async def analysis_status(ctx: Any, analysis_id: int) -> Dict[str, Any]:
 
 @mcp_server.tool()
 async def analysis_results(ctx: Any, analysis_id: int) -> Dict[str, Any]:
-    """Get full results for a completed analysis."""
+    """Get full results for a completed analysis.
+
+    WARNING: Returns complete data for 80+ members with ~40 fields each.
+    May overwhelm AI context windows. Consider using analysis_summary() instead
+    for high-level overview, or when you don't need all member details.
+    """
     api_key = extract_api_key_header(ctx)
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
@@ -95,8 +100,96 @@ async def analysis_results(ctx: Any, analysis_id: int) -> Dict[str, Any]:
 
 
 @mcp_server.tool()
+async def analysis_summary(ctx: Any, analysis_id: int) -> Dict[str, Any]:
+    """Get condensed summary of analysis results (optimized for AI agents).
+
+    Returns high-level overview instead of full 80+ member details to prevent
+    context overflow. Use analysis_results() when you need complete data.
+    """
+    api_key = extract_api_key_header(ctx)
+    if not api_key:
+        raise PermissionError("Missing API key. Provide X-API-Key header.")
+
+    async with OnCallHealthClient(api_key=api_key) as client:
+        try:
+            response = await client.get(f"/analyses/{analysis_id}")
+            data = response.json()
+            if data.get("status") != "completed":
+                raise ValueError(f"Analysis not completed yet (status={data['status']})")
+
+            # Extract analysis_data
+            analysis_data = data.get("analysis_data") or {}
+            members = analysis_data.get("members", [])
+
+            # Calculate summary statistics
+            total_members = len(members)
+
+            # Sort by OCH score (higher = more at risk)
+            sorted_by_score = sorted(
+                members,
+                key=lambda m: m.get("och_score", 0),
+                reverse=True
+            )
+
+            # Top 5 at risk (highest scores)
+            top_at_risk = [
+                {
+                    "user_name": m.get("user_name", "Unknown"),
+                    "och_score": m.get("och_score", 0),
+                    "risk_level": m.get("risk_level", "unknown"),
+                }
+                for m in sorted_by_score[:5]
+            ]
+
+            # Top 5 healthiest (lowest scores)
+            top_healthy = [
+                {
+                    "user_name": m.get("user_name", "Unknown"),
+                    "och_score": m.get("och_score", 0),
+                    "risk_level": m.get("risk_level", "unknown"),
+                }
+                for m in sorted_by_score[-5:][::-1]  # Reverse to show lowest first
+            ]
+
+            # Risk level distribution
+            risk_distribution = {}
+            for member in members:
+                risk_level = member.get("risk_level", "unknown")
+                risk_distribution[risk_level] = risk_distribution.get(risk_level, 0) + 1
+
+            # Team averages
+            if total_members > 0:
+                avg_och_score = sum(m.get("och_score", 0) for m in members) / total_members
+                avg_workload = sum(m.get("workload_score", 0) for m in members) / total_members
+                avg_exhaustion = sum(m.get("exhaustion_score", 0) for m in members) / total_members
+            else:
+                avg_och_score = avg_workload = avg_exhaustion = 0
+
+            return {
+                "analysis_id": analysis_id,
+                "total_members": total_members,
+                "team_averages": {
+                    "och_score": round(avg_och_score, 2),
+                    "workload_score": round(avg_workload, 2),
+                    "exhaustion_score": round(avg_exhaustion, 2),
+                },
+                "risk_distribution": risk_distribution,
+                "top_at_risk": top_at_risk,
+                "top_healthy": top_healthy,
+                "note": "This is a condensed summary. Use analysis_results() for complete member data.",
+            }
+        except NotFoundError:
+            raise LookupError("Analysis not found")
+
+
+@mcp_server.tool()
 async def analysis_current(ctx: Any) -> Dict[str, Any]:
-    """Get the most recent analysis for the current user."""
+    """Get the most recent analysis for the current user.
+
+    Returns normalized metadata only (status, timestamps, configuration).
+    Does not include full member data. Use analysis_summary() for team overview
+    or analysis_results() for complete member details.
+    """
     api_key = extract_api_key_header(ctx)
     if not api_key:
         raise PermissionError("Missing API key. Provide X-API-Key header.")
