@@ -18,7 +18,7 @@ interface TrendInfo {
   secondHalfScore: number
 }
 
-// Aggregate daily data into weekly buckets
+// Aggregate daily data into weekly buckets using health_score (same as UserObjectiveDataCard)
 function aggregateToWeekly(dailyData: Record<string, any>): { weekStart: string; score: number }[] {
   const dates = Object.keys(dailyData).sort()
   if (dates.length === 0) return []
@@ -29,10 +29,8 @@ function aggregateToWeekly(dailyData: Record<string, any>): { weekStart: string;
 
   for (const date of dates) {
     const dayData = dailyData[date]
-    // Calculate daily risk score (incidents + weighted severity + after hours)
-    const dayScore = (dayData.incident_count || 0) +
-                     (dayData.severity_weighted_count || 0) * 0.5 +
-                     (dayData.after_hours_count || 0) * 0.3
+    // Use health_score directly (same metric as UserObjectiveDataCard)
+    const dayScore = dayData.health_score || 0
 
     // Check if we've moved to a new week (7 days)
     const daysSinceWeekStart = Math.floor(
