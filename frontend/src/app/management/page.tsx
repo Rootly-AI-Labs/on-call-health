@@ -32,11 +32,12 @@ import {
   Search,
   Pencil,
   CheckCircle,
+  Users,
 } from "lucide-react"
 import { API_BASE, type Integration } from "@/app/integrations/types"
 import { UserMappingDrawer } from "./components/UserMappingDrawer"
 
-const TEAM_MEMBERS_PER_PAGE = 20
+const TEAM_MEMBERS_PER_PAGE = 10
 
 // Type definition for synced users
 interface SyncedUser {
@@ -176,6 +177,14 @@ function TeamPageContent() {
       fetchSyncedUsers(false, false, false)
     }
   }, [selectedOrganization])
+
+  // Auto-open sync modal if redirected from integrations page
+  useEffect(() => {
+    const syncParam = searchParams.get("sync")
+    if (syncParam === "true" && selectedOrganization && !loadingIntegrations) {
+      setShowSyncConfirmModal(true)
+    }
+  }, [searchParams, selectedOrganization, loadingIntegrations])
 
   // Fetch synced users from database
   const fetchSyncedUsers = async (showToast = false, autoSync = false, forceRefresh = false) => {
@@ -397,6 +406,21 @@ function TeamPageContent() {
     }
   }
 
+  // Check if selected organization is a primary integration (Rootly or PagerDuty)
+  const selectedIntegration = selectedOrganization
+    ? integrations.find(i => i.id.toString() === selectedOrganization)
+    : null
+
+  // A primary integration exists if the selected integration is Rootly or PagerDuty
+  // by platform field OR by name (fallback for cases where platform might not be set)
+  const hasPrimaryIntegration =
+    selectedIntegration !== null &&
+    selectedIntegration !== undefined &&
+    (selectedIntegration.platform === 'rootly' ||
+     selectedIntegration.platform === 'pagerduty' ||
+     selectedIntegration.name?.toLowerCase().includes('rootly') ||
+     selectedIntegration.name?.toLowerCase().includes('pagerduty'))
+
   // Filter users based on search query
   const filteredUsers = syncedUsers.filter(user => {
     if (!searchQuery) return true
@@ -404,7 +428,7 @@ function TeamPageContent() {
     return (
       user.email?.toLowerCase().includes(query) ||
       user.github_username?.toLowerCase().includes(query) ||
-      user.jira_username?.toLowerCase().includes(query)
+      user.jira_email?.toLowerCase().includes(query)
     )
   })
 
@@ -445,7 +469,7 @@ function TeamPageContent() {
               <Select
                 value={selectedOrganization}
                 onValueChange={setSelectedOrganization}
-                disabled={loadingIntegrations}
+                disabled={loadingIntegrations || !hasPrimaryIntegration}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select an organization..." />
@@ -462,7 +486,7 @@ function TeamPageContent() {
           </div>
 
           {/* Organization Management Section */}
-          {selectedOrganization && (
+          {selectedOrganization && !loadingIntegrations && (
             <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
               {/* Header with Search and Actions */}
               <div className="p-6 border-b border-neutral-200">
@@ -471,14 +495,14 @@ function TeamPageContent() {
                   <div className="flex items-center gap-3">
                     <Button
                       onClick={() => setShowSyncConfirmModal(true)}
-                      disabled={loadingSyncedUsers}
+                      disabled={loadingSyncedUsers || !hasPrimaryIntegration}
                       className="bg-purple-700 hover:bg-purple-800"
                     >
                       Sync Now
                     </Button>
                     <Button
                       onClick={refreshOnCallStatus}
-                      disabled={refreshingOnCall}
+                      disabled={refreshingOnCall || !hasPrimaryIntegration}
                       variant="outline"
                     >
                       <RefreshCw className={`w-4 h-4 mr-2 ${refreshingOnCall ? 'animate-spin' : ''}`} />
@@ -487,44 +511,77 @@ function TeamPageContent() {
                   </div>
                 </div>
 
-                {/* Search Bar */}
-                <div className="mb-4">
-                  <div className="relative max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                    <Input
-                      type="text"
-                      placeholder="Search members..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 w-full"
-                    />
+                {/* Search Bar - Only show when primary integration exists */}
+                {hasPrimaryIntegration && (
+                  <div className="mb-4">
+                    <div className="relative max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                      <Input
+                        type="text"
+                        placeholder="Search members..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 w-full"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Management Table */}
-              {loadingSyncedUsers ? (
+              {loadingIntegrations ? (
+                // LOADING INTEGRATIONS STATE
+                <div className="flex items-center justify-center h-96">
+                  <Loader2 className="w-8 h-8 animate-spin text-purple-700" />
+                </div>
+              ) : !hasPrimaryIntegration ? (
+                // NO PRIMARY INTEGRATION EMPTY STATE
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center max-w-md">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-4">
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <div className="text-left flex-1">
+                          <h3 className="text-sm font-semibold text-red-800 mb-1">
+                            No Primary Integrations Connected
+                          </h3>
+                          <p className="text-sm text-red-700">
+                            To sync members, you need to connect at least one primary integration (Rootly or PagerDuty).
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => router.push('/integrations')}
+                      className="bg-purple-700 hover:bg-purple-800"
+                    >
+                      Go to Integrations
+                    </Button>
+                  </div>
+                </div>
+              ) : loadingSyncedUsers ? (
+                // LOADING STATE
                 <div className="flex items-center justify-center h-96">
                   <Loader2 className="w-8 h-8 animate-spin text-purple-700" />
                 </div>
               ) : filteredUsers.length === 0 ? (
+                // EMPTY STATE (no users synced)
                 <div className="flex items-center justify-center h-96">
                   <div className="text-center">
-                    <p className="text-neutral-600">
-                      {syncedUsers.length === 0 ? 'No users synced yet' : 'No members found'}
-                    </p>
-                    {syncedUsers.length === 0 && (
-                      <Button
-                        onClick={() => setShowSyncConfirmModal(true)}
-                        className="mt-4 bg-purple-700 hover:bg-purple-800"
-                      >
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Sync Now
-                      </Button>
+                    {syncedUsers.length === 0 ? (
+                      <>
+                        <Users className="w-16 h-16 text-neutral-300 mx-auto mb-4" />
+                        <p className="text-neutral-600">No team members synced yet</p>
+                      </>
+                    ) : (
+                      <p className="text-neutral-600">No members found</p>
                     )}
                   </div>
                 </div>
               ) : (
+                // TABLE
                 <>
                   <div className="overflow-x-auto">
                     <table className="w-full">

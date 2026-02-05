@@ -4378,8 +4378,8 @@ export default function IntegrationsPage() {
         onClose={() => setShowPostIntegrationSyncModal(false)}
         onSyncNow={() => {
           setShowPostIntegrationSyncModal(false)
-          // Navigate to the Management page
-          router.push(`/management?org=${selectedOrganization}`)
+          // Navigate to the Management page and auto-open sync modal
+          router.push(`/management?org=${selectedOrganization}&sync=true`)
         }}
         integrationType={postIntegrationModalType || 'github'}
       />
