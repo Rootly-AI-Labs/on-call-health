@@ -231,6 +231,7 @@ async def list_organization_members(
                 "name": member.name,
                 "email": member.email,
                 "role": member.role,
+                "is_super_admin": member.is_super_admin,
                 "joined_org_at": member.joined_org_at.isoformat() if member.joined_org_at else None,
                 "created_at": member.created_at.isoformat() if member.created_at else None,
                 "is_current_user": member.id == current_user.id
