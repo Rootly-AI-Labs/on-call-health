@@ -214,6 +214,32 @@ async def startup_event():
     mcp_cleanup_scheduler.start()
     print("MCP connection cleanup scheduler started (every 5 minutes)")
 
+    # Initialize ARQ Redis pool for background tasks
+    try:
+        from app.workers.arq_worker import get_arq_pool
+        pool = await get_arq_pool()
+        print("✅ ARQ pool initialized")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize ARQ pool: {e}")
+        print("   Background tasks will not work until ARQ is configured")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on application shutdown."""
+    # Stop survey scheduler
+    from app.services.survey_scheduler import survey_scheduler
+    survey_scheduler.stop()
+    print("✅ Survey scheduler stopped")
+
+    # Shutdown ARQ pool
+    try:
+        from app.workers.arq_worker import shutdown_arq_pool
+        await shutdown_arq_pool()
+        print("✅ ARQ pool shutdown complete")
+    except Exception as e:
+        print(f"⚠️ Error shutting down ARQ pool: {e}")
+
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])

@@ -27,6 +27,9 @@ aiobreaker>=1.2.0
 slowapi
 redis
 
+# Background task queue
+arq
+
 # Environment and configuration
 python-dotenv
 pydantic
@@ -57,3 +60,4 @@ newrelic
 
 # Development
 pytest
+pytest-asyncio

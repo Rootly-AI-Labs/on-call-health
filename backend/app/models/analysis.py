@@ -16,7 +16,7 @@ class Analysis(Base):
     rootly_integration_id = Column(Integer, ForeignKey("rootly_integrations.id"), nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     
-    # NEW: Store integration details directly to avoid complex matching
+    # Integration details stored directly to avoid complex matching
     integration_name = Column(String(255), nullable=True)  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
     platform = Column(String(50), nullable=True)  # "rootly", "pagerduty"
     
@@ -27,6 +27,13 @@ class Analysis(Base):
     error_message = Column(Text, nullable=True)  # Error details if failed
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Checkpoint/resume fields for deployment resilience
+    last_checkpoint = Column(Integer, nullable=True, default=0)  # Last completed checkpoint (0-7)
+    checkpoint_data = Column(JSON, nullable=True)  # Intermediate data for resume
+    arq_job_id = Column(String(255), nullable=True, index=True)  # ARQ job ID for tracking
+    attempt_count = Column(Integer, default=0)  # Number of resume attempts
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)  # Track staleness
     
     # Relationships
     user = relationship("User", back_populates="analyses")

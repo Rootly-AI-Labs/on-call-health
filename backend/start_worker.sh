@@ -1,7 +1,12 @@
 #!/bin/bash
+# ARQ Worker Startup Script
+#
+# Starts the ARQ worker process for background task processing.
+# This should run alongside the FastAPI web server.
+
 set -e
 
-echo "🔧 Starting Worker Process..."
+echo "🔧 Starting ARQ Worker Process..."
 
 # Wait for database to be available
 echo "⏳ Waiting for database connection..."
@@ -29,10 +34,9 @@ for attempt in range(max_attempts):
         time.sleep(2)
 "
 
-# Wait for Redis to be available (if configured)
-if [ -n "$REDIS_URL" ] || [ -n "$ARQ_REDIS_URL" ]; then
-    echo "⏳ Waiting for Redis connection..."
-    python -c "
+# Wait for Redis to be available (required for ARQ)
+echo "⏳ Waiting for Redis connection..."
+python -c "
 import sys
 import time
 import os
@@ -49,17 +53,19 @@ if redis_url:
             break
         except Exception as e:
             if attempt == max_attempts - 1:
-                print(f'⚠️  Redis connection failed after {max_attempts} attempts: {e}')
-                print('   Continuing without Redis...')
-            else:
-                print(f'⏳ Attempt {attempt + 1}/{max_attempts} - waiting for Redis...')
-                time.sleep(2)
+                print(f'❌ Redis connection failed after {max_attempts} attempts: {e}')
+                print('   ARQ worker requires Redis to be running.')
+                sys.exit(1)
+            print(f'⏳ Attempt {attempt + 1}/{max_attempts} - waiting for Redis...')
+            time.sleep(2)
+else:
+    print('❌ No Redis URL configured. ARQ worker requires Redis.')
+    sys.exit(1)
 "
-fi
 
 echo "✅ Worker pre-checks completed!"
-echo "🚀 Starting worker with APScheduler..."
+echo "🚀 Starting ARQ worker..."
 
-# Start the FastAPI application (APScheduler starts automatically)
-# The worker runs the same app but typically doesn't expose HTTP endpoints
-exec uvicorn app.main:app --host 0.0.0.0 --port 8001
+# Run ARQ worker with the WorkerSettings class
+# Worker runs continuously and handles SIGTERM gracefully for deployment resilience
+exec arq app.workers.arq_worker.WorkerSettings --verbose
