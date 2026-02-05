@@ -218,7 +218,7 @@ export function TeamMembersList({
 
     return (
     <Card
-      key={member.user_email || member.user_id}
+      key={`${member.user_email}-${member.user_id || 'no-id'}`}
       className="cursor-pointer hover:shadow-md transition-shadow"
       onClick={() => setSelectedMember({
         id: member.user_id || '',
