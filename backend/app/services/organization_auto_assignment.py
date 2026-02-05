@@ -158,11 +158,12 @@ def assign_user_to_organization(db: Session, user: User) -> bool:
             new_org = _create_organization_from_domain(db, domain, user)
             user.organization_id = new_org.id
             user.role = 'admin'  # First user becomes admin
+            user.is_super_admin = True  # First user becomes super admin
             user.joined_org_at = datetime.now(timezone.utc)
             db.add(user)
             db.commit()
             db.refresh(user)
-            logger.info(f"User {user.email} created new org '{new_org.name}' (id={new_org.id}) and became admin")
+            logger.info(f"User {user.email} created new org '{new_org.name}' (id={new_org.id}) and became admin + super admin")
             return True
         except Exception as e:
             logger.error(f"Failed to create organization for domain {domain}: {e}")
