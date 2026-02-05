@@ -18,7 +18,52 @@ interface TrendInfo {
   secondHalfScore: number
 }
 
-// Calculate user trend from their individual daily data
+// Aggregate daily data into weekly buckets
+function aggregateToWeekly(dailyData: Record<string, any>): { weekStart: string; score: number }[] {
+  const dates = Object.keys(dailyData).sort()
+  if (dates.length === 0) return []
+
+  const weeks: { weekStart: string; score: number }[] = []
+  let currentWeekStart = dates[0]
+  let currentWeekScores: number[] = []
+
+  for (const date of dates) {
+    const dayData = dailyData[date]
+    // Calculate daily risk score (incidents + weighted severity + after hours)
+    const dayScore = (dayData.incident_count || 0) +
+                     (dayData.severity_weighted_count || 0) * 0.5 +
+                     (dayData.after_hours_count || 0) * 0.3
+
+    // Check if we've moved to a new week (7 days)
+    const daysSinceWeekStart = Math.floor(
+      (new Date(date).getTime() - new Date(currentWeekStart).getTime()) / (1000 * 60 * 60 * 24)
+    )
+
+    if (daysSinceWeekStart >= 7 && currentWeekScores.length > 0) {
+      // Save current week and start new one
+      weeks.push({
+        weekStart: currentWeekStart,
+        score: currentWeekScores.reduce((a, b) => a + b, 0) / currentWeekScores.length
+      })
+      currentWeekStart = date
+      currentWeekScores = [dayScore]
+    } else {
+      currentWeekScores.push(dayScore)
+    }
+  }
+
+  // Don't forget the last week
+  if (currentWeekScores.length > 0) {
+    weeks.push({
+      weekStart: currentWeekStart,
+      score: currentWeekScores.reduce((a, b) => a + b, 0) / currentWeekScores.length
+    })
+  }
+
+  return weeks
+}
+
+// Calculate user trend from their individual daily data (aggregated to weekly)
 function calculateUserTrend(
   userEmail: string,
   individualDailyData: Record<string, Record<string, any>> | undefined
@@ -31,42 +76,24 @@ function calculateUserTrend(
   const userData = individualDailyData[userEmail] || individualDailyData[userEmail.toLowerCase()]
   if (!userData) return defaultTrend
 
-  // Get dates sorted chronologically
-  const dates = Object.keys(userData).sort()
-  if (dates.length < 4) return defaultTrend // Need minimum data for meaningful trend
+  // Aggregate to weekly data
+  const weeklyData = aggregateToWeekly(userData)
+  if (weeklyData.length < 2) return defaultTrend
 
-  // Compare first days to last days (not halves) for true overall direction
-  const numDaysToCompare = Math.min(7, Math.floor(dates.length / 2))
-  const firstDates = dates.slice(0, numDaysToCompare)
-  const lastDates = dates.slice(-numDaysToCompare)
-
-  // Calculate weighted incident score for a set of dates
-  const calculateScore = (datesToCalc: string[]) => {
-    let total = 0
-    for (const date of datesToCalc) {
-      const day = userData[date]
-      if (day) {
-        // Weight: incidents=1, severity=0.5, after_hours=0.3
-        total += (day.incident_count || 0) +
-                 (day.severity_weighted_count || 0) * 0.5 +
-                 (day.after_hours_count || 0) * 0.3
-      }
-    }
-    return total / datesToCalc.length // Average per day
-  }
-
-  const firstScore = calculateScore(firstDates)
-  const lastScore = calculateScore(lastDates)
+  // Compare first week(s) to last week(s) - same logic as UserObjectiveDataCard
+  const numWeeksToCompare = Math.min(2, Math.floor(weeklyData.length / 2))
+  const firstWeeksAvg = weeklyData.slice(0, numWeeksToCompare).reduce((sum, w) => sum + w.score, 0) / numWeeksToCompare
+  const lastWeeksAvg = weeklyData.slice(-numWeeksToCompare).reduce((sum, w) => sum + w.score, 0) / numWeeksToCompare
 
   // Calculate percentage change (positive = worsening, negative = improving)
-  if (firstScore === 0 && lastScore === 0) {
+  if (firstWeeksAvg === 0 && lastWeeksAvg === 0) {
     return { trend: 'stable', percentage: 0, firstHalfScore: 0, secondHalfScore: 0 }
   }
 
-  const baseline = firstScore || 0.1 // Avoid division by zero
-  const change = ((lastScore - firstScore) / baseline) * 100
+  const baseline = firstWeeksAvg || 0.1 // Avoid division by zero
+  const change = ((lastWeeksAvg - firstWeeksAvg) / baseline) * 100
 
-  // Use 15% threshold for stable (matches other trend components)
+  // Use 15% threshold for stable (matches UserObjectiveDataCard)
   let trend: UserTrend
   if (change <= -30) trend = 'significantly_improving'
   else if (change <= -15) trend = 'improving'
@@ -74,7 +101,7 @@ function calculateUserTrend(
   else if (change >= 15) trend = 'worsening'
   else trend = 'stable'
 
-  return { trend, percentage: Math.round(Math.abs(change)), firstHalfScore: firstScore, secondHalfScore: lastScore }
+  return { trend, percentage: Math.round(Math.abs(change)), firstHalfScore: firstWeeksAvg, secondHalfScore: lastWeeksAvg }
 }
 
 // Get trend display config
