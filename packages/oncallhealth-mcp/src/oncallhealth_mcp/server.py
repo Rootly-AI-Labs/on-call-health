@@ -64,9 +64,7 @@ async def analysis_start(
     integration_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Start a new burnout analysis."""
-    api_key = extract_api_key_header(ctx)
-    if not api_key:
-        raise PermissionError("Missing API key. Provide X-API-Key header.")
+    api_key = _validate_api_key(ctx)
 
     if days_back <= 0:
         raise ValueError(f"days_back must be positive, got {days_back}")
@@ -101,12 +99,8 @@ async def analysis_start(
 @mcp_server.tool()
 async def analysis_status(ctx: Any, analysis_id: int) -> Dict[str, Any]:
     """Get the status of an analysis."""
-    api_key = extract_api_key_header(ctx)
-    if not api_key:
-        raise PermissionError("Missing API key. Provide X-API-Key header.")
-
-    if analysis_id <= 0:
-        raise ValueError(f"analysis_id must be positive, got {analysis_id}")
+    api_key = _validate_api_key(ctx)
+    _validate_analysis_id(analysis_id)
 
     async with OnCallHealthClient(api_key=api_key) as client:
         try:
@@ -125,12 +119,8 @@ async def analysis_results(ctx: Any, analysis_id: int) -> Dict[str, Any]:
     May overwhelm AI context windows. Consider using analysis_summary() instead
     for high-level overview, or when you don't need all member details.
     """
-    api_key = extract_api_key_header(ctx)
-    if not api_key:
-        raise PermissionError("Missing API key. Provide X-API-Key header.")
-
-    if analysis_id <= 0:
-        raise ValueError(f"analysis_id must be positive, got {analysis_id}")
+    api_key = _validate_api_key(ctx)
+    _validate_analysis_id(analysis_id)
 
     async with OnCallHealthClient(api_key=api_key) as client:
         try:
@@ -234,9 +224,7 @@ async def analysis_current(ctx: Any) -> Dict[str, Any]:
     Does not include full member data. Use analysis_summary() for team overview
     or analysis_results() for complete member details.
     """
-    api_key = extract_api_key_header(ctx)
-    if not api_key:
-        raise PermissionError("Missing API key. Provide X-API-Key header.")
+    api_key = _validate_api_key(ctx)
 
     async with OnCallHealthClient(api_key=api_key) as client:
         # Get list with limit=1, sorted by created_at desc (server default)
@@ -251,9 +239,7 @@ async def analysis_current(ctx: Any) -> Dict[str, Any]:
 @mcp_server.tool()
 async def integrations_list(ctx: Any) -> Dict[str, Any]:
     """List connected integrations for the current user."""
-    api_key = extract_api_key_header(ctx)
-    if not api_key:
-        raise PermissionError("Missing API key. Provide X-API-Key header.")
+    api_key = _validate_api_key(ctx)
 
     async with OnCallHealthClient(api_key=api_key) as client:
         # Parallel fetch all integration types
