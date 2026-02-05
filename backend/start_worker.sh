@@ -70,4 +70,5 @@ echo "🚀 Starting ARQ worker..."
 # Worker runs continuously (default behavior, no --burst flag)
 # Worker handles SIGTERM gracefully for deployment resilience
 # Note: max_jobs is configured in WorkerSettings class, not via CLI
-exec arq app.workers.arq_worker.WorkerSettings --verbose
+# Note: Removed --verbose flag to reduce log noise (was spamming "already running elsewhere")
+exec arq app.workers.arq_worker.WorkerSettings

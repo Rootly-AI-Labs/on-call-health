@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 # Suppress verbose ARQ "already running elsewhere" messages
 # These fire repeatedly when a job is in progress and pollute logs
+logging.getLogger("arq").setLevel(logging.WARNING)
 logging.getLogger("arq.worker").setLevel(logging.WARNING)
+logging.getLogger("arq.jobs").setLevel(logging.WARNING)
 
 # Global ARQ pool instance (reused across requests)
 _arq_pool: Optional[ArqRedis] = None
