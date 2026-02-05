@@ -985,6 +985,7 @@ async def regenerate_analysis_trends(
             daily_trends.append({
                 "date": current_date.strftime("%Y-%m-%d"),
                 "overall_score": round(daily_score, 2),
+                "average_health_score": 0.0,  # Legacy analyses don't have this data
                 "incident_count": incidents_for_day,
                 "members_at_risk": members_at_risk,
                 "total_members": total_members,

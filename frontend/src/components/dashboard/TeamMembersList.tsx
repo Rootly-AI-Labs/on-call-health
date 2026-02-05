@@ -211,14 +211,14 @@ export function TeamMembersList({
     return '#dc2626'                          // Red - High/severe health risk (75-100)
   }
 
-  const renderMemberCard = (member: any) => {
+  const renderMemberCard = (member: any, index: number) => {
     // Calculate user trend from individual daily data
     const trendInfo = calculateUserTrend(member.user_email, individualDailyData)
     const trendConfig = getTrendConfig(trendInfo.trend)
 
     return (
     <Card
-      key={`${member.user_email}-${member.user_id || 'no-id'}`}
+      key={`member-${index}-${member.user_email}`}
       className="cursor-pointer hover:shadow-md transition-shadow"
       onClick={() => setSelectedMember({
         id: member.user_id || '',

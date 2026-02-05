@@ -3142,20 +3142,20 @@ class UnifiedBurnoutAnalyzer:
         eligible_members = members_with_incidents  # Only those with actual incident activity
         logger.info(f"🏥 TEAM_HEALTH: Filtering to {len(eligible_members)} members with incidents (from {len(member_analyses)} total)")
         
-        # Calculate average burnout for ELIGIBLE members only - prioritize OCH scores when available  
+        # Calculate average score for ELIGIBLE members only - prioritize OCH scores when available
         och_scores = [m.get("och_score") for m in eligible_members if m and isinstance(m, dict) and m.get("och_score") is not None]
-        
+
         if och_scores and len(och_scores) > 0:
-            # Use OCH scores (0-100 scale where higher = more burnout)
-            avg_burnout = sum(och_scores) / len(och_scores)
+            # Use OCH scores (0-100 scale where higher = more health risk)
+            avg_score = sum(och_scores) / len(och_scores)
             using_och = True
-            logger.info(f"Team health calculation using OCH scores: avg={avg_burnout:.1f}, count={len(och_scores)}")
+            logger.info(f"Team health calculation using OCH scores: avg={avg_score:.1f}, count={len(och_scores)}")
         else:
-            # Fallback to legacy burnout scores (0-10 scale where higher = more burnout)
+            # Fallback to legacy health scores (0-10 scale where higher = more health risk)
             legacy_scores = [m.get("health_score", 0) for m in eligible_members if m and isinstance(m, dict) and m.get("health_score") is not None]
-            avg_burnout = sum(legacy_scores) / len(legacy_scores) if legacy_scores and len(legacy_scores) > 0 else 0
+            avg_score = sum(legacy_scores) / len(legacy_scores) if legacy_scores and len(legacy_scores) > 0 else 0
             using_och = False
-            logger.info(f"Team health calculation using legacy scores: avg={avg_burnout:.1f}, count={len(legacy_scores)}")
+            logger.info(f"Team health calculation using legacy scores: avg={avg_score:.1f}, count={len(legacy_scores)}")
         
         # Count risk levels (updated for 4-tier system) - ONLY include eligible members with incidents
         risk_dist = {"low": 0, "medium": 0, "high": 0, "critical": 0}
@@ -3169,27 +3169,27 @@ class UnifiedBurnoutAnalyzer:
         
         # Calculate overall health score using appropriate scale
         if using_och:
-            # OCH scoring (0-100 where higher = more burnout)
+            # OCH scoring (0-100 where higher = more health risk)
             # Store raw OCH score as overall_score for frontend consumption
-            overall_score = avg_burnout
+            overall_score = avg_score
             logger.info(f"Using raw OCH score as overall_score: {overall_score}")
         else:
-            # Legacy scoring - convert 0-10 burnout to 0-10 health scale (inverse)
-            overall_score = 10 - avg_burnout
+            # Legacy scoring - convert 0-10 health risk to 0-10 health scale (inverse)
+            overall_score = 10 - avg_score
             overall_score = max(0, overall_score)
-            logger.info(f"Using legacy health calculation: burnout={avg_burnout} -> health={overall_score}")
+            logger.info(f"Using legacy health calculation: health_risk={avg_score} -> health={overall_score}")
         
         # Determine health status based on scoring method
         if using_och:
-            # OCH scoring (0-100 where higher = more burnout)
+            # OCH scoring (0-100 where higher = more health risk)
             if overall_score < 25:
-                health_status = "excellent"  # Low/minimal burnout
+                health_status = "excellent"  # Low/minimal health risk
             elif overall_score < 50:
-                health_status = "good"       # Mild burnout symptoms  
+                health_status = "good"       # Mild health risk
             elif overall_score < 75:
-                health_status = "fair"       # Moderate burnout risk
+                health_status = "fair"       # Moderate health risk
             else:
-                health_status = "poor"       # High/severe burnout risk
+                health_status = "poor"       # High/severe health risk
             logger.info(f"OCH health status: score={overall_score} -> {health_status}")
         else:
             # Legacy scoring (0-10 health scale where higher = better health)
@@ -3204,12 +3204,12 @@ class UnifiedBurnoutAnalyzer:
             else:  # <60%
                 health_status = "critical"
             logger.info(f"Legacy health status: score={overall_score} -> {health_status}")
-        
+
         return {
             "overall_score": round(overall_score, 2),
             "scoring_method": "OCH" if using_och else "Legacy",
             "risk_distribution": risk_dist,
-            "average_health_score": round(avg_burnout, 2),
+            "average_health_score": round(avg_score, 2),
             "health_status": health_status,
             "members_at_risk": risk_dist["high"] + risk_dist["critical"]
         }
