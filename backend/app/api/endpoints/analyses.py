@@ -22,6 +22,22 @@ from ...utils.visual_logger import log_task_start, log_task_complete
 logger = logging.getLogger(__name__)
 
 
+def sanitize_burnout_score_from_response(analysis_data: Optional[dict]) -> Optional[dict]:
+    """
+    No-op function for compatibility with analysis.py imports.
+
+    We've renamed burnout_score to health_score, so no sanitization needed.
+    This function exists only to maintain import compatibility.
+
+    Args:
+        analysis_data: The analysis data dict
+
+    Returns:
+        The same dict unchanged (health_score is kept)
+    """
+    return analysis_data
+
+
 def extract_analysis_summary(full_results: dict) -> dict:
     """
     Extract lightweight summary data from full analysis results.
