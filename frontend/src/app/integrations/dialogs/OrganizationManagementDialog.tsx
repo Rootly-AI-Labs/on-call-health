@@ -15,6 +15,7 @@ interface OrganizationMember {
   name: string
   email: string
   role: string
+  is_super_admin?: boolean
   status: 'active' | 'pending'
   is_current_user: boolean
   joined_at?: string
@@ -85,6 +86,8 @@ export function OrganizationManagementDialog({
   const [confirmingInvitationId, setConfirmingInvitationId] = useState<number | null>(null)
   const [removingUserId, setRemovingUserId] = useState<number | null>(null)
   const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<number | null>(null)
+  const [transferringSuperAdmin, setTransferringSuperAdmin] = useState<number | null>(null)
+  const [confirmTransferSuperAdmin, setConfirmTransferSuperAdmin] = useState<number | null>(null)
 
   const handleAcceptInvitation = async (invitationId: number, skipWarning = false) => {
     // Check if user is already in an org and show warning first
@@ -195,6 +198,36 @@ export function OrganizationManagementDialog({
       toast.error(error.message || 'Failed to remove member')
     } finally {
       setRemovingUserId(null)
+    }
+  }
+
+  const handleTransferSuperAdmin = async (userId: number, userName: string) => {
+    setTransferringSuperAdmin(userId)
+    setConfirmTransferSuperAdmin(null)
+    try {
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`${API_BASE}/auth/organizations/transfer-super-admin`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ target_user_id: userId })
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.detail || 'Failed to transfer super admin status')
+      }
+
+      const data = await response.json()
+      toast.success(`Super admin status transferred to ${userName}`)
+      await onRefreshOrgData()
+    } catch (error: any) {
+      console.error('Error transferring super admin:', error)
+      toast.error(error.message || 'Failed to transfer super admin status')
+    } finally {
+      setTransferringSuperAdmin(null)
     }
   }
 
@@ -426,6 +459,9 @@ export function OrganizationManagementDialog({
                               {member.is_current_user && (
                                 <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">You</span>
                               )}
+                              {member.is_super_admin && (
+                                <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded font-semibold">Super Admin</span>
+                              )}
                             </div>
                             <div className="text-neutral-700">{member.email}</div>
                             <div>
@@ -452,7 +488,47 @@ export function OrganizationManagementDialog({
                                 </div>
                               )}
                             </div>
-                            <div className="flex justify-end">
+                            <div className="flex justify-end gap-2">
+                              {/* Transfer Super Admin Button - only visible to current super admin for other admins */}
+                              {!member.is_current_user && member.role === 'admin' && !member.is_super_admin && (userInfo as any)?.is_super_admin && (
+                                confirmTransferSuperAdmin === member.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleTransferSuperAdmin(member.id as number, member.name)}
+                                      disabled={transferringSuperAdmin !== null}
+                                      className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                    >
+                                      {transferringSuperAdmin === member.id ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        'Confirm Transfer'
+                                      )}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setConfirmTransferSuperAdmin(null)}
+                                      disabled={transferringSuperAdmin !== null}
+                                      className="h-7 text-xs"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setConfirmTransferSuperAdmin(member.id as number)}
+                                    disabled={transferringSuperAdmin !== null}
+                                    className="h-7 text-xs text-neutral-500 hover:text-amber-600 hover:bg-amber-50"
+                                  >
+                                    Transfer Super Admin
+                                  </Button>
+                                )
+                              )}
+                              {/* Remove Member Button */}
                               {!member.is_current_user && userInfo?.role === 'admin' && (
                                 confirmRemoveUserId === member.id ? (
                                   <div className="flex items-center gap-2">
