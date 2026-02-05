@@ -324,6 +324,7 @@ async def run_burnout_analysis(
                 "include_slack": request.include_slack,
                 "include_jira": request.include_jira,
                 "include_linear": request.include_linear,
+                "enable_ai": request.enable_ai,
                 "permission_warnings": permission_warnings,
                 "organization_name": integration.organization_name if hasattr(integration, 'organization_name') else integration.name
             }

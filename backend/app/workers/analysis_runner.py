@@ -157,6 +157,14 @@ async def run_analysis_with_checkpoints(
         user = db.query(User).filter(User.id == user_id).first()
         has_llm_token = user and user.llm_token and user.llm_provider
 
+        # Read analysis config for user preferences
+        config = analysis.config or {}
+        enable_ai_requested = config.get("enable_ai", False)
+
+        # AI is enabled only if user requested it AND has LLM token configured
+        use_ai = enable_ai_requested and has_llm_token
+        logger.info(f"AI settings: requested={enable_ai_requested}, has_token={has_llm_token}, enabled={use_ai}")
+
         # Check for GitHub integration
         from ..models import GitHubIntegration
         github_integration = db.query(GitHubIntegration).filter(
@@ -320,7 +328,7 @@ async def run_analysis_with_checkpoints(
             phase_start = datetime.now()
 
             # Set user context for AI analysis if available
-            if has_llm_token:
+            if use_ai:
                 from ..services.ai_burnout_analyzer import set_user_context
                 set_user_context(user)
 
@@ -328,7 +336,7 @@ async def run_analysis_with_checkpoints(
             analyzer = UnifiedBurnoutAnalyzer(
                 api_token=integration.api_token,
                 platform=integration.platform,
-                enable_ai=has_llm_token,
+                enable_ai=use_ai,
                 github_token=github_token,
                 slack_token=slack_token,
                 jira_token=jira_token,
