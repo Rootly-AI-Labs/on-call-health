@@ -20,20 +20,25 @@ Comprehensive unit tests for the On-Call Health MCP server.
 - Case-insensitive risk levels (HIGH vs high)
 - Empty results
 - External ID inclusion (Rootly, PagerDuty, Slack, GitHub)
+- **Edge cases:** Missing analysis_data, missing team_analysis, missing members
 
 ### New Tool: get_safe_responders (`TestGetSafeResponders`)
 - Default parameters (max_och_score=30.0, limit=10)
 - Custom OCH score threshold
 - Limit parameter enforcement
 - Empty results
+- **Edge case:** Missing analysis_data
 
 ### New Tool: check_users_risk (`TestCheckUsersRisk`)
 - Mixed results (at_risk, healthy, not_found)
 - Custom min_och_score threshold
 - Risk level override (medium/high overrides score)
+- Exact threshold boundary (>= behavior)
 - Invalid ID format handling
 - Empty ID string validation
+- Integer overflow protection (32-bit bounds)
 - All IDs not found scenario
+- **Edge case:** Missing analysis_data
 
 ### Validation Errors (`TestValidationErrors`)
 - All tools reject invalid analysis_id
@@ -88,7 +93,7 @@ Simplified response for testing analysis_summary bug fix.
 ================================ tests coverage ================================
 src/oncallhealth_mcp/server.py                     251    102    59%
 ------------------------------------------------------------------------------
-25 passed in 1.20s
+32 passed in 0.52s
 ```
 
 ### Coverage Focus

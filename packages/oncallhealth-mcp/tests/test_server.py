@@ -256,6 +256,99 @@ class TestGetAtRiskUsers:
         assert user["slack_user_id"] == "U012345"
         assert user["github_username"] == "quentinr"
 
+    @patch("oncallhealth_mcp.server.extract_api_key_header")
+    @patch("oncallhealth_mcp.server.OnCallHealthClient")
+    async def test_get_at_risk_users_missing_analysis_data(
+        self, mock_client_class, mock_extract
+    ):
+        """Test get_at_risk_users handles missing analysis_data gracefully."""
+        mock_extract.return_value = "test-api-key"
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "id": 1226,
+            "status": "completed",
+            # Missing analysis_data entirely
+        }
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_class.return_value = mock_client
+
+        from oncallhealth_mcp.server import get_at_risk_users
+
+        ctx = MagicMock()
+        result = await get_at_risk_users(ctx, 1226)
+
+        assert result["total_at_risk"] == 0
+        assert result["users"] == []
+
+    @patch("oncallhealth_mcp.server.extract_api_key_header")
+    @patch("oncallhealth_mcp.server.OnCallHealthClient")
+    async def test_get_at_risk_users_missing_team_analysis(
+        self, mock_client_class, mock_extract
+    ):
+        """Test get_at_risk_users handles missing team_analysis gracefully."""
+        mock_extract.return_value = "test-api-key"
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "id": 1226,
+            "status": "completed",
+            "analysis_data": {
+                # Missing team_analysis
+            }
+        }
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_class.return_value = mock_client
+
+        from oncallhealth_mcp.server import get_at_risk_users
+
+        ctx = MagicMock()
+        result = await get_at_risk_users(ctx, 1226)
+
+        assert result["total_at_risk"] == 0
+        assert result["users"] == []
+
+    @patch("oncallhealth_mcp.server.extract_api_key_header")
+    @patch("oncallhealth_mcp.server.OnCallHealthClient")
+    async def test_get_at_risk_users_missing_members(
+        self, mock_client_class, mock_extract
+    ):
+        """Test get_at_risk_users handles missing members list gracefully."""
+        mock_extract.return_value = "test-api-key"
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "id": 1226,
+            "status": "completed",
+            "analysis_data": {
+                "team_analysis": {
+                    # Missing members
+                }
+            }
+        }
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_class.return_value = mock_client
+
+        from oncallhealth_mcp.server import get_at_risk_users
+
+        ctx = MagicMock()
+        result = await get_at_risk_users(ctx, 1226)
+
+        assert result["total_at_risk"] == 0
+        assert result["users"] == []
+
 
 class TestGetSafeResponders:
     """Tests for get_safe_responders tool."""
@@ -348,6 +441,35 @@ class TestGetSafeResponders:
 
         ctx = MagicMock()
         result = await get_safe_responders(ctx, 1226, max_och_score=5.0)
+
+        assert result["total_safe"] == 0
+        assert result["users"] == []
+
+    @patch("oncallhealth_mcp.server.extract_api_key_header")
+    @patch("oncallhealth_mcp.server.OnCallHealthClient")
+    async def test_get_safe_responders_missing_analysis_data(
+        self, mock_client_class, mock_extract
+    ):
+        """Test get_safe_responders handles missing analysis_data gracefully."""
+        mock_extract.return_value = "test-api-key"
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "id": 1226,
+            "status": "completed",
+            # Missing analysis_data entirely
+        }
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_class.return_value = mock_client
+
+        from oncallhealth_mcp.server import get_safe_responders
+
+        ctx = MagicMock()
+        result = await get_safe_responders(ctx, 1226)
 
         assert result["total_safe"] == 0
         assert result["users"] == []
@@ -529,6 +651,38 @@ class TestCheckUsersRisk:
         assert len(result["at_risk"]) == 0
         assert len(result["healthy"]) == 0
         assert set(result["not_found"]) == {99999, 88888}
+
+    @patch("oncallhealth_mcp.server.extract_api_key_header")
+    @patch("oncallhealth_mcp.server.OnCallHealthClient")
+    async def test_check_users_risk_missing_analysis_data(
+        self, mock_client_class, mock_extract
+    ):
+        """Test check_users_risk handles missing analysis_data gracefully."""
+        mock_extract.return_value = "test-api-key"
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "id": 1226,
+            "status": "completed",
+            # Missing analysis_data entirely
+        }
+
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_class.return_value = mock_client
+
+        from oncallhealth_mcp.server import check_users_risk
+
+        ctx = MagicMock()
+        result = await check_users_risk(ctx, 1226, "2381,1234")
+
+        assert result["checked"] == 2
+        assert result["found"] == 0
+        assert len(result["at_risk"]) == 0
+        assert len(result["healthy"]) == 0
+        assert set(result["not_found"]) == {2381, 1234}
 
 
 class TestValidationErrors:
