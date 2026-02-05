@@ -6,6 +6,7 @@ Falls back to fuzzy name matching if email is unavailable or no email match foun
 import logging
 from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from difflib import SequenceMatcher
 from app.models import User, UserCorrelation, JiraIntegration
 from app.auth.integration_oauth import jira_integration_oauth
