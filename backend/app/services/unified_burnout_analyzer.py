@@ -1731,18 +1731,18 @@ class UnifiedBurnoutAnalyzer:
         
         # OCH DEBUG LOGGING - Removed to reduce Railway log noise
         
-        # Calculate overall burnout score using three-factor methodology (equal weighting)
-        burnout_score = (dimensions["personal_burnout"] * 0.333 + 
-                        dimensions["work_related_burnout"] * 0.333 + 
+        # Calculate overall health score using three-factor methodology (equal weighting)
+        health_score = (dimensions["personal_burnout"] * 0.333 +
+                        dimensions["work_related_burnout"] * 0.333 +
                         dimensions["accomplishment_burnout"] * 0.334)
-        
+
         # Ensure overall score is never negative
-        burnout_score = max(0, burnout_score)
-        
+        health_score = max(0, health_score)
+
         # Debug logging removed to reduce noise
-        
+
         # Determine risk level
-        risk_level = self._determine_risk_level(burnout_score)
+        risk_level = self._determine_risk_level(health_score)
         
         # Calculate OCH (On-Call Health) score
         # Map existing metrics to OCH format with severity weighting
@@ -1945,7 +1945,7 @@ class UnifiedBurnoutAnalyzer:
             "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
             "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
             "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
-            "health_score": round(burnout_score, 2),
+            "health_score": round(health_score, 2),
             "och_score": round(min(100, composite_och['composite_score']), 2),  # Cap display at 100 for UI
             "risk_level": risk_level,
             "incident_count": len(incidents),
