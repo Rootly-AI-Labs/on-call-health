@@ -44,7 +44,7 @@
                 "high": 1,
                 "critical": 0
             },
-            "average_burnout_score": 0,
+            "average_health_score": 0,
             "health_status": "excellent",
             "members_at_risk": 1
         },
@@ -8713,7 +8713,7 @@
                     "primary_concern": "1 team member(s) showing severe OCH burnout symptoms (>75/100) requiring immediate intervention",
                     "key_metrics": {
                         "total_team_incidents": 0,
-                        "average_burnout_score": 0,
+                        "average_health_score": 0,
                         "scoring_methodology": "OCH (0-100)",
                         "high_risk_percentage": 2.4390243902439024,
                         "data_completeness": 1
