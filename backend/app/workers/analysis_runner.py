@@ -155,15 +155,19 @@ async def run_analysis_with_checkpoints(
 
         # Get user and check available integrations
         user = db.query(User).filter(User.id == user_id).first()
-        has_llm_token = user and user.llm_token and user.llm_provider
+        has_user_llm_token = user and user.llm_token and user.llm_provider
+
+        # Check for system-level Anthropic API key (Railway provides this)
+        import os
+        system_api_key = os.getenv('ANTHROPIC_API_KEY')
 
         # Read analysis config for user preferences
         config = analysis.config or {}
         enable_ai_requested = config.get("enable_ai", False)
 
-        # AI is enabled only if user requested it AND has LLM token configured
-        use_ai = enable_ai_requested and has_llm_token
-        logger.info(f"AI settings: requested={enable_ai_requested}, has_token={has_llm_token}, enabled={use_ai}")
+        # AI is enabled if user requested it AND (system key OR user token available)
+        use_ai = enable_ai_requested and (system_api_key or has_user_llm_token)
+        logger.info(f"AI settings: requested={enable_ai_requested}, system_key={bool(system_api_key)}, user_token={has_user_llm_token}, enabled={use_ai}")
 
         # Check for GitHub integration
         from ..models import GitHubIntegration
