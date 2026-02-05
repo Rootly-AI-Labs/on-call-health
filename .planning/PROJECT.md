@@ -8,20 +8,11 @@ On-Call Health is a burnout detection platform that analyzes on-call patterns ac
 
 Catch exhaustion before it burns out team members by analyzing cross-platform activity patterns, on-call load, and workload distribution.
 
-## Current Milestone: v1.1 MCP Distribution
+## Current Milestone
 
-**Goal:** Enable zero-installation MCP server access via SSE-hosted endpoint and PyPI distribution, replacing direct database access with REST API calls.
-
-**Target features:**
-- SSE transport endpoint at `https://mcp.oncallhealth.com/sse` (or similar)
-- REST API client layer (calls oncallhealth.ai APIs instead of direct DB)
-- PyPI package `on-call-health-mcp` for self-hosted users
-- Rate limiting and connection limits for hosted SSE
-- Documentation for both deployment methods (SSE hosted + PyPI/uvx)
-
-**Architecture shift:**
-- **Before (v1.0)**: MCP server → stdio transport → direct database access
-- **After (v1.1)**: MCP server → SSE/stdio transport → REST API calls → oncallhealth.ai
+**Status:** Between milestones
+**Last shipped:** v1.1 MCP Distribution (2026-02-04)
+**Next:** To be planned
 
 ## Requirements
 
@@ -45,6 +36,14 @@ Catch exhaustion before it burns out team members by analyzing cross-platform ac
 - ✓ Token validity checking with platform-specific error messages — v1.1
 - ✓ Users can switch between OAuth and Token auth methods — v1.1
 - ✓ Team-level data access with tokens (same as OAuth) — v1.1
+- ✓ REST API client with resilience patterns (retry, circuit breaker, connection pooling) — v1.1
+- ✓ MCP tools refactored to use REST API instead of direct database access — v1.1
+- ✓ SSE and Streamable HTTP transport endpoints for MCP server — v1.1
+- ✓ PyPI package distribution (`oncallhealth-mcp` via uvx) — v1.1
+- ✓ Connection limits and rate limiting for hosted SSE endpoint — v1.1
+- ✓ AWS ECS/Fargate deployment at http://13.218.46.36:8080 — v1.1
+- ✓ Environment variable authentication (ONCALLHEALTH_API_KEY) with header fallback — v1.1
+- ✓ Analysis summary tool (condensed data for AI agents) — v1.1
 
 ### Active
 
@@ -96,4 +95,4 @@ Catch exhaustion before it burns out team members by analyzing cross-platform ac
 | Show both options in modal | Clear choice for users, discoverability of token option for blocked users | ✓ Implemented v1.1 |
 
 ---
-*Last updated: 2026-02-03 after v1.1 (Token Auth) completion and v1.2 (MCP Distribution) Phase 11 deployment*
+*Last updated: 2026-02-04 after v1.1 MCP Distribution milestone completion*
