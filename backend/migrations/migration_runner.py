@@ -1221,6 +1221,11 @@ class MigrationRunner:
                 "description": "Add last_modified_by_user_id and last_modified_at columns to track survey schedule changes",
                 "sql_file": "2026_01_26_add_last_modified_to_survey_schedules.sql"
             },
+            {
+                "name": "043_add_super_admin",
+                "description": "Add is_super_admin flag for org continuity - ensures at least one super admin per org",
+                "sql_file": "2026_02_05_add_super_admin.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 
