@@ -370,27 +370,27 @@ export function ObjectiveDataCard({
         <div className="space-y-1.5">
           <div className="flex items-center gap-3">
             <CardTitle>Team Trends</CardTitle>
-            {viewMode === 'weekly' && hasData && (() => {
-              // Use vsLastWeek for recent direction (more actionable), fall back to overallTrend
-              const trendToShow = vsLastWeek || overallTrend
+            {viewMode === 'weekly' && hasData && weeklyData.length >= 2 && (() => {
+              // Compare first week(s) to last week(s) for true overall direction
+              const numWeeksToCompare = Math.min(2, Math.floor(weeklyData.length / 2))
+              const firstWeeksAvg = weeklyData.slice(0, numWeeksToCompare).reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / numWeeksToCompare
+              const lastWeeksAvg = weeklyData.slice(-numWeeksToCompare).reduce((sum, w) => sum + w[config.weeklyDataKey], 0) / numWeeksToCompare
+              const overallDirection = calculateTrend(lastWeeksAvg, firstWeeksAvg)
+
               return (
                 <div className="relative group">
-                  <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 cursor-help ${getTrendStatusClass(trendToShow.direction)}`}>
-                    {getTrendIcon(trendToShow.direction)}
-                    {getTrendLabel(trendToShow.direction)}
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 cursor-help ${getTrendStatusClass(overallDirection.direction)}`}>
+                    {getTrendIcon(overallDirection.direction)}
+                    {getTrendLabel(overallDirection.direction)}
                   </div>
-                  <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                    {vsLastWeek ? (
-                      <span>
-                        {trendToShow.direction === 'down'
-                          ? `Down ${trendToShow.percentage}% vs last week`
-                          : trendToShow.direction === 'up'
-                          ? `Up ${trendToShow.percentage}% vs last week`
-                          : 'No significant change vs last week'}
-                      </span>
-                    ) : (
-                      <span>{getTrendTooltipMessage(overallTrend.direction, overallTrend.percentage, firstHalfAvg, secondHalfAvg, weeklyMean)}</span>
-                    )}
+                  <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <span>
+                      {overallDirection.direction === 'down'
+                        ? `Down ${overallDirection.percentage}% from start to end`
+                        : overallDirection.direction === 'up'
+                        ? `Up ${overallDirection.percentage}% from start to end`
+                        : `Returned to similar level (${Math.round(firstWeeksAvg)} → ${Math.round(lastWeeksAvg)})`}
+                    </span>
                   </div>
                 </div>
               )
