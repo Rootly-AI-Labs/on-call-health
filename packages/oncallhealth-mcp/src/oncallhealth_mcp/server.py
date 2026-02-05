@@ -311,7 +311,7 @@ async def get_at_risk_users(
     min_och_score: float = 50.0,
     include_risk_levels: Optional[str] = "medium,high"
 ) -> Dict[str, Any]:
-    """Get users above burnout threshold with their external IDs.
+    """Get users at or above burnout threshold with their external IDs.
 
     Use this to identify at-risk responders and correlate with external
     systems (Rootly, PagerDuty, Slack) using their platform-specific IDs.
@@ -323,7 +323,7 @@ async def get_at_risk_users(
                             Risk levels are case-insensitive.
 
     Returns:
-        - total_at_risk: count of users above threshold
+        - total_at_risk: count of users at or above threshold (och_score >= min_och_score)
         - users: list of {user_name, och_score, risk_level, burnout_score,
                          incident_count, rootly_user_id, pagerduty_user_id,
                          slack_user_id, github_username}
@@ -409,7 +409,7 @@ async def get_safe_responders(
         limit: Maximum users to return (default: 10)
 
     Returns:
-        - total_safe: count of users below threshold
+        - total_safe: count of users at or below threshold (och_score <= max_och_score)
         - users: list of {user_name, och_score, risk_level,
                          rootly_user_id, slack_user_id}
                  sorted by och_score ascending (healthiest first)
@@ -488,7 +488,7 @@ async def check_users_risk(
     Returns:
         - checked: number of IDs checked
         - found: number matched in analysis
-        - at_risk: list of users with och_score > min_och_score or risk_level in [medium, high]
+        - at_risk: list of users with och_score >= min_och_score or risk_level in [medium, high]
         - healthy: list of users with low risk
         - not_found: list of rootly_user_ids not in analysis
 
