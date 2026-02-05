@@ -40,12 +40,14 @@ def get_redis_settings() -> RedisSettings:
     host = DEFAULT_HOST
     port = DEFAULT_PORT
     database = DEFAULT_DATABASE
+    password = None
 
     try:
         parsed = urlparse(redis_url)
         if parsed.scheme == "redis":
             host = parsed.hostname or DEFAULT_HOST
             port = parsed.port or DEFAULT_PORT
+            password = parsed.password  # Extract password from URL
             # Path is like "/1" for database 1, strip leading slash
             if parsed.path and len(parsed.path) > 1:
                 db_str = parsed.path.lstrip("/").split("/")[0]
@@ -58,6 +60,7 @@ def get_redis_settings() -> RedisSettings:
         host=host,
         port=port,
         database=database,
+        password=password,  # Pass password to RedisSettings
         conn_timeout=settings.ARQ_TIMEOUT,
         conn_retries=3,
         conn_retry_delay=1,
