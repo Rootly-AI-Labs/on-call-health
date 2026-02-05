@@ -1124,8 +1124,9 @@ async def transfer_super_admin(
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Transfer super admin status to another admin.
-    Only super admins can transfer their status.
+    Promote another admin to super admin (does not remove current user's super admin status).
+    Only super admins can promote other admins to super admin.
+    This allows organizations to have multiple super admins.
     """
     # Check if current user is super admin
     if not current_user.is_super_admin:
@@ -1174,17 +1175,17 @@ async def transfer_super_admin(
             detail="Target user is already a super admin"
         )
 
-    # Transfer super admin status
+    # Promote target user to super admin (does NOT remove from current user)
     target_user.is_super_admin = True
     db.commit()
 
     logger.info(
-        f"Super admin status transferred: {current_user.id} ({current_user.email}) "
-        f"-> {target_user.id} ({target_user.email}) in org {current_user.organization_id}"
+        f"Super admin promoted: {target_user.id} ({target_user.email}) "
+        f"by {current_user.id} ({current_user.email}) in org {current_user.organization_id}"
     )
 
     return {
-        "message": "Super admin status transferred successfully",
+        "message": f"Successfully promoted {target_user.name} to super admin",
         "new_super_admin": {
             "id": target_user.id,
             "email": target_user.email,

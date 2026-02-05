@@ -221,11 +221,11 @@ export function OrganizationManagementDialog({
       }
 
       const data = await response.json()
-      toast.success(`Super admin status transferred to ${userName}`)
+      toast.success(`${userName} is now a super admin`)
       await onRefreshOrgData()
     } catch (error: any) {
-      console.error('Error transferring super admin:', error)
-      toast.error(error.message || 'Failed to transfer super admin status')
+      console.error('Error promoting to super admin:', error)
+      toast.error(error.message || 'Failed to promote to super admin')
     } finally {
       setTransferringSuperAdmin(null)
     }
@@ -489,7 +489,7 @@ export function OrganizationManagementDialog({
                               )}
                             </div>
                             <div className="flex justify-end gap-2">
-                              {/* Transfer Super Admin Button - only visible to current super admin for other admins */}
+                              {/* Make Super Admin Button - only visible to current super admin for other admins */}
                               {!member.is_current_user && member.role === 'admin' && !member.is_super_admin && (userInfo as any)?.is_super_admin && (
                                 confirmTransferSuperAdmin === member.id ? (
                                   <div className="flex items-center gap-2">
@@ -503,7 +503,7 @@ export function OrganizationManagementDialog({
                                       {transferringSuperAdmin === member.id ? (
                                         <Loader2 className="w-3 h-3 animate-spin" />
                                       ) : (
-                                        'Confirm Transfer'
+                                        'Confirm'
                                       )}
                                     </Button>
                                     <Button
@@ -524,7 +524,7 @@ export function OrganizationManagementDialog({
                                     disabled={transferringSuperAdmin !== null}
                                     className="h-7 text-xs text-neutral-500 hover:text-amber-600 hover:bg-amber-50"
                                   >
-                                    Transfer Super Admin
+                                    Make Super Admin
                                   </Button>
                                 )
                               )}
