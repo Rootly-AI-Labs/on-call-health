@@ -521,7 +521,9 @@ async def check_users_risk(
                 if id_str:
                     try:
                         user_id = int(id_str)
-                        if user_id <= 0 or user_id > 2147483647:  # Max 32-bit signed int
+                        # Validate positive integer within reasonable bounds
+                        # Using 64-bit limit to support modern ID systems (Rootly, PagerDuty, etc.)
+                        if user_id <= 0 or user_id > 9223372036854775807:  # Max 64-bit signed int
                             raise ValueError(f"Invalid rootly_user_id: {id_str}")
                         requested_ids.add(user_id)
                     except ValueError:

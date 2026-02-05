@@ -621,9 +621,9 @@ class TestCheckUsersRisk:
 
         ctx = MagicMock()
 
-        # Test overflow (> max 32-bit int)
+        # Test overflow (> max 64-bit int)
         with pytest.raises(ValueError, match="Invalid rootly_user_id"):
-            await check_users_risk(ctx, 1226, "999999999999999999999")
+            await check_users_risk(ctx, 1226, "99999999999999999999999999999")
 
         # Test negative ID
         with pytest.raises(ValueError, match="Invalid rootly_user_id"):
