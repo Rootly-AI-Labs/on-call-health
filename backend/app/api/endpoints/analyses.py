@@ -22,6 +22,42 @@ from ...utils.visual_logger import log_task_start, log_task_complete
 logger = logging.getLogger(__name__)
 
 
+def sanitize_burnout_score_from_response(analysis_data: Optional[dict]) -> Optional[dict]:
+    """
+    Remove burnout_score from API responses.
+
+    We've migrated to 'och_score' (On-Call Health score) as the single source of truth.
+    This function strips legacy burnout_score fields from member data before returning
+    to clients, while keeping internal calculations intact.
+
+    Args:
+        analysis_data: The analysis data dict containing team_analysis.members
+
+    Returns:
+        Sanitized dict with burnout_score removed from all member objects
+    """
+    if not analysis_data:
+        return analysis_data
+
+    # Create a copy to avoid modifying the original
+    import copy
+    sanitized = copy.deepcopy(analysis_data)
+
+    # Remove burnout_score from team members
+    team_analysis = sanitized.get("team_analysis", {})
+    if "members" in team_analysis and isinstance(team_analysis["members"], list):
+        for member in team_analysis["members"]:
+            if isinstance(member, dict) and "burnout_score" in member:
+                del member["burnout_score"]
+
+    # Remove average_burnout_score from team_health if present
+    team_health = sanitized.get("team_health", {})
+    if "average_burnout_score" in team_health:
+        del team_health["average_burnout_score"]
+
+    return sanitized
+
+
 def extract_analysis_summary(full_results: dict) -> dict:
     """
     Extract lightweight summary data from full analysis results.
@@ -109,7 +145,7 @@ class AnalysisListResponse(BaseModel):
 class DailyTrendPoint(BaseModel):
     date: str
     overall_score: float
-    average_burnout_score: float
+    # Removed: average_burnout_score (replaced by och_score in members)
     members_at_risk: int
     total_members: int
     health_status: str
@@ -554,6 +590,9 @@ async def get_analysis_by_uuid(
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
 
+    # Sanitize burnout_score from response (use och_score only)
+    analysis_data = sanitize_burnout_score_from_response(analysis_data)
+
     return AnalysisResponse(
         id=analysis.id,
         uuid=getattr(analysis, 'uuid', None),
@@ -610,6 +649,9 @@ async def get_analysis(
     analysis_data = analysis.results or {}
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
+
+    # Sanitize burnout_score from response (use och_score only)
+    analysis_data = sanitize_burnout_score_from_response(analysis_data)
 
     return AnalysisResponse(
         id=analysis.id,
@@ -810,6 +852,9 @@ async def get_analysis_by_identifier(
     analysis_data = analysis.results or {}
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
+
+    # Sanitize burnout_score from response (use och_score only)
+    analysis_data = sanitize_burnout_score_from_response(analysis_data)
 
     return AnalysisResponse(
         id=analysis.id,
@@ -1354,7 +1399,6 @@ async def get_historical_trends(
         daily_trends.append(DailyTrendPoint(
             date=trend_date,
             overall_score=float(overall_score),
-            average_burnout_score=float(trend_data.get("overall_score", 0.0)),  # Use same score for consistency
             members_at_risk=int(members_at_risk),
             total_members=max(int(total_members), 1),  # Use actual total_members from analysis
             health_status=health_status,
