@@ -237,6 +237,48 @@ function DashboardContent() {
     setMounted(true)
   }, [])
 
+  // Connected integrations state (to filter which integrations are currently active)
+  const [connectedIntegrations, setConnectedIntegrations] = useState<Set<string>>(new Set())
+
+  // Load connected integration statuses
+  useEffect(() => {
+    const fetchConnectedIntegrations = async () => {
+      const authToken = localStorage.getItem("auth_token")
+      if (!authToken) return
+
+      try {
+        const connected = new Set<string>()
+
+        // Check each integration's status
+        const integrationTypes = ['github', 'jira', 'linear', 'slack']
+
+        for (const integrationType of integrationTypes) {
+          try {
+            const response = await fetch(`${API_BASE}/integrations/${integrationType}/status`, {
+              headers: { Authorization: `Bearer ${authToken}` },
+            })
+
+            if (response.ok) {
+              const data = await response.json()
+              if (data.connected) {
+                connected.add(integrationType)
+              }
+            }
+          } catch (error) {
+            // Continue checking other integrations if one fails
+            console.debug(`Failed to check ${integrationType} status:`, error)
+          }
+        }
+
+        setConnectedIntegrations(connected)
+      } catch (error) {
+        console.error("Failed to fetch connected integrations:", error)
+      }
+    }
+
+    fetchConnectedIntegrations()
+  }, [API_BASE])
+
   // GitHub All Metrics Popup State
   const [showAllMetricsPopup, setShowAllMetricsPopup] = useState(false)
 
@@ -851,6 +893,7 @@ function DashboardContent() {
                 setSelectedMember={setSelectedMember}
                 getRiskColor={getRiskColor}
                 getProgressColor={getProgressColor}
+                connectedIntegrations={connectedIntegrations}
               />
             </>
           )}
@@ -1296,7 +1339,7 @@ function DashboardContent() {
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   {/* GitHub Toggle Card */}
-                  {true && (
+                  {connectedIntegrations.has('github') && (
                     <div className={`border rounded-lg p-3 transition-all ${includeGithub && githubIntegration ? 'border-neutral-900 bg-neutral-100' : 'border-neutral-200 bg-white'}`}>
                       {/* Always show GitHub content immediately, no skeleton loader */}
                       {(
@@ -1371,7 +1414,7 @@ function DashboardContent() {
                   )}
 
                   {/* Jira Toggle Card */}
-                  {true && (
+                  {connectedIntegrations.has('jira') && (
                     <div className={`border rounded-lg p-3 transition-all ${includeJira && jiraIntegration ? 'border-blue-500 bg-blue-50' : 'border-neutral-200 bg-white'}`}>
                       {/* Always show Jira content immediately, no skeleton loader */}
                       {(
@@ -1414,7 +1457,7 @@ function DashboardContent() {
                   )}
 
                   {/* Linear Toggle Card */}
-                  {true && (
+                  {connectedIntegrations.has('linear') && (
                     <div className={`border rounded-lg p-3 transition-all ${includeLinear && linearIntegration ? 'border-purple-500 bg-purple-50' : 'border-neutral-200 bg-white'}`}>
                       {(
                         <>

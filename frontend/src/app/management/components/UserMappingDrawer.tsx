@@ -36,6 +36,7 @@ interface UserMappingDrawerProps {
   } | null
   selectedOrganization: string
   onMappingUpdated: () => void
+  connectedIntegrations?: Set<string>
 }
 
 type IntegrationType = "github" | "jira" | "linear"
@@ -46,6 +47,7 @@ export function UserMappingDrawer({
   user,
   selectedOrganization,
   onMappingUpdated,
+  connectedIntegrations = new Set(),
 }: UserMappingDrawerProps) {
   const [editingIntegration, setEditingIntegration] = useState<IntegrationType | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -228,7 +230,7 @@ export function UserMappingDrawer({
 
         <div className="space-y-4 py-6">
           {/* GitHub Integration */}
-          <div className="space-y-2">
+          {connectedIntegrations.has('github') && <div className="space-y-2">
             <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 flex items-center justify-center">
@@ -308,10 +310,10 @@ export function UserMappingDrawer({
                 )}
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Jira Integration */}
-          <div className="space-y-2">
+          {connectedIntegrations.has('jira') && <div className="space-y-2">
             <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 flex items-center justify-center">
@@ -395,10 +397,10 @@ export function UserMappingDrawer({
                 )}
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Linear Integration */}
-          <div className="space-y-2">
+          {connectedIntegrations.has('linear') && <div className="space-y-2">
             <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 flex items-center justify-center">
@@ -476,7 +478,7 @@ export function UserMappingDrawer({
                 )}
               </div>
             )}
-          </div>
+          </div>}
         </div>
       </SheetContent>
     </Sheet>

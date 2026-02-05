@@ -1,8 +1,11 @@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Users, Mail, Loader2 } from "lucide-react"
+import { Users, Mail, Loader2, Search, ChevronLeft, ChevronRight } from "lucide-react"
+import { useState } from "react"
 import { UserInfo } from "../types"
+
+const TEAM_MEMBERS_PER_PAGE = 10
 
 interface OrganizationMember {
   id: number | string
@@ -43,6 +46,8 @@ interface OrganizationManagementDialogProps {
   onRoleChange: (userId: number, newRole: string) => void
   onClose: () => void
   asInlineView?: boolean  // Flag to render as inline view instead of modal
+  title?: string  // Custom title (defaults to "Organization Management")
+  subtitle?: string  // Custom subtitle
 }
 
 export function OrganizationManagementDialog({
@@ -60,9 +65,30 @@ export function OrganizationManagementDialog({
   userInfo,
   onRoleChange,
   onClose,
-  asInlineView = false  // Default to modal view
+  asInlineView = false,  // Default to modal view
+  title = "Organization Management",  // Default title
+  subtitle = "Invite new members and manage your organization"  // Default subtitle
 }: OrganizationManagementDialogProps) {
   // Content component extracted for reuse
+  // Local search state for filtering members
+  const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // Filter members based on search query
+  const filteredMembers = orgMembers.filter((member) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      member.name.toLowerCase().includes(query) ||
+      member.email.toLowerCase().includes(query)
+    )
+  })
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredMembers.length / TEAM_MEMBERS_PER_PAGE)
+  const startIndex = (currentPage - 1) * TEAM_MEMBERS_PER_PAGE
+  const paginatedMembers = filteredMembers.slice(startIndex, startIndex + TEAM_MEMBERS_PER_PAGE)
+
   const DialogContentBody = () => (
     <>
       {/* Role descriptions */}
@@ -153,34 +179,55 @@ export function OrganizationManagementDialog({
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Current Members */}
+              {/* Search Bar - above members table */}
               {orgMembers.length > 0 && (
+                <div className="mb-4">
+                  <div className="relative max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    <Input
+                      type="text"
+                      placeholder="Search members..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value)
+                        setCurrentPage(1)
+                      }}
+                      className="pl-9 w-full"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Current Members */}
+              {filteredMembers.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-medium mb-3 flex items-center space-x-2">
-                    <Users className="w-5 h-5" />
-                    <span>Organization Members ({orgMembers.length})</span>
-                  </h3>
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="bg-neutral-100 px-4 py-2 border-b">
-                      <div className="grid grid-cols-4 gap-4 text-sm font-medium text-neutral-700">
-                        <div>Name</div>
-                        <div>Email</div>
-                        <div>Status</div>
-                        <div>Role</div>
-                      </div>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {orgMembers.map((member) => (
-                        <div key={member.id} className={`px-4 py-3 border-b last:border-b-0 hover:bg-neutral-100 ${member.status === 'pending' ? 'bg-yellow-50' : 'bg-white'}`}>
-                          <div className="grid grid-cols-4 gap-4 text-sm items-center">
-                            <div className="font-medium text-neutral-900">
-                              {member.name}
-                              {member.is_current_user && (
-                                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">You</span>
-                              )}
-                            </div>
-                            <div className="text-neutral-700">{member.email}</div>
-                            <div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-neutral-200 bg-neutral-50">
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Name</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Status</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Role</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedMembers.map((member, index) => (
+                          <tr key={member.id} className={`border-b border-neutral-100 hover:bg-neutral-50 ${index === paginatedMembers.length - 1 ? 'border-b-0' : ''}`}>
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-3">
+                                <span className="font-medium text-neutral-900">
+                                  {member.name}
+                                  {member.is_current_user && (
+                                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">You</span>
+                                  )}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-sm text-neutral-600">{member.email}</span>
+                            </td>
+                            <td className="py-4 px-6">
                               {member.status === 'pending' ? (
                                 <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
                                   Pending
@@ -190,8 +237,8 @@ export function OrganizationManagementDialog({
                                   Active
                                 </span>
                               )}
-                            </div>
-                            <div>
+                            </td>
+                            <td className="py-4 px-6">
                               {member.status === 'pending' ? (
                                 <span className="text-xs text-neutral-500 capitalize">
                                   {member.role?.replace('_', ' ') || 'member'}
@@ -218,12 +265,41 @@ export function OrganizationManagementDialog({
                                   )}
                                 </div>
                               )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-200">
+                      <p className="text-sm text-neutral-600">
+                        Showing {startIndex + 1}-{Math.min(startIndex + TEAM_MEMBERS_PER_PAGE, filteredMembers.length)} of {filteredMembers.length}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <span className="text-sm text-neutral-600 px-3">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -234,46 +310,59 @@ export function OrganizationManagementDialog({
                     <Mail className="w-5 h-5" />
                     <span>Pending Invitations ({pendingInvitations.length})</span>
                   </h3>
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="bg-neutral-100 px-4 py-2 border-b">
-                      <div className="grid grid-cols-5 gap-4 text-sm font-medium text-neutral-700">
-                        <div>Email</div>
-                        <div>Role</div>
-                        <div>Invited By</div>
-                        <div>Sent</div>
-                        <div>Expires</div>
-                      </div>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {pendingInvitations.map((invitation) => (
-                        <div key={invitation.id} className="px-4 py-3 border-b last:border-b-0 bg-yellow-50">
-                          <div className="grid grid-cols-5 gap-4 text-sm">
-                            <div className="font-medium text-neutral-900">{invitation.email}</div>
-                            <div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-neutral-200 bg-neutral-50">
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Role</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Invited By</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Sent</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Expires</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingInvitations.map((invitation, index) => (
+                          <tr key={invitation.id} className={`border-b border-neutral-100 hover:bg-neutral-50 bg-yellow-50 ${index === pendingInvitations.length - 1 ? 'border-b-0' : ''}`}>
+                            <td className="py-4 px-6">
+                              <span className="text-sm font-medium text-neutral-900">{invitation.email}</span>
+                            </td>
+                            <td className="py-4 px-6">
                               <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 capitalize">
                                 {invitation.role?.replace('_', ' ') || 'member'}
                               </span>
-                            </div>
-                            <div className="text-neutral-700">{invitation.invited_by?.name || 'Unknown'}</div>
-                            <div className="text-neutral-500 text-xs">
-                              {new Date(invitation.created_at).toLocaleDateString()}
-                            </div>
-                            <div className="text-neutral-500 text-xs">
-                              {invitation.is_expired ? (
-                                <span className="text-red-600">Expired</span>
-                              ) : (
-                                new Date(invitation.expires_at).toLocaleDateString()
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-sm text-neutral-600">{invitation.invited_by?.name || 'Unknown'}</span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-xs text-neutral-500">{new Date(invitation.created_at).toLocaleDateString()}</span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-xs text-neutral-500">
+                                {invitation.is_expired ? (
+                                  <span className="text-red-600">Expired</span>
+                                ) : (
+                                  new Date(invitation.expires_at).toLocaleDateString()
+                                )}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
 
-              {/* Empty State */}
+              {/* Empty State - No results from search */}
+              {filteredMembers.length === 0 && orgMembers.length > 0 && (
+                <div className="text-center py-8 text-neutral-500">
+                  <p>No members found matching your search</p>
+                </div>
+              )}
+
+              {/* Empty State - No members at all */}
               {!loadingOrgData && orgMembers.length === 0 && pendingInvitations.length === 0 && (
                 <div className="text-center py-8 text-neutral-500">
                   <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -301,21 +390,20 @@ export function OrganizationManagementDialog({
   // If inline view, render content without Dialog wrapper
   if (asInlineView) {
     return (
-      <div className="space-y-6">
+      <>
         {/* Header */}
-        <div>
-          <h2 className="flex items-center space-x-2 text-2xl font-semibold">
-            <Users className="w-6 h-6" />
-            <span>Organization Management</span>
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold">
+            {title}
           </h2>
           <p className="text-sm text-neutral-600 mt-1">
-            Invite new members and manage your organization
+            {subtitle}
           </p>
         </div>
 
         {/* Content */}
         <DialogContentBody />
-      </div>
+      </>
     )
   }
 
@@ -326,10 +414,10 @@ export function OrganizationManagementDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Users className="w-5 h-5" />
-            <span>Organization Management</span>
+            <span>{title}</span>
           </DialogTitle>
           <DialogDescription>
-            Invite new members and manage your organization
+            {subtitle}
           </DialogDescription>
         </DialogHeader>
 

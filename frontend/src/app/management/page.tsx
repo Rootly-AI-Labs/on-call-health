@@ -67,6 +67,9 @@ function TeamPageContent() {
   const [loadingIntegrations, setLoadingIntegrations] = useState(true)
   const [viewMode, setViewMode] = useState<'organization' | 'company'>('organization')
 
+  // Connected integrations state (to filter which integrations are currently active)
+  const [connectedIntegrations, setConnectedIntegrations] = useState<Set<string>>(new Set())
+
   // Team management state (for Company tab)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState("member")
@@ -165,6 +168,45 @@ function TeamPageContent() {
 
     fetchIntegrations()
   }, [searchParams])
+
+  // Load connected integration statuses
+  useEffect(() => {
+    const fetchConnectedIntegrations = async () => {
+      const authToken = localStorage.getItem("auth_token")
+      if (!authToken) return
+
+      try {
+        const connected = new Set<string>()
+
+        // Check each integration's status
+        const integrationTypes = ['github', 'jira', 'linear', 'slack']
+
+        for (const integrationType of integrationTypes) {
+          try {
+            const response = await fetch(`${API_BASE}/integrations/${integrationType}/status`, {
+              headers: { Authorization: `Bearer ${authToken}` },
+            })
+
+            if (response.ok) {
+              const data = await response.json()
+              if (data.connected) {
+                connected.add(integrationType)
+              }
+            }
+          } catch (error) {
+            // Continue checking other integrations if one fails
+            console.debug(`Failed to check ${integrationType} status:`, error)
+          }
+        }
+
+        setConnectedIntegrations(connected)
+      } catch (error) {
+        console.error("Failed to fetch connected integrations:", error)
+      }
+    }
+
+    fetchConnectedIntegrations()
+  }, [])
 
   // Save selected organization to localStorage
   useEffect(() => {
@@ -541,12 +583,12 @@ function TeamPageContent() {
     }
   }
 
-  // Get integration logos for a user
+  // Get integration logos for a user (filtered by currently connected integrations)
   const getUserIntegrations = (user: any) => {
     const integrations = []
-    if (user.github_username) integrations.push('github')
-    if (user.jira_account_id) integrations.push('jira')
-    if (user.linear_user_id) integrations.push('linear')
+    if (user.github_username && connectedIntegrations.has('github')) integrations.push('github')
+    if (user.jira_account_id && connectedIntegrations.has('jira')) integrations.push('jira')
+    if (user.linear_user_id && connectedIntegrations.has('linear')) integrations.push('linear')
     return integrations
   }
 
@@ -555,28 +597,8 @@ function TeamPageContent() {
       <TopPanel />
       <main className="min-h-screen bg-neutral-50 p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
-          {/* Header with Organization Selector and View Mode Toggle */}
-          <div className="mb-8 flex items-end justify-between gap-6">
-            <div className="flex-1 max-w-md">
-              <label className="text-sm font-semibold text-neutral-700 mb-2 block">Select Organization</label>
-              <Select
-                value={selectedOrganization}
-                onValueChange={setSelectedOrganization}
-                disabled={loadingIntegrations || !hasPrimaryIntegration}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select an organization..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {integrations.map((integration) => (
-                    <SelectItem key={integration.id} value={integration.id.toString()}>
-                      {integration.name || `Integration #${integration.id}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+          {/* Header with View Mode Toggle */}
+          <div className="mb-8 flex items-end justify-end gap-6">
             {/* View Mode Toggle */}
             <div className="flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
               <button
@@ -597,7 +619,7 @@ function TeamPageContent() {
                     : 'text-neutral-600 hover:text-neutral-900'
                 }`}
               >
-                Company
+                Team
               </button>
             </div>
           </div>
@@ -611,7 +633,10 @@ function TeamPageContent() {
                   {/* Header with Search and Actions */}
                   <div className="p-6 border-b border-neutral-200">
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-xl font-semibold text-neutral-900">Organization Management</h2>
+                      <div>
+                        <h2 className="text-xl font-semibold text-neutral-900">Organization Management</h2>
+                        <p className="text-sm text-neutral-600 mt-1">Sync team data, manage incident response integrations, and track on-call status</p>
+                      </div>
                       <div className="flex items-center gap-3">
                         <Button
                           onClick={() => setShowSyncConfirmModal(true)}
@@ -631,18 +656,43 @@ function TeamPageContent() {
                       </div>
                     </div>
 
-                    {/* Search Bar - Only show when primary integration exists */}
+                    {/* Search Bar and Organization Selector - Only show when primary integration exists */}
                     {hasPrimaryIntegration && (
-                      <div className="mb-4">
-                        <div className="relative max-w-md">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                          <Input
-                            type="text"
-                            placeholder="Search members..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 w-full"
-                          />
+                      <div className="mb-4 flex items-end gap-4">
+                        {/* Search Bar - shorter */}
+                        <div className="w-80">
+                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">&nbsp;</label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                            <Input
+                              type="text"
+                              placeholder="Search members..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="pl-9 w-full"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Organization Selector - wider on the right */}
+                        <div className="flex-shrink-0">
+                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">Select Organization</label>
+                          <Select
+                            value={selectedOrganization}
+                            onValueChange={setSelectedOrganization}
+                            disabled={loadingIntegrations || !hasPrimaryIntegration}
+                          >
+                            <SelectTrigger className="w-72">
+                              <SelectValue placeholder="Select an organization..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {integrations.map((integration) => (
+                                <SelectItem key={integration.id} value={integration.id.toString()}>
+                                  {integration.name || `Integration #${integration.id}`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     )}
@@ -837,7 +887,7 @@ function TeamPageContent() {
               )}
                 </>
               ) : (
-                // Company View - Team Management
+                // Team View - Team Management
                 <div className="p-6">
                   <OrganizationManagementDialog
                     open={true}
@@ -855,6 +905,8 @@ function TeamPageContent() {
                     onRoleChange={handleRoleChange}
                     onClose={() => {}}
                     asInlineView={true}
+                    title="Team Management"
+                    subtitle="Add team members, assign roles, manage access permissions, and control who can view and edit team data"
                   />
                 </div>
               )}
@@ -946,6 +998,7 @@ function TeamPageContent() {
         user={selectedUserForMapping}
         selectedOrganization={selectedOrganization}
         onMappingUpdated={handleMappingUpdated}
+        connectedIntegrations={connectedIntegrations}
       />
     </>
   )
