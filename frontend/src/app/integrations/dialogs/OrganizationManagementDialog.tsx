@@ -459,9 +459,6 @@ export function OrganizationManagementDialog({
                               {member.is_current_user && (
                                 <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">You</span>
                               )}
-                              {member.is_super_admin && (
-                                <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded font-semibold">Super Admin</span>
-                              )}
                             </div>
                             <div className="text-neutral-700">{member.email}</div>
                             <div>
