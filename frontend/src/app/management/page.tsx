@@ -33,11 +33,26 @@ import {
   Pencil,
   CheckCircle,
 } from "lucide-react"
-import * as TeamHandlers from "@/app/integrations/handlers/team-handlers"
 import { API_BASE, type Integration } from "@/app/integrations/types"
 import { UserMappingDrawer } from "./components/UserMappingDrawer"
 
 const TEAM_MEMBERS_PER_PAGE = 20
+
+// Type definition for synced users
+interface SyncedUser {
+  id: number
+  email: string
+  name?: string
+  avatar_url?: string
+  github_username?: string
+  jira_account_id?: string
+  jira_email?: string
+  linear_user_id?: string
+  linear_email?: string
+  on_call_status?: string
+  is_oncall?: boolean
+  role?: string
+}
 
 function TeamPageContent() {
   const router = useRouter()
@@ -49,7 +64,7 @@ function TeamPageContent() {
   const [loadingIntegrations, setLoadingIntegrations] = useState(true)
 
   // Team members state
-  const [syncedUsers, setSyncedUsers] = useState<any[]>([])
+  const [syncedUsers, setSyncedUsers] = useState<SyncedUser[]>([])
   const [loadingSyncedUsers, setLoadingSyncedUsers] = useState(false)
   const [refreshingOnCall, setRefreshingOnCall] = useState(false)
 
@@ -57,8 +72,9 @@ function TeamPageContent() {
   const [searchQuery, setSearchQuery] = useState("")
 
   // Cache to track which integrations have already been loaded
-  const syncedUsersCache = useRef<Map<string, any[]>>(new Map())
+  const syncedUsersCache = useRef<Map<string, SyncedUser[]>>(new Map())
   const recipientsCache = useRef<Map<string, Set<number>>>(new Map())
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Survey recipient selection state
   const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
@@ -143,7 +159,18 @@ function TeamPageContent() {
     }
   }, [selectedOrganization])
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current)
+        syncTimeoutRef.current = null
+      }
+    }
+  }, [])
+
   // Auto-fetch synced users when organization changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (selectedOrganization) {
       fetchSyncedUsers(false, false, false)
@@ -226,11 +253,6 @@ function TeamPageContent() {
         throw new Error("Not authenticated")
       }
 
-      // Clear cache for this organization
-      if (selectedOrganization) {
-        syncedUsersCache.current.delete(selectedOrganization)
-      }
-
       const response = await fetch(
         `${API_BASE}/rootly/integrations/${selectedOrganization}/sync-users`,
         {
@@ -244,6 +266,11 @@ function TeamPageContent() {
       }
 
       const syncResults = await response.json()
+
+      // Clear cache only after successful sync
+      if (selectedOrganization) {
+        syncedUsersCache.current.delete(selectedOrganization)
+      }
 
       setSyncProgress({
         stage: "Sync Complete!",
@@ -262,9 +289,10 @@ function TeamPageContent() {
       await fetchSyncedUsers(false, false, true)
     } catch (error) {
       setSyncProgress({ stage: "Error", details: "Failed to sync. Please try again.", isLoading: false })
-      setTimeout(() => {
+      syncTimeoutRef.current = setTimeout(() => {
         setShowSyncConfirmModal(false)
         setSyncProgress(null)
+        syncTimeoutRef.current = null
       }, 2000)
     }
   }
@@ -334,6 +362,14 @@ function TeamPageContent() {
 
     try {
       const recipientIds = Array.from(selectedRecipients)
+
+      // Validate recipient IDs are numbers
+      if (!recipientIds.every(id => typeof id === 'number' && id > 0)) {
+        toast.error("Invalid recipient IDs")
+        setSavingRecipients(false)
+        return
+      }
+
       const response = await fetch(
         `${API_BASE}/rootly/integrations/${selectedOrganization}/survey-recipients`,
         {
@@ -376,6 +412,17 @@ function TeamPageContent() {
   const totalPages = Math.ceil(filteredUsers.length / TEAM_MEMBERS_PER_PAGE)
   const startIndex = (currentPage - 1) * TEAM_MEMBERS_PER_PAGE
   const paginatedUsers = filteredUsers.slice(startIndex, startIndex + TEAM_MEMBERS_PER_PAGE)
+
+  // Validate avatar URL to prevent XSS
+  const isValidUrl = (url: string): boolean => {
+    if (!url) return false
+    try {
+      const urlObj = new URL(url)
+      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:'
+    } catch {
+      return false
+    }
+  }
 
   // Get integration logos for a user
   const getUserIntegrations = (user: any) => {
@@ -501,7 +548,7 @@ function TeamPageContent() {
                               <td className="py-4 px-6">
                                 <div className="flex items-center gap-3">
                                   <Avatar className="w-9 h-9">
-                                    {user.avatar_url && <AvatarImage src={user.avatar_url} alt={displayName} />}
+                                    {isValidUrl(user.avatar_url) && <AvatarImage src={user.avatar_url} alt={displayName} />}
                                     <AvatarFallback className="text-sm font-medium">
                                       {displayName
                                         .split('.')
