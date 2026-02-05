@@ -131,16 +131,8 @@ export async function fetchJiraUsers(
 
     if (response.ok) {
       const data = await response.json()
-      console.log("[Jira Users] API Response:", data)
-      console.log("[Jira Users] Number of users:", data.users?.length || 0)
-      if (data.users?.length) {
-        data.users.forEach((user: any, index: number) => {
-          console.log(`[Jira Users] User ${index + 1}:`, user.display_name, `(${user.account_id})`)
-        })
-      }
       return data.users || []
     }
-    console.error("[Jira Users] API returned non-OK status:", response.status)
     return []
   } catch (error) {
     console.error("Error fetching Jira users:", error)
