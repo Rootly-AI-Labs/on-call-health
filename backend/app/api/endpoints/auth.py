@@ -409,7 +409,7 @@ async def get_current_user_info(
         "has_rootly_token": bool(current_user.rootly_token),
         "created_at": current_user.created_at,
         "role": current_user.role,
-        "is_super_admin": current_user.is_super_admin if current_user.is_super_admin else False,
+        "is_super_admin": current_user.is_super_admin,  # Property based on role
         "organization_id": current_user.organization_id,
         "oauth_providers": linking_service.get_user_providers(current_user.id),
         "emails": linking_service.get_user_emails(current_user.id)
@@ -470,7 +470,7 @@ async def get_current_user_basic_info(
         "email": current_user.email,
         "name": current_user.name,
         "role": current_user.role,
-        "is_super_admin": current_user.is_super_admin if current_user.is_super_admin else False,
+        "is_super_admin": current_user.is_super_admin,  # Property based on role
         "organization_id": current_user.organization_id,
         "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
         "updated_at": current_user.updated_at.isoformat() if current_user.updated_at else None
@@ -523,22 +523,29 @@ async def exchange_auth_code_for_token(
 @router.patch("/users/{user_id}/role")
 async def update_user_role(
     user_id: int,
-    new_role: str = Query(..., regex="^(member|admin)$"),
+    new_role: str = Query(..., regex="^(member|admin|super_admin)$"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Update a user's role within the organization.
-    Only admin can change roles.
+    Only admins can change roles. Only super admins can promote to super_admin.
     """
     # Normalize role to lowercase to prevent bypass
     new_role = new_role.lower()
 
     # Check if current user is admin
-    if current_user.role != 'admin':
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins can change user roles"
+        )
+
+    # Only super admins can promote to super_admin
+    if new_role == 'super_admin' and not current_user.is_super_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super admins can promote users to super admin"
         )
 
     # Get the target user
@@ -563,19 +570,19 @@ async def update_user_role(
             detail="Cannot change your own role"
         )
 
-    # Prevent changing role of super admins (they must transfer status first)
-    if target_user.is_super_admin:
+    # Prevent demoting super admins
+    if target_user.is_super_admin and new_role != 'super_admin':
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot change role of super admins. Super admin must transfer their status first."
+            detail="Cannot demote super admins. Promote another admin to super admin first."
         )
 
-    # Prevent demoting the last admin
-    if target_user.role == 'admin' and new_role != 'admin':
+    # Prevent demoting the last admin (includes super_admin)
+    if target_user.is_admin and new_role not in ['admin', 'super_admin']:
         admin_count = db.query(User).filter(
             User.organization_id == current_user.organization_id,
             User.organization_id.isnot(None),
-            User.role == 'admin',
+            User.role.in_(['admin', 'super_admin']),
             User.status == 'active',
             User.id != target_user.id
         ).count()
@@ -705,13 +712,13 @@ async def delete_current_user_account(
             detail="Email confirmation does not match your account email"
         )
 
-    # Additional safety check - prevent deletion if user is super admin WITH other super admins
+    # Additional safety check - prevent deletion if user is super admin WITH other members
     if current_user.organization_id and current_user.is_super_admin:
         # Check if there are other super admins
         other_super_admins = db.query(User).filter(
             User.organization_id == current_user.organization_id,
             User.organization_id.isnot(None),
-            User.is_super_admin == True,
+            User.role == 'super_admin',
             User.id != current_user.id,
             User.status == 'active'
         ).count()
@@ -721,7 +728,7 @@ async def delete_current_user_account(
             other_admins = db.query(User).filter(
                 User.organization_id == current_user.organization_id,
                 User.organization_id.isnot(None),
-                User.role == 'admin',
+                User.role.in_(['admin', 'super_admin']),
                 User.id != current_user.id,
                 User.status == 'active'
             ).count()
@@ -739,7 +746,7 @@ async def delete_current_user_account(
                 logger.warning(f"Account deletion blocked - user {current_user.id} is sole super admin with {other_admins} admins and {other_members} team members")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="You are the only super admin. Please transfer super admin status to another admin before deleting your account."
+                    detail="You are the only super admin. Please promote another admin to super admin before deleting your account."
                 )
             else:
                 # Allow deletion - user is sole member, org will be disbanded
@@ -1161,8 +1168,8 @@ async def transfer_super_admin(
             detail="Target user must be in the same organization"
         )
 
-    # Check if target user is an admin
-    if target_user.role != 'admin':
+    # Check if target user is an admin (but not already super admin)
+    if target_user.role not in ['admin', 'super_admin']:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Target user must be an admin to become super admin"
@@ -1175,8 +1182,8 @@ async def transfer_super_admin(
             detail="Target user is already a super admin"
         )
 
-    # Promote target user to super admin (does NOT remove from current user)
-    target_user.is_super_admin = True
+    # Promote target user to super admin role
+    target_user.role = 'super_admin'
     db.commit()
 
     logger.info(

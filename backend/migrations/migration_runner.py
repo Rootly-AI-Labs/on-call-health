@@ -1226,6 +1226,11 @@ class MigrationRunner:
                 "description": "Add is_super_admin flag for org continuity - ensures at least one super admin per org",
                 "sql_file": "2026_02_05_add_super_admin.sql"
             },
+            {
+                "name": "044_convert_super_admin_flag_to_role",
+                "description": "Convert is_super_admin flag to super_admin role - cleaner role-based permissions",
+                "sql_file": "2026_02_05_convert_super_admin_flag_to_role.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 

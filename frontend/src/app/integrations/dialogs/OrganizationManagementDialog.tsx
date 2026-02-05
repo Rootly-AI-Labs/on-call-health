@@ -475,12 +475,12 @@ export function OrganizationManagementDialog({
                                     value={member.role || 'member'}
                                     onChange={(e) => onRoleChange(member.id as number, e.target.value)}
                                     className="text-xs px-2 py-1 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white disabled:opacity-60 disabled:cursor-not-allowed"
-                                    disabled={userInfo?.role !== 'admin'}
+                                    disabled={!['admin', 'super_admin'].includes(userInfo?.role || '')}
                                   >
                                     <option value="member">Member</option>
                                     <option value="admin">Admin</option>
                                   </select>
-                                  {userInfo?.role !== 'admin' && (
+                                  {!['admin', 'super_admin'].includes(userInfo?.role || '') && (
                                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-neutral-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                                       Only admins can change roles
                                     </div>
@@ -529,7 +529,7 @@ export function OrganizationManagementDialog({
                                 )
                               )}
                               {/* Remove Member Button - cannot remove super admins */}
-                              {!member.is_current_user && !member.is_super_admin && userInfo?.role === 'admin' && (
+                              {!member.is_current_user && !member.is_super_admin && ['admin', 'super_admin'].includes(userInfo?.role || '') && (
                                 confirmRemoveUserId === member.id ? (
                                   <div className="flex items-center gap-2">
                                     <Button

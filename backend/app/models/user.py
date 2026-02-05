@@ -28,8 +28,7 @@ class User(Base):
 
     # Organization and role management
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
-    role = Column(String(20), default="member")  # 'admin', 'member'
-    is_super_admin = Column(Boolean, default=False)  # Super admin for org continuity (at least 1 per org)
+    role = Column(String(20), default="member")  # 'super_admin', 'admin', 'member', 'viewer'
     joined_org_at = Column(DateTime(timezone=True), server_default=func.now())
     last_active_at = Column(DateTime(timezone=True))
     status = Column(String(20), default="active")  # 'active', 'suspended', 'pending'
@@ -151,14 +150,19 @@ class User(Base):
 
     # Role-based properties
     @property
+    def is_super_admin(self) -> bool:
+        """Check if user is a super admin."""
+        return self.role == 'super_admin'
+
+    @property
     def is_admin(self) -> bool:
-        """Check if user is an admin."""
-        return self.role == 'admin'
+        """Check if user is an admin (includes super_admin)."""
+        return self.role in ['super_admin', 'admin']
 
     @property
     def is_manager(self) -> bool:
         """Check if user can manage analyses and surveys."""
-        return self.role in ['admin', 'member']
+        return self.role in ['super_admin', 'admin', 'member']
 
     @property
     def is_active(self) -> bool:
@@ -167,7 +171,7 @@ class User(Base):
 
     def can_manage_organization(self, org_id: int = None) -> bool:
         """Check if user can manage organization settings."""
-        if self.role == 'admin' and (org_id is None or self.organization_id == org_id):
+        if self.role in ['super_admin', 'admin'] and (org_id is None or self.organization_id == org_id):
             return True
         return False
 
@@ -179,21 +183,6 @@ class User(Base):
         """Check if user can create burnout analyses."""
         return self.is_manager
 
-    def can_leave_organization(self) -> bool:
-        """
-        Check if user can leave/delete their account.
-        Super admins can only leave if there's another super admin in the org.
-        """
-        if not self.is_super_admin or not self.organization_id:
-            return True
-
-        # Super admin can leave if there are other super admins
-        from sqlalchemy import func
-        from . import User as UserModel
-
-        # This will be checked in the endpoint with db session
-        return True  # Actual check happens in endpoint with db access
-
     def to_dict(self, include_sensitive=False):
         """Convert user to dictionary for API responses."""
         data = {
@@ -201,7 +190,7 @@ class User(Base):
             'email': self.email,
             'name': self.name,
             'role': self.role,
-            'is_super_admin': self.is_super_admin if self.is_super_admin else False,
+            'is_super_admin': self.is_super_admin,  # Property that checks role == 'super_admin'
             'status': self.status,
             'is_verified': self.is_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None,

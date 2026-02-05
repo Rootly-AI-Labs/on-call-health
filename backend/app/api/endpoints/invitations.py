@@ -306,12 +306,12 @@ async def accept_invitation_page(
         if invitation.role == 'admin':
             other_super_admins = db.query(User).filter(
                 User.organization_id == invitation.organization_id,
-                User.is_super_admin == True,
+                User.role == 'super_admin',
                 User.status == 'active'
             ).count()
 
             if other_super_admins == 0:
-                current_user.is_super_admin = True
+                current_user.role = 'super_admin'
                 logger.info(f"User {current_user.email} became first super admin in org {invitation.organization_id} via invitation")
 
         # Mark invitation as accepted
@@ -400,12 +400,12 @@ async def accept_invitation_api(
         if invitation.role == 'admin':
             other_super_admins = db.query(User).filter(
                 User.organization_id == invitation.organization_id,
-                User.is_super_admin == True,
+                User.role == 'super_admin',
                 User.status == 'active'
             ).count()
 
             if other_super_admins == 0:
-                current_user.is_super_admin = True
+                current_user.role = 'super_admin'
                 logger.info(f"User {current_user.email} became first super admin in org {invitation.organization_id} via invitation")
 
         # Mark invitation as accepted
