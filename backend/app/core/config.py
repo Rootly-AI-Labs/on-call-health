@@ -98,9 +98,11 @@ class Settings:
 
     # ARQ (Async Redis Queue) Configuration
     # Construct ARQ Redis URL with db=1 (separate database from main app)
-    _redis_base = REDIS_URL.rstrip('/').split('?')[0]  # Remove trailing slash and query params
-    if '/' in _redis_base.split('://')[-1]:  # Check if db number already specified
-        _redis_base = '/'.join(_redis_base.split('/')[:-1])  # Remove existing db number
+    # Use urllib.parse for robust URL manipulation
+    from urllib.parse import urlparse, urlunparse
+    _parsed = urlparse(REDIS_URL)
+    # Build base URL without path (db number) and query params
+    _redis_base = urlunparse((_parsed.scheme, _parsed.netloc, '', '', '', ''))
     ARQ_REDIS_URL: str = os.getenv("ARQ_REDIS_URL", f"{_redis_base}/1")  # Use db=1 for ARQ
     ARQ_MAX_CONNECTIONS: int = int(os.getenv("ARQ_MAX_CONNECTIONS", "10"))
     ARQ_TIMEOUT: int = int(os.getenv("ARQ_TIMEOUT", "30"))  # seconds

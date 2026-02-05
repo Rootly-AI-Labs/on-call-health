@@ -91,6 +91,7 @@ async def resume_interrupted_analyses() -> None:
 
     try:
         # Find analyses that were interrupted (status=running with checkpoint saved)
+        # Use SELECT FOR UPDATE to prevent race condition with multiple workers
         stale_threshold = datetime.now(timezone.utc) - timedelta(minutes=5)
 
         interrupted = (
@@ -101,6 +102,7 @@ async def resume_interrupted_analyses() -> None:
                 Analysis.last_checkpoint > 0,  # Has made progress
                 Analysis.updated_at < stale_threshold,  # Stale (no activity for 5+ min)
             )
+            .with_for_update(skip_locked=True)  # Lock rows, skip if already locked by another worker
             .all()
         )
 

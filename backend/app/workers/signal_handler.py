@@ -61,16 +61,6 @@ async def graceful_shutdown_handler(signum: int, frame: Optional[FrameType]) -> 
     sys.exit(0)
 
 
-def _get_or_create_event_loop() -> asyncio.AbstractEventLoop:
-    """Get the current event loop or create a new one if none exists."""
-    try:
-        return asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop
-
-
 def register_signal_handlers() -> None:
     """
     Register SIGTERM signal handler for graceful shutdown.
@@ -81,6 +71,7 @@ def register_signal_handlers() -> None:
         - Only registers once (subsequent calls are no-op)
         - Preserves original handler for restoration if needed
         - SIGINT (Ctrl+C) is handled by ARQ's default handler
+        - Uses synchronous flag-setting to avoid event loop conflicts
     """
     global _handler_registered, _original_handler
 
@@ -92,13 +83,26 @@ def register_signal_handlers() -> None:
         _original_handler = signal.getsignal(signal.SIGTERM)
 
         def sync_handler(signum: int, frame: Optional[FrameType]) -> None:
-            """Sync wrapper to run async handler."""
-            try:
-                loop = _get_or_create_event_loop()
-                loop.run_until_complete(graceful_shutdown_handler(signum, frame))
-            except Exception as e:
-                logger.error(f"Fatal error in signal handler: {e}")
-                sys.exit(1)
+            """
+            Sync signal handler that sets shutdown flag and waits.
+
+            Avoids running async code in signal context to prevent
+            event loop conflicts when signal arrives during async operations.
+            """
+            import time
+
+            logger.warning(f"Received signal {signum} - initiating graceful shutdown")
+
+            # Import here to avoid circular dependency
+            from .analysis_runner import request_shutdown
+            request_shutdown()
+
+            # Wait synchronously for checkpoint save (avoids event loop issues)
+            logger.info(f"Waiting up to {SHUTDOWN_TIMEOUT_SECONDS}s for checkpoint save...")
+            time.sleep(SHUTDOWN_TIMEOUT_SECONDS)
+
+            logger.warning("Exiting (SIGTERM handler)")
+            sys.exit(0)
 
         signal.signal(signal.SIGTERM, sync_handler)
         _handler_registered = True
