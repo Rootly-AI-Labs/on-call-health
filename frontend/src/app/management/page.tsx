@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, Suspense } from "react"
+import { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { TopPanel } from "@/components/TopPanel"
@@ -63,6 +63,7 @@ function TeamPageContent() {
   const [selectedOrganization, setSelectedOrganization] = useState<string>("")
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loadingIntegrations, setLoadingIntegrations] = useState(true)
+  const [viewMode, setViewMode] = useState<'organization' | 'company'>('organization')
 
   // Team members state
   const [syncedUsers, setSyncedUsers] = useState<SyncedUser[]>([])
@@ -171,6 +172,7 @@ function TeamPageContent() {
   }, [])
 
   // Auto-fetch synced users when organization changes
+  // fetchSyncedUsers is memoized based on selectedOrganization, so we only need selectedOrganization in deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (selectedOrganization) {
@@ -186,8 +188,8 @@ function TeamPageContent() {
     }
   }, [searchParams, selectedOrganization, loadingIntegrations])
 
-  // Fetch synced users from database
-  const fetchSyncedUsers = async (showToast = false, autoSync = false, forceRefresh = false) => {
+  // Fetch synced users from database (memoized to avoid stale closures)
+  const fetchSyncedUsers = useCallback(async (showToast = false, autoSync = false, forceRefresh = false) => {
     if (!selectedOrganization) return
 
     // Check cache first
@@ -247,7 +249,7 @@ function TeamPageContent() {
     } finally {
       setLoadingSyncedUsers(false)
     }
-  }
+  }, [selectedOrganization])
 
   // Perform full team sync with progress tracking
   const performTeamSync = async () => {
@@ -298,6 +300,10 @@ function TeamPageContent() {
       await fetchSyncedUsers(false, false, true)
     } catch (error) {
       setSyncProgress({ stage: "Error", details: "Failed to sync. Please try again.", isLoading: false })
+      // Clean up any existing timeout before setting a new one
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current)
+      }
       syncTimeoutRef.current = setTimeout(() => {
         setShowSyncConfirmModal(false)
         setSyncProgress(null)
@@ -437,12 +443,19 @@ function TeamPageContent() {
   const startIndex = (currentPage - 1) * TEAM_MEMBERS_PER_PAGE
   const paginatedUsers = filteredUsers.slice(startIndex, startIndex + TEAM_MEMBERS_PER_PAGE)
 
-  // Validate avatar URL to prevent XSS
+  // Validate avatar URL to prevent XSS and data URIs
   const isValidUrl = (url: string): boolean => {
     if (!url) return false
+    // Reject data URIs and other potentially unsafe schemes
+    if (url.startsWith('data:') || url.startsWith('javascript:') || url.startsWith('vbscript:')) {
+      return false
+    }
     try {
       const urlObj = new URL(url)
-      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:'
+      // Only allow http and https protocols
+      return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') &&
+             // Ensure it's not a localhost/internal URL that could be exploited
+             urlObj.hostname && !urlObj.hostname.match(/^(localhost|127\.|0\.0\.|::1)/)
     } catch {
       return false
     }
@@ -462,8 +475,8 @@ function TeamPageContent() {
       <TopPanel />
       <main className="min-h-screen bg-neutral-50 p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
-          {/* Header with Organization Selector */}
-          <div className="mb-8 flex items-center justify-between">
+          {/* Header with Organization Selector and View Mode Toggle */}
+          <div className="mb-8 flex items-end justify-between gap-6">
             <div className="flex-1 max-w-md">
               <label className="text-sm font-semibold text-neutral-700 mb-2 block">Select Organization</label>
               <Select
@@ -482,6 +495,30 @@ function TeamPageContent() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('organization')}
+                className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
+                  viewMode === 'organization'
+                    ? 'bg-neutral-100 text-neutral-900'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                Organization
+              </button>
+              <button
+                onClick={() => setViewMode('company')}
+                className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
+                  viewMode === 'company'
+                    ? 'bg-neutral-100 text-neutral-900'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                Company
+              </button>
             </div>
           </div>
 

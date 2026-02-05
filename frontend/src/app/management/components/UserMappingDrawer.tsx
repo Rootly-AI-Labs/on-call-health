@@ -90,10 +90,6 @@ export function UserMappingDrawer({
     setLoadingOptions(true)
     try {
       const users = await fetchJiraUsers(selectedOrganization)
-      console.log("[UserMappingDrawer] Jira users loaded:", users.length, "users")
-      users.forEach((user, index) => {
-        console.log(`[UserMappingDrawer] User ${index + 1}:`, user)
-      })
       setJiraUsers(users)
     } catch (error) {
       console.error("[UserMappingDrawer] Error loading Jira users:", error)
