@@ -16,6 +16,10 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Suppress verbose ARQ "already running elsewhere" messages
+# These fire repeatedly when a job is in progress and pollute logs
+logging.getLogger("arq.worker").setLevel(logging.WARNING)
+
 # Global ARQ pool instance (reused across requests)
 _arq_pool: Optional[ArqRedis] = None
 
