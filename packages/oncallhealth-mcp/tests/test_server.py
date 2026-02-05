@@ -444,6 +444,24 @@ class TestCheckUsersRisk:
 
     @patch("oncallhealth_mcp.server.extract_api_key_header")
     @patch("oncallhealth_mcp.server.OnCallHealthClient")
+    async def test_check_users_risk_exact_threshold(
+        self, mock_client_class, mock_extract, sample_analysis_response
+    ):
+        """Test that users with score exactly at threshold are marked as at_risk."""
+        self._setup_mock_client(mock_client_class, mock_extract, sample_analysis_response)
+
+        from oncallhealth_mcp.server import check_users_risk
+
+        ctx = MagicMock()
+        # Bob has score 55.0, threshold exactly 55.0 should mark as at_risk (>=)
+        result = await check_users_risk(ctx, 1226, "1234", min_och_score=55.0)
+
+        assert result["checked"] == 1
+        assert len(result["at_risk"]) == 1
+        assert result["at_risk"][0]["och_score"] == 55.0
+
+    @patch("oncallhealth_mcp.server.extract_api_key_header")
+    @patch("oncallhealth_mcp.server.OnCallHealthClient")
     async def test_check_users_risk_invalid_id_format(
         self, mock_client_class, mock_extract, sample_analysis_response
     ):
@@ -468,6 +486,30 @@ class TestCheckUsersRisk:
 
         with pytest.raises(ValueError, match="rootly_user_ids cannot be empty"):
             await check_users_risk(ctx, 1226, "")
+
+    @patch("oncallhealth_mcp.server.extract_api_key_header")
+    @patch("oncallhealth_mcp.server.OnCallHealthClient")
+    async def test_check_users_risk_integer_overflow(
+        self, mock_client_class, mock_extract, sample_analysis_response
+    ):
+        """Test check_users_risk rejects IDs outside valid range."""
+        self._setup_mock_client(mock_client_class, mock_extract, sample_analysis_response)
+
+        from oncallhealth_mcp.server import check_users_risk
+
+        ctx = MagicMock()
+
+        # Test overflow (> max 32-bit int)
+        with pytest.raises(ValueError, match="Invalid rootly_user_id"):
+            await check_users_risk(ctx, 1226, "999999999999999999999")
+
+        # Test negative ID
+        with pytest.raises(ValueError, match="Invalid rootly_user_id"):
+            await check_users_risk(ctx, 1226, "-1")
+
+        # Test zero ID
+        with pytest.raises(ValueError, match="Invalid rootly_user_id"):
+            await check_users_risk(ctx, 1226, "0")
 
     @patch("oncallhealth_mcp.server.extract_api_key_header")
     @patch("oncallhealth_mcp.server.OnCallHealthClient")

@@ -520,7 +520,10 @@ async def check_users_risk(
                 id_str = id_str.strip()
                 if id_str:
                     try:
-                        requested_ids.add(int(id_str))
+                        user_id = int(id_str)
+                        if user_id <= 0 or user_id > 2147483647:  # Max 32-bit signed int
+                            raise ValueError(f"Invalid rootly_user_id: {id_str}")
+                        requested_ids.add(user_id)
                     except ValueError:
                         raise ValueError(f"Invalid rootly_user_id: {id_str}")
 
@@ -554,7 +557,7 @@ async def check_users_risk(
                     "risk_level": member.get("risk_level", "unknown"),
                 }
 
-                if och_score > min_och_score or risk_level in ["medium", "high"]:
+                if och_score >= min_och_score or risk_level in ["medium", "high"]:
                     at_risk.append(user_info)
                 else:
                     healthy.append(user_info)
