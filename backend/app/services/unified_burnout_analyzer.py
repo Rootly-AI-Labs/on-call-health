@@ -4390,6 +4390,7 @@ class UnifiedBurnoutAnalyzer:
                 daily_trends.append({
                     "date": date_str,
                     "overall_score": round(daily_score, 2),  # Keep as 0-10 scale (SimpleBurnoutAnalyzer approach)
+                    "average_health_score": team_health.get("average_health_score", 0.0) if team_health else 0.0,
                     "incident_count": incident_count,
                     "severity_weighted_count": round(severity_weighted, 1),
                     "after_hours_count": after_hours_count,
