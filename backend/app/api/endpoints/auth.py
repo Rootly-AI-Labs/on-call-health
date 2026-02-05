@@ -408,6 +408,9 @@ async def get_current_user_info(
         "is_verified": current_user.is_verified,
         "has_rootly_token": bool(current_user.rootly_token),
         "created_at": current_user.created_at,
+        "role": current_user.role,
+        "is_super_admin": current_user.is_super_admin if current_user.is_super_admin else False,
+        "organization_id": current_user.organization_id,
         "oauth_providers": linking_service.get_user_providers(current_user.id),
         "emails": linking_service.get_user_emails(current_user.id)
     }
@@ -467,6 +470,7 @@ async def get_current_user_basic_info(
         "email": current_user.email,
         "name": current_user.name,
         "role": current_user.role,
+        "is_super_admin": current_user.is_super_admin if current_user.is_super_admin else False,
         "organization_id": current_user.organization_id,
         "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
         "updated_at": current_user.updated_at.isoformat() if current_user.updated_at else None

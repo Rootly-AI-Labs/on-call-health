@@ -866,6 +866,7 @@ function IntegrationsPageContent() {
     const userEmail = localStorage.getItem('user_email')
     const userAvatar = localStorage.getItem('user_avatar')
     const userRole = localStorage.getItem('user_role')
+    const userIsSuperAdmin = localStorage.getItem('user_is_super_admin')
     const userId = localStorage.getItem('user_id')
     const userOrgId = localStorage.getItem('user_organization_id')
 
@@ -876,6 +877,7 @@ function IntegrationsPageContent() {
         email: userEmail,
         avatar: userAvatar || undefined,
         role: userRole || 'member',
+        is_super_admin: userIsSuperAdmin === 'true',
         id: userId ? parseInt(userId) : undefined,
         organization_id: userOrgId ? parseInt(userOrgId) : undefined
       })
@@ -903,6 +905,7 @@ function IntegrationsPageContent() {
             email: userData.email,
             avatar: userData.avatar || undefined,
             role: userData.role || 'member',
+            is_super_admin: userData.is_super_admin || false,
             id: userData.id,
             organization_id: userData.organization_id
           })
@@ -910,6 +913,7 @@ function IntegrationsPageContent() {
           localStorage.setItem('user_name', userData.name)
           localStorage.setItem('user_email', userData.email)
           localStorage.setItem('user_role', userData.role || 'member')
+          localStorage.setItem('user_is_super_admin', userData.is_super_admin ? 'true' : 'false')
           if (userData.avatar) localStorage.setItem('user_avatar', userData.avatar)
           if (userData.id) localStorage.setItem('user_id', userData.id.toString())
           if (userData.organization_id) localStorage.setItem('user_organization_id', userData.organization_id.toString())
