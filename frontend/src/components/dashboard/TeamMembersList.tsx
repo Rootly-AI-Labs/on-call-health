@@ -4,9 +4,118 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronRight, Users, Loader2 } from "lucide-react"
+import { ChevronDown, ChevronRight, Users, Loader2, TrendingUp, TrendingDown, Minus, ChevronsUp, ChevronsDown } from "lucide-react"
 import { useState } from "react"
 import Image from "next/image"
+
+// User trend categories (5 levels)
+type UserTrend = 'significantly_worsening' | 'worsening' | 'stable' | 'improving' | 'significantly_improving'
+
+interface TrendInfo {
+  trend: UserTrend
+  percentage: number
+  firstHalfScore: number
+  secondHalfScore: number
+}
+
+// Calculate user trend from their individual daily data
+function calculateUserTrend(
+  userEmail: string,
+  individualDailyData: Record<string, Record<string, any>> | undefined
+): TrendInfo {
+  const defaultTrend: TrendInfo = { trend: 'stable', percentage: 0, firstHalfScore: 0, secondHalfScore: 0 }
+
+  if (!individualDailyData || !userEmail) return defaultTrend
+
+  // Find user data (try both exact match and lowercase)
+  const userData = individualDailyData[userEmail] || individualDailyData[userEmail.toLowerCase()]
+  if (!userData) return defaultTrend
+
+  // Get dates sorted chronologically
+  const dates = Object.keys(userData).sort()
+  if (dates.length < 4) return defaultTrend // Need minimum data for meaningful trend
+
+  // Split into first and second half
+  const midpoint = Math.floor(dates.length / 2)
+  const firstHalfDates = dates.slice(0, midpoint)
+  const secondHalfDates = dates.slice(midpoint)
+
+  // Calculate weighted incident score for each half (incident_count + severity_weighted_count + after_hours_count)
+  const calculateHalfScore = (halfDates: string[]) => {
+    let total = 0
+    for (const date of halfDates) {
+      const day = userData[date]
+      if (day) {
+        // Weight: incidents=1, severity=0.5, after_hours=0.3
+        total += (day.incident_count || 0) +
+                 (day.severity_weighted_count || 0) * 0.5 +
+                 (day.after_hours_count || 0) * 0.3
+      }
+    }
+    return total / halfDates.length // Average per day
+  }
+
+  const firstHalfScore = calculateHalfScore(firstHalfDates)
+  const secondHalfScore = calculateHalfScore(secondHalfDates)
+
+  // Calculate percentage change (positive = worsening, negative = improving)
+  if (firstHalfScore === 0 && secondHalfScore === 0) {
+    return { trend: 'stable', percentage: 0, firstHalfScore: 0, secondHalfScore: 0 }
+  }
+
+  const baseline = firstHalfScore || 0.1 // Avoid division by zero
+  const change = ((secondHalfScore - firstHalfScore) / baseline) * 100
+
+  let trend: UserTrend
+  if (change <= -15) trend = 'significantly_improving'
+  else if (change <= -5) trend = 'improving'
+  else if (change >= 15) trend = 'significantly_worsening'
+  else if (change >= 5) trend = 'worsening'
+  else trend = 'stable'
+
+  return { trend, percentage: Math.round(Math.abs(change)), firstHalfScore, secondHalfScore }
+}
+
+// Get trend display config
+function getTrendConfig(trend: UserTrend) {
+  switch (trend) {
+    case 'significantly_improving':
+      return {
+        label: 'Improving Fast',
+        icon: <ChevronsDown className="w-4 h-4" />,
+        className: 'bg-green-100 text-green-700 border-green-200',
+        tooltip: 'Workload decreased significantly'
+      }
+    case 'improving':
+      return {
+        label: 'Improving',
+        icon: <TrendingDown className="w-4 h-4" />,
+        className: 'bg-green-50 text-green-600 border-green-100',
+        tooltip: 'Workload trending down'
+      }
+    case 'stable':
+      return {
+        label: 'Stable',
+        icon: <Minus className="w-4 h-4" />,
+        className: 'bg-purple-50 text-purple-600 border-purple-200',
+        tooltip: 'Workload consistent'
+      }
+    case 'worsening':
+      return {
+        label: 'Worsening',
+        icon: <TrendingUp className="w-4 h-4" />,
+        className: 'bg-red-50 text-red-600 border-red-100',
+        tooltip: 'Workload trending up'
+      }
+    case 'significantly_worsening':
+      return {
+        label: 'Needs Attention',
+        icon: <ChevronsUp className="w-4 h-4" />,
+        className: 'bg-red-100 text-red-700 border-red-200',
+        tooltip: 'Workload increased significantly'
+      }
+  }
+}
 
 interface TeamMembersListProps {
   currentAnalysis: any
@@ -24,6 +133,7 @@ export function TeamMembersList({
   const [showMembersWithoutIncidents, setShowMembersWithoutIncidents] = useState(false);
   const dataSources = currentAnalysis?.analysis_data?.data_sources;
   const analysisConfig = currentAnalysis?.config;
+  const individualDailyData = currentAnalysis?.analysis_data?.individual_daily_data;
 
   const isDataSourceEnabled = (source: 'github' | 'slack' | 'jira' | 'linear') => {
     if (Array.isArray(dataSources)) {
@@ -84,7 +194,12 @@ export function TeamMembersList({
     return '#dc2626'                          // Red - High/severe burnout (75-100)
   }
 
-  const renderMemberCard = (member: any) => (
+  const renderMemberCard = (member: any) => {
+    // Calculate user trend from individual daily data
+    const trendInfo = calculateUserTrend(member.user_email, individualDailyData)
+    const trendConfig = getTrendConfig(trendInfo.trend)
+
+    return (
     <Card
       key={member.user_id}
       className="cursor-pointer hover:shadow-md transition-shadow"
@@ -93,9 +208,10 @@ export function TeamMembersList({
         name: member.user_name || 'Unknown',
         email: member.user_email || '',
         avatar_url: member.avatar_url || null,
-        burnoutScore: member.och_score || 0, // Use OCH risk level directly
+        burnoutScore: member.och_score || 0,
         riskLevel: (member.risk_level || 'low') as 'high' | 'medium' | 'low',
-        trend: 'stable' as const,
+        trend: trendInfo.trend,
+        trendPercentage: trendInfo.percentage,
         incidentsHandled: member.incident_count || 0,
         avgResponseTime: `${Math.round(member.metrics?.avg_response_time_minutes || 0)}m`,
         factors: {
@@ -174,8 +290,24 @@ export function TeamMembersList({
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {/* Trend badge - most important, shown first */}
+            <div className="relative group">
+              <Badge className={`flex items-center gap-1 ${trendConfig.className} border`}>
+                {trendConfig.icon}
+                {trendConfig.label}
+              </Badge>
+              {trendInfo.percentage > 0 && (
+                <div className="absolute top-full right-0 mt-1 px-2 py-1 bg-neutral-900/95 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  {trendInfo.trend.includes('improving')
+                    ? `Workload down ${trendInfo.percentage}%`
+                    : trendInfo.trend.includes('worsening')
+                    ? `Workload up ${trendInfo.percentage}%`
+                    : 'No significant change'}
+                </div>
+              )}
+            </div>
             {member.is_oncall && (
-              <Badge className="bg-purple-50 text-purple-700">
+              <Badge className="bg-purple-50 text-purple-700 border border-purple-200">
                 ON-CALL
               </Badge>
             )}
@@ -225,7 +357,7 @@ export function TeamMembersList({
         </div>
       </CardContent>
     </Card>
-  )
+  )}
 
   return (
     <>
