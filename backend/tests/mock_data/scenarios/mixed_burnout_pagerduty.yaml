@@ -1,0 +1,473 @@
+# Scenario: Mixed Burnout (PagerDuty Platform)
+# Description: Realistic team with varied burnout levels - some healthy, some struggling
+# Expected Result: Mixed scores showing team imbalance
+# Platform: PagerDuty (uses PagerDuty IDs consistently)
+
+scenario_name: mixed_burnout_pagerduty
+description: Team with varied workload distribution and burnout levels
+
+users:
+  - email: healthy.dev@rootly.com
+    username: healthydev
+    name: Healthy Developer
+
+    # GitHub Activity - NORMAL WORKLOAD
+    github:
+      total_commits: 42
+      total_pull_requests: 14
+      total_reviews: 18
+      commits_per_week: 9.8
+      prs_per_week: 3.3
+      after_hours_commit_percentage: 0.08
+      weekend_commit_percentage: 0.04
+      repositories_touched: 6
+      avg_pr_size: 195
+      clustered_commits: 4
+      burnout_indicators:
+        excessive_commits: false
+        late_night_activity: false
+        weekend_work: false
+        large_prs: false
+      activity_data:
+        commits_count: 42
+        pull_requests_count: 14
+        reviews_count: 18
+        after_hours_commits: 3
+        weekend_commits: 2
+        avg_pr_size: 195
+
+    slack:
+      total_messages: 165
+      messages_per_day: 5.5
+      after_hours_percentage: 0.07
+      weekend_percentage: 0.03
+      channel_diversity: 7
+      dm_ratio: 0.20
+      thread_participation_rate: 0.50
+      avg_message_length: 70
+      peak_hour_concentration: 0.40
+      response_pattern_score: 7.5
+      avg_sentiment: 0.70
+      negative_sentiment_ratio: 0.04
+      positive_sentiment_ratio: 0.48
+      stress_indicator_ratio: 0.02
+      sentiment_volatility: 0.12
+      burnout_indicators:
+        excessive_messaging: false
+        poor_sentiment: false
+        late_responses: false
+        after_hours_activity: false
+        stress_indicators: false
+      activity_data:
+        messages_sent: 165
+        channels_active: 7
+        after_hours_messages: 12
+        weekend_messages: 5
+        avg_response_time_minutes: 18
+        sentiment_score: 0.70
+        negative_messages: 7
+        positive_messages: 79
+        neutral_messages: 79
+        stress_indicators: 3
+      fetch_errors:
+        rate_limited_channels: []
+        errors: []
+
+    pagerduty:
+      id: PHEALTHY
+      role: user
+      timezone: America/Los_Angeles
+      teams:
+        - Engineering EST + PST
+      contact_methods_count: 4
+      job_title: Software Engineer
+
+    rootly:
+      id: "112351"
+      slack_id: U01HEAL123
+      time_zone: America/Los_Angeles
+      full_name_with_team: "[Engineering] Healthy Developer"
+      phone: "+14085551234"
+      created_at: "2024-04-01T10:00:00Z"
+      updated_at: "2025-09-01T14:30:00Z"
+
+  - email: moderate.load@rootly.com
+    username: moderateload
+    name: Moderate Load Dev
+
+    # GitHub Activity - MODERATE BURNOUT WARNING
+    github:
+      total_commits: 75
+      total_pull_requests: 22
+      total_reviews: 28
+      commits_per_week: 17.5
+      prs_per_week: 5.1
+      after_hours_commit_percentage: 0.25   # 25% - Warning level
+      weekend_commit_percentage: 0.15       # 15% - Warning level
+      repositories_touched: 9
+      avg_pr_size: 310
+      clustered_commits: 8
+      burnout_indicators:
+        excessive_commits: false
+        late_night_activity: false
+        weekend_work: true                   # Warning triggered
+        large_prs: false
+      activity_data:
+        commits_count: 75
+        pull_requests_count: 22
+        reviews_count: 28
+        after_hours_commits: 19
+        weekend_commits: 11
+        avg_pr_size: 310
+
+    slack:
+      total_messages: 340
+      messages_per_day: 11.3
+      after_hours_percentage: 0.22
+      weekend_percentage: 0.12
+      channel_diversity: 10
+      dm_ratio: 0.32
+      thread_participation_rate: 0.68
+      avg_message_length: 95
+      peak_hour_concentration: 0.52
+      response_pattern_score: 5.0
+      avg_sentiment: 0.25
+      negative_sentiment_ratio: 0.18
+      positive_sentiment_ratio: 0.30
+      stress_indicator_ratio: 0.15
+      sentiment_volatility: 0.35
+      burnout_indicators:
+        excessive_messaging: false
+        poor_sentiment: false
+        late_responses: false
+        after_hours_activity: true           # Warning triggered
+        stress_indicators: false
+      activity_data:
+        messages_sent: 340
+        channels_active: 10
+        after_hours_messages: 75
+        weekend_messages: 41
+        avg_response_time_minutes: 12
+        sentiment_score: 0.25
+        negative_messages: 61
+        positive_messages: 102
+        neutral_messages: 177
+        stress_indicators: 51
+      fetch_errors:
+        rate_limited_channels: []
+        errors: []
+
+    pagerduty:
+      id: PMODERATE
+      role: user
+      timezone: America/Denver
+      teams:
+        - Engineering EST + PST
+        - Production Support
+      contact_methods_count: 5
+      job_title: Senior Software Engineer
+
+    rootly:
+      id: "112352"
+      slack_id: U01MOD456
+      time_zone: America/Denver
+      full_name_with_team: "[Engineering] Moderate Load Dev"
+      phone: "+13035551234"
+      created_at: "2024-03-15T10:00:00Z"
+      updated_at: "2025-09-01T14:30:00Z"
+
+  - email: overworked.engineer@rootly.com
+    username: overworked
+    name: Overworked Engineer
+
+    # GitHub Activity - HIGH BURNOUT
+    github:
+      total_commits: 105
+      total_pull_requests: 32
+      total_reviews: 42
+      commits_per_week: 24.5
+      prs_per_week: 7.5
+      after_hours_commit_percentage: 0.40   # 40% - High burnout
+      weekend_commit_percentage: 0.28       # 28% - High burnout
+      repositories_touched: 11
+      avg_pr_size: 420
+      clustered_commits: 13
+      burnout_indicators:
+        excessive_commits: true
+        late_night_activity: true
+        weekend_work: true
+        large_prs: true
+      activity_data:
+        commits_count: 105
+        pull_requests_count: 32
+        reviews_count: 42
+        after_hours_commits: 42
+        weekend_commits: 29
+        avg_pr_size: 420
+
+    slack:
+      total_messages: 580
+      messages_per_day: 19.3
+      after_hours_percentage: 0.45
+      weekend_percentage: 0.32
+      channel_diversity: 14
+      dm_ratio: 0.42
+      thread_participation_rate: 0.78
+      avg_message_length: 115
+      peak_hour_concentration: 0.62
+      response_pattern_score: 3.2
+      avg_sentiment: -0.18
+      negative_sentiment_ratio: 0.32
+      positive_sentiment_ratio: 0.18
+      stress_indicator_ratio: 0.38
+      sentiment_volatility: 0.58
+      burnout_indicators:
+        excessive_messaging: true
+        poor_sentiment: true
+        late_responses: true
+        after_hours_activity: true
+        stress_indicators: true
+      activity_data:
+        messages_sent: 580
+        channels_active: 14
+        after_hours_messages: 261
+        weekend_messages: 186
+        avg_response_time_minutes: 6
+        sentiment_score: -0.18
+        negative_messages: 186
+        positive_messages: 104
+        neutral_messages: 290
+        stress_indicators: 220
+      fetch_errors:
+        rate_limited_channels: []
+        errors: []
+
+    pagerduty:
+      id: POVERWORK
+      role: admin
+      timezone: America/New_York
+      teams:
+        - Engineering EST + PST
+        - On-Call Team
+        - Production Support
+      contact_methods_count: 6
+      job_title: Staff Engineer
+
+    rootly:
+      id: "112353"
+      slack_id: U01OVER789
+      time_zone: America/New_York
+      full_name_with_team: "[Engineering] Overworked Engineer"
+      phone: "+16465559876"
+      created_at: "2024-01-20T10:00:00Z"
+      updated_at: "2025-09-01T14:30:00Z"
+
+  - email: balanced.contributor@rootly.com
+    username: balanced
+    name: Balanced Contributor
+
+    # GitHub Activity - HEALTHY
+    github:
+      total_commits: 38
+      total_pull_requests: 11
+      total_reviews: 15
+      commits_per_week: 8.9
+      prs_per_week: 2.6
+      after_hours_commit_percentage: 0.11
+      weekend_commit_percentage: 0.06
+      repositories_touched: 5
+      avg_pr_size: 180
+      clustered_commits: 3
+      burnout_indicators:
+        excessive_commits: false
+        late_night_activity: false
+        weekend_work: false
+        large_prs: false
+      activity_data:
+        commits_count: 38
+        pull_requests_count: 11
+        reviews_count: 15
+        after_hours_commits: 4
+        weekend_commits: 2
+        avg_pr_size: 180
+
+    slack:
+      total_messages: 145
+      messages_per_day: 4.8
+      after_hours_percentage: 0.09
+      weekend_percentage: 0.04
+      channel_diversity: 6
+      dm_ratio: 0.18
+      thread_participation_rate: 0.48
+      avg_message_length: 68
+      peak_hour_concentration: 0.38
+      response_pattern_score: 7.8
+      avg_sentiment: 0.68
+      negative_sentiment_ratio: 0.05
+      positive_sentiment_ratio: 0.46
+      stress_indicator_ratio: 0.02
+      sentiment_volatility: 0.14
+      burnout_indicators:
+        excessive_messaging: false
+        poor_sentiment: false
+        late_responses: false
+        after_hours_activity: false
+        stress_indicators: false
+      activity_data:
+        messages_sent: 145
+        channels_active: 6
+        after_hours_messages: 13
+        weekend_messages: 6
+        avg_response_time_minutes: 20
+        sentiment_score: 0.68
+        negative_messages: 7
+        positive_messages: 67
+        neutral_messages: 71
+        stress_indicators: 3
+      fetch_errors:
+        rate_limited_channels: []
+        errors: []
+
+    pagerduty:
+      id: PBALANCED
+      role: user
+      timezone: Europe/London
+      teams:
+        - Engineering IST + EU
+      contact_methods_count: 4
+      job_title: Software Engineer
+
+    rootly:
+      id: "112354"
+      slack_id: U01BAL321
+      time_zone: Europe/London
+      full_name_with_team: "[Engineering] Balanced Contributor"
+      phone: "+442071234567"
+      created_at: "2024-05-10T10:00:00Z"
+      updated_at: "2025-09-01T14:30:00Z"
+
+# Incidents - MIXED DISTRIBUTION (using PagerDuty IDs)
+incidents:
+  # Healthy dev - normal incidents during business hours
+  - id: INC_MIX_001
+    title: Minor bug fix needed
+    created_at: "2025-09-12T14:30:00Z"
+    resolved_at: "2025-09-12T15:45:00Z"
+    assigned_user_id: "PHEALTHY"  # PagerDuty ID
+    assigned_user_email: healthy.dev@rootly.com
+    assigned_user_name: Healthy Developer
+    severity: low
+    status: resolved
+
+  - id: INC_MIX_002
+    title: Update documentation
+    created_at: "2025-09-18T10:15:00Z"
+    resolved_at: "2025-09-18T11:30:00Z"
+    assigned_user_id: "PHEALTHY"  # PagerDuty ID
+    assigned_user_email: healthy.dev@rootly.com
+    assigned_user_name: Healthy Developer
+    severity: low
+    status: resolved
+
+  # Moderate load - some after-hours
+  - id: INC_MIX_003
+    title: Performance degradation investigation
+    created_at: "2025-09-15T16:45:00Z"
+    resolved_at: "2025-09-15T20:30:00Z"
+    assigned_user_id: "PMODERATE"  # PagerDuty ID
+    assigned_user_email: moderate.load@rootly.com
+    assigned_user_name: Moderate Load Dev
+    severity: medium
+    status: resolved
+
+  - id: INC_MIX_004
+    title: Cache invalidation issue
+    created_at: "2025-09-20T19:00:00Z"          # After hours
+    resolved_at: "2025-09-20T21:45:00Z"
+    assigned_user_id: "PMODERATE"  # PagerDuty ID
+    assigned_user_email: moderate.load@rootly.com
+    assigned_user_name: Moderate Load Dev
+    severity: medium
+    status: resolved
+
+  - id: INC_MIX_005
+    title: API timeout errors
+    created_at: "2025-09-25T11:30:00Z"
+    resolved_at: "2025-09-25T14:15:00Z"
+    assigned_user_id: "PMODERATE"  # PagerDuty ID
+    assigned_user_email: moderate.load@rootly.com
+    assigned_user_name: Moderate Load Dev
+    severity: medium
+    status: resolved
+
+  # Overworked engineer - many incidents, often after hours
+  - id: INC_MIX_006
+    title: Critical database issue
+    created_at: "2025-09-13T22:30:00Z"          # Late night
+    resolved_at: "2025-09-14T02:15:00Z"
+    assigned_user_id: "POVERWORK"  # PagerDuty ID
+    assigned_user_email: overworked.engineer@rootly.com
+    assigned_user_name: Overworked Engineer
+    severity: critical
+    status: resolved
+
+  - id: INC_MIX_007
+    title: Production deployment rollback
+    created_at: "2025-09-17T23:45:00Z"
+    resolved_at: "2025-09-18T01:30:00Z"
+    assigned_user_id: "POVERWORK"  # PagerDuty ID
+    assigned_user_email: overworked.engineer@rootly.com
+    assigned_user_name: Overworked Engineer
+    severity: high
+    status: resolved
+
+  - id: INC_MIX_008
+    title: Memory leak in payment service
+    created_at: "2025-09-21T01:15:00Z"
+    resolved_at: "2025-09-21T04:45:00Z"
+    assigned_user_id: "POVERWORK"  # PagerDuty ID
+    assigned_user_email: overworked.engineer@rootly.com
+    assigned_user_name: Overworked Engineer
+    severity: critical
+    status: resolved
+
+  - id: INC_MIX_009
+    title: Service mesh configuration error
+    created_at: "2025-09-24T20:30:00Z"
+    resolved_at: "2025-09-24T23:15:00Z"
+    assigned_user_id: "POVERWORK"  # PagerDuty ID
+    assigned_user_email: overworked.engineer@rootly.com
+    assigned_user_name: Overworked Engineer
+    severity: high
+    status: resolved
+
+  - id: INC_MIX_010
+    title: Load balancer failure
+    created_at: "2025-09-28T03:00:00Z"          # 3 AM
+    resolved_at: "2025-09-28T06:30:00Z"
+    assigned_user_id: "POVERWORK"  # PagerDuty ID
+    assigned_user_email: overworked.engineer@rootly.com
+    assigned_user_name: Overworked Engineer
+    severity: critical
+    status: resolved
+
+  # Balanced contributor - normal load
+  - id: INC_MIX_011
+    title: UI component refactoring
+    created_at: "2025-09-16T13:00:00Z"
+    resolved_at: "2025-09-16T16:30:00Z"
+    assigned_user_id: "PBALANCED"  # PagerDuty ID
+    assigned_user_email: balanced.contributor@rootly.com
+    assigned_user_name: Balanced Contributor
+    severity: low
+    status: resolved
+
+  - id: INC_MIX_012
+    title: Test coverage improvements
+    created_at: "2025-09-23T09:45:00Z"
+    resolved_at: "2025-09-23T12:15:00Z"
+    assigned_user_id: "PBALANCED"  # PagerDuty ID
+    assigned_user_email: balanced.contributor@rootly.com
+    assigned_user_name: Balanced Contributor
+    severity: low
+    status: resolved
