@@ -157,7 +157,7 @@ function calculateTrend(current: number, previous: number): TrendDirection {
   if (previous === 0) return { direction: 'stable', percentage: 0 }
 
   const change = ((current - previous) / previous) * 100
-  if (Math.abs(change) < 5) return { direction: 'stable', percentage: Math.round(change) }
+  if (Math.abs(change) < 15) return { direction: 'stable', percentage: Math.round(change) }
 
   return {
     direction: change > 0 ? 'up' : 'down',
