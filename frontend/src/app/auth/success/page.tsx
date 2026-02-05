@@ -102,6 +102,7 @@ export default function AuthSuccessPage() {
           localStorage.setItem('user_name', userData.name)
           localStorage.setItem('user_email', userData.email)
           localStorage.setItem('user_role', userData.role || 'member')
+          localStorage.setItem('user_is_super_admin', userData.is_super_admin ? 'true' : 'false')
           if (userData.avatar) {
             localStorage.setItem('user_avatar', userData.avatar)
           }

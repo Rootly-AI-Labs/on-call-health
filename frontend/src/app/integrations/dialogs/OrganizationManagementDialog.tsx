@@ -465,7 +465,7 @@ export function OrganizationManagementDialog({
                             </div>
                             <div className="text-neutral-700">{member.email}</div>
                             <div>
-                              {member.is_current_user ? (
+                              {member.is_current_user || member.is_super_admin ? (
                                 <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800 capitalize">
                                   {member.role?.replace('_', ' ') || 'member'}
                                 </span>
