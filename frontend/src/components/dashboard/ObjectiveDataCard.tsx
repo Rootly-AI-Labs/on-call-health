@@ -234,15 +234,16 @@ function getTrendTooltipMessage(
   percentage: number,
   firstHalfAvg: number,
   secondHalfAvg: number,
-  weeklyMean: number
+  weeklyMean: number,
+  metricLabel: string
 ): string {
   switch (direction) {
     case 'down':
-      return `Risk level dropped ${percentage}% from ${Math.round(firstHalfAvg)} to ${Math.round(secondHalfAvg)} (first vs second half)`
+      return `${metricLabel} dropped ${percentage}% from ${Math.round(firstHalfAvg)} to ${Math.round(secondHalfAvg)} (first vs second half)`
     case 'up':
-      return `Risk level increased ${percentage}% from ${Math.round(firstHalfAvg)} to ${Math.round(secondHalfAvg)} (first vs second half)`
+      return `${metricLabel} increased ${percentage}% from ${Math.round(firstHalfAvg)} to ${Math.round(secondHalfAvg)} (first vs second half)`
     default:
-      return `Risk level stable around ${Math.round(weeklyMean)} (less than 5% change)`
+      return `${metricLabel} stable around ${Math.round(weeklyMean)} (less than 5% change)`
   }
 }
 
@@ -383,13 +384,13 @@ export function ObjectiveDataCard({
                     {getTrendIcon(overallDirection.direction)}
                     {getTrendLabel(overallDirection.direction)}
                   </div>
-                  <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                     <span>
                       {overallDirection.direction === 'down'
-                        ? `Down ${overallDirection.percentage}% from start to end`
+                        ? `${config.label} down ${overallDirection.percentage}% from start to end`
                         : overallDirection.direction === 'up'
-                        ? `Up ${overallDirection.percentage}% from start to end`
-                        : `Returned to similar level (${Math.round(firstWeeksAvg)} → ${Math.round(lastWeeksAvg)})`}
+                        ? `${config.label} up ${overallDirection.percentage}% from start to end`
+                        : `${config.label} stable (${Math.round(firstWeeksAvg || 0)} → ${Math.round(lastWeeksAvg || 0)})`}
                     </span>
                   </div>
                 </div>
