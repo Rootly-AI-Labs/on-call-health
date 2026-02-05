@@ -35,15 +35,15 @@ function calculateUserTrend(
   const dates = Object.keys(userData).sort()
   if (dates.length < 4) return defaultTrend // Need minimum data for meaningful trend
 
-  // Split into first and second half
-  const midpoint = Math.floor(dates.length / 2)
-  const firstHalfDates = dates.slice(0, midpoint)
-  const secondHalfDates = dates.slice(midpoint)
+  // Compare first days to last days (not halves) for true overall direction
+  const numDaysToCompare = Math.min(7, Math.floor(dates.length / 2))
+  const firstDates = dates.slice(0, numDaysToCompare)
+  const lastDates = dates.slice(-numDaysToCompare)
 
-  // Calculate weighted incident score for each half (incident_count + severity_weighted_count + after_hours_count)
-  const calculateHalfScore = (halfDates: string[]) => {
+  // Calculate weighted incident score for a set of dates
+  const calculateScore = (datesToCalc: string[]) => {
     let total = 0
-    for (const date of halfDates) {
+    for (const date of datesToCalc) {
       const day = userData[date]
       if (day) {
         // Weight: incidents=1, severity=0.5, after_hours=0.3
@@ -52,28 +52,29 @@ function calculateUserTrend(
                  (day.after_hours_count || 0) * 0.3
       }
     }
-    return total / halfDates.length // Average per day
+    return total / datesToCalc.length // Average per day
   }
 
-  const firstHalfScore = calculateHalfScore(firstHalfDates)
-  const secondHalfScore = calculateHalfScore(secondHalfDates)
+  const firstScore = calculateScore(firstDates)
+  const lastScore = calculateScore(lastDates)
 
   // Calculate percentage change (positive = worsening, negative = improving)
-  if (firstHalfScore === 0 && secondHalfScore === 0) {
+  if (firstScore === 0 && lastScore === 0) {
     return { trend: 'stable', percentage: 0, firstHalfScore: 0, secondHalfScore: 0 }
   }
 
-  const baseline = firstHalfScore || 0.1 // Avoid division by zero
-  const change = ((secondHalfScore - firstHalfScore) / baseline) * 100
+  const baseline = firstScore || 0.1 // Avoid division by zero
+  const change = ((lastScore - firstScore) / baseline) * 100
 
+  // Use 15% threshold for stable (matches other trend components)
   let trend: UserTrend
-  if (change <= -15) trend = 'significantly_improving'
-  else if (change <= -5) trend = 'improving'
-  else if (change >= 15) trend = 'significantly_worsening'
-  else if (change >= 5) trend = 'worsening'
+  if (change <= -30) trend = 'significantly_improving'
+  else if (change <= -15) trend = 'improving'
+  else if (change >= 30) trend = 'significantly_worsening'
+  else if (change >= 15) trend = 'worsening'
   else trend = 'stable'
 
-  return { trend, percentage: Math.round(Math.abs(change)), firstHalfScore, secondHalfScore }
+  return { trend, percentage: Math.round(Math.abs(change)), firstHalfScore: firstScore, secondHalfScore: lastScore }
 }
 
 // Get trend display config
