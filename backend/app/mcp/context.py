@@ -6,6 +6,7 @@ which can cause Pydantic schema generation issues.
 """
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, Optional
@@ -38,7 +39,18 @@ def request_context(request: "Request"):
 
 
 def get_api_key() -> Optional[str]:
-    """Extract API key from current request context."""
+    """Extract API key from environment variable or current request context.
+
+    Priority:
+    1. Environment variable ONCALLHEALTH_API_KEY (for MCP clients like Claude Desktop)
+    2. Request header X-API-Key (for multi-user hosted deployment)
+    """
+    # Priority 1: Environment variable (for MCP clients like Claude Desktop)
+    api_key = os.getenv("ONCALLHEALTH_API_KEY")
+    if api_key:
+        return api_key
+
+    # Priority 2: Request header (for multi-user hosted deployment)
     request = get_request_context()
     if request is None:
         return None

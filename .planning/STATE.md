@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Catch exhaustion before it burns out team members by analyzing cross-platform activity patterns, on-call load, and workload distribution.
-**Current focus:** Phase 5 - User Experience (Complete)
+**Current focus:** Between milestones - v1.1 shipped, ready for next milestone
 
 ## Current Position
 
-Milestone: v1.1 complete (archived 2026-02-03)
-Phase: Ready for next milestone
-Plan: —
-Status: Milestone v1.1 archived and shipped
-Last activity: 2026-02-03 - Archived v1.1 milestone
+Milestone: v1.1 MCP Distribution (SHIPPED 2026-02-04)
+Phase: None (between milestones)
+Plan: None
+Status: Milestone complete and archived to .planning/milestones/v1.1-*
+Last activity: 2026-02-04 - v1.1 milestone archived with git tag v1.1
 
-Progress: Awaiting next milestone definition
+Progress: Ready for next milestone
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
+- Total plans completed: 13
 - Average duration: 2.7 min
-- Total execution time: 0.57 hours
+- Total execution time: 0.62 hours
 
 **By Phase:**
 
@@ -33,9 +33,10 @@ Progress: Awaiting next milestone definition
 | 03-jira-token-integration | 2/2 | 6 min | 3.0 min |
 | 04-linear-token-integration | 2/2 | 5 min | 2.5 min |
 | 05-user-experience | 2/2 | 7 min | 3.5 min |
+| 12-documentation-cleanup | 1/1 | 3 min | 3.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-02 (3 min), 05-01 (4 min), 04-02 (4 min), 04-01 (1 min), 03-02 (4 min)
+- Last 5 plans: 12-01 (3 min), 05-02 (3 min), 05-01 (4 min), 04-02 (4 min), 04-01 (1 min)
 - Trend: Consistent 1-4 min per plan
 
 *Updated after each plan completion*
@@ -97,6 +98,10 @@ Recent decisions affecting current work:
 | Data preservation message uses consistent blue info box styling across all dialogs | 05-02 | Implemented |
 | Toast message specifies new auth method (OAuth or API Token) to guide user | 05-02 | Implemented |
 | Switch handlers reuse existing disconnect logic | 05-02 | Implemented |
+| Client-side API key authentication for MCP (X-API-Key header from client) | 11-02 | Documented |
+| Defer AWS ALB to post-v1.1 (static IP needed for MCP SSE) | 11-02 | Documented |
+| Environment variable priority for MCP authentication (ONCALLHEALTH_API_KEY) | 12-01 | Implemented |
+| Dual authentication pattern: env var first, then request header fallback | 12-01 | Implemented |
 | Support tokens alongside OAuth (not replacement) | - | Implemented |
 | Trust user for token permissions | - | Implemented |
 | Validate token works, not permissions | - | Implemented |
@@ -113,8 +118,15 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-03
-Stopped at: v1.1 milestone archived
+Last session: 2026-02-04
+Stopped at: v1.1 milestone archived and tagged
 Resume file: None
 
-**Milestone v1.1 archived. All requirements satisfied. Ready for next milestone definition.**
+**v1.1 MCP Distribution milestone complete:**
+- 8 phases (5-12) delivered
+- 16 plans executed
+- 40 of 44 requirements satisfied (91%)
+- Archived to .planning/milestones/v1.1-ROADMAP.md and v1.1-REQUIREMENTS.md
+- Tagged as v1.1
+- Key features: REST API client, dual transport (SSE/stdio), PyPI package, AWS deployment, env var authentication, analysis summary tool
+- Ready for next milestone planning with `/gsd:new-milestone`
