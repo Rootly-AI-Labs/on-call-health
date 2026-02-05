@@ -36,6 +36,8 @@ import {
 } from "lucide-react"
 import { API_BASE, type Integration } from "@/app/integrations/types"
 import { UserMappingDrawer } from "./components/UserMappingDrawer"
+import { OrganizationManagementDialog } from "@/app/integrations/dialogs/OrganizationManagementDialog"
+import * as OrganizationHandlers from "@/app/integrations/handlers/organization-handlers"
 
 const TEAM_MEMBERS_PER_PAGE = 10
 
@@ -64,6 +66,15 @@ function TeamPageContent() {
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loadingIntegrations, setLoadingIntegrations] = useState(true)
   const [viewMode, setViewMode] = useState<'organization' | 'company'>('organization')
+
+  // Team management state (for Company tab)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState("member")
+  const [isInviting, setIsInviting] = useState(false)
+  const [orgMembers, setOrgMembers] = useState([])
+  const [pendingInvitations, setPendingInvitations] = useState([])
+  const [loadingOrgData, setLoadingOrgData] = useState(false)
+  const [userInfo, setUserInfo] = useState<any>(null)
 
   // Team members state
   const [syncedUsers, setSyncedUsers] = useState<SyncedUser[]>([])
@@ -181,6 +192,30 @@ function TeamPageContent() {
       setShowSyncConfirmModal(true)
     }
   }, [searchParams, selectedOrganization, loadingIntegrations])
+
+  // Load user info for team management
+  useEffect(() => {
+    const userName = localStorage.getItem('user_name')
+    const userEmail = localStorage.getItem('user_email')
+    const userRole = localStorage.getItem('user_role')
+    const userId = localStorage.getItem('user_id')
+
+    if (userName && userEmail) {
+      setUserInfo({
+        name: userName,
+        email: userEmail,
+        role: userRole,
+        id: userId
+      })
+    }
+  }, [])
+
+  // Load organization data when Company tab is selected
+  useEffect(() => {
+    if (viewMode === 'company') {
+      loadOrganizationData()
+    }
+  }, [viewMode])
 
   // Fetch synced users from database (memoized to avoid stale closures)
   const fetchSyncedUsers = useCallback(async (showToast = false, autoSync = false, forceRefresh = false) => {
@@ -370,6 +405,31 @@ function TeamPageContent() {
     await fetchSyncedUsers(false, false, true)
   }
 
+  // Team management handlers
+  const handleInvite = async () => {
+    return OrganizationHandlers.handleInvite(
+      inviteEmail,
+      inviteRole,
+      setIsInviting,
+      setInviteEmail,
+      setInviteRole,
+      () => {}, // No need to close modal since it's inline
+      loadOrganizationData
+    )
+  }
+
+  const handleRoleChange = async (userId: number, newRole: string) => {
+    return OrganizationHandlers.handleRoleChange(userId, newRole, loadOrganizationData)
+  }
+
+  const loadOrganizationData = async () => {
+    return OrganizationHandlers.loadOrganizationData(
+      setLoadingOrgData,
+      setOrgMembers,
+      setPendingInvitations
+    )
+  }
+
   // Save recipient selections to database
   const saveRecipientSelections = async () => {
     if (!selectedOrganization) return
@@ -545,47 +605,50 @@ function TeamPageContent() {
           {/* Organization Management Section */}
           {selectedOrganization && !loadingIntegrations && (
             <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
-              {/* Header with Search and Actions */}
-              <div className="p-6 border-b border-neutral-200">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-neutral-900">Organization Management</h2>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      onClick={() => setShowSyncConfirmModal(true)}
-                      disabled={loadingSyncedUsers || !hasPrimaryIntegration}
-                      className="bg-purple-700 hover:bg-purple-800"
-                    >
-                      Sync Now
-                    </Button>
-                    <Button
-                      onClick={refreshOnCallStatus}
-                      disabled={refreshingOnCall || !hasPrimaryIntegration}
-                      variant="outline"
-                    >
-                      <RefreshCw className={`w-4 h-4 mr-2 ${refreshingOnCall ? 'animate-spin' : ''}`} />
-                      Refresh On-Call
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Search Bar - Only show when primary integration exists */}
-                {hasPrimaryIntegration && (
-                  <div className="mb-4">
-                    <div className="relative max-w-md">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                      <Input
-                        type="text"
-                        placeholder="Search members..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 w-full"
-                      />
+              {viewMode === 'organization' ? (
+                <>
+                  {/* Organization View */}
+                  {/* Header with Search and Actions */}
+                  <div className="p-6 border-b border-neutral-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-semibold text-neutral-900">Organization Management</h2>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          onClick={() => setShowSyncConfirmModal(true)}
+                          disabled={loadingSyncedUsers || !hasPrimaryIntegration}
+                          className="bg-purple-700 hover:bg-purple-800"
+                        >
+                          Sync Now
+                        </Button>
+                        <Button
+                          onClick={refreshOnCallStatus}
+                          disabled={refreshingOnCall || !hasPrimaryIntegration}
+                          variant="outline"
+                        >
+                          <RefreshCw className={`w-4 h-4 mr-2 ${refreshingOnCall ? 'animate-spin' : ''}`} />
+                          Refresh On-Call
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
 
-              {/* Management Table */}
+                    {/* Search Bar - Only show when primary integration exists */}
+                    {hasPrimaryIntegration && (
+                      <div className="mb-4">
+                        <div className="relative max-w-md">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                          <Input
+                            type="text"
+                            placeholder="Search members..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 w-full"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Management Table */}
               {loadingIntegrations ? (
                 // LOADING INTEGRATIONS STATE
                 <div className="flex items-center justify-center h-96">
@@ -771,6 +834,29 @@ function TeamPageContent() {
                     </div>
                   )}
                 </>
+              )}
+                </>
+              ) : (
+                // Company View - Team Management
+                <div className="p-6">
+                  <OrganizationManagementDialog
+                    open={true}
+                    onOpenChange={() => {}}
+                    inviteEmail={inviteEmail}
+                    onInviteEmailChange={setInviteEmail}
+                    inviteRole={inviteRole}
+                    onInviteRoleChange={setInviteRole}
+                    isInviting={isInviting}
+                    onInvite={handleInvite}
+                    loadingOrgData={loadingOrgData}
+                    orgMembers={orgMembers}
+                    pendingInvitations={pendingInvitations}
+                    userInfo={userInfo}
+                    onRoleChange={handleRoleChange}
+                    onClose={() => {}}
+                    asInlineView={true}
+                  />
+                </div>
               )}
             </div>
           )}

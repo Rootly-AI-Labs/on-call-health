@@ -158,7 +158,6 @@ import { LinearDisconnectDialog } from "./dialogs/LinearDisconnectDialog"
 import { AuthMethodSwitchDialog } from "./dialogs/AuthMethodSwitchDialog"
 import { JiraWorkspaceSelector } from "./dialogs/JiraWorkspaceSelector"
 import { NewMappingDialog } from "./dialogs/NewMappingDialog"
-import { OrganizationManagementDialog } from "./dialogs/OrganizationManagementDialog"
 import { PostIntegrationSyncModal } from "./dialogs/PostIntegrationSyncModal"
 
 export default function IntegrationsPage() {
@@ -217,20 +216,9 @@ export default function IntegrationsPage() {
   const [validatingGithub, setValidatingGithub] = useState(false)
   const [githubValidation, setGithubValidation] = useState<{valid: boolean, message?: string} | null>(null)
 
-  // Invite modal state
-  const [showInviteModal, setShowInviteModal] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState("member")
-  const [isInviting, setIsInviting] = useState(false)
-
   // Post-integration sync modal state
   const [showPostIntegrationSyncModal, setShowPostIntegrationSyncModal] = useState(false)
   const [postIntegrationModalType, setPostIntegrationModalType] = useState<'github' | 'slack' | 'jira' | 'linear' | 'rootly' | 'pagerduty' | null>(null)
-
-  // Organization members and invitations state
-  const [orgMembers, setOrgMembers] = useState([])
-  const [pendingInvitations, setPendingInvitations] = useState([])
-  const [loadingOrgData, setLoadingOrgData] = useState(false)
 
   // Sorting state
   const [sortField, setSortField] = useState<'email' | 'status' | 'data' | 'method'>('email')
@@ -842,13 +830,6 @@ export default function IntegrationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slackIntegration])
 
-  // Load organization data when invite modal opens
-  useEffect(() => {
-    if (showInviteModal) {
-      loadOrganizationData()
-    }
-  }, [showInviteModal])
-
   // Fetch GitHub org members when GitHub is connected
 
 
@@ -1336,32 +1317,6 @@ export default function IntegrationsPage() {
   }
 
   // Invite function
-  const handleInvite = async () => {
-    return OrganizationHandlers.handleInvite(
-      inviteEmail,
-      inviteRole,
-      setIsInviting,
-      setInviteEmail,
-      setInviteRole,
-      setShowInviteModal,
-      loadOrganizationData
-    )
-  }
-
-  // Handle role change for organization members
-  const handleRoleChange = async (userId: number, newRole: string) => {
-    return OrganizationHandlers.handleRoleChange(userId, newRole, loadOrganizationData)
-  }
-
-  // Load organization members and pending invitations
-  const loadOrganizationData = async () => {
-    return OrganizationHandlers.loadOrganizationData(
-      setLoadingOrgData,
-      setOrgMembers,
-      setPendingInvitations
-    )
-  }
-
   // 🚀 PHASE 3: Refresh permissions for a specific integration (wrapped with useCallback)
   const refreshIntegrationPermissions = useCallback(async (integrationId: number) => {
     setRefreshingPermissions(integrationId)
@@ -2425,14 +2380,6 @@ export default function IntegrationsPage() {
                     })()}
                   </SelectContent>
                 </Select>
-                <Button
-                  onClick={() => setShowInviteModal(true)}
-                  variant="outline"
-                  className="flex-shrink-0 h-10"
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Team
-                </Button>
               </div>
             </div>
           </div>
@@ -4318,28 +4265,6 @@ export default function IntegrationsPage() {
         onCancel={() => {
           setDeleteDialogOpen(false)
           setIntegrationToDelete(null)
-        }}
-      />
-
-      {/* Organization Management Modal */}
-      <OrganizationManagementDialog
-        open={showInviteModal}
-        onOpenChange={setShowInviteModal}
-        inviteEmail={inviteEmail}
-        onInviteEmailChange={setInviteEmail}
-        inviteRole={inviteRole}
-        onInviteRoleChange={setInviteRole}
-        isInviting={isInviting}
-        onInvite={handleInvite}
-        loadingOrgData={loadingOrgData}
-        orgMembers={orgMembers}
-        pendingInvitations={pendingInvitations}
-        userInfo={userInfo}
-        onRoleChange={handleRoleChange}
-        onClose={() => {
-          setShowInviteModal(false)
-          setInviteEmail("")
-          setInviteRole("member")
         }}
       />
 
