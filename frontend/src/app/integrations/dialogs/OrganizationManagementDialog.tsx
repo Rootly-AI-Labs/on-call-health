@@ -42,6 +42,7 @@ interface OrganizationManagementDialogProps {
   userInfo: UserInfo | null
   onRoleChange: (userId: number, newRole: string) => void
   onClose: () => void
+  asInlineView?: boolean  // Flag to render as inline view instead of modal
 }
 
 export function OrganizationManagementDialog({
@@ -58,23 +59,14 @@ export function OrganizationManagementDialog({
   pendingInvitations,
   userInfo,
   onRoleChange,
-  onClose
+  onClose,
+  asInlineView = false  // Default to modal view
 }: OrganizationManagementDialogProps) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Users className="w-5 h-5" />
-            <span>Organization Management</span>
-          </DialogTitle>
-          <DialogDescription>
-            Invite new members and manage your organization
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Role descriptions - at the top of modal */}
-        <div className="mt-4 px-4 py-3 bg-purple-100 rounded-lg">
+  // Content component extracted for reuse
+  const DialogContentBody = () => (
+    <>
+      {/* Role descriptions */}
+      <div className={asInlineView ? "px-0 py-3 bg-purple-100 rounded-lg mb-6" : "mt-4 px-4 py-3 bg-purple-100 rounded-lg"}>
           <div className="space-y-1.5 text-xs">
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-neutral-900 min-w-[80px]">Admin</span>
@@ -293,6 +285,7 @@ export function OrganizationManagementDialog({
           )}
         </div>
 
+      {!asInlineView && (
         <DialogFooter>
           <Button
             variant="outline"
@@ -301,6 +294,46 @@ export function OrganizationManagementDialog({
             Close
           </Button>
         </DialogFooter>
+      )}
+    </>
+  )
+
+  // If inline view, render content without Dialog wrapper
+  if (asInlineView) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h2 className="flex items-center space-x-2 text-2xl font-semibold">
+            <Users className="w-6 h-6" />
+            <span>Organization Management</span>
+          </h2>
+          <p className="text-sm text-neutral-600 mt-1">
+            Invite new members and manage your organization
+          </p>
+        </div>
+
+        {/* Content */}
+        <DialogContentBody />
+      </div>
+    )
+  }
+
+  // Original modal rendering
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center space-x-2">
+            <Users className="w-5 h-5" />
+            <span>Organization Management</span>
+          </DialogTitle>
+          <DialogDescription>
+            Invite new members and manage your organization
+          </DialogDescription>
+        </DialogHeader>
+
+        <DialogContentBody />
       </DialogContent>
     </Dialog>
   )
