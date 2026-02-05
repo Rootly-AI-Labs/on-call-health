@@ -346,6 +346,8 @@ async def run_analysis_with_checkpoints(
                 jira_token=jira_token,
                 synced_users=synced_users,
                 current_user_id=user_id,
+                organization_name=integration.organization_name,
+                db=db,  # Required for AI insights DB lookups
             )
 
             # Run analysis
