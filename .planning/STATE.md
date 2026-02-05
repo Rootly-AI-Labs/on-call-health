@@ -9,20 +9,20 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 
 ## Current Position
 
-Milestone: v1.1 complete (archived 2026-02-03)
-Phase: Ready for next milestone
-Plan: —
-Status: Milestone v1.1 archived and shipped
-Last activity: 2026-02-03 - Archived v1.1 milestone
+Milestone: v1.1 complete (archived 2026-02-03, documentation finalized 2026-02-04)
+Phase: 12-documentation-cleanup (Complete)
+Plan: 01 of 01
+Status: Phase 12 complete - v1.1 documentation finalized
+Last activity: 2026-02-04 - Completed Phase 12-01 documentation cleanup
 
-Progress: Awaiting next milestone definition
+Progress: █████████████████████████████████████████ 100% (12/12 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
+- Total plans completed: 13
 - Average duration: 2.7 min
-- Total execution time: 0.57 hours
+- Total execution time: 0.62 hours
 
 **By Phase:**
 
@@ -33,9 +33,10 @@ Progress: Awaiting next milestone definition
 | 03-jira-token-integration | 2/2 | 6 min | 3.0 min |
 | 04-linear-token-integration | 2/2 | 5 min | 2.5 min |
 | 05-user-experience | 2/2 | 7 min | 3.5 min |
+| 12-documentation-cleanup | 1/1 | 3 min | 3.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-02 (3 min), 05-01 (4 min), 04-02 (4 min), 04-01 (1 min), 03-02 (4 min)
+- Last 5 plans: 12-01 (3 min), 05-02 (3 min), 05-01 (4 min), 04-02 (4 min), 04-01 (1 min)
 - Trend: Consistent 1-4 min per plan
 
 *Updated after each plan completion*
@@ -97,6 +98,10 @@ Recent decisions affecting current work:
 | Data preservation message uses consistent blue info box styling across all dialogs | 05-02 | Implemented |
 | Toast message specifies new auth method (OAuth or API Token) to guide user | 05-02 | Implemented |
 | Switch handlers reuse existing disconnect logic | 05-02 | Implemented |
+| Client-side API key authentication for MCP (X-API-Key header from client) | 11-02 | Documented |
+| Defer AWS ALB to post-v1.1 (static IP needed for MCP SSE) | 11-02 | Documented |
+| Environment variable priority for MCP authentication (ONCALLHEALTH_API_KEY) | 12-01 | Implemented |
+| Dual authentication pattern: env var first, then request header fallback | 12-01 | Implemented |
 | Support tokens alongside OAuth (not replacement) | - | Implemented |
 | Trust user for token permissions | - | Implemented |
 | Validate token works, not permissions | - | Implemented |
@@ -113,8 +118,13 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-03
-Stopped at: v1.1 milestone archived
+Last session: 2026-02-04
+Stopped at: Completed Phase 12-01 documentation cleanup
 Resume file: None
 
-**Milestone v1.1 archived. All requirements satisfied. Ready for next milestone definition.**
+**Phase 12 complete. v1.1 milestone documentation finalized:**
+- Phase 11-02 SUMMARY.md created (ECS deployment documented)
+- REQUIREMENTS.md updated (AWS-01 through AWS-05 marked Complete)
+- Environment variable authentication support added for MCP clients
+- 40 of 44 requirements complete (5 AWS requirements deferred to post-v1.1)
+- Ready for next milestone definition
