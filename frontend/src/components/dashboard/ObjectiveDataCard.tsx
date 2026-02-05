@@ -210,11 +210,11 @@ function calculateTrend(current: number, previous: number): TrendDirection {
 function getTrendStatusClass(direction: 'up' | 'down' | 'stable'): string {
   switch (direction) {
     case 'down':
-      return 'bg-green-100 text-green-700'
+      return 'bg-green-100 text-green-700 border border-green-200'
     case 'up':
-      return 'bg-red-100 text-red-700'
+      return 'bg-red-100 text-red-700 border border-red-200'
     default:
-      return 'bg-neutral-100 text-neutral-600'
+      return 'bg-purple-50 text-purple-600 border border-purple-200'
   }
 }
 
@@ -249,11 +249,11 @@ function getTrendTooltipMessage(
 function getTrendIcon(direction: 'up' | 'down' | 'stable') {
   switch (direction) {
     case 'down':
-      return <TrendingDown className="w-3 h-3" />
+      return <TrendingDown className="w-4 h-4" />
     case 'up':
-      return <TrendingUp className="w-3 h-3" />
+      return <TrendingUp className="w-4 h-4" />
     default:
-      return <Minus className="w-3 h-3" />
+      return <Minus className="w-4 h-4" />
   }
 }
 
