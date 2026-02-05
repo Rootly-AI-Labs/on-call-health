@@ -42,5 +42,26 @@ Documentation = "https://oncallhealth.ai/docs/mcp"
 [project.scripts]
 oncallhealth-mcp = "oncallhealth_mcp.cli:main"
 
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/oncallhealth_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--cov=oncallhealth_mcp",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
