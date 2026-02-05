@@ -528,8 +528,8 @@ export function OrganizationManagementDialog({
                                   </Button>
                                 )
                               )}
-                              {/* Remove Member Button */}
-                              {!member.is_current_user && userInfo?.role === 'admin' && (
+                              {/* Remove Member Button - cannot remove super admins */}
+                              {!member.is_current_user && !member.is_super_admin && userInfo?.role === 'admin' && (
                                 confirmRemoveUserId === member.id ? (
                                   <div className="flex items-center gap-2">
                                     <Button

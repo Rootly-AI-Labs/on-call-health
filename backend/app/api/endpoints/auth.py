@@ -974,7 +974,14 @@ async def remove_organization_member(
             detail="User is not in your organization"
         )
 
-    # Safety check 5: If removing an admin, ensure there's at least one other admin
+    # Safety check 5: Cannot remove super admins (only they can transfer their status)
+    if target_user.is_super_admin:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot remove super admins. Super admin must transfer their status first before leaving the organization."
+        )
+
+    # Safety check 6: If removing an admin, ensure there's at least one other admin
     if target_user.role == 'admin':
         # Count other admins in the organization
         # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
