@@ -30,6 +30,9 @@ def sanitize_burnout_score_from_response(analysis_data: Optional[dict]) -> Optio
     This function strips legacy burnout_score fields from member data before returning
     to clients, while keeping internal calculations intact.
 
+    Performance: Uses shallow copy + targeted dict comprehensions instead of deepcopy
+    to avoid copying 30MB+ datasets unnecessarily.
+
     Args:
         analysis_data: The analysis data dict containing team_analysis.members
 
@@ -39,21 +42,25 @@ def sanitize_burnout_score_from_response(analysis_data: Optional[dict]) -> Optio
     if not analysis_data:
         return analysis_data
 
-    # Create a copy to avoid modifying the original
-    import copy
-    sanitized = copy.deepcopy(analysis_data)
+    # Shallow copy - only copy what we modify
+    sanitized = analysis_data.copy()
 
-    # Remove burnout_score from team members
+    # Remove burnout_score from team members using dict comprehension
     team_analysis = sanitized.get("team_analysis", {})
     if "members" in team_analysis and isinstance(team_analysis["members"], list):
-        for member in team_analysis["members"]:
-            if isinstance(member, dict) and "burnout_score" in member:
-                del member["burnout_score"]
+        sanitized["team_analysis"] = team_analysis.copy()
+        sanitized["team_analysis"]["members"] = [
+            {key: value for key, value in member.items() if key != "burnout_score"}
+            for member in team_analysis["members"]
+            if isinstance(member, dict)
+        ]
 
-    # Remove average_burnout_score from team_health if present
+    # Remove average_burnout_score from team_health
     team_health = sanitized.get("team_health", {})
-    if "average_burnout_score" in team_health:
-        del team_health["average_burnout_score"]
+    if team_health:
+        sanitized["team_health"] = {
+            key: value for key, value in team_health.items() if key != "average_burnout_score"
+        }
 
     return sanitized
 
