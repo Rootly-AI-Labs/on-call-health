@@ -164,10 +164,15 @@ async def run_analysis_with_checkpoints(
         # Read analysis config for user preferences
         config = analysis.config or {}
         enable_ai_requested = config.get("enable_ai", False)
+        include_github = config.get("include_github", False)
+        include_slack = config.get("include_slack", False)
+        include_jira = config.get("include_jira", False)
+        include_linear = config.get("include_linear", False)
 
         # AI is enabled if user requested it AND (system key OR user token available)
         use_ai = enable_ai_requested and (system_api_key or has_user_llm_token)
         logger.info(f"AI settings: requested={enable_ai_requested}, system_key={bool(system_api_key)}, user_token={has_user_llm_token}, enabled={use_ai}")
+        logger.info(f"Integration flags: github={include_github}, slack={include_slack}, jira={include_jira}, linear={include_linear}")
 
         # Check for GitHub integration
         from ..models import GitHubIntegration
@@ -189,6 +194,14 @@ async def run_analysis_with_checkpoints(
             JiraIntegration.access_token.isnot(None),
         ).first()
         has_jira = bool(jira_integration)
+
+        # Check for Linear integration
+        from ..models import LinearIntegration
+        linear_integration = db.query(LinearIntegration).filter(
+            LinearIntegration.user_id == user_id,
+            LinearIntegration.access_token.isnot(None),
+        ).first()
+        has_linear = bool(linear_integration)
 
         # ====================
         # CHECKPOINT 1: Data Fetch
@@ -244,6 +257,14 @@ async def run_analysis_with_checkpoints(
                 jira_token = decrypt_jira_token(jira_integration.access_token)
             except Exception as e:
                 logger.error(f"Failed to decrypt Jira token: {e}")
+
+        linear_token = None
+        if has_linear:
+            try:
+                from ..api.endpoints.linear import decrypt_token as decrypt_linear_token
+                linear_token = decrypt_linear_token(linear_integration.access_token)
+            except Exception as e:
+                logger.error(f"Failed to decrypt Linear token: {e}")
 
         if resume_from < 2:
             logger.info(f"CHECKPOINT 1->2: Collecting GitHub/Slack/Jira data")
@@ -331,24 +352,27 @@ async def run_analysis_with_checkpoints(
             logger.info(f"CHECKPOINT 2->3: Running team burnout analysis")
             phase_start = datetime.now()
 
-            # Set user context for AI analysis if available
-            if use_ai:
+            # Set user context for AI analysis if available (must check user exists)
+            if use_ai and user:
                 from ..services.ai_burnout_analyzer import set_user_context
                 set_user_context(user)
+                logger.info(f"Set user context for AI analysis (LLM provider: {user.llm_provider if user.llm_token else 'system'})")
 
-            # Initialize analyzer
+            # Initialize analyzer - pass tokens ONLY if user requested that integration
             analyzer = UnifiedBurnoutAnalyzer(
                 api_token=integration.api_token,
                 platform=integration.platform,
                 enable_ai=use_ai,
-                github_token=github_token,
-                slack_token=slack_token,
-                jira_token=jira_token,
+                github_token=github_token if include_github else None,
+                slack_token=slack_token if include_slack else None,
+                jira_token=jira_token if include_jira else None,
+                linear_token=linear_token if include_linear else None,
                 synced_users=synced_users,
                 current_user_id=user_id,
                 organization_name=integration.organization_name,
                 db=db,  # Required for AI insights DB lookups
             )
+            logger.info(f"UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}")
 
             # Run analysis
             results = await analyzer.analyze_burnout(
