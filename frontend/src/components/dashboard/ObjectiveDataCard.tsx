@@ -229,6 +229,23 @@ function getTrendLabel(direction: 'up' | 'down' | 'stable'): string {
   }
 }
 
+function getTrendTooltipMessage(
+  direction: 'up' | 'down' | 'stable',
+  percentage: number,
+  firstHalfAvg: number,
+  secondHalfAvg: number,
+  weeklyMean: number
+): string {
+  switch (direction) {
+    case 'down':
+      return `Risk level dropped ${percentage}% from ${Math.round(firstHalfAvg)} to ${Math.round(secondHalfAvg)} (first vs second half)`
+    case 'up':
+      return `Risk level increased ${percentage}% from ${Math.round(firstHalfAvg)} to ${Math.round(secondHalfAvg)} (first vs second half)`
+    default:
+      return `Risk level stable around ${Math.round(weeklyMean)} (less than 5% change)`
+  }
+}
+
 function getTrendIcon(direction: 'up' | 'down' | 'stable') {
   switch (direction) {
     case 'down':
@@ -292,6 +309,8 @@ function calculateWeeklyStats(weeklyData: any[], config: MetricConfig) {
   return {
     weeklyMean,
     overallTrend: calculateTrend(secondHalfAvg, firstHalfAvg),
+    firstHalfAvg,
+    secondHalfAvg,
     currentWeek,
     vsLastWeek: currentWeek && previousWeek
       ? calculateTrend(currentWeek[config.weeklyDataKey], previousWeek[config.weeklyDataKey])
@@ -315,16 +334,22 @@ export function ObjectiveDataCard({
 
   const weeklyData = aggregateToWeekly(dailyTrends)
   const dailyChartData = buildDailyChartData(dailyTrends, config)
-  const { weeklyMean, overallTrend, currentWeek, vsLastWeek, vsMean } = calculateWeeklyStats(weeklyData, config)
+  const { weeklyMean, overallTrend, firstHalfAvg, secondHalfAvg, currentWeek, vsLastWeek, vsMean } = calculateWeeklyStats(weeklyData, config)
 
   const hasData = viewMode === 'weekly' ? weeklyData.length > 0 : dailyChartData.length > 0
   const dailyMean = dailyChartData.length > 0 ? dailyChartData[0]?.meanScore : 0
 
-  const description = hasData
-    ? viewMode === 'weekly'
-      ? `Weekly averages over ${timeRange} days. Mean: ${Math.round(weeklyMean)} ${config.label.toLowerCase()}.`
-      : `Over the last ${timeRange} days, the average ${config.yAxisLabel.toLowerCase()} was ${Math.round(dailyMean)} points.`
-    : "No trend data available for this analysis"
+  function getDescription(): string {
+    if (!hasData) {
+      return "No trend data available for this analysis"
+    }
+    if (viewMode === 'weekly') {
+      return `Weekly averages over ${timeRange} days. Mean: ${Math.round(weeklyMean)} ${config.label.toLowerCase()}.`
+    }
+    return `Over the last ${timeRange} days, the average ${config.yAxisLabel.toLowerCase()} was ${Math.round(dailyMean)} points.`
+  }
+
+  const description = getDescription()
 
   if (loadingTrends) {
     return (
@@ -346,9 +371,14 @@ export function ObjectiveDataCard({
           <div className="flex items-center gap-3">
             <CardTitle>Team Trends</CardTitle>
             {viewMode === 'weekly' && hasData && (
-              <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getTrendStatusClass(overallTrend.direction)}`}>
-                {getTrendIcon(overallTrend.direction)}
-                {getTrendLabel(overallTrend.direction)}
+              <div className="relative group">
+                <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 cursor-help ${getTrendStatusClass(overallTrend.direction)}`}>
+                  {getTrendIcon(overallTrend.direction)}
+                  {getTrendLabel(overallTrend.direction)}
+                </div>
+                <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  {getTrendTooltipMessage(overallTrend.direction, overallTrend.percentage, firstHalfAvg, secondHalfAvg, weeklyMean)}
+                </div>
               </div>
             )}
           </div>
