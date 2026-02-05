@@ -25,7 +25,7 @@ branch = "testing"
 [services.build]
 builder = "DOCKERFILE"
 dockerfile_path = "Dockerfile"
-watch_patterns = []
+watch_patterns = ["app/**", "migrations/**", "start_worker.sh", "requirements.txt"]
 
 [services.deploy]
 start_command = "bash start_worker.sh"
