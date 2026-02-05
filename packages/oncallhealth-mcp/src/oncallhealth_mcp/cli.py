@@ -12,7 +12,7 @@ def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         prog="oncallhealth-mcp",
-        description="MCP server for On-Call Health burnout analysis",
+        description="MCP server for On-Call Health analysis",
     )
     parser.add_argument(
         "--transport",

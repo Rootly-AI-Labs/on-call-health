@@ -119,7 +119,7 @@ The frontend will be available at `http://localhost:3000`
 
 ##  Methodology
 
-On-call Health takes inspiration from the [Copenhagen Burnout Inventory](https://nfa.dk/media/hl5nbers/cbi-first-edition.pdf) (CBI), a scientifically validated approach to measuring overwork risk in professional settings. On-call Health isn't a medical tool and doesn't provide a diagnosis; it is designed to help identify patterns and trends that may suggest overwork.
+On-call Health uses a scientifically informed approach to measuring overwork risk in professional settings. On-call Health isn't a medical tool and doesn't provide a diagnosis; it is designed to help identify patterns and trends that may suggest overwork.
 
 ### Methodology breakdown
 Our implementation uses the two core dimensions:
