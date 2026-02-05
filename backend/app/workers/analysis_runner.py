@@ -240,7 +240,7 @@ async def run_analysis_with_checkpoints(
         jira_token = None
         if has_jira:
             try:
-                from ..api.endpoints.jira import decrypt_jira_token
+                from ..api.endpoints.jira import decrypt_token as decrypt_jira_token
                 jira_token = decrypt_jira_token(jira_integration.access_token)
             except Exception as e:
                 logger.error(f"Failed to decrypt Jira token: {e}")
