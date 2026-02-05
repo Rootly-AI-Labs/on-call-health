@@ -24,6 +24,38 @@ logger = logging.getLogger(__name__)
 mcp_server = FastMCP("On-Call Health")
 
 
+# Helper functions for validation
+def _validate_analysis_id(analysis_id: int) -> None:
+    """Validate that analysis_id is positive.
+
+    Args:
+        analysis_id: The analysis ID to validate
+
+    Raises:
+        ValueError: If analysis_id is not positive
+    """
+    if analysis_id <= 0:
+        raise ValueError(f"analysis_id must be positive, got {analysis_id}")
+
+
+def _validate_api_key(ctx: Any) -> str:
+    """Extract and validate API key from context.
+
+    Args:
+        ctx: MCP context containing request metadata
+
+    Returns:
+        str: The extracted API key
+
+    Raises:
+        PermissionError: If API key is missing
+    """
+    api_key = extract_api_key_header(ctx)
+    if not api_key:
+        raise PermissionError("Missing API key. Provide X-API-Key header.")
+    return api_key
+
+
 @mcp_server.tool()
 async def analysis_start(
     ctx: Any,
@@ -291,20 +323,21 @@ async def get_at_risk_users(
     Args:
         analysis_id: The analysis to query
         min_och_score: Minimum OCH score threshold (default: 50.0)
-        include_risk_levels: Comma-separated risk levels to include (default: "medium,high")
+        include_risk_levels: Comma-separated risk levels to include (default: "medium,high").
+                            Risk levels are case-insensitive.
 
     Returns:
         - total_at_risk: count of users above threshold
         - users: list of {user_name, och_score, risk_level, burnout_score,
                          incident_count, rootly_user_id, pagerduty_user_id,
                          slack_user_id, github_username}
-    """
-    api_key = extract_api_key_header(ctx)
-    if not api_key:
-        raise PermissionError("Missing API key. Provide X-API-Key header.")
 
-    if analysis_id <= 0:
-        raise ValueError(f"analysis_id must be positive, got {analysis_id}")
+    Example:
+        >>> result = await get_at_risk_users(ctx, 1226, min_och_score=60)
+        >>> print(f"Found {result['total_at_risk']} at-risk users")
+    """
+    api_key = _validate_api_key(ctx)
+    _validate_analysis_id(analysis_id)
     if min_och_score < 0:
         raise ValueError(f"min_och_score must be non-negative, got {min_och_score}")
 
@@ -384,13 +417,13 @@ async def get_safe_responders(
         - users: list of {user_name, och_score, risk_level,
                          rootly_user_id, slack_user_id}
                  sorted by och_score ascending (healthiest first)
-    """
-    api_key = extract_api_key_header(ctx)
-    if not api_key:
-        raise PermissionError("Missing API key. Provide X-API-Key header.")
 
-    if analysis_id <= 0:
-        raise ValueError(f"analysis_id must be positive, got {analysis_id}")
+    Example:
+        >>> result = await get_safe_responders(ctx, 1226, max_och_score=30, limit=5)
+        >>> print(f"Found {result['total_safe']} safe responders")
+    """
+    api_key = _validate_api_key(ctx)
+    _validate_analysis_id(analysis_id)
     if max_och_score < 0:
         raise ValueError(f"max_och_score must be non-negative, got {max_och_score}")
     if limit <= 0:
@@ -443,7 +476,8 @@ async def get_safe_responders(
 async def check_users_risk(
     ctx: Any,
     analysis_id: int,
-    rootly_user_ids: str
+    rootly_user_ids: str,
+    min_och_score: float = 50.0
 ) -> Dict[str, Any]:
     """Check burnout risk for specific users by their Rootly user IDs.
 
@@ -453,20 +487,23 @@ async def check_users_risk(
     Args:
         analysis_id: The analysis to query
         rootly_user_ids: Comma-separated Rootly user IDs (e.g., "2381,94178,27965")
+        min_och_score: Minimum OCH score threshold for at-risk classification (default: 50.0)
 
     Returns:
         - checked: number of IDs checked
         - found: number matched in analysis
-        - at_risk: list of users with och_score > 50 or risk_level in [medium, high]
+        - at_risk: list of users with och_score > min_och_score or risk_level in [medium, high]
         - healthy: list of users with low risk
         - not_found: list of rootly_user_ids not in analysis
-    """
-    api_key = extract_api_key_header(ctx)
-    if not api_key:
-        raise PermissionError("Missing API key. Provide X-API-Key header.")
 
-    if analysis_id <= 0:
-        raise ValueError(f"analysis_id must be positive, got {analysis_id}")
+    Example:
+        >>> result = await check_users_risk(ctx, 1226, "2381,94178,27965")
+        >>> print(f"{len(result['at_risk'])} users are at risk")
+    """
+    api_key = _validate_api_key(ctx)
+    _validate_analysis_id(analysis_id)
+    if min_och_score < 0:
+        raise ValueError(f"min_och_score must be non-negative, got {min_och_score}")
     if not rootly_user_ids or not rootly_user_ids.strip():
         raise ValueError("rootly_user_ids cannot be empty")
 
@@ -521,7 +558,7 @@ async def check_users_risk(
                     "risk_level": member.get("risk_level", "unknown"),
                 }
 
-                if och_score > 50 or risk_level in ["medium", "high"]:
+                if och_score > min_och_score or risk_level in ["medium", "high"]:
                     at_risk.append(user_info)
                 else:
                     healthy.append(user_info)
