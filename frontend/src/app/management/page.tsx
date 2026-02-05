@@ -77,6 +77,7 @@ function TeamPageContent() {
   const syncedUsersCache = useRef<Map<string, SyncedUser[]>>(new Map())
   const recipientsCache = useRef<Map<string, Set<number>>>(new Map())
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isMountedRef = useRef(true)
 
   // Survey recipient selection state
   const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
@@ -161,9 +162,10 @@ function TeamPageContent() {
     }
   }, [selectedOrganization])
 
-  // Cleanup timeout on unmount
+  // Cleanup timeout on unmount and mark component as unmounted
   useEffect(() => {
     return () => {
+      isMountedRef.current = false
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current)
         syncTimeoutRef.current = null
@@ -303,11 +305,17 @@ function TeamPageContent() {
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current)
       }
-      syncTimeoutRef.current = setTimeout(() => {
-        setShowSyncConfirmModal(false)
-        setSyncProgress(null)
-        syncTimeoutRef.current = null
-      }, 2000)
+      // Only set new timeout if component is still mounted
+      if (isMountedRef.current) {
+        syncTimeoutRef.current = setTimeout(() => {
+          // Check again before setting state to prevent memory leaks
+          if (isMountedRef.current) {
+            setShowSyncConfirmModal(false)
+            setSyncProgress(null)
+          }
+          syncTimeoutRef.current = null
+        }, 2000)
+      }
     }
   }
 
@@ -377,8 +385,13 @@ function TeamPageContent() {
     try {
       const recipientIds = Array.from(selectedRecipients)
 
-      // Validate recipient IDs are numbers
-      if (!recipientIds.every(id => typeof id === 'number' && id > 0)) {
+      // Validate recipient IDs are valid positive integers (not NaN, Infinity, or floats)
+      if (!recipientIds.every(id =>
+        typeof id === 'number' &&
+        Number.isFinite(id) &&
+        Number.isInteger(id) &&
+        id > 0
+      )) {
         toast.error("Invalid recipient IDs")
         setSavingRecipients(false)
         return
@@ -442,19 +455,27 @@ function TeamPageContent() {
   const startIndex = (currentPage - 1) * TEAM_MEMBERS_PER_PAGE
   const paginatedUsers = filteredUsers.slice(startIndex, startIndex + TEAM_MEMBERS_PER_PAGE)
 
-  // Validate avatar URL to prevent XSS and data URIs
+  // Validate avatar URL to prevent XSS and dangerous schemes
   const isValidUrl = (url: string): boolean => {
     if (!url) return false
-    // Reject data URIs and other potentially unsafe schemes
-    if (url.startsWith('data:') || url.startsWith('javascript:') || url.startsWith('vbscript:')) {
+
+    // List of dangerous schemes that should never be used for media URLs
+    const dangerousSchemes = ['data:', 'javascript:', 'vbscript:', 'blob:', 'file:', 'ftp:', 'ftps:', 'about:', 'chrome:', 'edge:', 'safari:']
+    const lowerUrl = url.toLowerCase()
+
+    // Reject dangerous schemes
+    if (dangerousSchemes.some(scheme => lowerUrl.startsWith(scheme))) {
       return false
     }
+
     try {
       const urlObj = new URL(url)
       // Only allow http and https protocols
-      return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') &&
-             // Ensure it's not a localhost/internal URL that could be exploited
-             urlObj.hostname && !urlObj.hostname.match(/^(localhost|127\.|0\.0\.|::1)/)
+      if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+        return false
+      }
+      // Ensure hostname exists and is not a localhost/internal URL that could be exploited
+      return urlObj.hostname && !urlObj.hostname.match(/^(localhost|127\.|0\.0\.|::1)/)
     } catch {
       return false
     }
