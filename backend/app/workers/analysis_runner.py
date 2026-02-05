@@ -215,18 +215,33 @@ async def run_analysis_with_checkpoints(
             await save_checkpoint(db, analysis_id, 1, checkpoint_data)
             return {"status": "interrupted", "checkpoint": 1}
 
+        # Decrypt tokens BEFORE checkpoint block - needed for both fresh runs and resume
+        # (Cannot store decrypted tokens in checkpoint for security reasons)
+        github_token = None
+        if has_github:
+            try:
+                from ..api.endpoints.github import decrypt_token as decrypt_github_token
+                github_token = decrypt_github_token(github_integration.github_token)
+            except Exception as e:
+                logger.error(f"Failed to decrypt GitHub token: {e}")
+
+        jira_token = None
+        if has_jira:
+            try:
+                from ..api.endpoints.jira import decrypt_jira_token
+                jira_token = decrypt_jira_token(jira_integration.access_token)
+            except Exception as e:
+                logger.error(f"Failed to decrypt Jira token: {e}")
+
         if resume_from < 2:
             logger.info(f"CHECKPOINT 1->2: Collecting GitHub/Slack/Jira data")
             phase_start = datetime.now()
 
             # Collect additional data sources
             github_data = None
-            if has_github:
+            if has_github and github_token:
                 try:
-                    from ..api.endpoints.github import decrypt_token as decrypt_github_token
                     from ..services.github_collector import collect_team_github_data
-
-                    github_token = decrypt_github_token(github_integration.github_token)
 
                     # Get team emails from user correlations
                     mappings = db.query(UserCorrelation).filter(
@@ -238,15 +253,6 @@ async def run_analysis_with_checkpoints(
                         github_data = await collect_team_github_data(team_emails, days_back, github_token)
                 except Exception as e:
                     logger.error(f"Failed to collect GitHub data: {e}")
-
-            # Get Jira token if available
-            jira_token = None
-            if has_jira:
-                try:
-                    from ..api.endpoints.jira import decrypt_jira_token
-                    jira_token = decrypt_jira_token(jira_integration.access_token)
-                except Exception as e:
-                    logger.error(f"Failed to decrypt Jira token: {e}")
 
             # Fetch user correlations for Jira mapping
             synced_users = []
@@ -306,9 +312,9 @@ async def run_analysis_with_checkpoints(
                 api_token=integration.api_token,
                 platform=integration.platform,
                 enable_ai=has_llm_token,
-                github_token=github_integration.github_token if has_github else None,
+                github_token=github_token,
                 slack_token=slack_token,
-                jira_token=jira_token if has_jira else None,
+                jira_token=jira_token,
                 synced_users=synced_users,
                 current_user_id=user_id,
             )
