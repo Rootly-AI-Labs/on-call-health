@@ -372,23 +372,29 @@ export function UserMappingDrawer({
                       >
                         Clear mapping
                       </button>
-                      {filterJiraOptions(searchQuery).map((jiraUser, index) => (
-                        <button
-                          key={jiraUser.account_id || `jira-${index}`}
-                          onClick={() =>
-                            handleSelectMapping("jira", jiraUser.account_id, {
-                              email: jiraUser.email,
-                            })
-                          }
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded flex items-center justify-between"
-                          disabled={saving}
-                        >
-                          <span>{jiraUser.display_name || jiraUser.email}</span>
-                          {user.jira_account_id === jiraUser.account_id && (
-                            <Check className="w-4 h-4 text-green-600" />
-                          )}
-                        </button>
-                      ))}
+                      {filterJiraOptions(searchQuery).map((jiraUser, index) => {
+                        // Skip users without account_id to prevent null mapping errors
+                        if (!jiraUser.account_id) {
+                          return null
+                        }
+                        return (
+                          <button
+                            key={jiraUser.account_id}
+                            onClick={() =>
+                              handleSelectMapping("jira", jiraUser.account_id, {
+                                email: jiraUser.email,
+                              })
+                            }
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-100 rounded flex items-center justify-between"
+                            disabled={saving}
+                          >
+                            <span>{jiraUser.display_name || jiraUser.email}</span>
+                            {user.jira_account_id === jiraUser.account_id && (
+                              <Check className="w-4 h-4 text-green-600" />
+                            )}
+                          </button>
+                        )
+                      })}
                       {filterJiraOptions(searchQuery).length === 0 && (
                         <p className="text-sm text-neutral-400 py-2 px-3">No users found</p>
                       )}
