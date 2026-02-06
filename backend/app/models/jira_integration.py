@@ -10,7 +10,7 @@ class JiraIntegration(Base):
     __tablename__ = "jira_integrations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # OAuth tokens (encrypted)
     access_token = Column(Text, nullable=True)  # Encrypted Jira access token
