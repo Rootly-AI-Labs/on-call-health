@@ -1277,15 +1277,20 @@ async def sync_integration_users(
             current_user=current_user
         )
 
-        # Update last_synced_by and last_synced_at
-        integration = db.query(RootlyIntegration).filter(
-            RootlyIntegration.id == numeric_id
-        ).first()
-        if integration:
-            from datetime import datetime, timezone
-            integration.last_synced_by = current_user.id
-            integration.last_synced_at = datetime.now(timezone.utc)
-            db.commit()
+        # Update last_synced_by and last_synced_at in separate transaction
+        # This ensures metadata is only updated if sync completes successfully
+        try:
+            integration = db.query(RootlyIntegration).filter(
+                RootlyIntegration.id == numeric_id
+            ).first()
+            if integration:
+                integration.last_synced_by = current_user.id
+                integration.last_synced_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception as e:
+            # Non-critical failure - sync succeeded but metadata update failed
+            logger.warning(f"Failed to update sync metadata for integration {numeric_id}: {e}")
+            db.rollback()
 
         # Build detailed message
         message_parts = [f"Successfully synced {stats['total']} users from integration"]

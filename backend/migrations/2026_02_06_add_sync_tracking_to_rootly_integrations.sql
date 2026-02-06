@@ -7,9 +7,14 @@ ALTER TABLE rootly_integrations
 ADD COLUMN IF NOT EXISTS last_synced_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
 ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMP WITH TIME ZONE;
 
--- Create index for efficient queries
+-- Create indexes for efficient queries
+-- Single-column index for "recent syncs across all users" queries
 CREATE INDEX IF NOT EXISTS idx_rootly_integrations_last_synced
 ON rootly_integrations(last_synced_at DESC);
+
+-- Composite index for "user's recent syncs" queries
+CREATE INDEX IF NOT EXISTS idx_rootly_integrations_user_last_synced
+ON rootly_integrations(user_id, last_synced_at DESC);
 
 -- Verification
 SELECT 'Added sync tracking columns' as status;
