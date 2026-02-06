@@ -129,7 +129,7 @@ function TeamPageContent() {
     return false
   }
 
-  // Load integrations on mount
+  // Load integrations on mount (both Rootly and PagerDuty)
   useEffect(() => {
     const fetchIntegrations = async () => {
       const authToken = localStorage.getItem("auth_token")
@@ -139,23 +139,43 @@ function TeamPageContent() {
       }
 
       try {
-        const response = await fetch(`${API_BASE}/rootly/integrations`, {
-          headers: { Authorization: `Bearer ${authToken}` },
-        })
+        // Fetch both Rootly and PagerDuty integrations in parallel
+        const [rootlyResponse, pagerdutyResponse] = await Promise.all([
+          fetch(`${API_BASE}/rootly/integrations`, {
+            headers: { Authorization: `Bearer ${authToken}` },
+          }).catch(() => null),
+          fetch(`${API_BASE}/pagerduty/integrations`, {
+            headers: { Authorization: `Bearer ${authToken}` },
+          }).catch(() => null),
+        ])
 
-        if (response.ok) {
-          const data = await response.json()
-          setIntegrations(data.integrations || [])
+        let allIntegrations: Integration[] = []
 
-          // Try to restore selected organization from URL or localStorage
-          const urlOrgId = searchParams.get("org")
-          if (urlOrgId) {
-            setSelectedOrganization(urlOrgId)
-          } else {
-            const saved = localStorage.getItem("selectedOrganization")
-            if (saved) setSelectedOrganization(saved)
-            else if (data.integrations.length > 0) setSelectedOrganization(data.integrations[0].id.toString())
-          }
+        if (rootlyResponse?.ok) {
+          const data = await rootlyResponse.json()
+          const rootlyIntegrations = (data.integrations || []).map((i: Integration) => ({ ...i, platform: 'rootly' as const }))
+          allIntegrations = [...allIntegrations, ...rootlyIntegrations]
+        }
+
+        if (pagerdutyResponse?.ok) {
+          const data = await pagerdutyResponse.json()
+          const pdIntegrations = (data.integrations || []).map((i: Integration) => ({ ...i, platform: 'pagerduty' as const }))
+          allIntegrations = [...allIntegrations, ...pdIntegrations]
+        }
+
+        setIntegrations(allIntegrations)
+
+        // Restore selected org, with validation against actual integration IDs
+        const urlOrgId = searchParams.get("org")
+        const saved = localStorage.getItem("selectedOrganization")
+        const matchesIntegration = (id: string) => allIntegrations.some(i => i.id.toString() === id)
+
+        if (urlOrgId && matchesIntegration(urlOrgId)) {
+          setSelectedOrganization(urlOrgId)
+        } else if (saved && matchesIntegration(saved)) {
+          setSelectedOrganization(saved)
+        } else if (allIntegrations.length > 0) {
+          setSelectedOrganization(allIntegrations[0].id.toString())
         }
       } catch (error) {
         console.error("Failed to load integrations:", error)
@@ -500,20 +520,14 @@ function TeamPageContent() {
     }
   }
 
-  // Check if selected organization is a primary integration (Rootly or PagerDuty)
+  // Find the currently selected integration (used for context elsewhere on the page)
   const selectedIntegration = selectedOrganization
     ? integrations.find(i => i.id.toString() === selectedOrganization)
     : null
 
-  // A primary integration exists if the selected integration is Rootly or PagerDuty
-  // by platform field OR by name (fallback for cases where platform might not be set)
-  const hasPrimaryIntegration =
-    selectedIntegration !== null &&
-    selectedIntegration !== undefined &&
-    (selectedIntegration.platform === 'rootly' ||
-     selectedIntegration.platform === 'pagerduty' ||
-     selectedIntegration.name?.toLowerCase().includes('rootly') ||
-     selectedIntegration.name?.toLowerCase().includes('pagerduty'))
+  // Check if any primary integration (Rootly or PagerDuty) exists
+  // Since the integrations array only contains Rootly and PagerDuty entries, length > 0 is sufficient
+  const hasPrimaryIntegration = integrations.length > 0
 
   // Filter users based on search query
   const filteredUsers = syncedUsers.filter(user => {
@@ -599,7 +613,7 @@ function TeamPageContent() {
           </div>
 
           {/* Organization Management Section */}
-          {selectedOrganization && !loadingIntegrations && (
+          {(selectedOrganization || !hasPrimaryIntegration) && !loadingIntegrations && (
             <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
               {viewMode === 'organization' ? (
                 <>
