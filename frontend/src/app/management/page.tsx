@@ -87,6 +87,10 @@ function TeamPageContent() {
   // Search state
   const [searchQuery, setSearchQuery] = useState("")
 
+  // Filter state
+  const [onCallFilter, setOnCallFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [integrationFilter, setIntegrationFilter] = useState<'all' | 'github' | 'jira' | 'linear'>('all')
+
   // Cache to track which integrations have already been loaded
   const syncedUsersCache = useRef<Map<string, SyncedUser[]>>(new Map())
   const recipientsCache = useRef<Map<string, Set<number>>>(new Map())
@@ -554,15 +558,33 @@ function TeamPageContent() {
   // Since the integrations array only contains Rootly and PagerDuty entries, length > 0 is sufficient
   const hasPrimaryIntegration = integrations.length > 0
 
-  // Filter users based on search query
+  // Filter users based on search query and filters
   const filteredUsers = syncedUsers.filter(user => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      user.email?.toLowerCase().includes(query) ||
-      user.github_username?.toLowerCase().includes(query) ||
-      user.jira_email?.toLowerCase().includes(query)
-    )
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const matchesSearch = (
+        user.email?.toLowerCase().includes(query) ||
+        user.github_username?.toLowerCase().includes(query) ||
+        user.jira_email?.toLowerCase().includes(query)
+      )
+      if (!matchesSearch) return false
+    }
+
+    // On-call status filter
+    if (onCallFilter !== 'all') {
+      if (onCallFilter === 'active' && !user.is_oncall) return false
+      if (onCallFilter === 'inactive' && user.is_oncall) return false
+    }
+
+    // Integration filter
+    if (integrationFilter !== 'all') {
+      if (integrationFilter === 'github' && !user.github_username) return false
+      if (integrationFilter === 'jira' && !user.jira_account_id) return false
+      if (integrationFilter === 'linear' && !user.linear_user_id) return false
+    }
+
+    return true
   })
 
   // Pagination
@@ -642,41 +664,134 @@ function TeamPageContent() {
 
                     {/* Search Bar and Organization Selector - Only show when primary integration exists */}
                     {hasPrimaryIntegration && (
-                      <div className="mb-4 flex items-end gap-4">
-                        {/* Search Bar - shorter */}
-                        <div className="w-80">
-                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">&nbsp;</label>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                            <Input
-                              type="text"
-                              placeholder="Search members..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="pl-9 w-full"
-                            />
+                      <div className="space-y-4">
+                        <div className="flex items-end gap-4">
+                          {/* Search Bar - shorter */}
+                          <div className="w-80">
+                            <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">&nbsp;</label>
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                              <Input
+                                type="text"
+                                placeholder="Search members..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 w-full"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Organization Selector - wider on the right */}
+                          <div className="flex-shrink-0">
+                            <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">Select Organization</label>
+                            <Select
+                              value={selectedOrganization}
+                              onValueChange={setSelectedOrganization}
+                              disabled={loadingIntegrations || !hasPrimaryIntegration}
+                            >
+                              <SelectTrigger className="w-72">
+                                <SelectValue placeholder="Select an organization..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {integrations.map((integration) => (
+                                  <SelectItem key={integration.id} value={integration.id.toString()}>
+                                    {integration.name || `Integration #${integration.id}`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
 
-                        {/* Organization Selector - wider on the right */}
-                        <div className="flex-shrink-0">
-                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">Select Organization</label>
-                          <Select
-                            value={selectedOrganization}
-                            onValueChange={setSelectedOrganization}
-                            disabled={loadingIntegrations || !hasPrimaryIntegration}
-                          >
-                            <SelectTrigger className="w-72">
-                              <SelectValue placeholder="Select an organization..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {integrations.map((integration) => (
-                                <SelectItem key={integration.id} value={integration.id.toString()}>
-                                  {integration.name || `Integration #${integration.id}`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        {/* Filters */}
+                        <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-neutral-700">On-Call:</span>
+                            <div className="flex gap-1">
+                              <Badge
+                                className={`cursor-pointer transition-colors ${
+                                  onCallFilter === 'all'
+                                    ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                                }`}
+                                onClick={() => setOnCallFilter('all')}
+                              >
+                                All
+                              </Badge>
+                              <Badge
+                                className={`cursor-pointer transition-colors ${
+                                  onCallFilter === 'active'
+                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                                }`}
+                                onClick={() => setOnCallFilter('active')}
+                              >
+                                Active
+                              </Badge>
+                              <Badge
+                                className={`cursor-pointer transition-colors ${
+                                  onCallFilter === 'inactive'
+                                    ? 'bg-neutral-200 text-neutral-800 hover:bg-neutral-300'
+                                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                                }`}
+                                onClick={() => setOnCallFilter('inactive')}
+                              >
+                                Inactive
+                              </Badge>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-neutral-700">Integration:</span>
+                            <div className="flex gap-1">
+                              <Badge
+                                className={`cursor-pointer transition-colors ${
+                                  integrationFilter === 'all'
+                                    ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                                }`}
+                                onClick={() => setIntegrationFilter('all')}
+                              >
+                                All
+                              </Badge>
+                              {connectedIntegrations.has('github') && (
+                                <Badge
+                                  className={`cursor-pointer transition-colors ${
+                                    integrationFilter === 'github'
+                                      ? 'bg-neutral-800 text-white hover:bg-neutral-900'
+                                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                                  }`}
+                                  onClick={() => setIntegrationFilter('github')}
+                                >
+                                  GitHub
+                                </Badge>
+                              )}
+                              {connectedIntegrations.has('jira') && (
+                                <Badge
+                                  className={`cursor-pointer transition-colors ${
+                                    integrationFilter === 'jira'
+                                      ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                                  }`}
+                                  onClick={() => setIntegrationFilter('jira')}
+                                >
+                                  Jira
+                                </Badge>
+                              )}
+                              {connectedIntegrations.has('linear') && (
+                                <Badge
+                                  className={`cursor-pointer transition-colors ${
+                                    integrationFilter === 'linear'
+                                      ? 'bg-purple-200 text-purple-900 hover:bg-purple-300'
+                                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                                  }`}
+                                  onClick={() => setIntegrationFilter('linear')}
+                                >
+                                  Linear
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
