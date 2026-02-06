@@ -294,7 +294,7 @@ export function UnifiedSlackCard({
                                      userInfo?.role === 'super_admin' ||
                                      !userInfo?.organization_id
                 if (!canDisconnect) {
-                  toast.error('Only admins can disconnect Slack integration')
+                  toast.error('Only admins can manage Slack integration')
                   return
                 }
                 setSlackSurveyDisconnectDialogOpen(true)
@@ -372,7 +372,7 @@ export function UnifiedSlackCard({
                 if (!canConnect) {
                   return (
                     <div className="text-center py-4">
-                      <p className="text-sm text-neutral-600">Only admins can connect Slack integration</p>
+                      <p className="text-sm text-neutral-600">Only organization admins can connect Slack integration</p>
                     </div>
                   )
                 }
