@@ -115,6 +115,16 @@ export function TopPanel() {
               >
                 Integrations
               </Link>
+              <Link
+                href="/management"
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                  isActive("/management")
+                    ? "bg-purple-700 text-white shadow-sm"
+                    : "text-neutral-700 hover:text-white hover:bg-purple-800"
+                }`}
+              >
+                Management
+              </Link>
             </nav>
           </div>
 
@@ -175,13 +185,13 @@ export function TopPanel() {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => {
-                      setShowTeamManagement(true)
+                      router.push("/management?view=team")
                       setIsDropdownOpen(false)
                     }}
                     className="cursor-pointer focus:bg-purple-100 focus:text-purple-900"
                   >
                     <Users className="w-4 h-4 mr-2" />
-                    <span className="flex-1">Organization</span>
+                    <span className="flex-1">Team</span>
                     {userInfo.role && (
                       <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-200 text-purple-900 capitalize">
                         {userInfo.role.replace('_', ' ')}
