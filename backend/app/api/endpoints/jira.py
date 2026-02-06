@@ -47,7 +47,7 @@ REQUESTED_SCOPES = [
 # Encryption helpers
 # -------------------------------
 def get_encryption_key() -> bytes:
-    key = settings.ENCRYPTION_KEY.encode()
+    key = settings.JWT_SECRET_KEY.encode()
     # Ensure 32 bytes for Fernet
     return base64.urlsafe_b64encode(key[:32].ljust(32, b"\0"))
 
