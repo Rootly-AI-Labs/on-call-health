@@ -2,12 +2,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Users, Mail, Loader2, Check, X, Building2, AlertCircle, Trash2 } from "lucide-react"
-import { UserInfo } from "../types"
+import { Users, Mail, Loader2, Search, ChevronLeft, ChevronRight, AlertCircle, Trash2 } from "lucide-react"
 import { useState } from "react"
+import { UserInfo } from "../types"
 import { toast } from "sonner"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+const TEAM_MEMBERS_PER_PAGE = 10
 
 interface OrganizationMember {
   id: number | string
@@ -61,6 +63,9 @@ interface OrganizationManagementDialogProps {
   onRoleChange: (userId: number, newRole: string) => void
   onRefreshOrgData: () => Promise<void>
   onClose: () => void
+  asInlineView?: boolean  // Flag to render as inline view instead of modal
+  title?: string  // Custom title (defaults to "Organization Management")
+  subtitle?: string  // Custom subtitle
 }
 
 export function OrganizationManagementDialog({
@@ -79,13 +84,22 @@ export function OrganizationManagementDialog({
   userInfo,
   onRoleChange,
   onRefreshOrgData,
-  onClose
+  onClose,
+  asInlineView = false,  // Default to modal view
+  title = "Organization Management",  // Default title
+  subtitle = "Invite new members and manage your organization"  // Default subtitle
 }: OrganizationManagementDialogProps) {
+  // State from HEAD - invitation and member removal
   const [processingInvitationId, setProcessingInvitationId] = useState<number | null>(null)
   const [confirmingInvitationId, setConfirmingInvitationId] = useState<number | null>(null)
   const [removingUserId, setRemovingUserId] = useState<number | null>(null)
   const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<number | null>(null)
 
+  // State from feature/management_page - search and pagination
+  const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // Handler functions from HEAD
   const handleAcceptInvitation = async (invitationId: number, skipWarning = false) => {
     // Check if user is already in an org and show warning first
     if (!skipWarning && userInfo?.organization_id) {
@@ -198,21 +212,25 @@ export function OrganizationManagementDialog({
     }
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Users className="w-5 h-5" />
-            <span>Organization Management</span>
-          </DialogTitle>
-          <DialogDescription>
-            Invite new members and manage your organization
-          </DialogDescription>
-        </DialogHeader>
+  // Filter members based on search query (from feature/management_page)
+  const filteredMembers = orgMembers.filter((member) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      member.name.toLowerCase().includes(query) ||
+      member.email.toLowerCase().includes(query)
+    )
+  })
 
-        {/* Role descriptions - at the top of modal */}
-        <div className="mt-4 px-4 py-3 bg-purple-100 rounded-lg">
+  // Pagination calculations (from feature/management_page)
+  const totalPages = Math.ceil(filteredMembers.length / TEAM_MEMBERS_PER_PAGE)
+  const startIndex = (currentPage - 1) * TEAM_MEMBERS_PER_PAGE
+  const paginatedMembers = filteredMembers.slice(startIndex, startIndex + TEAM_MEMBERS_PER_PAGE)
+
+  const dialogContentBody = (
+    <>
+      {/* Role descriptions with padding */}
+      <div className={asInlineView ? "px-6 py-3 bg-purple-100 rounded-lg mb-6 mx-6 mt-6" : "mt-4 px-4 py-3 bg-purple-100 rounded-lg"}>
           <div className="space-y-1.5 text-xs">
             <div className="flex items-baseline space-x-2">
               <span className="font-semibold text-neutral-900 min-w-[80px]">Admin</span>
@@ -330,7 +348,7 @@ export function OrganizationManagementDialog({
 
           {/* Invite New Member Section - Only visible to admins */}
           {(userInfo?.role === 'admin') && (
-            <div className="p-6 border rounded-lg bg-white">
+            <div className={asInlineView ? "p-6 border rounded-lg bg-white mx-6" : "p-6 border rounded-lg bg-white"}>
               <div className="flex items-start space-x-4">
                 <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                   <Mail className="w-5 h-5 text-purple-600" />
@@ -401,103 +419,147 @@ export function OrganizationManagementDialog({
             </div>
           ) : (
             <div className="space-y-6">
+              {/* Search Bar - above members table */}
+              {orgMembers.length > 0 && (
+                <div className={asInlineView ? "px-6 mb-4" : "mb-4"}>
+                  <div className="relative max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    <Input
+                      type="text"
+                      placeholder="Search members..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value)
+                        setCurrentPage(1)
+                      }}
+                      className="pl-9 w-full"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Current Members */}
-              {orgMembers.filter(m => m.status === 'active').length > 0 && (
+              {filteredMembers.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-medium mb-3 flex items-center space-x-2">
-                    <Users className="w-5 h-5" />
-                    <span>Organization Members ({orgMembers.filter(m => m.status === 'active').length})</span>
-                  </h3>
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="bg-neutral-100 px-4 py-2 border-b">
-                      <div className="grid grid-cols-4 gap-4 text-sm font-medium text-neutral-700">
-                        <div>Name</div>
-                        <div>Email</div>
-                        <div>Role</div>
-                        <div></div>
-                      </div>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {orgMembers.filter(m => m.status === 'active').map((member) => (
-                        <div key={member.id} className="px-4 py-3 border-b last:border-b-0 hover:bg-neutral-100 bg-white">
-                          <div className="grid grid-cols-4 gap-4 text-sm items-center">
-                            <div className="font-medium text-neutral-900">
-                              {member.name}
-                              {member.is_current_user && (
-                                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">You</span>
-                              )}
-                            </div>
-                            <div className="text-neutral-700">{member.email}</div>
-                            <div>
-                              {member.is_current_user ? (
-                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800 capitalize">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-neutral-200 bg-neutral-50">
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Name</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Role</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedMembers.map((member, index) => (
+                          <tr key={member.id} className={`border-b border-neutral-100 hover:bg-neutral-50 ${index === paginatedMembers.length - 1 ? 'border-b-0' : ''}`}>
+                            <td className="py-4 px-6">
+                              <div className="flex items-center gap-3">
+                                <span className="font-medium text-neutral-900">
+                                  {member.name}
+                                  {member.is_current_user && (
+                                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">You</span>
+                                  )}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-sm text-neutral-600">{member.email}</span>
+                            </td>
+                            <td className="py-4 px-6">
+                              {userInfo?.role === 'admin' && !member.is_current_user ? (
+                                <select
+                                  value={member.role || 'member'}
+                                  onChange={(e) => onRoleChange(member.id as number, e.target.value)}
+                                  className="text-sm px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                >
+                                  <option value="member">Member</option>
+                                  <option value="admin">Admin</option>
+                                </select>
+                              ) : (
+                                <span className="text-sm text-neutral-900 capitalize">
                                   {member.role?.replace('_', ' ') || 'member'}
                                 </span>
-                              ) : (
-                                <div className="relative group">
-                                  <select
-                                    value={member.role || 'member'}
-                                    onChange={(e) => onRoleChange(member.id as number, e.target.value)}
-                                    className="text-xs px-2 py-1 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white disabled:opacity-60 disabled:cursor-not-allowed"
-                                    disabled={userInfo?.role !== 'admin'}
-                                  >
-                                    <option value="member">Member</option>
-                                    <option value="admin">Admin</option>
-                                  </select>
-                                  {userInfo?.role !== 'admin' && (
-                                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-neutral-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                                      Only admins can change roles
+                              )}
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex justify-end">
+                                {!member.is_current_user && userInfo?.role === 'admin' && (
+                                  confirmRemoveUserId === member.id ? (
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleRemoveMember(member.id as number, member.name)}
+                                        disabled={removingUserId !== null}
+                                        className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        {removingUserId === member.id ? (
+                                          <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                          'Confirm'
+                                        )}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => setConfirmRemoveUserId(null)}
+                                        disabled={removingUserId !== null}
+                                        className="h-7 text-xs"
+                                      >
+                                        Cancel
+                                      </Button>
                                     </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex justify-end">
-                              {!member.is_current_user && userInfo?.role === 'admin' && (
-                                confirmRemoveUserId === member.id ? (
-                                  <div className="flex items-center gap-2">
+                                  ) : (
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => handleRemoveMember(member.id as number, member.name)}
+                                      onClick={() => setConfirmRemoveUserId(member.id as number)}
                                       disabled={removingUserId !== null}
-                                      className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      className="h-7 text-xs text-neutral-500 hover:text-red-600 hover:bg-red-50"
                                     >
-                                      {removingUserId === member.id ? (
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                      ) : (
-                                        'Confirm'
-                                      )}
+                                      <Trash2 className="w-3 h-3 mr-1" />
+                                      Remove
                                     </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => setConfirmRemoveUserId(null)}
-                                      disabled={removingUserId !== null}
-                                      className="h-7 text-xs"
-                                    >
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => setConfirmRemoveUserId(member.id as number)}
-                                    disabled={removingUserId !== null}
-                                    className="h-7 text-xs text-neutral-500 hover:text-red-600 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="w-3 h-3 mr-1" />
-                                    Remove
-                                  </Button>
-                                )
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                                  )
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-200">
+                      <p className="text-sm text-neutral-600">
+                        Showing {startIndex + 1}-{Math.min(startIndex + TEAM_MEMBERS_PER_PAGE, filteredMembers.length)} of {filteredMembers.length}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <span className="text-sm text-neutral-600 px-3">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -508,48 +570,61 @@ export function OrganizationManagementDialog({
                     <Mail className="w-5 h-5" />
                     <span>Pending Invitations ({pendingInvitations.length})</span>
                   </h3>
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="bg-neutral-100 px-4 py-2 border-b">
-                      <div className="grid grid-cols-5 gap-4 text-sm font-medium text-neutral-700">
-                        <div>Email</div>
-                        <div>Role</div>
-                        <div>Invited By</div>
-                        <div>Sent</div>
-                        <div>Expires</div>
-                      </div>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {pendingInvitations.map((invitation) => (
-                        <div key={invitation.id} className="px-4 py-3 border-b last:border-b-0 bg-yellow-50">
-                          <div className="grid grid-cols-5 gap-4 text-sm">
-                            <div className="font-medium text-neutral-900">{invitation.email}</div>
-                            <div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-neutral-200 bg-neutral-50">
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Role</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Invited By</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Sent</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Expires</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingInvitations.map((invitation, index) => (
+                          <tr key={invitation.id} className={`border-b border-neutral-100 hover:bg-neutral-50 bg-yellow-50 ${index === pendingInvitations.length - 1 ? 'border-b-0' : ''}`}>
+                            <td className="py-4 px-6">
+                              <span className="text-sm font-medium text-neutral-900">{invitation.email}</span>
+                            </td>
+                            <td className="py-4 px-6">
                               <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 capitalize">
                                 {invitation.role?.replace('_', ' ') || 'member'}
                               </span>
-                            </div>
-                            <div className="text-neutral-700">{invitation.invited_by?.name || 'Unknown'}</div>
-                            <div className="text-neutral-500 text-xs">
-                              {new Date(invitation.created_at).toLocaleDateString()}
-                            </div>
-                            <div className="text-neutral-500 text-xs">
-                              {invitation.is_expired ? (
-                                <span className="text-red-600">Expired</span>
-                              ) : (
-                                new Date(invitation.expires_at).toLocaleDateString()
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-sm text-neutral-600">{invitation.invited_by?.name || 'Unknown'}</span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-xs text-neutral-500">{new Date(invitation.created_at).toLocaleDateString()}</span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-xs text-neutral-500">
+                                {invitation.is_expired ? (
+                                  <span className="text-red-600">Expired</span>
+                                ) : (
+                                  new Date(invitation.expires_at).toLocaleDateString()
+                                )}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
 
-              {/* Empty State */}
+              {/* Empty State - No results from search */}
+              {filteredMembers.length === 0 && orgMembers.length > 0 && (
+                <div className={asInlineView ? "px-6 text-center py-8 text-neutral-500" : "text-center py-8 text-neutral-500"}>
+                  <p>No members found matching your search</p>
+                </div>
+              )}
+
+              {/* Empty State - No members at all */}
               {!loadingOrgData && orgMembers.length === 0 && pendingInvitations.length === 0 && (
-                <div className="text-center py-8 text-neutral-500">
+                <div className={asInlineView ? "px-6 text-center py-8 text-neutral-500" : "text-center py-8 text-neutral-500"}>
                   <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No organization members or pending invitations found</p>
                   <p className="text-sm mt-1">Start by inviting team members above</p>
@@ -559,6 +634,7 @@ export function OrganizationManagementDialog({
           )}
         </div>
 
+      {!asInlineView && (
         <DialogFooter>
           <Button
             variant="outline"
@@ -567,6 +643,45 @@ export function OrganizationManagementDialog({
             Close
           </Button>
         </DialogFooter>
+      )}
+    </>
+  )
+
+  // If inline view, render content without Dialog wrapper
+  if (asInlineView) {
+    return (
+      <>
+        {/* Header with padding and border */}
+        <div className="p-6 border-b border-neutral-200">
+          <h2 className="text-xl font-semibold text-neutral-900">
+            {title}
+          </h2>
+          <p className="text-sm text-neutral-600 mt-1">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Content */}
+        {dialogContentBody}
+      </>
+    )
+  }
+
+  // Original modal rendering
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center space-x-2">
+            <Users className="w-5 h-5" />
+            <span>{title}</span>
+          </DialogTitle>
+          <DialogDescription>
+            {subtitle}
+          </DialogDescription>
+        </DialogHeader>
+
+        {dialogContentBody}
       </DialogContent>
     </Dialog>
   )

@@ -1374,6 +1374,10 @@ async def get_jira_users(
             integration.jira_cloud_id
         )
 
+        logger.info("[Jira] Fetched %d total users from sync service", len(jira_users))
+        for u in jira_users:
+            logger.debug(f"[Jira] User: {u.get('display_name')} ({u.get('account_id')}) - Email: {u.get('email')} - Active: {u.get('active')}")
+
         # Filter to ensure we only return valid users with display names and account IDs
         valid_users = [
             {
@@ -1385,7 +1389,7 @@ async def get_jira_users(
             if u.get("account_id") and u.get("display_name")
         ]
 
-        logger.info("[Jira] Retrieved %d valid users for dropdown", len(valid_users))
+        logger.info("[Jira] Retrieved %d valid users for dropdown (from %d total)", len(valid_users), len(jira_users))
 
         return {
             "success": True,
