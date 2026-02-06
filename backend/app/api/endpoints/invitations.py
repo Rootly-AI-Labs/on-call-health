@@ -1,6 +1,7 @@
 """
 Organization invitations API endpoints.
 """
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -10,6 +11,8 @@ from pydantic import BaseModel, EmailStr
 from ...models import get_db, User, OrganizationInvitation, Organization, UserNotification, OAuthProvider
 from ...auth.dependencies import get_current_active_user, get_current_user_optional
 from ...services.notification_service import NotificationService
+
+logger = logging.getLogger(__name__)
 
 class CreateInvitationRequest(BaseModel):
     email: EmailStr
@@ -299,6 +302,8 @@ async def accept_invitation_page(
     try:
         # Delete user's personal Slack integration if they have one
         # (organizations should have a single shared Slack workspace)
+        # NOTE: This deletion is part of the atomic transaction and will be rolled back
+        # if any subsequent operation fails, ensuring data consistency
         from app.models.slack import SlackIntegration
         personal_slack = db.query(SlackIntegration).filter(
             SlackIntegration.user_id == current_user.id,
@@ -317,7 +322,7 @@ async def accept_invitation_page(
         invitation.status = "accepted"
         invitation.used_at = datetime.now(timezone.utc)
 
-        # Commit changes
+        # Commit changes (atomic transaction - all or nothing)
         db.commit()
 
         # Create notifications
@@ -392,6 +397,8 @@ async def accept_invitation_api(
     try:
         # Delete user's personal Slack integration if they have one
         # (organizations should have a single shared Slack workspace)
+        # NOTE: This deletion is part of the atomic transaction and will be rolled back
+        # if any subsequent operation fails, ensuring data consistency
         from app.models.slack import SlackIntegration
         personal_slack = db.query(SlackIntegration).filter(
             SlackIntegration.user_id == current_user.id,
@@ -410,7 +417,7 @@ async def accept_invitation_api(
         invitation.status = "accepted"
         invitation.used_at = datetime.now(timezone.utc)
 
-        # Commit changes
+        # Commit changes (atomic transaction - all or nothing)
         db.commit()
 
         # Create notifications
