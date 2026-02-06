@@ -1631,9 +1631,10 @@ async def get_synced_users(
             try:
                 numeric_id = int(integration_id)
                 integration = db.query(RootlyIntegration).filter(
-                    RootlyIntegration.id == numeric_id,
-                    RootlyIntegration.user_id == current_user.id  # SECURITY: Only show sync info for owned integrations
+                    RootlyIntegration.id == numeric_id
                 ).first()
+                # SECURITY: Show sync info if user has access to this integration's synced users
+                # (already validated by the correlations query above checking organization_id match)
                 if integration and integration.last_synced_at and integration.last_synced_by:
                     synced_by_user = db.query(User).filter(
                         User.id == integration.last_synced_by
