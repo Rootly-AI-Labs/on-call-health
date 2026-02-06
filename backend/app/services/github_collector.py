@@ -380,10 +380,10 @@ class GitHubCollector:
                         after_hours_commits += after_hours_count
                         weekend_commits += weekend_count
 
-            # Fall back to estimates if we couldn't fetch detailed data
+            # If we couldn't fetch detailed commit data, report zeros rather than guessing
             if not daily_commits_data:
-                after_hours_commits = int(total_commits * 0.15)  # Estimate 15% after hours
-                weekend_commits = int(total_commits * 0.1)       # Estimate 10% weekend
+                after_hours_commits = 0
+                weekend_commits = 0
 
             total_reviews = int(total_prs * 1.5)             # Estimate 1.5 reviews per PR
 
