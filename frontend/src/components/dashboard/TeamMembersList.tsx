@@ -13,13 +13,15 @@ interface TeamMembersListProps {
   setSelectedMember: (member: any) => void
   getRiskColor: (riskLevel: string) => string
   getProgressColor: (riskLevel: string) => string
+  connectedIntegrations?: Set<string>
 }
 
 export function TeamMembersList({
   currentAnalysis,
   setSelectedMember,
   getRiskColor,
-  getProgressColor
+  getProgressColor,
+  connectedIntegrations = new Set()
 }: TeamMembersListProps) {
   const [showMembersWithoutIncidents, setShowMembersWithoutIncidents] = useState(false);
   const dataSources = currentAnalysis?.analysis_data?.data_sources;
@@ -125,14 +127,14 @@ export function TeamMembersList({
               <h3 className="font-medium">{member.user_name || member.user_email}</h3>
               {/* Integration icons - inline with username */}
               <div className="flex gap-1">
-                {member.github_username && (
+                {member.github_username && connectedIntegrations.has('github') && isDataSourceEnabled('github') && (
                   <div className="flex items-center justify-center w-5 h-5 bg-neutral-200 rounded-full border border-neutral-200" title="GitHub">
                     <svg className="w-3 h-3 text-neutral-700" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
                     </svg>
                   </div>
                 )}
-                {member.slack_user_id && (
+                {member.slack_user_id && connectedIntegrations.has('slack') && isDataSourceEnabled('slack') && (
                   <div className="flex items-center justify-center w-5 h-5 bg-white rounded-full border border-neutral-200" title="Slack">
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
                       <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z" fill="#E01E5A"/>
@@ -146,14 +148,14 @@ export function TeamMembersList({
                     </svg>
                   </div>
                 )}
-                {isJiraEnabled && member.jira_account_id && (
+                {isJiraEnabled && member.jira_account_id && connectedIntegrations.has('jira') && isDataSourceEnabled('jira') && (
                   <div className="flex items-center justify-center w-5 h-5 bg-blue-50 rounded-full border border-blue-200" title="Jira">
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
                       <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z" fill="#2684FF"/>
                     </svg>
                   </div>
                 )}
-                {member.linear_user_id && (
+                {member.linear_user_id && connectedIntegrations.has('linear') && isDataSourceEnabled('linear') && (
                   <div className="flex items-center justify-center w-5 h-5" title="Linear">
                     <Image src="/images/linear-logo.png" alt="Linear" width={14} height={14} />
                   </div>

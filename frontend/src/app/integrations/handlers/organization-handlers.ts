@@ -91,7 +91,7 @@ export async function handleRoleChange(
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/auth/users/${userId}/role?new_role=${newRole}`, {
+    const response = await fetch(`${API_BASE}/auth/users/${userId}/role?new_role=${newRole}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${authToken}`,
