@@ -289,8 +289,11 @@ export function UnifiedSlackCard({
           {isConnected ? (
             <button
               onClick={() => {
-                const isAdmin = userInfo?.role === 'admin'
-                if (!isAdmin) {
+                // Allow admins, super_admins, or users without an organization
+                const canDisconnect = userInfo?.role === 'admin' ||
+                                     userInfo?.role === 'super_admin' ||
+                                     !userInfo?.organization_id
+                if (!canDisconnect) {
                   toast.error('Only admins can disconnect Slack integration')
                   return
                 }
@@ -354,8 +357,11 @@ export function UnifiedSlackCard({
                 <div className="flex justify-center pt-2">
                   <Button
                     onClick={() => {
-                      const isAdmin = userInfo?.role === 'admin'
-                      if (!isAdmin) {
+                      // Allow admins, super_admins, or users without an organization
+                      const canConnect = userInfo?.role === 'admin' ||
+                                        userInfo?.role === 'super_admin' ||
+                                        !userInfo?.organization_id
+                      if (!canConnect) {
                         toast.error('Only admins can connect Slack integration')
                         return
                       }
