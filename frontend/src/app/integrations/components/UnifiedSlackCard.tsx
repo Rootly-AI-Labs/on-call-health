@@ -352,46 +352,54 @@ export function UnifiedSlackCard({
 
             {/* Pre-Connection: Simple description and button */}
             <div className="space-y-4">
-              {/* Connect Button */}
-              {process.env.NEXT_PUBLIC_SLACK_CLIENT_ID ? (
-                <div className="flex justify-center pt-2">
-                  <Button
-                    onClick={() => {
-                      // Allow admins, super_admins, or users without an organization
-                      const canConnect = userInfo?.role === 'admin' ||
-                                        userInfo?.role === 'super_admin' ||
-                                        !userInfo?.organization_id
-                      if (!canConnect) {
-                        toast.error('Only admins can connect Slack integration')
-                        return
-                      }
-                      handleSlackConnect()
-                    }}
-                    disabled={isConnectingSlackOAuth}
-                    className="bg-purple-700 hover:bg-purple-800 text-white px-6 py-2.5 text-base"
-                    size="lg"
-                  >
-                    {isConnectingSlackOAuth ? (
-                      <span className="flex items-center space-x-2">
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Connecting...</span>
-                      </span>
-                    ) : (
-                      <span className="flex items-center space-x-2">
+              {/* Connect Button - Only show to admins, super_admins, or users without org */}
+              {(() => {
+                const canConnect = userInfo?.role === 'admin' ||
+                                  userInfo?.role === 'super_admin' ||
+                                  !userInfo?.organization_id
+
+                if (!process.env.NEXT_PUBLIC_SLACK_CLIENT_ID) {
+                  return (
+                    <div className="text-center py-4">
+                      <div className="inline-flex items-center space-x-2 bg-neutral-200 text-neutral-500 px-4 py-2 rounded-lg text-sm font-medium">
                         <SlackIcon />
-                        <span>Add to Slack</span>
-                      </span>
-                    )}
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <div className="inline-flex items-center space-x-2 bg-neutral-200 text-neutral-500 px-4 py-2 rounded-lg text-sm font-medium">
-                    <SlackIcon />
-                    <span>Slack App Not Configured</span>
+                        <span>Slack App Not Configured</span>
+                      </div>
+                    </div>
+                  )
+                }
+
+                if (!canConnect) {
+                  return (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-neutral-600">Only admins can connect Slack integration</p>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      onClick={handleSlackConnect}
+                      disabled={isConnectingSlackOAuth}
+                      className="bg-purple-700 hover:bg-purple-800 text-white px-6 py-2.5 text-base"
+                      size="lg"
+                    >
+                      {isConnectingSlackOAuth ? (
+                        <span className="flex items-center space-x-2">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Connecting...</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center space-x-2">
+                          <SlackIcon />
+                          <span>Add to Slack</span>
+                        </span>
+                      )}
+                    </Button>
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
           </>
         ) : (
