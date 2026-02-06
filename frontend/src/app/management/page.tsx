@@ -587,27 +587,32 @@ function TeamPageContent() {
           {/* Header with View Mode Toggle */}
           <div className="mb-8 flex items-end justify-end gap-6">
             {/* View Mode Toggle */}
-            <div className="flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
+            <div className="relative flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('organization')}
-                className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
+                className={`relative z-10 px-3 py-2 text-sm font-medium rounded transition-colors duration-200 ${
                   viewMode === 'organization'
-                    ? 'bg-neutral-100 text-neutral-900'
+                    ? 'text-neutral-900'
                     : 'text-neutral-600 hover:text-neutral-900'
                 }`}
               >
-                Organization
+                Synced Org
               </button>
               <button
                 onClick={() => setViewMode('company')}
-                className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
+                className={`relative z-10 px-3 py-2 text-sm font-medium rounded transition-colors duration-200 ${
                   viewMode === 'company'
-                    ? 'bg-neutral-100 text-neutral-900'
+                    ? 'text-neutral-900'
                     : 'text-neutral-600 hover:text-neutral-900'
                 }`}
               >
-                Team
+                Team Roles
               </button>
+              <div
+                className={`absolute top-1 bottom-1 bg-neutral-100 rounded transition-all duration-300 ease-in-out ${
+                  viewMode === 'organization' ? 'left-1 w-[calc(50%-0.25rem)]' : 'left-[calc(50%+0.125rem)] w-[calc(50%-0.375rem)]'
+                }`}
+              />
             </div>
           </div>
 
