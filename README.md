@@ -17,7 +17,7 @@ On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jir
 
 Get started at [www.oncallhealth.ai](https://www.oncallhealth.ai/) or [self-host it.](#Installation)
 
-![Rootly AI Labs On-call Health screenshot](https://github.com/user-attachments/assets/037358d8-1b9b-43f8-ae89-183d04e48bca)
+![On-Call Health Dashboard](frontend/public/images/dashboard-screenshot.png)
 
 ##  Methodology
 
