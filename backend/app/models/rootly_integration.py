@@ -21,9 +21,12 @@ class RootlyIntegration(Base):
     last_used_at = Column(DateTime(timezone=True), nullable=True)
     cached_permissions = Column(JSON, nullable=True)  # Cached permission check results
     permissions_checked_at = Column(DateTime(timezone=True), nullable=True)  # When permissions were last checked
+    last_synced_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)  # User who last synced
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)  # When last synced
 
     # Relationships
-    user = relationship("User", back_populates="rootly_integrations")
+    user = relationship("User", foreign_keys=[user_id], back_populates="rootly_integrations")
+    synced_by_user = relationship("User", foreign_keys=[last_synced_by])
     analyses = relationship("Analysis", back_populates="rootly_integration")
     
     def __repr__(self):
