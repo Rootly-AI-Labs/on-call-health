@@ -70,8 +70,47 @@ export async function updateUserCorrelation(
     // Check if all responses are OK
     for (const response of responses) {
       if (!response.ok) {
-        const error = await response.json()
-        toast.error(error.detail || "Failed to update mappings")
+        // Provide specific error messages based on status code
+        let errorMessage = "Failed to update mappings"
+
+        try {
+          const error = await response.json()
+          const detail = error.detail || ""
+
+          switch (response.status) {
+            case 400:
+              errorMessage = `Validation error: ${detail || "Invalid data provided"}`
+              break
+            case 401:
+              errorMessage = "Session expired. Please log in again"
+              // Clear auth token on 401
+              localStorage.removeItem("auth_token")
+              break
+            case 403:
+              errorMessage = "You don't have permission to update user mappings"
+              break
+            case 404:
+              errorMessage = "User not found. They may have been removed"
+              break
+            case 409:
+              errorMessage = `Conflict: ${detail || "This mapping may already exist"}`
+              break
+            case 500:
+            case 502:
+            case 503:
+              errorMessage = "Server error. Please try again later"
+              break
+            default:
+              errorMessage = detail || "Failed to update mappings"
+          }
+        } catch {
+          // If response body is not JSON, use status-based message
+          errorMessage = response.status === 401
+            ? "Session expired. Please log in again"
+            : `Server error (${response.status})`
+        }
+
+        toast.error(errorMessage)
         return false
       }
     }
@@ -79,7 +118,12 @@ export async function updateUserCorrelation(
     return true
   } catch (error) {
     console.error("Error updating user correlation:", error)
-    toast.error("Error updating mappings")
+    // Network or other errors
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      toast.error("Network error. Check your connection and try again")
+    } else {
+      toast.error(error instanceof Error ? error.message : "Error updating mappings")
+    }
     return false
   }
 }

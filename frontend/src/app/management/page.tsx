@@ -292,13 +292,16 @@ function TeamPageContent() {
   const fetchSyncedUsers = useCallback(async (showToast = false, autoSync = false, forceRefresh = false) => {
     if (!selectedOrganization) return
 
+    // Capture current organization to prevent race conditions
+    const requestedOrg = selectedOrganization
+
     // Check cache first
-    if (!forceRefresh && syncedUsersCache.current.has(selectedOrganization)) {
-      const cachedUsers = syncedUsersCache.current.get(selectedOrganization)!
+    if (!forceRefresh && syncedUsersCache.current.has(requestedOrg)) {
+      const cachedUsers = syncedUsersCache.current.get(requestedOrg)!
       setSyncedUsers(cachedUsers)
 
-      if (recipientsCache.current.has(selectedOrganization)) {
-        const cachedRecipients = recipientsCache.current.get(selectedOrganization)!
+      if (recipientsCache.current.has(requestedOrg)) {
+        const cachedRecipients = recipientsCache.current.get(requestedOrg)!
         const validUserIds = new Set(cachedUsers.map(u => u.id))
         const validCachedRecipients = new Set(
           Array.from(cachedRecipients).filter(id => validUserIds.has(id))
@@ -319,23 +322,28 @@ function TeamPageContent() {
 
     try {
       const response = await fetch(
-        `${API_BASE}/rootly/synced-users?integration_id=${selectedOrganization}`,
+        `${API_BASE}/rootly/synced-users?integration_id=${requestedOrg}`,
         {
           headers: { Authorization: `Bearer ${authToken}` },
         }
       )
 
+      // Ignore stale responses if user switched organizations
+      if (requestedOrg !== selectedOrganization) {
+        return
+      }
+
       if (response.ok) {
         const data = await response.json()
         const users = data.users || []
         setSyncedUsers(users)
-        syncedUsersCache.current.set(selectedOrganization, users)
+        syncedUsersCache.current.set(requestedOrg, users)
 
         // Load saved recipients
         const recipientIds = new Set<number>(users.filter((u: any) => u.is_survey_recipient).map((u: any) => u.id as number))
         setSelectedRecipients(recipientIds)
         setSavedRecipients(recipientIds)
-        recipientsCache.current.set(selectedOrganization, recipientIds)
+        recipientsCache.current.set(requestedOrg, recipientIds)
 
         if (showToast) {
           toast.success(`Loaded ${users.length} users`)
