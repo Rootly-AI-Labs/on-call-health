@@ -1435,6 +1435,8 @@ async def get_synced_users(
         else:
             # Personal mode: show user's own correlations
             # Beta users or users without organization see their personal synced data
+            # SECURITY: .is_(None) translates to SQL "IS NULL" (safe for NULL comparison)
+            # Combined with user_id check, this ensures users only see their own personal data
             query = db.query(UserCorrelation).filter(
                 UserCorrelation.user_id == current_user.id,
                 UserCorrelation.organization_id.is_(None)
@@ -1581,8 +1583,10 @@ async def get_synced_users(
         if integration_id and surveys_enabled:
             try:
                 numeric_id = int(integration_id)
+                # SECURITY: Verify user owns this integration
                 integration = db.query(RootlyIntegration).filter(
-                    RootlyIntegration.id == numeric_id
+                    RootlyIntegration.id == numeric_id,
+                    RootlyIntegration.user_id == current_user.id
                 ).first()
                 if integration and integration.survey_recipients:
                     saved_recipient_ids = set(integration.survey_recipients)
@@ -1608,7 +1612,8 @@ async def get_synced_users(
                 platforms.append("linear")
 
             # Check if user is currently on-call
-            is_oncall = corr.email.lower() in {email.lower() for email in oncall_emails}
+            # SAFETY: Guard against NULL email to prevent crash
+            is_oncall = bool(corr.email and corr.email.lower() in {email.lower() for email in oncall_emails})
 
             # Determine if user will receive automated surveys
             receives_automated_surveys = False
@@ -1646,11 +1651,11 @@ async def get_synced_users(
         if integration_id:
             try:
                 numeric_id = int(integration_id)
+                # SECURITY: Verify user owns this integration (both org mode and personal mode)
                 integration = db.query(RootlyIntegration).filter(
-                    RootlyIntegration.id == numeric_id
+                    RootlyIntegration.id == numeric_id,
+                    RootlyIntegration.user_id == current_user.id
                 ).first()
-                # SECURITY: Show sync info if user has access to this integration's synced users
-                # (already validated by the correlations query above checking organization_id match)
                 if integration and integration.last_synced_at and integration.last_synced_by:
                     synced_by_user = db.query(User).filter(
                         User.id == integration.last_synced_by
