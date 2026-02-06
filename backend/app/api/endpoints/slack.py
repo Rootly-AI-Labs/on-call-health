@@ -348,11 +348,13 @@ async def slack_oauth_callback(
         if slack_integration:
             # Update existing OAuth integration
             slack_integration.slack_token = encrypt_token(access_token)
+            slack_integration.organization_id = organization_id  # Update org attribution
             slack_integration.updated_at = datetime.now(timezone.utc)
         else:
             # Create new OAuth integration (won't conflict with manual integrations)
             slack_integration = SlackIntegration(
                 user_id=owner_user.id,
+                organization_id=organization_id,  # NULL for personal, set for org
                 slack_token=encrypt_token(access_token),
                 workspace_id=workspace_id,
                 token_source="oauth"
