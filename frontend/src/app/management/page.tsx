@@ -32,6 +32,9 @@ import {
   Pencil,
   CheckCircle,
   Users,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react"
 import { API_BASE, type Integration } from "@/app/integrations/types"
 import { UserMappingDrawer } from "./components/UserMappingDrawer"
@@ -87,9 +90,9 @@ function TeamPageContent() {
   // Search state
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Filter state
-  const [onCallFilter, setOnCallFilter] = useState<'all' | 'active' | 'inactive'>('all')
-  const [integrationFilter, setIntegrationFilter] = useState<'all' | 'github' | 'jira' | 'linear'>('all')
+  // Sort state
+  const [sortBy, setSortBy] = useState<'name' | 'email' | 'oncall' | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   // Cache to track which integrations have already been loaded
   const syncedUsersCache = useRef<Map<string, SyncedUser[]>>(new Map())
@@ -558,34 +561,37 @@ function TeamPageContent() {
   // Since the integrations array only contains Rootly and PagerDuty entries, length > 0 is sufficient
   const hasPrimaryIntegration = integrations.length > 0
 
-  // Filter users based on search query and filters
-  const filteredUsers = syncedUsers.filter(user => {
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      const matchesSearch = (
-        user.email?.toLowerCase().includes(query) ||
-        user.github_username?.toLowerCase().includes(query) ||
-        user.jira_email?.toLowerCase().includes(query)
-      )
-      if (!matchesSearch) return false
-    }
+  // Filter and sort users
+  const filteredUsers = syncedUsers
+    .filter(user => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        const matchesSearch = (
+          user.email?.toLowerCase().includes(query) ||
+          user.github_username?.toLowerCase().includes(query) ||
+          user.jira_email?.toLowerCase().includes(query)
+        )
+        if (!matchesSearch) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      if (!sortBy) return 0
 
-    // On-call status filter
-    if (onCallFilter !== 'all') {
-      if (onCallFilter === 'active' && !user.is_oncall) return false
-      if (onCallFilter === 'inactive' && user.is_oncall) return false
-    }
+      let comparison = 0
+      if (sortBy === 'name') {
+        const aName = a.email?.split('@')[0] || ''
+        const bName = b.email?.split('@')[0] || ''
+        comparison = aName.localeCompare(bName)
+      } else if (sortBy === 'email') {
+        comparison = (a.email || '').localeCompare(b.email || '')
+      } else if (sortBy === 'oncall') {
+        comparison = (a.is_oncall ? 1 : 0) - (b.is_oncall ? 1 : 0)
+      }
 
-    // Integration filter
-    if (integrationFilter !== 'all') {
-      if (integrationFilter === 'github' && !user.github_username) return false
-      if (integrationFilter === 'jira' && !user.jira_account_id) return false
-      if (integrationFilter === 'linear' && !user.linear_user_id) return false
-    }
-
-    return true
-  })
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
 
   // Pagination
   const totalPages = Math.ceil(filteredUsers.length / TEAM_MEMBERS_PER_PAGE)
@@ -599,6 +605,28 @@ function TeamPageContent() {
     if (user.jira_account_id && connectedIntegrations.has('jira')) integrations.push('jira')
     if (user.linear_user_id && connectedIntegrations.has('linear')) integrations.push('linear')
     return integrations
+  }
+
+  // Handle column header click for sorting
+  const handleSort = (column: 'name' | 'email' | 'oncall') => {
+    if (sortBy === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New column, default to ascending
+      setSortBy(column)
+      setSortDirection('asc')
+    }
+  }
+
+  // Get sort icon for column
+  const getSortIcon = (column: 'name' | 'email' | 'oncall') => {
+    if (sortBy !== column) {
+      return <ArrowUpDown className="w-4 h-4 text-neutral-400" />
+    }
+    return sortDirection === 'asc'
+      ? <ArrowUp className="w-4 h-4 text-purple-700" />
+      : <ArrowDown className="w-4 h-4 text-purple-700" />
   }
 
   return (
@@ -664,134 +692,41 @@ function TeamPageContent() {
 
                     {/* Search Bar and Organization Selector - Only show when primary integration exists */}
                     {hasPrimaryIntegration && (
-                      <div className="space-y-4">
-                        <div className="flex items-end gap-4">
-                          {/* Search Bar - shorter */}
-                          <div className="w-80">
-                            <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">&nbsp;</label>
-                            <div className="relative">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                              <Input
-                                type="text"
-                                placeholder="Search members..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 w-full"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Organization Selector - wider on the right */}
-                          <div className="flex-shrink-0">
-                            <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">Select Organization</label>
-                            <Select
-                              value={selectedOrganization}
-                              onValueChange={setSelectedOrganization}
-                              disabled={loadingIntegrations || !hasPrimaryIntegration}
-                            >
-                              <SelectTrigger className="w-72">
-                                <SelectValue placeholder="Select an organization..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {integrations.map((integration) => (
-                                  <SelectItem key={integration.id} value={integration.id.toString()}>
-                                    {integration.name || `Integration #${integration.id}`}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                      <div className="flex items-end gap-4">
+                        {/* Search Bar - shorter */}
+                        <div className="w-80">
+                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">&nbsp;</label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                            <Input
+                              type="text"
+                              placeholder="Search members..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="pl-9 w-full"
+                            />
                           </div>
                         </div>
 
-                        {/* Filters */}
-                        <div className="flex items-center gap-6">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-neutral-700">On-Call:</span>
-                            <div className="flex gap-1">
-                              <Badge
-                                className={`cursor-pointer transition-colors ${
-                                  onCallFilter === 'all'
-                                    ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
-                                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                                }`}
-                                onClick={() => setOnCallFilter('all')}
-                              >
-                                All
-                              </Badge>
-                              <Badge
-                                className={`cursor-pointer transition-colors ${
-                                  onCallFilter === 'active'
-                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                                }`}
-                                onClick={() => setOnCallFilter('active')}
-                              >
-                                Active
-                              </Badge>
-                              <Badge
-                                className={`cursor-pointer transition-colors ${
-                                  onCallFilter === 'inactive'
-                                    ? 'bg-neutral-200 text-neutral-800 hover:bg-neutral-300'
-                                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                                }`}
-                                onClick={() => setOnCallFilter('inactive')}
-                              >
-                                Inactive
-                              </Badge>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-neutral-700">Integration:</span>
-                            <div className="flex gap-1">
-                              <Badge
-                                className={`cursor-pointer transition-colors ${
-                                  integrationFilter === 'all'
-                                    ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
-                                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                                }`}
-                                onClick={() => setIntegrationFilter('all')}
-                              >
-                                All
-                              </Badge>
-                              {connectedIntegrations.has('github') && (
-                                <Badge
-                                  className={`cursor-pointer transition-colors ${
-                                    integrationFilter === 'github'
-                                      ? 'bg-neutral-800 text-white hover:bg-neutral-900'
-                                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                                  }`}
-                                  onClick={() => setIntegrationFilter('github')}
-                                >
-                                  GitHub
-                                </Badge>
-                              )}
-                              {connectedIntegrations.has('jira') && (
-                                <Badge
-                                  className={`cursor-pointer transition-colors ${
-                                    integrationFilter === 'jira'
-                                      ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                                  }`}
-                                  onClick={() => setIntegrationFilter('jira')}
-                                >
-                                  Jira
-                                </Badge>
-                              )}
-                              {connectedIntegrations.has('linear') && (
-                                <Badge
-                                  className={`cursor-pointer transition-colors ${
-                                    integrationFilter === 'linear'
-                                      ? 'bg-purple-200 text-purple-900 hover:bg-purple-300'
-                                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                                  }`}
-                                  onClick={() => setIntegrationFilter('linear')}
-                                >
-                                  Linear
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
+                        {/* Organization Selector - wider on the right */}
+                        <div className="flex-shrink-0">
+                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">Select Organization</label>
+                          <Select
+                            value={selectedOrganization}
+                            onValueChange={setSelectedOrganization}
+                            disabled={loadingIntegrations || !hasPrimaryIntegration}
+                          >
+                            <SelectTrigger className="w-72">
+                              <SelectValue placeholder="Select an organization..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {integrations.map((integration) => (
+                                <SelectItem key={integration.id} value={integration.id.toString()}>
+                                  {integration.name || `Integration #${integration.id}`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     )}
@@ -865,9 +800,33 @@ function TeamPageContent() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-neutral-200 bg-neutral-50">
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Name</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">On-Call Status</th>
+                          <th className="text-left py-3 px-6">
+                            <button
+                              onClick={() => handleSort('name')}
+                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
+                            >
+                              Name
+                              {getSortIcon('name')}
+                            </button>
+                          </th>
+                          <th className="text-left py-3 px-6">
+                            <button
+                              onClick={() => handleSort('email')}
+                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
+                            >
+                              Email
+                              {getSortIcon('email')}
+                            </button>
+                          </th>
+                          <th className="text-left py-3 px-6">
+                            <button
+                              onClick={() => handleSort('oncall')}
+                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
+                            >
+                              On-Call Status
+                              {getSortIcon('oncall')}
+                            </button>
+                          </th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Integrations</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700"></th>
                         </tr>
