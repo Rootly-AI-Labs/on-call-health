@@ -1626,20 +1626,22 @@ async def get_synced_users(
             try:
                 numeric_id = int(integration_id)
                 integration = db.query(RootlyIntegration).filter(
-                    RootlyIntegration.id == numeric_id
+                    RootlyIntegration.id == numeric_id,
+                    RootlyIntegration.user_id == current_user.id  # SECURITY: Only show sync info for owned integrations
                 ).first()
-                if integration and integration.last_synced_at:
+                if integration and integration.last_synced_at and integration.last_synced_by:
                     synced_by_user = db.query(User).filter(
                         User.id == integration.last_synced_by
                     ).first()
-                    last_sync_info = {
-                        "synced_at": integration.last_synced_at.isoformat(),
-                        "synced_by": {
-                            "id": synced_by_user.id,
-                            "name": synced_by_user.name,
-                            "email": synced_by_user.email
-                        } if synced_by_user else None
-                    }
+                    if synced_by_user:  # Null safety: Handle deleted user
+                        last_sync_info = {
+                            "synced_at": integration.last_synced_at.isoformat(),
+                            "synced_by": {
+                                "id": synced_by_user.id,
+                                "name": synced_by_user.name,
+                                "email": synced_by_user.email
+                            }
+                        }
             except (ValueError, AttributeError):
                 pass
 

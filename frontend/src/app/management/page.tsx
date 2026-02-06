@@ -724,7 +724,7 @@ function TeamPageContent() {
                     <div className="px-6 py-3 bg-neutral-50 border-b border-neutral-200">
                       <p className="text-sm text-neutral-600">
                         Last synced {new Date(lastSyncInfo.synced_at).toLocaleString()} by{' '}
-                        <span className="font-medium text-neutral-900">{lastSyncInfo.synced_by?.name || lastSyncInfo.synced_by?.email}</span>
+                        <span className="font-medium text-neutral-900">{lastSyncInfo.synced_by?.name || lastSyncInfo.synced_by?.email || "Unknown User"}</span>
                       </p>
                     </div>
                   )}
