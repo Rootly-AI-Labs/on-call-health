@@ -82,6 +82,7 @@ function TeamPageContent() {
   // Team members state
   const [syncedUsers, setSyncedUsers] = useState<SyncedUser[]>([])
   const [loadingSyncedUsers, setLoadingSyncedUsers] = useState(false)
+  const [lastSyncInfo, setLastSyncInfo] = useState<{synced_at: string; synced_by: {id: number; name: string; email: string}} | null>(null)
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("")
@@ -338,6 +339,7 @@ function TeamPageContent() {
         const users = data.users || []
         setSyncedUsers(users)
         syncedUsersCache.current.set(requestedOrg, users)
+        setLastSyncInfo(data.last_sync || null)
 
         // Load saved recipients
         const recipientIds = new Set<number>(users.filter((u: any) => u.is_survey_recipient).map((u: any) => u.id as number))
@@ -717,6 +719,16 @@ function TeamPageContent() {
               ) : (
                 // TABLE
                 <>
+                  {/* Last Sync Info */}
+                  {lastSyncInfo && (
+                    <div className="px-6 py-3 bg-neutral-50 border-b border-neutral-200">
+                      <p className="text-sm text-neutral-600">
+                        Last synced {new Date(lastSyncInfo.synced_at).toLocaleString()} by{' '}
+                        <span className="font-medium text-neutral-900">{lastSyncInfo.synced_by?.name || lastSyncInfo.synced_by?.email || "Unknown User"}</span>
+                      </p>
+                    </div>
+                  )}
+
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
