@@ -1424,13 +1424,23 @@ async def get_synced_users(
     try:
         from sqlalchemy import func, cast, String, or_, and_
 
-        # Fetch all user correlations for this organization
-        # Organization-scoped: show all team members in the org, not just current user's personal data
-        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-        query = db.query(UserCorrelation).filter(
-            UserCorrelation.organization_id.isnot(None),
-            UserCorrelation.organization_id == current_user.organization_id
-        )
+        # Support both organization mode (multi-tenant) and personal mode (individual users)
+        if current_user.organization_id:
+            # Organization mode: show all team members in the org
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+            query = db.query(UserCorrelation).filter(
+                UserCorrelation.organization_id.isnot(None),
+                UserCorrelation.organization_id == current_user.organization_id
+            )
+        else:
+            # Personal mode: show user's own correlations
+            # Beta users or users without organization see their personal synced data
+            # SECURITY: .is_(None) translates to SQL "IS NULL" (safe for NULL comparison)
+            # Combined with user_id check, this ensures users only see their own personal data
+            query = db.query(UserCorrelation).filter(
+                UserCorrelation.user_id == current_user.id,
+                UserCorrelation.organization_id.is_(None)
+            )
 
         # Get all correlations, then filter in Python
         # This is simpler and works across all database types
@@ -1542,19 +1552,27 @@ async def get_synced_users(
                 survey_counts[corr.id] = count
 
         # Check if automated surveys are enabled for this organization
-        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-        survey_schedule = db.query(SurveySchedule).filter(
-            SurveySchedule.organization_id.isnot(None),
-            SurveySchedule.organization_id == current_user.organization_id,
-            SurveySchedule.enabled == True
-        ).first()
+        # Only check survey schedule if user has an organization
+        if current_user.organization_id:
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+            survey_schedule = db.query(SurveySchedule).filter(
+                SurveySchedule.organization_id.isnot(None),
+                SurveySchedule.organization_id == current_user.organization_id,
+                SurveySchedule.enabled == True
+            ).first()
+        else:
+            survey_schedule = None  # Personal mode doesn't have org-level survey schedules
 
-        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-        workspace_mapping = db.query(SlackWorkspaceMapping).filter(
-            SlackWorkspaceMapping.organization_id.isnot(None),
-            SlackWorkspaceMapping.organization_id == current_user.organization_id,
-            SlackWorkspaceMapping.status == 'active'
-        ).first()
+        # Only check workspace mapping if user has an organization
+        if current_user.organization_id:
+            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+            workspace_mapping = db.query(SlackWorkspaceMapping).filter(
+                SlackWorkspaceMapping.organization_id.isnot(None),
+                SlackWorkspaceMapping.organization_id == current_user.organization_id,
+                SlackWorkspaceMapping.status == 'active'
+            ).first()
+        else:
+            workspace_mapping = None  # Personal mode doesn't have org-level Slack workspace
 
         surveys_enabled = (survey_schedule is not None and
                           workspace_mapping is not None and
@@ -1565,8 +1583,10 @@ async def get_synced_users(
         if integration_id and surveys_enabled:
             try:
                 numeric_id = int(integration_id)
+                # SECURITY: Verify user owns this integration
                 integration = db.query(RootlyIntegration).filter(
-                    RootlyIntegration.id == numeric_id
+                    RootlyIntegration.id == numeric_id,
+                    RootlyIntegration.user_id == current_user.id
                 ).first()
                 if integration and integration.survey_recipients:
                     saved_recipient_ids = set(integration.survey_recipients)
@@ -1592,7 +1612,8 @@ async def get_synced_users(
                 platforms.append("linear")
 
             # Check if user is currently on-call
-            is_oncall = corr.email.lower() in {email.lower() for email in oncall_emails}
+            # SAFETY: Guard against NULL email to prevent crash
+            is_oncall = bool(corr.email and corr.email.lower() in {email.lower() for email in oncall_emails})
 
             # Determine if user will receive automated surveys
             receives_automated_surveys = False
@@ -1630,11 +1651,11 @@ async def get_synced_users(
         if integration_id:
             try:
                 numeric_id = int(integration_id)
+                # SECURITY: Verify user owns this integration (both org mode and personal mode)
                 integration = db.query(RootlyIntegration).filter(
-                    RootlyIntegration.id == numeric_id
+                    RootlyIntegration.id == numeric_id,
+                    RootlyIntegration.user_id == current_user.id
                 ).first()
-                # SECURITY: Show sync info if user has access to this integration's synced users
-                # (already validated by the correlations query above checking organization_id match)
                 if integration and integration.last_synced_at and integration.last_synced_by:
                     synced_by_user = db.query(User).filter(
                         User.id == integration.last_synced_by
