@@ -2181,20 +2181,19 @@ class UnifiedBurnoutAnalyzer:
         safe_incidents_len = len(incidents) if incidents is not None else 0
         safe_days = days_analyzed if days_analyzed is not None and days_analyzed > 0 else 1
 
-        # Combine GitHub and incident after-hours activity
-        total_after_hours_activities = safe_after_hours + github_after_hours_commits
-        total_weekend_activities = safe_weekend + github_weekend_commits
-        total_activities = safe_incidents_len + total_commits
-
         incidents_per_week = (safe_incidents_len / safe_days) * 7 if safe_days > 0 else 0
 
-        # Calculate after-hours percentage INCLUDING weekends
-        # Research shows weekends are a critical component of work-life boundary erosion
-        total_non_business_hours = total_after_hours_activities + total_weekend_activities
-        after_hours_percentage = total_non_business_hours / total_activities if total_activities > 0 else 0
+        # After-hours activity is based only on voluntary user activity (GitHub commits, Slack messages)
+        # Incidents are excluded because being paged is not a choice — it doesn't reflect work-life boundaries
+        # Slack after-hours data is merged in later via _enhance_metrics_with_slack_data
+        total_voluntary_after_hours = github_after_hours_commits
+        total_voluntary_weekend = github_weekend_commits
+        total_voluntary_activities = total_commits
 
-        # Calculate weekend percentage separately for additional analysis
-        weekend_percentage = total_weekend_activities / total_activities if total_activities > 0 else 0
+        total_non_business_hours = total_voluntary_after_hours + total_voluntary_weekend
+        after_hours_percentage = total_non_business_hours / total_voluntary_activities if total_voluntary_activities > 0 else 0
+
+        weekend_percentage = total_voluntary_weekend / total_voluntary_activities if total_voluntary_activities > 0 else 0
         avg_response_time = sum(response_times) / len(response_times) if response_times and len(response_times) > 0 else 0
         
         # Ensure all numeric values are not None before rounding
@@ -2410,6 +2409,7 @@ class UnifiedBurnoutAnalyzer:
             if message_hours:
                 after_hours_msgs = sum(1 for h in message_hours if h < BUSINESS_HOURS_START or h >= BUSINESS_HOURS_END)
                 enhanced["slack_after_hours_ratio"] = after_hours_msgs / len(messages)
+                enhanced["slack_after_hours_count"] = after_hours_msgs
 
                 # Late night communication stress (using standard constants)
                 late_night_msgs = sum(1 for h in message_hours if h >= LATE_NIGHT_START or h <= LATE_NIGHT_END)
@@ -2419,9 +2419,28 @@ class UnifiedBurnoutAnalyzer:
             if message_weekdays:
                 weekend_msgs = sum(1 for day in message_weekdays if day >= 5)  # Sat=5, Sun=6
                 enhanced["slack_weekend_ratio"] = weekend_msgs / len(messages)
+                enhanced["slack_weekend_count"] = weekend_msgs
+
+        # Recalculate after_hours_percentage to include Slack voluntary activity
+        # after_hours_percentage is based on GitHub + Slack only (not incidents)
+        total_messages = len(messages)
+        slack_after_hours = enhanced.get("slack_after_hours_count", 0)
+        slack_weekend = enhanced.get("slack_weekend_count", 0)
+        prev_total_activities = enhanced.get("total_activities", 0)
+        prev_github_after_hours = enhanced.get("github_after_hours_commits", 0)
+        prev_github_weekend = enhanced.get("github_weekend_commits", 0)
+
+        new_total_activities = prev_total_activities + total_messages
+        new_after_hours = prev_github_after_hours + slack_after_hours
+        new_weekend = prev_github_weekend + slack_weekend
+        new_non_business = new_after_hours + new_weekend
+
+        if new_total_activities > 0:
+            enhanced["after_hours_percentage"] = round(new_non_business / new_total_activities, 3)
+            enhanced["weekend_percentage"] = round(new_weekend / new_total_activities, 3)
+        enhanced["total_activities"] = new_total_activities
 
         # 2. Social Engagement and Isolation Indicators
-        total_messages = len(messages)
         enhanced["slack_daily_msg_volume"] = total_messages / 30 if total_messages > 0 else 0  # Avg per day
 
         # Communication channel diversity (social health indicator)
