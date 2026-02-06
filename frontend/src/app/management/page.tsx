@@ -90,6 +90,7 @@ function TeamPageContent() {
   // Cache to track which integrations have already been loaded
   const syncedUsersCache = useRef<Map<string, SyncedUser[]>>(new Map())
   const recipientsCache = useRef<Map<string, Set<number>>>(new Map())
+  const lastSyncInfoCache = useRef<Map<string, {synced_at: string; synced_by: {id: number; name: string; email: string}} | null>>(new Map())
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isMountedRef = useRef(true)
 
@@ -301,6 +302,13 @@ function TeamPageContent() {
       const cachedUsers = syncedUsersCache.current.get(requestedOrg)!
       setSyncedUsers(cachedUsers)
 
+      // Restore cached last sync info
+      if (lastSyncInfoCache.current.has(requestedOrg)) {
+        setLastSyncInfo(lastSyncInfoCache.current.get(requestedOrg)!)
+      } else {
+        setLastSyncInfo(null)
+      }
+
       if (recipientsCache.current.has(requestedOrg)) {
         const cachedRecipients = recipientsCache.current.get(requestedOrg)!
         const validUserIds = new Set(cachedUsers.map(u => u.id))
@@ -339,7 +347,11 @@ function TeamPageContent() {
         const users = data.users || []
         setSyncedUsers(users)
         syncedUsersCache.current.set(requestedOrg, users)
-        setLastSyncInfo(data.last_sync || null)
+
+        // Cache last sync info
+        const syncInfo = data.last_sync || null
+        setLastSyncInfo(syncInfo)
+        lastSyncInfoCache.current.set(requestedOrg, syncInfo)
 
         // Load saved recipients
         const recipientIds = new Set<number>(users.filter((u: any) => u.is_survey_recipient).map((u: any) => u.id as number))
@@ -398,6 +410,7 @@ function TeamPageContent() {
       // Clear cache only after successful sync
       if (selectedOrganization) {
         syncedUsersCache.current.delete(selectedOrganization)
+        lastSyncInfoCache.current.delete(selectedOrganization)
       }
 
       setSyncProgress({
