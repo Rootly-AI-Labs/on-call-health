@@ -588,7 +588,9 @@ async def get_analysis(
 
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
-        most_recent = db.query(Analysis).filter(
+        most_recent = db.query(Analysis).options(
+            load_only(Analysis.id, Analysis.uuid)
+        ).filter(
             Analysis.user_id == current_user.id,
             Analysis.status == "completed"
         ).order_by(Analysis.created_at.desc()).first()
@@ -670,14 +672,15 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     analysis_end_date = datetime.now(timezone.utc)
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
 
-    # Query 1: Get all team member emails
+    # Query 1: Get all team member emails (select only email column to avoid loading full objects)
     # SECURITY: Explicitly check IS NOT NULL for defense-in-depth
-    correlations = db.query(UserCorrelation).filter(
-        UserCorrelation.organization_id == analysis.organization_id,
-        UserCorrelation.organization_id.isnot(None)
-    ).all()
-
-    member_emails = [c.email for c in correlations if c.email]
+    member_emails = [
+        row[0] for row in db.query(UserCorrelation.email).filter(
+            UserCorrelation.organization_id == analysis.organization_id,
+            UserCorrelation.organization_id.isnot(None),
+            UserCorrelation.email.isnot(None)
+        ).all()
+    ]
     if not member_emails:
         return {}
 
