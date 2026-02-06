@@ -87,6 +87,14 @@ function TeamPageContent() {
   // Search state
   const [searchQuery, setSearchQuery] = useState("")
 
+  // Sort state
+  const [sortBy, setSortBy] = useState<'name' | 'oncall' | 'survey_count' | 'platforms' | 'recent'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('teamSortBy') as any) || 'name'
+    }
+    return 'name'
+  })
+
   // Cache to track which integrations have already been loaded
   const syncedUsersCache = useRef<Map<string, SyncedUser[]>>(new Map())
   const recipientsCache = useRef<Map<string, Set<number>>>(new Map())
@@ -541,7 +549,7 @@ function TeamPageContent() {
   // Since the integrations array only contains Rootly and PagerDuty entries, length > 0 is sufficient
   const hasPrimaryIntegration = integrations.length > 0
 
-  // Filter users based on search query
+  // Filter and sort users
   const filteredUsers = syncedUsers.filter(user => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
@@ -550,7 +558,38 @@ function TeamPageContent() {
       user.github_username?.toLowerCase().includes(query) ||
       user.jira_email?.toLowerCase().includes(query)
     )
+  }).sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return (a.name || a.email || '').localeCompare(b.name || b.email || '')
+      case 'oncall':
+        // On-call users first
+        if (a.is_oncall && !b.is_oncall) return -1
+        if (!a.is_oncall && b.is_oncall) return 1
+        return (a.name || a.email || '').localeCompare(b.name || b.email || '')
+      case 'survey_count':
+        // Highest survey count first
+        return ((b as any).survey_count || 0) - ((a as any).survey_count || 0)
+      case 'platforms':
+        // Most platforms first
+        const aPlatforms = (a as any).platforms?.length || 0
+        const bPlatforms = (b as any).platforms?.length || 0
+        if (aPlatforms !== bPlatforms) return bPlatforms - aPlatforms
+        return (a.name || a.email || '').localeCompare(b.name || b.email || '')
+      case 'recent':
+        // Most recently added first
+        const aTime = new Date((a as any).created_at || 0).getTime()
+        const bTime = new Date((b as any).created_at || 0).getTime()
+        return bTime - aTime
+      default:
+        return 0
+    }
   })
+
+  // Update localStorage when sort changes
+  useEffect(() => {
+    localStorage.setItem('teamSortBy', sortBy)
+  }, [sortBy])
 
   // Pagination
   const totalPages = Math.ceil(filteredUsers.length / TEAM_MEMBERS_PER_PAGE)
@@ -638,6 +677,23 @@ function TeamPageContent() {
                               className="pl-9 w-full"
                             />
                           </div>
+                        </div>
+
+                        {/* Sort Dropdown */}
+                        <div className="w-48">
+                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">Sort By</label>
+                          <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="name">Alphabetical (A-Z)</SelectItem>
+                              <SelectItem value="oncall">On-Call Status</SelectItem>
+                              <SelectItem value="survey_count">Survey Count</SelectItem>
+                              <SelectItem value="platforms">Platform Coverage</SelectItem>
+                              <SelectItem value="recent">Recently Added</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
 
                         {/* Organization Selector - wider on the right */}
