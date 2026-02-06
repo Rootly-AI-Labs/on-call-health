@@ -12,19 +12,15 @@
 ![OpenAI](https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white)
 ![Anthropic](https://img.shields.io/badge/Anthropic-D4A27F?logo=anthropic&logoColor=white)
 
-Catch exhaustion before it burns out your engineers.
+Catch exhaustion before it burns out your incident responders.
 
-On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to collect objective and self-reported data to look for sign of overload in on-call engineers. Free and open-source.
+On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to collect objective and self-reported data to identify signs of overload among on-call engineers. Free and open-source.
+
+Get started at [www.oncallhealth.ai](https://www.oncallhealth.ai/) or [self-host it.](#Installation)
 
 ![Rootly AI Labs On-call Health screenshot](https://github.com/user-attachments/assets/037358d8-1b9b-43f8-ae89-183d04e48bca)
 
-
-Two ways to get started:
-* Use our hosted version [www.oncallhealth.ai](https://www.oncallhealth.ai/) (contains mock data to easily test it out)
-* Host it [locally](#Installation)
-
 ## Installation
-
 
 ### 1) Environment Variables
 ⚠️ For login purposes, you **must** configure OAuth tokens for Google OR GitHub OAuth:
@@ -63,7 +59,6 @@ cp backend/.env.example backend/.env
 3. **Add to `backend/.env:`**
 4. **Restart backend:**
 </details>
-
 
 ### 2) Docker Setup
 Use our Docker Compose file.
@@ -158,6 +153,6 @@ On-call Health also offers [an API](https://api.oncallhealth.ai/docs) that can e
 [<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://god.gw.postman.com/run-collection/45004446-1074ba3c-44fe-40e3-a932-af7c071b96eb?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D45004446-1074ba3c-44fe-40e3-a932-af7c071b96eb%26entityType%3Dcollection%26workspaceId%3D4bec6e3c-50a0-4746-85f1-00a703c32f24)
 
 ## 🔗 About the Rootly AI Labs
-On-call Health is built with ❤️ by the [Rootly AI Labs](https://rootly.com/ai-labs) for engineering teams everywhere. The Rootly AI Labs is a fellow-led community designed to redefine reliability engineering. We develop innovative prototypes, create open-source tools, and produce research that's shared to advance the standards of operational excellence. We want to thank Anthropic, Google Cloud, and Google DeepMind for their support.
+On-call Health is built with ❤️ by the [Rootly AI Labs](https://rootly.com/ai-labs) for engineering teams everywhere. The Rootly AI Labs is a fellow-led community designed to redefine reliability engineering. We develop innovative prototypes, create open-source tools, and produce research that's shared to advance operational excellence standards. We want to thank Anthropic, Google Cloud, and Google DeepMind for their support.
 
 This project is licensed under the Apache License 2.0.
