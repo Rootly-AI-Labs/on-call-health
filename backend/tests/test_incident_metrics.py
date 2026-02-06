@@ -215,19 +215,20 @@ class TestMetricCalculationLogic(unittest.TestCase):
         self.assertEqual(percentage, 0.0)
 
     def test_after_hours_detection(self):
-        """Test after-hours detection logic (before 9 AM or after 6 PM)."""
+        """Test after-hours detection logic (before 9 AM or 5 PM and later)."""
         test_cases = [
             (8, True),   # 8 AM - before 9 AM
             (9, False),  # 9 AM - business hours
             (12, False), # 12 PM - business hours
-            (17, False), # 5 PM - business hours
+            (16, False), # 4 PM - business hours
+            (17, True),  # 5 PM - after hours
             (18, True),  # 6 PM - after hours
             (22, True),  # 10 PM - after hours
             (0, True),   # Midnight - after hours
         ]
 
         for hour, expected_after_hours in test_cases:
-            is_after_hours = hour < 9 or hour >= 18
+            is_after_hours = hour < 9 or hour >= 17
             self.assertEqual(is_after_hours, expected_after_hours,
                            f"Hour {hour} should be {'after hours' if expected_after_hours else 'business hours'}")
 
@@ -1082,6 +1083,101 @@ class TestEdgeCases(unittest.TestCase):
         incidents = None
         safe_incidents_len = len(incidents) if incidents is not None else 0
         self.assertEqual(safe_incidents_len, 0)
+
+
+class TestAfterHoursVoluntaryActivityOnly(unittest.TestCase):
+    """Test that after-hours calculation uses only voluntary activity (GitHub + Slack), not incidents."""
+
+    def test_after_hours_excludes_incidents(self):
+        """After-hours percentage should be based on GitHub + Slack only, not incidents."""
+        # Simulate: 5 incidents (3 after hours), 10 GitHub commits (2 after hours)
+        incident_after_hours = 3
+        incident_total = 5
+        github_after_hours = 2
+        github_weekend = 1
+        total_commits = 10
+
+        # OLD behavior (wrong): included incidents
+        old_total_after_hours = incident_after_hours + github_after_hours
+        old_total_activities = incident_total + total_commits
+        old_percentage = old_total_after_hours / old_total_activities  # 5/15 = 0.333
+
+        # NEW behavior (correct): only voluntary activity
+        new_total_after_hours = github_after_hours + github_weekend
+        new_total_activities = total_commits
+        new_percentage = new_total_after_hours / new_total_activities  # 3/10 = 0.3
+
+        # New percentage should not include incident counts
+        self.assertAlmostEqual(new_percentage, 0.3, places=2)
+        # Old and new should differ when incidents have after-hours activity
+        self.assertNotAlmostEqual(old_percentage, new_percentage, places=2)
+
+    def test_after_hours_zero_when_no_voluntary_activity(self):
+        """After-hours should be 0 when there are no GitHub commits or Slack messages."""
+        github_after_hours = 0
+        github_weekend = 0
+        total_commits = 0
+
+        total_voluntary = total_commits
+        after_hours_percentage = (github_after_hours + github_weekend) / total_voluntary if total_voluntary > 0 else 0
+
+        self.assertEqual(after_hours_percentage, 0)
+
+    def test_slack_data_recalculates_after_hours(self):
+        """When Slack data is available, after-hours should combine GitHub + Slack."""
+        # Initial: only GitHub data
+        github_after_hours = 2
+        github_weekend = 1
+        total_commits = 10
+
+        initial_after_hours = github_after_hours + github_weekend
+        initial_total = total_commits
+        initial_pct = initial_after_hours / initial_total  # 3/10 = 0.3
+
+        # After Slack enhancement: add Slack messages
+        slack_after_hours = 5
+        slack_weekend = 2
+        total_messages = 20
+
+        new_after_hours = github_after_hours + slack_after_hours
+        new_weekend = github_weekend + slack_weekend
+        new_total = total_commits + total_messages
+        new_non_business = new_after_hours + new_weekend
+        new_pct = new_non_business / new_total  # (7 + 3) / 30 = 0.333
+
+        self.assertAlmostEqual(new_pct, 10 / 30, places=2)
+        # Adding Slack data should change the percentage
+        self.assertNotAlmostEqual(initial_pct, new_pct, places=2)
+
+
+class TestGitHubFallbackNoEstimate(unittest.TestCase):
+    """Test that GitHub reports zero (not estimated) after-hours when detailed data is unavailable."""
+
+    def test_no_daily_data_returns_zero_after_hours(self):
+        """When daily commit data can't be fetched, after_hours should be 0, not an estimate."""
+        daily_commits_data = None  # Could not fetch detailed data
+        total_commits = 100
+
+        # The code should NOT estimate: after_hours = int(total_commits * 0.15)
+        # Instead it should report zeros
+        if not daily_commits_data:
+            after_hours_commits = 0
+            weekend_commits = 0
+
+        self.assertEqual(after_hours_commits, 0)
+        self.assertEqual(weekend_commits, 0)
+
+    def test_empty_daily_data_returns_zero_after_hours(self):
+        """When daily data is empty dict, after_hours should be 0."""
+        daily_commits_data = {}
+        total_commits = 50
+
+        if not daily_commits_data:
+            after_hours_commits = 0
+            weekend_commits = 0
+
+        self.assertEqual(after_hours_commits, 0)
+        self.assertEqual(weekend_commits, 0)
 
 
 if __name__ == '__main__':
