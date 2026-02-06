@@ -330,7 +330,7 @@ class PagerDutyAPIClient:
     async def check_permissions(self) -> Dict[str, Any]:
         """
         Check API token permissions for PagerDuty endpoints.
-        Similar to Rootly's check_permissions method.
+        Checks all 4 endpoints in parallel using asyncio.gather().
         """
         permissions = {
             "users": {"access": False, "error": None},
@@ -338,95 +338,47 @@ class PagerDutyAPIClient:
             "services": {"access": False, "error": None},
             "oncalls": {"access": False, "error": None}
         }
-        
+
         timeout = aiohttp.ClientTimeout(total=30)
-        
+
+        async def _check_endpoint(session, name, url, params):
+            """Check a single endpoint and return (name, access, error)."""
+            try:
+                async with session.get(url, headers=self.headers, params=params) as response:
+                    if response.status == 200:
+                        return (name, True, None)
+                    elif response.status == 401:
+                        return (name, False, "Unauthorized - check API token")
+                    elif response.status == 403:
+                        return (name, False, f"Token needs '{name}:read' permission")
+                    else:
+                        return (name, False, f"HTTP {response.status}")
+            except Exception as e:
+                return (name, False, f"Connection error: {str(e)}")
+
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                # Test users endpoint
-                try:
-                    async with session.get(
-                        f"{self.base_url}/users",
-                        headers=self.headers,
-                        params={"limit": 1}
-                    ) as response:
-                        if response.status == 200:
-                            permissions["users"]["access"] = True
-                        elif response.status == 401:
-                            permissions["users"]["error"] = "Unauthorized - check API token"
-                        elif response.status == 403:
-                            permissions["users"]["error"] = "Token needs 'users:read' permission"
-                        else:
-                            permissions["users"]["error"] = f"HTTP {response.status}"
-                except Exception as e:
-                    permissions["users"]["error"] = f"Connection error: {str(e)}"
-                
-                # Test incidents endpoint (CRITICAL for burnout analysis)
-                try:
-                    async with session.get(
-                        f"{self.base_url}/incidents",
-                        headers=self.headers,
-                        params={"limit": 1, "total": "true"}
-                    ) as response:
-                        if response.status == 200:
-                            permissions["incidents"]["access"] = True
-                        elif response.status == 401:
-                            permissions["incidents"]["error"] = "Unauthorized - check API token"
-                        elif response.status == 403:
-                            permissions["incidents"]["error"] = "Token needs 'incidents:read' permission"
-                        else:
-                            permissions["incidents"]["error"] = f"HTTP {response.status}"
-                except Exception as e:
-                    permissions["incidents"]["error"] = f"Connection error: {str(e)}"
-                
-                # Test services endpoint
-                try:
-                    async with session.get(
-                        f"{self.base_url}/services",
-                        headers=self.headers,
-                        params={"limit": 1}
-                    ) as response:
-                        if response.status == 200:
-                            permissions["services"]["access"] = True
-                        elif response.status == 401:
-                            permissions["services"]["error"] = "Unauthorized - check API token"
-                        elif response.status == 403:
-                            permissions["services"]["error"] = "Token needs 'services:read' permission"
-                        else:
-                            permissions["services"]["error"] = f"HTTP {response.status}"
-                except Exception as e:
-                    permissions["services"]["error"] = f"Connection error: {str(e)}"
-                
-                # Test oncalls endpoint (for on-call filtering)
-                try:
-                    async with session.get(
-                        f"{self.base_url}/oncalls",
-                        headers=self.headers,
-                        params={"limit": 1}
-                    ) as response:
-                        if response.status == 200:
-                            permissions["oncalls"]["access"] = True
-                        elif response.status == 401:
-                            permissions["oncalls"]["error"] = "Unauthorized - check API token"
-                        elif response.status == 403:
-                            permissions["oncalls"]["error"] = "Token needs 'oncalls:read' permission"
-                        else:
-                            permissions["oncalls"]["error"] = f"HTTP {response.status}"
-                except Exception as e:
-                    permissions["oncalls"]["error"] = f"Connection error: {str(e)}"
-                
+                results = await asyncio.gather(
+                    _check_endpoint(session, "users", f"{self.base_url}/users", {"limit": 1}),
+                    _check_endpoint(session, "incidents", f"{self.base_url}/incidents", {"limit": 1, "total": "true"}),
+                    _check_endpoint(session, "services", f"{self.base_url}/services", {"limit": 1}),
+                    _check_endpoint(session, "oncalls", f"{self.base_url}/oncalls", {"limit": 1}),
+                )
+                for name, access, error in results:
+                    permissions[name]["access"] = access
+                    permissions[name]["error"] = error
         except Exception as e:
             # If session creation fails, mark all as connection errors
             error_msg = f"Connection error: {str(e)}"
             for endpoint in permissions:
                 permissions[endpoint]["error"] = error_msg
-        
+
         # Log permission check results
         logger.info("🔑 PAGERDUTY PERMISSIONS CHECK:")
         for endpoint, perm in permissions.items():
             status = "✅ GRANTED" if perm["access"] else f"❌ {perm['error']}"
             logger.info(f"   - {endpoint.upper()}: {status}")
-        
+
         return permissions
     
     async def get_services(self, limit: int = 100, force_refresh: bool = False) -> List[Dict[str, Any]]:
