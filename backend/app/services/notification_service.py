@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 from sqlalchemy import case, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..models import UserNotification, User, OrganizationInvitation, Analysis, Organization
 
@@ -325,7 +325,9 @@ class NotificationService:
         unread_count = counts_result.unread_count or 0
         total_count = counts_result.total_count or 0
 
-        notifications = self.db.query(UserNotification).filter(
+        notifications = self.db.query(UserNotification).options(
+            joinedload(UserNotification.organization)
+        ).filter(
             user_filter,
             UserNotification.status.notin_(['dismissed', 'acted'])
         ).order_by(
