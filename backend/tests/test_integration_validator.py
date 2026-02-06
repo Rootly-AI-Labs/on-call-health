@@ -716,6 +716,35 @@ class TestValidateAllIntegrations(unittest.TestCase):
 
         self.assertEqual(result, cached_results)
 
+    def test_validate_all_returns_cached_jira_result(self):
+        """Test that cached jira result is returned by validate_all_integrations.
+
+        This is the pattern used by the Jira /status endpoint to avoid
+        calling _validate_jira() directly and bypassing the cache.
+        """
+        user_id = 1
+        cached_results = {
+            "github": {"valid": True, "error": None},
+            "jira": {"valid": True, "error": None},
+        }
+        set_cached_validation(user_id, cached_results)
+
+        result = self._run_async(self.validator.validate_all_integrations(user_id, use_cache=True))
+
+        self.assertEqual(result.get("jira"), {"valid": True, "error": None})
+
+    def test_validate_all_returns_none_for_missing_jira(self):
+        """Test that .get('jira') returns None when jira is not in cached results."""
+        user_id = 1
+        cached_results = {
+            "github": {"valid": True, "error": None},
+        }
+        set_cached_validation(user_id, cached_results)
+
+        result = self._run_async(self.validator.validate_all_integrations(user_id, use_cache=True))
+
+        self.assertIsNone(result.get("jira"))
+
     @patch('app.services.integration_validator.decrypt_token')
     def test_validate_all_bypasses_cache(self, mock_decrypt):
         """Test that validate_all_integrations bypasses cache when use_cache=False."""
