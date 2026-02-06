@@ -547,32 +547,6 @@ function TeamPageContent() {
   const startIndex = (currentPage - 1) * TEAM_MEMBERS_PER_PAGE
   const paginatedUsers = filteredUsers.slice(startIndex, startIndex + TEAM_MEMBERS_PER_PAGE)
 
-  // Validate avatar URL to prevent XSS and dangerous schemes
-  const isValidUrl = (url: string): boolean => {
-    if (!url) return false
-
-    // List of dangerous schemes that should never be used for media URLs
-    const dangerousSchemes = ['data:', 'javascript:', 'vbscript:', 'blob:', 'file:', 'ftp:', 'ftps:', 'about:', 'chrome:', 'edge:', 'safari:']
-    const lowerUrl = url.toLowerCase()
-
-    // Reject dangerous schemes
-    if (dangerousSchemes.some(scheme => lowerUrl.startsWith(scheme))) {
-      return false
-    }
-
-    try {
-      const urlObj = new URL(url)
-      // Only allow http and https protocols
-      if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
-        return false
-      }
-      // Ensure hostname exists and is not a localhost/internal URL that could be exploited
-      return urlObj.hostname && !urlObj.hostname.match(/^(localhost|127\.|0\.0\.|::1)/)
-    } catch {
-      return false
-    }
-  }
-
   // Get integration logos for a user (filtered by currently connected integrations)
   const getUserIntegrations = (user: any) => {
     const integrations = []
@@ -756,7 +730,7 @@ function TeamPageContent() {
                               <td className="py-4 px-6">
                                 <div className="flex items-center gap-3">
                                   <Avatar className="w-9 h-9">
-                                    {isValidUrl(user.avatar_url) && <AvatarImage src={user.avatar_url} alt={displayName} />}
+                                    {user.avatar_url && <AvatarImage src={user.avatar_url} alt={displayName} />}
                                     <AvatarFallback className="text-sm font-medium">
                                       {displayName
                                         .split('.')
