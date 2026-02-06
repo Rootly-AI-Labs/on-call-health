@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { INTEGRATION_TIMEOUTS, getModalDelay } from "./constants"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -159,12 +158,9 @@ import { LinearDisconnectDialog } from "./dialogs/LinearDisconnectDialog"
 import { AuthMethodSwitchDialog } from "./dialogs/AuthMethodSwitchDialog"
 import { JiraWorkspaceSelector } from "./dialogs/JiraWorkspaceSelector"
 import { NewMappingDialog } from "./dialogs/NewMappingDialog"
-import { OrganizationManagementDialog } from "./dialogs/OrganizationManagementDialog"
 import { PostIntegrationSyncModal } from "./dialogs/PostIntegrationSyncModal"
 
-function IntegrationsPageContent() {
-  const searchParams = useSearchParams()
-
+export default function IntegrationsPage() {
   // State management
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loadingRootly, setLoadingRootly] = useState(true)
@@ -220,21 +216,9 @@ function IntegrationsPageContent() {
   const [validatingGithub, setValidatingGithub] = useState(false)
   const [githubValidation, setGithubValidation] = useState<{valid: boolean, message?: string} | null>(null)
 
-  // Invite modal state
-  const [showInviteModal, setShowInviteModal] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState("member")
-  const [isInviting, setIsInviting] = useState(false)
-
   // Post-integration sync modal state
   const [showPostIntegrationSyncModal, setShowPostIntegrationSyncModal] = useState(false)
   const [postIntegrationModalType, setPostIntegrationModalType] = useState<'github' | 'slack' | 'jira' | 'linear' | 'rootly' | 'pagerduty' | null>(null)
-
-  // Organization members and invitations state
-  const [orgMembers, setOrgMembers] = useState([])
-  const [pendingInvitations, setPendingInvitations] = useState([])
-  const [receivedInvitations, setReceivedInvitations] = useState([])
-  const [loadingOrgData, setLoadingOrgData] = useState(false)
 
   // Sorting state
   const [sortField, setSortField] = useState<'email' | 'status' | 'data' | 'method'>('email')
@@ -729,16 +713,6 @@ function IntegrationsPageContent() {
       setSelectedOrganization(savedOrg)
     }
 
-    // Check if we should open org management modal (from notification)
-    if (searchParams.get('openOrgModal') === 'true') {
-      // Small delay to ensure data is loaded
-      setTimeout(() => {
-        setShowInviteModal(true)
-        // Clean up URL
-        window.history.replaceState({}, '', '/integrations')
-      }, 500)
-    }
-
     // Load user info from localStorage first for immediate display
     const userName = localStorage.getItem('user_name')
     const userEmail = localStorage.getItem('user_email')
@@ -855,13 +829,6 @@ function IntegrationsPageContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slackIntegration])
-
-  // Load organization data when invite modal opens
-  useEffect(() => {
-    if (showInviteModal) {
-      loadOrganizationData()
-    }
-  }, [showInviteModal])
 
   // Fetch GitHub org members when GitHub is connected
 
@@ -1350,33 +1317,6 @@ function IntegrationsPageContent() {
   }
 
   // Invite function
-  const handleInvite = async () => {
-    return OrganizationHandlers.handleInvite(
-      inviteEmail,
-      inviteRole,
-      setIsInviting,
-      setInviteEmail,
-      setInviteRole,
-      setShowInviteModal,
-      loadOrganizationData
-    )
-  }
-
-  // Handle role change for organization members
-  const handleRoleChange = async (userId: number, newRole: string) => {
-    return OrganizationHandlers.handleRoleChange(userId, newRole, loadOrganizationData)
-  }
-
-  // Load organization members and pending invitations
-  const loadOrganizationData = async () => {
-    return OrganizationHandlers.loadOrganizationData(
-      setLoadingOrgData,
-      setOrgMembers,
-      setPendingInvitations,
-      setReceivedInvitations
-    )
-  }
-
   // 🚀 PHASE 3: Refresh permissions for a specific integration (wrapped with useCallback)
   const refreshIntegrationPermissions = useCallback(async (integrationId: number) => {
     setRefreshingPermissions(integrationId)
@@ -2440,14 +2380,6 @@ function IntegrationsPageContent() {
                     })()}
                   </SelectContent>
                 </Select>
-                <Button
-                  onClick={() => setShowInviteModal(true)}
-                  variant="outline"
-                  className="flex-shrink-0 h-10"
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Team
-                </Button>
               </div>
             </div>
           </div>
@@ -4336,30 +4268,6 @@ function IntegrationsPageContent() {
         }}
       />
 
-      {/* Organization Management Modal */}
-      <OrganizationManagementDialog
-        open={showInviteModal}
-        onOpenChange={setShowInviteModal}
-        inviteEmail={inviteEmail}
-        onInviteEmailChange={setInviteEmail}
-        inviteRole={inviteRole}
-        onInviteRoleChange={setInviteRole}
-        isInviting={isInviting}
-        onInvite={handleInvite}
-        loadingOrgData={loadingOrgData}
-        orgMembers={orgMembers}
-        pendingInvitations={pendingInvitations}
-        receivedInvitations={receivedInvitations}
-        userInfo={userInfo}
-        onRoleChange={handleRoleChange}
-        onRefreshOrgData={loadOrganizationData}
-        onClose={() => {
-          setShowInviteModal(false)
-          setInviteEmail("")
-          setInviteRole("member")
-        }}
-      />
-
       {/* Powered by Rootly AI Footer */}
       <div className="mt-12 pt-8 border-t border-neutral-200 text-center">
         <a
@@ -4410,13 +4318,5 @@ function IntegrationsPageContent() {
         missingPermissions={tokenErrorMissingPermissions}
       />
     </div>
-  )
-}
-
-export default function IntegrationsPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <IntegrationsPageContent />
-    </Suspense>
   )
 }
