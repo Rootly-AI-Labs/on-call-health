@@ -1277,6 +1277,16 @@ async def sync_integration_users(
             current_user=current_user
         )
 
+        # Update last_synced_by and last_synced_at
+        integration = db.query(RootlyIntegration).filter(
+            RootlyIntegration.id == numeric_id
+        ).first()
+        if integration:
+            from datetime import datetime, timezone
+            integration.last_synced_by = current_user.id
+            integration.last_synced_at = datetime.now(timezone.utc)
+            db.commit()
+
         # Build detailed message
         message_parts = [f"Successfully synced {stats['total']} users from integration"]
         if stats.get('github_matched'):
@@ -1610,11 +1620,35 @@ async def get_synced_users(
                 "created_at": corr.created_at.isoformat() if corr.created_at else None
             })
 
+        # Get last sync info if integration_id is provided
+        last_sync_info = None
+        if integration_id:
+            try:
+                numeric_id = int(integration_id)
+                integration = db.query(RootlyIntegration).filter(
+                    RootlyIntegration.id == numeric_id
+                ).first()
+                if integration and integration.last_synced_at:
+                    synced_by_user = db.query(User).filter(
+                        User.id == integration.last_synced_by
+                    ).first()
+                    last_sync_info = {
+                        "synced_at": integration.last_synced_at.isoformat(),
+                        "synced_by": {
+                            "id": synced_by_user.id,
+                            "name": synced_by_user.name,
+                            "email": synced_by_user.email
+                        } if synced_by_user else None
+                    }
+            except (ValueError, AttributeError):
+                pass
+
         return {
             "total": len(synced_users),
             "users": synced_users,
             "oncall_status_included": include_oncall_status,
-            "oncall_cache_info": oncall_cache_info
+            "oncall_cache_info": oncall_cache_info,
+            "last_sync": last_sync_info
         }
 
     except Exception as e:
