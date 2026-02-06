@@ -42,7 +42,7 @@ class User(Base):
     # Relationships
     organization = relationship("Organization", back_populates="users")
     analyses = relationship("Analysis", back_populates="user")
-    rootly_integrations = relationship("RootlyIntegration", back_populates="user")
+    rootly_integrations = relationship("RootlyIntegration", foreign_keys="[RootlyIntegration.user_id]", back_populates="user")
     oauth_providers = relationship("OAuthProvider", back_populates="user", cascade="all, delete-orphan")
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
     emails = relationship("UserEmail", back_populates="user", cascade="all, delete-orphan")
