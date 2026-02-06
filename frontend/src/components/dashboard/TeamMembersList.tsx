@@ -89,7 +89,7 @@ function calculateUserTrend(
     // Use absolute point difference as the "change" metric
     change = absDiff
   } else {
-    const baseline = firstWeeksAvg || 1
+    const baseline = firstWeeksAvg === 0 ? 1 : firstWeeksAvg || 1
     change = ((lastWeeksAvg - firstWeeksAvg) / baseline) * 100
   }
 
@@ -98,7 +98,7 @@ function calculateUserTrend(
     // For low scores, use absolute point thresholds
     if (absDiff <= -5) trend = 'significantly_improving'
     else if (absDiff <= -2) trend = 'improving'
-    else if (absDiff >= 5) trend = 'worsening'
+    else if (absDiff >= 5) trend = 'significantly_worsening'
     else if (absDiff >= 2) trend = 'worsening'
     else trend = 'stable'
   } else {
