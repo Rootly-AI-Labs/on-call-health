@@ -46,36 +46,9 @@ def get_encryption_key() -> bytes:
 
 
 def decrypt_token(encrypted_token: str) -> str:
-    """Decrypt a token from storage with fallback for legacy keys.
-
-    Tries current ENCRYPTION_KEY first, then falls back to old default
-    for tokens encrypted before the security update (commit 9a0c87a7, Jan 29 2026).
-    """
-    from base64 import urlsafe_b64encode
-
-    # Try current key first
-    try:
-        fernet = Fernet(get_encryption_key())
-        return fernet.decrypt(encrypted_token.encode()).decode()
-    except Exception as e:
-        logger.debug(f"Failed to decrypt with current key, trying legacy key: {e}")
-
-    # Fallback to old default key for backward compatibility
-    try:
-        old_default = "your-secret-key-change-in-production"
-        legacy_key = urlsafe_b64encode(old_default.encode()[:32].ljust(32, b'\0'))
-        fernet_legacy = Fernet(legacy_key)
-        decrypted = fernet_legacy.decrypt(encrypted_token.encode()).decode()
-        logger.warning(
-            f"Token decrypted with legacy key. Consider re-encrypting. "
-            f"Token prefix: {encrypted_token[:20]}..."
-        )
-        return decrypted
-    except Exception as e:
-        logger.error(f"Failed to decrypt token with both current and legacy keys: {e}")
-        raise ValueError(
-            "Unable to decrypt token. Token may be corrupted or encrypted with unknown key."
-        )
+    """Decrypt a token from storage."""
+    fernet = Fernet(get_encryption_key())
+    return fernet.decrypt(encrypted_token.encode()).decode()
 
 
 def encrypt_token(token: str) -> str:
