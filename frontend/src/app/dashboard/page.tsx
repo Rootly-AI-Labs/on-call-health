@@ -45,6 +45,7 @@ import {
   CalendarIcon,
   ArrowRight,
   RefreshCw,
+  Loader2,
 } from "lucide-react"
 
 // Helper function for platform-based colors
@@ -239,40 +240,49 @@ function DashboardContent() {
 
   // Connected integrations state (to filter which integrations are currently active)
   const [connectedIntegrations, setConnectedIntegrations] = useState<Set<string>>(new Set())
+  const [loadingConnectedIntegrations, setLoadingConnectedIntegrations] = useState(true)
 
-  // Load connected integration statuses
+  // Load connected integration statuses (in parallel for speed)
   useEffect(() => {
     const fetchConnectedIntegrations = async () => {
       const authToken = localStorage.getItem("auth_token")
-      if (!authToken) return
+      if (!authToken) {
+        setLoadingConnectedIntegrations(false)
+        return
+      }
 
       try {
         const connected = new Set<string>()
-
-        // Check each integration's status
         const integrationTypes = ['github', 'jira', 'linear', 'slack']
 
-        for (const integrationType of integrationTypes) {
-          try {
-            const response = await fetch(`${API_BASE}/integrations/${integrationType}/status`, {
-              headers: { Authorization: `Bearer ${authToken}` },
-            })
-
-            if (response.ok) {
-              const data = await response.json()
-              if (data.connected) {
-                connected.add(integrationType)
+        const results = await Promise.all(
+          integrationTypes.map(async (integrationType) => {
+            try {
+              const response = await fetch(`${API_BASE}/integrations/${integrationType}/status`, {
+                headers: { Authorization: `Bearer ${authToken}` },
+              })
+              if (response.ok) {
+                const data = await response.json()
+                return { type: integrationType, connected: !!data.connected }
               }
+            } catch (error) {
+              console.debug(`Failed to check ${integrationType} status:`, error)
             }
-          } catch (error) {
-            // Continue checking other integrations if one fails
-            console.debug(`Failed to check ${integrationType} status:`, error)
+            return { type: integrationType, connected: false }
+          })
+        )
+
+        for (const result of results) {
+          if (result.connected) {
+            connected.add(result.type)
           }
         }
 
         setConnectedIntegrations(connected)
       } catch (error) {
         console.error("Failed to fetch connected integrations:", error)
+      } finally {
+        setLoadingConnectedIntegrations(false)
       }
     }
 
@@ -1337,6 +1347,11 @@ function DashboardContent() {
                 <label className="text-sm font-medium text-neutral-700 mb-2 block">
                   Additional Data Sources
                 </label>
+                {loadingConnectedIntegrations ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
+                  </div>
+                ) : (
                 <div className="grid grid-cols-2 gap-3">
                   {/* GitHub Toggle Card */}
                   {connectedIntegrations.has('github') && (
@@ -1486,6 +1501,7 @@ function DashboardContent() {
                     </div>
                   )}
                 </div>
+                )}
               </div>
             )}
 
