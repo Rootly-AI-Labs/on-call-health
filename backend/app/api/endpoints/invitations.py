@@ -3,7 +3,6 @@ Organization invitations API endpoints.
 """
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
-import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
@@ -11,8 +10,6 @@ from pydantic import BaseModel, EmailStr
 from ...models import get_db, User, OrganizationInvitation, Organization, UserNotification, OAuthProvider
 from ...auth.dependencies import get_current_active_user, get_current_user_optional
 from ...services.notification_service import NotificationService
-
-logger = logging.getLogger(__name__)
 
 class CreateInvitationRequest(BaseModel):
     email: EmailStr
@@ -40,10 +37,10 @@ async def create_invitation(
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can invite users")
 
-    # Check if user already exists with this email in the SAME organization
+    # Check if user already exists with this email
     existing_user = db.query(User).filter(User.email.ilike(request.email)).first()
-    if existing_user and existing_user.organization_id == current_user.organization_id:
-        raise HTTPException(status_code=400, detail="User is already a member of your organization")
+    if existing_user and existing_user.organization_id:
+        raise HTTPException(status_code=400, detail="User with this email already belongs to an organization")
 
     # Check for pending invitation with same email to same org
     # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
@@ -252,6 +249,110 @@ async def list_organization_members(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch members: {str(e)}")
 
+@router.get("/accept/{invitation_id}")
+async def accept_invitation_page(
+    invitation_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Accept invitation page - can be accessed by authenticated or unauthenticated users.
+    If unauthenticated, will show login prompt. If authenticated, will process acceptance.
+    """
+    # Get invitation
+    invitation = db.query(OrganizationInvitation).filter(
+        OrganizationInvitation.id == invitation_id,
+        OrganizationInvitation.status == "pending"
+    ).first()
+
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Invitation not found or already processed")
+
+    if invitation.is_expired:
+        raise HTTPException(status_code=400, detail="Invitation has expired")
+
+    # If user is not authenticated, return invitation details for login
+    if not current_user:
+        return {
+            "requires_auth": True,
+            "invitation": invitation.to_dict(),
+            "organization_name": invitation.organization.name,
+            "message": "Please log in to accept this invitation"
+        }
+
+    # Check if current user's email matches invitation
+    if current_user.email.lower() != invitation.email.lower():
+        raise HTTPException(
+            status_code=403,
+            detail="This invitation is for a different email address"
+        )
+
+    # Check if user is already in an organization
+    if current_user.organization_id and current_user.organization_id != invitation.organization_id:
+        raise HTTPException(
+            status_code=400,
+            detail="You are already a member of another organization"
+        )
+
+    # Process acceptance
+    try:
+        # Delete user's personal Slack integration if they have one
+        # (organizations should have a single shared Slack workspace)
+        from app.models.slack import SlackIntegration
+        personal_slack = db.query(SlackIntegration).filter(
+            SlackIntegration.user_id == current_user.id,
+            SlackIntegration.organization_id.is_(None)
+        ).first()
+        if personal_slack:
+            db.delete(personal_slack)
+            logger.info(f"Deleted personal Slack integration for user {current_user.email} joining org {invitation.organization_id}")
+
+        # Update user's organization
+        current_user.organization_id = invitation.organization_id
+        current_user.role = invitation.role
+        current_user.joined_org_at = datetime.now(timezone.utc)
+
+        # Mark invitation as accepted
+        invitation.status = "accepted"
+        invitation.used_at = datetime.now(timezone.utc)
+
+        # Commit changes
+        db.commit()
+
+        # Create notifications
+        notification_service = NotificationService(db)
+
+        # Notify admins about the acceptance
+        admin_notifications = notification_service.create_invitation_accepted_notification(
+            invitation, current_user
+        )
+
+        # Mark the original invitation notification as acted upon
+        original_notification = db.query(UserNotification).filter(
+            UserNotification.organization_invitation_id == invitation.id,
+            UserNotification.email == current_user.email
+        ).first()
+
+        if original_notification:
+            original_notification.mark_as_acted()
+            db.commit()
+
+        return {
+            "success": True,
+            "message": f"Successfully joined {invitation.organization.name}!",
+            "organization": {
+                "id": invitation.organization.id,
+                "name": invitation.organization.name
+            },
+            "role": invitation.role,
+            "redirect_url": "/dashboard"  # Frontend can redirect here
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to accept invitation: {str(e)}")
+
 @router.post("/accept/{invitation_id}")
 async def accept_invitation_api(
     invitation_id: int,
@@ -280,15 +381,26 @@ async def accept_invitation_api(
             detail="This invitation is for a different email address"
         )
 
-    # Check if user is already in the SAME organization
-    if current_user.organization_id and current_user.organization_id == invitation.organization_id:
+    # Check if user is already in an organization
+    if current_user.organization_id and current_user.organization_id != invitation.organization_id:
         raise HTTPException(
             status_code=400,
-            detail="You are already a member of this organization"
+            detail="You are already a member of another organization"
         )
 
-    # Process acceptance (allows switching organizations)
+    # Process acceptance
     try:
+        # Delete user's personal Slack integration if they have one
+        # (organizations should have a single shared Slack workspace)
+        from app.models.slack import SlackIntegration
+        personal_slack = db.query(SlackIntegration).filter(
+            SlackIntegration.user_id == current_user.id,
+            SlackIntegration.organization_id.is_(None)
+        ).first()
+        if personal_slack:
+            db.delete(personal_slack)
+            logger.info(f"Deleted personal Slack integration for user {current_user.email} joining org {invitation.organization_id}")
+
         # Update user's organization
         current_user.organization_id = invitation.organization_id
         current_user.role = invitation.role
