@@ -609,13 +609,13 @@ function TeamPageContent() {
           {/* Header with View Mode Toggle */}
           <div className="mb-8 flex items-end justify-end gap-6">
             {/* View Mode Toggle */}
-            <div className="relative flex items-center gap-2 bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-1 shadow-sm">
+            <div className="relative flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('organization')}
                 className={`relative z-10 px-4 py-2 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'organization'
-                    ? 'text-white shadow-md'
-                    : 'text-neutral-700 hover:text-purple-700'
+                    ? 'text-purple-700'
+                    : 'text-neutral-600 hover:text-neutral-900'
                 }`}
               >
                 Synced Org
@@ -624,17 +624,15 @@ function TeamPageContent() {
                 onClick={() => setViewMode('company')}
                 className={`relative z-10 px-4 py-2 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'company'
-                    ? 'text-white shadow-md'
-                    : 'text-neutral-700 hover:text-blue-700'
+                    ? 'text-purple-700'
+                    : 'text-neutral-600 hover:text-neutral-900'
                 }`}
               >
                 Team Roles
               </button>
               <div
-                className={`absolute top-1 bottom-1 rounded transition-all duration-300 ease-in-out shadow-lg ${
-                  viewMode === 'organization'
-                    ? 'left-1 w-[calc(50%-0.25rem)] bg-gradient-to-r from-purple-600 to-purple-500'
-                    : 'left-[calc(50%+0.125rem)] w-[calc(50%-0.375rem)] bg-gradient-to-r from-blue-600 to-blue-500'
+                className={`absolute top-1 bottom-1 bg-purple-100 rounded transition-all duration-300 ease-in-out ${
+                  viewMode === 'organization' ? 'left-1 w-[calc(50%-0.25rem)]' : 'left-[calc(50%+0.125rem)] w-[calc(50%-0.375rem)]'
                 }`}
               />
             </div>
