@@ -1,4 +1,3 @@
-
 # On-call Health
 
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
@@ -19,6 +18,37 @@ On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jir
 Get started at [www.oncallhealth.ai](https://www.oncallhealth.ai/) or [self-host it.](#Installation)
 
 ![Rootly AI Labs On-call Health screenshot](https://github.com/user-attachments/assets/037358d8-1b9b-43f8-ae89-183d04e48bca)
+
+##  Methodology
+
+On-call Health takes inspiration from the [CBI](https://emerge.ucsd.edu/r_2qfb6wi4uepyugd/) to measure overwork risk in professional settings. On-call Health isn't a medical or diagnostic tool; it is designed to help identify patterns and trends that may suggest overwork.
+
+The tool is centered around 2 main metrics:
+* **On-Call Health (OCH) Score** — A composite score derived from all collected signals, reflecting an individual's incident response workload.
+
+* **Score Trend** — How the OCH score evolves over time relative to each responder's own baseline.
+
+The OCH score measures workload, not well-being directly. People respond differently to incidents, after-hours work, and pressure; some thrive under high-severity incidents, while others don't. The score trend captures whether someone's workload is shifting from *their* normal, regardless of where that normal sits.
+
+##  Data Collection
+
+* **Incident Response:** Volume, severity, time-to-acknowledge, time-to-resolve, after-hours pages, consecutive on-call days (PagerDuty, Rootly)
+
+* **Work Patterns:** After-hours and weekend activity, commit/message timing distribution, on-call shift frequency (Rootly, PagerDuty, GitHub, Slack)
+
+* **Workload:** Active issues assigned, PR volume and size, commit frequency, code review participation (Jira, Linear, GitHub)
+
+* **Self-Reported Wellbeing**: Feeling and workload scores, stress factors, personal circumstances (Slack surveys)
+
+## Integrations ⚒️
+* [Rootly](https://rootly.com/): For incident management and on-call data
+* [PagerDuty](https://www.pagerduty.com/): For incident management and on-call data
+* [GitHub](https://github.com/): For commit activity
+* [Slack](http://slack.com/): For communication patterns and collecting self-reported data
+* [Linear](https://linear.app/): For workload tracking
+* [Jira](https://www.atlassian.com/software/jira): For workload tracking
+
+If you are interested in integrating with On-call Health, [get in touch](mailto:sylvain@rootly.com)!
 
 ## Installation
 
@@ -106,50 +136,9 @@ npm run dev
 The frontend will be available at `http://localhost:3000`
 </details>
 
-##  Features
-
-- **Multi Layer Signals**: Individual and team-level insights
-- **Interactive Dashboard**: Visual and AI-powered risk analysis for incident responders at the team and individual level
-- **Tailor to Your organization**: Customize tool integration and signal weights
-
-##  Methodology
-
-On-call Health uses a scientifically informed approach to measuring overwork risk in professional settings. On-call Health isn't a medical tool and doesn't provide a diagnosis; it is designed to help identify patterns and trends that may suggest overwork.
-
-### Methodology breakdown
-Our implementation uses the two core dimensions:
-
-1. **Personal Overwork Risk**
-   - Physical and psychological fatigue from workload
-   - Work-life boundary violations (after-hours/weekend work)
-   - Temporal stress patterns and recovery time deficits
-
-2. **Work-Related Overwork Risk**
-   - Fatigue specifically tied to work processes
-   - Response time, pressure, and incident load
-   - Team collaboration, stress, and communication quality
-
-## 🔐 Security
-
-- OAuth with Google/GitHub (no password storage)
-- JWT tokens for session management
-- Encrypted API token storage
-- HTTPS enforcement
-- Input validation and sanitization
-
-## Integrations ⚒️
-* [Rootly](https://rootly.com/): For incident management and on-call data
-* [PagerDuty](https://www.pagerduty.com/): For incident management and on-call data
-* [GitHub](https://github.com/): For commit activity
-* [Slack](http://slack.com/): For communication patterns and collecting self-reported data
-* [Linear](https://linear.app/): For workload tracking
-* [Jira](https://www.atlassian.com/software/jira): For workload tracking
-
-If you are interested in integrating with On-call Health, [get in touch](mailto:sylvain@rootly.com)!
-
 ## API
 
-On-call Health also offers [an API](https://api.oncallhealth.ai/docs) that can expose its findings. <br>
+On-call Health also offers [an API](https://api.oncallhealth.ai/docs) and [MCP server](https://github.com/Rootly-AI-Labs/On-Call-Health/tree/main/packages/oncallhealth-mcp) that can expose its findings. <br>
 [<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://god.gw.postman.com/run-collection/45004446-1074ba3c-44fe-40e3-a932-af7c071b96eb?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D45004446-1074ba3c-44fe-40e3-a932-af7c071b96eb%26entityType%3Dcollection%26workspaceId%3D4bec6e3c-50a0-4746-85f1-00a703c32f24)
 
 ## 🔗 About the Rootly AI Labs
