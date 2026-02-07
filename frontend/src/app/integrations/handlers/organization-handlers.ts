@@ -122,8 +122,15 @@ export async function handleRoleChange(
     return
   }
 
+  // Validate role to prevent injection attacks
+  const allowedRoles = ['admin', 'member']
+  if (!allowedRoles.includes(newRole)) {
+    toast.error("Invalid role specified")
+    return
+  }
+
   try {
-    const response = await fetch(`${API_BASE}/auth/users/${userId}/role?new_role=${newRole}`, {
+    const response = await fetch(`${API_BASE}/auth/users/${userId}/role?new_role=${encodeURIComponent(newRole)}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${authToken}`,

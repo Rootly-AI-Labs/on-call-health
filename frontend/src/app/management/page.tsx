@@ -109,6 +109,7 @@ function TeamPageContent() {
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isMountedRef = useRef(true)
   const mappingDropdownRef = useRef<HTMLDivElement>(null)
+  const hasShownSyncModal = useRef(false)
 
   // Survey recipient selection state
   const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
@@ -285,11 +286,12 @@ function TeamPageContent() {
   }, [])
 
 
-  // Auto-open sync modal if redirected from integrations page
+  // Auto-open sync modal if redirected from integrations page (only once)
   useEffect(() => {
     const syncParam = searchParams.get("sync")
-    if (syncParam === "true" && selectedOrganization && !loadingIntegrations) {
+    if (syncParam === "true" && selectedOrganization && !loadingIntegrations && !hasShownSyncModal.current) {
       setShowSyncConfirmModal(true)
+      hasShownSyncModal.current = true
     }
   }, [searchParams, selectedOrganization, loadingIntegrations])
 
@@ -481,13 +483,19 @@ function TeamPageContent() {
         }
       )
 
-      // Ignore stale responses if user switched organizations
+      // Check immediately after fetch completes
       if (requestedOrg !== selectedOrganization) {
         return
       }
 
       if (response.ok) {
         const data = await response.json()
+
+        // Check again after JSON parsing to prevent race conditions
+        if (requestedOrg !== selectedOrganization) {
+          return
+        }
+
         const users = data.users || []
         setSyncedUsers(users)
         syncedUsersCache.current.set(requestedOrg, users)
@@ -585,8 +593,8 @@ function TeamPageContent() {
           if (isMountedRef.current) {
             setShowSyncConfirmModal(false)
             setSyncProgress(null)
+            syncTimeoutRef.current = null
           }
-          syncTimeoutRef.current = null
         }, 2000)
       }
     }
@@ -648,16 +656,22 @@ function TeamPageContent() {
     }
 
     try {
-      const recipientIds = Array.from(selectedRecipients)
-
-      // Validate recipient IDs are valid positive integers (not NaN, Infinity, or floats)
-      if (!recipientIds.every(id =>
+      // Convert Set to Array and validate/filter for type safety
+      const recipientIds = Array.from(selectedRecipients).filter(id =>
         typeof id === 'number' &&
         Number.isFinite(id) &&
         Number.isInteger(id) &&
         id > 0
-      )) {
-        toast.error("Invalid recipient IDs")
+      )
+
+      // Check if any invalid IDs were filtered out
+      if (recipientIds.length !== selectedRecipients.size) {
+        console.warn('Some invalid recipient IDs were filtered out')
+      }
+
+      // Ensure we have valid IDs to send
+      if (recipientIds.length === 0 && selectedRecipients.size > 0) {
+        toast.error("No valid recipient IDs found")
         setSavingRecipients(false)
         return
       }
