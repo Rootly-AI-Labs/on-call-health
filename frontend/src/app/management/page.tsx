@@ -809,15 +809,7 @@ function TeamPageContent() {
                               {getSortIcon('name')}
                             </button>
                           </th>
-                          <th className="text-left py-3 px-6">
-                            <button
-                              onClick={() => handleSort('email')}
-                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
-                            >
-                              Email
-                              {getSortIcon('email')}
-                            </button>
-                          </th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
                           <th className="text-left py-3 px-6">
                             <button
                               onClick={() => handleSort('oncall')}
