@@ -1221,6 +1221,11 @@ class MigrationRunner:
                 "description": "Add last_modified_by_user_id and last_modified_at columns to track survey schedule changes",
                 "sql_file": "2026_01_26_add_last_modified_to_survey_schedules.sql"
             },
+            {
+                "name": "043_optimize_get_platform_mappings",
+                "description": "Add composite indexes to optimize get_platform_mappings endpoint",
+                "sql_file": "2026_02_06_optimize_get_platform_mappings.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 
