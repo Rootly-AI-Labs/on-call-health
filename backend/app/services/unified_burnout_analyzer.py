@@ -2214,7 +2214,7 @@ class UnifiedBurnoutAnalyzer:
             "github_after_hours_commits": github_after_hours_commits,
             "github_weekend_commits": github_weekend_commits,
             "total_commits": total_commits,
-            "total_activities": total_activities,
+            "total_activities": total_voluntary_activities,
             # Time period for rate normalization (CBI/sRPE methodology)
             "days_analyzed": safe_days,
             "total_incidents": safe_incidents_len
