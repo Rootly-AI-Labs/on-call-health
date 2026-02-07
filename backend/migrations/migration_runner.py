@@ -1222,9 +1222,9 @@ class MigrationRunner:
                 "sql_file": "2026_01_26_add_last_modified_to_survey_schedules.sql"
             },
             {
-                "name": "043_optimize_get_platform_mappings",
-                "description": "Add composite indexes to optimize get_platform_mappings endpoint",
-                "sql_file": "2026_02_06_optimize_get_platform_mappings.sql"
+                "name": "043_add_sync_tracking_to_rootly_integrations",
+                "description": "Add last_synced_by and last_synced_at columns to track who last synced each integration",
+                "sql_file": "2026_02_06_add_sync_tracking_to_rootly_integrations.sql"
             },
             # Add future migrations here with incrementing numbers
         ]

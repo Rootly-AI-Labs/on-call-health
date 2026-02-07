@@ -14,7 +14,11 @@ export const FACTOR_DESCRIPTIONS: Record<string, string> = {
   'High-severity incidents': 'Count of critical and high-severity incidents handled.',
   'On-call load': 'Total incident volume and frequency during on-call shifts. Counts all incidents regardless of severity.',
   'Task load': 'Number of tasks and tickets assigned. Higher counts indicate more workload pressure.',
+  'Consecutive incident days': 'Number of consecutive days with at least one incident. Longer streaks indicate sustained on-call pressure.',
+  'Incident frequency': 'Rate of incidents over the analysis period regardless of severity or timing.',
   'Severity-weighted workload': 'Workload score weighted by incident severity. Critical incidents count more than lower severity ones.',
+  'Meeting load': 'Volume of meetings and synchronous obligations cutting into focus time.',
+  'Review speed pressure': 'How quickly code reviews are expected to be completed, indicating urgency pressure.',
 }
 
 interface TeamRiskFactorsCardProps {
