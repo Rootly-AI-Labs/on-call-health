@@ -120,14 +120,14 @@ function getTrendConfig(trend: UserTrend) {
     case 'significantly_improving':
       return {
         label: 'Improving Fast',
-        icon: <><TrendingDown className="w-4 h-4" /><TrendingDown className="w-4 h-4" /></>,
+        icon: <><TrendingUp className="w-4 h-4" /><TrendingUp className="w-4 h-4" /></>,
         className: 'bg-green-100 text-green-700 border-green-200',
         tooltip: 'Workload decreased significantly'
       }
     case 'improving':
       return {
         label: 'Improving',
-        icon: <TrendingDown className="w-4 h-4" />,
+        icon: <TrendingUp className="w-4 h-4" />,
         className: 'bg-green-50 text-green-600 border-green-100',
         tooltip: 'Workload trending down'
       }
@@ -141,14 +141,14 @@ function getTrendConfig(trend: UserTrend) {
     case 'worsening':
       return {
         label: 'Worsening',
-        icon: <TrendingUp className="w-4 h-4" />,
+        icon: <TrendingDown className="w-4 h-4" />,
         className: 'bg-red-50 text-red-600 border-red-100',
         tooltip: 'Workload trending up'
       }
     case 'significantly_worsening':
       return {
         label: 'Critical',
-        icon: <><TrendingUp className="w-4 h-4" /><TrendingUp className="w-4 h-4" /></>,
+        icon: <><TrendingDown className="w-4 h-4" /><TrendingDown className="w-4 h-4" /></>,
         className: 'bg-red-100 text-red-700 border-red-200',
         tooltip: 'Workload increased significantly'
       }
