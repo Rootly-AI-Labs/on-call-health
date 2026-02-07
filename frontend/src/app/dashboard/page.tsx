@@ -238,56 +238,15 @@ function DashboardContent() {
     setMounted(true)
   }, [])
 
-  // Connected integrations state (to filter which integrations are currently active)
-  const [connectedIntegrations, setConnectedIntegrations] = useState<Set<string>>(new Set())
-  const [loadingConnectedIntegrations, setLoadingConnectedIntegrations] = useState(true)
-
-  // Load connected integration statuses (in parallel for speed)
-  useEffect(() => {
-    const fetchConnectedIntegrations = async () => {
-      const authToken = localStorage.getItem("auth_token")
-      if (!authToken) {
-        setLoadingConnectedIntegrations(false)
-        return
-      }
-
-      try {
-        const connected = new Set<string>()
-        const integrationTypes = ['github', 'jira', 'linear', 'slack']
-
-        const results = await Promise.all(
-          integrationTypes.map(async (integrationType) => {
-            try {
-              const response = await fetch(`${API_BASE}/integrations/${integrationType}/status`, {
-                headers: { Authorization: `Bearer ${authToken}` },
-              })
-              if (response.ok) {
-                const data = await response.json()
-                return { type: integrationType, connected: !!data.connected }
-              }
-            } catch (error) {
-              console.debug(`Failed to check ${integrationType} status:`, error)
-            }
-            return { type: integrationType, connected: false }
-          })
-        )
-
-        for (const result of results) {
-          if (result.connected) {
-            connected.add(result.type)
-          }
-        }
-
-        setConnectedIntegrations(connected)
-      } catch (error) {
-        console.error("Failed to fetch connected integrations:", error)
-      } finally {
-        setLoadingConnectedIntegrations(false)
-      }
-    }
-
-    fetchConnectedIntegrations()
-  }, [API_BASE])
+  // Derive connected integrations from useDashboard data (avoids 4 duplicate API calls)
+  const connectedIntegrations = useMemo(() => {
+    const connected = new Set<string>()
+    if (githubIntegration) connected.add('github')
+    if (slackIntegration) connected.add('slack')
+    if (jiraIntegration) connected.add('jira')
+    if (linearIntegration) connected.add('linear')
+    return connected
+  }, [githubIntegration, slackIntegration, jiraIntegration, linearIntegration])
 
   // GitHub All Metrics Popup State
   const [showAllMetricsPopup, setShowAllMetricsPopup] = useState(false)
@@ -1347,7 +1306,7 @@ function DashboardContent() {
                 <label className="text-sm font-medium text-neutral-700 mb-2 block">
                   Additional Data Sources
                 </label>
-                {loadingConnectedIntegrations ? (
+                {isLoadingGitHubSlack ? (
                   <div className="flex items-center justify-center py-6">
                     <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
                   </div>
