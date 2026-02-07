@@ -204,8 +204,8 @@ export function TeamHealthOverview({
                               <span>{teamOchScore}</span>
                               <span
                                 className="text-xs text-gray-500 cursor-help ml-1"
-                                onMouseEnter={(e) => showTooltip('ocb-score-tooltip', e.currentTarget.getBoundingClientRect(), 180, 120)}
-                                onMouseLeave={() => hideTooltip('ocb-score-tooltip')}
+                                onMouseEnter={(e) => showTooltip('och-score-tooltip', e.currentTarget.getBoundingClientRect(), 180, 120)}
+                                onMouseLeave={() => hideTooltip('och-score-tooltip')}
                               >
                                 Risk Level
                               </span>
