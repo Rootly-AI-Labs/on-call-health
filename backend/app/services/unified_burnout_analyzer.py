@@ -4108,7 +4108,10 @@ class UnifiedBurnoutAnalyzer:
                                 if assigned_to and isinstance(assigned_to, dict):
                                     user_id = assigned_to.get("id")
                                     user_email = assigned_to.get("email")
-                                    
+                                    # Fallback: look up email from user_id mapping when incident lacks email
+                                    if not user_email and user_id:
+                                        user_email = user_id_to_email.get(str(user_id))
+
                                     # DEBUG: Log PagerDuty user mapping for first few incidents
                                     if user_id and len(daily_data) <= 3:
                                         assignment_method = assigned_to.get("assignment_method", "unknown")
