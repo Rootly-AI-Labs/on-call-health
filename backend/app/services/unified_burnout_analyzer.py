@@ -1563,7 +1563,14 @@ class UnifiedBurnoutAnalyzer:
                     data = resolved_by_data.get("data")
                     if data and isinstance(data, dict) and data.get("id"):
                         incident_users.add(str(data["id"]))
-            
+
+                # Mitigated by
+                mitigated_by_data = attrs.get("mitigated_by")
+                if mitigated_by_data and isinstance(mitigated_by_data, dict):
+                    data = mitigated_by_data.get("data")
+                    if data and isinstance(data, dict) and data.get("id"):
+                        incident_users.add(str(data["id"]))
+
             # Add incident to each involved user
             for user_id in incident_users:
                 user_incidents[user_id].append(incident)
@@ -1706,7 +1713,8 @@ class UnifiedBurnoutAnalyzer:
             days_analyzed,
             include_weekends,
             user_tz,
-            github_data
+            github_data,
+            user_id=user_id,
         )
 
         # Enhance metrics with GitHub/Slack/Jira data if available
@@ -2078,6 +2086,89 @@ class UnifiedBurnoutAnalyzer:
             dt = pytz.UTC.localize(dt)
         return dt.astimezone(tz)
 
+    def _get_user_id_from_role(self, attrs: Dict[str, Any], role: str) -> Optional[str]:
+        """Extract user ID from an incident role attribute (user, started_by, resolved_by, mitigated_by)."""
+        role_data = attrs.get(role)
+        if not role_data:
+            return None
+        if not isinstance(role_data, dict):
+            logger.debug(f"Unexpected type for role '{role}': {type(role_data).__name__}")
+            return None
+        data = role_data.get("data")
+        if not data:
+            return None
+        if not isinstance(data, dict):
+            logger.debug(f"Unexpected type for role '{role}' data: {type(data).__name__}")
+            return None
+        if data.get("id"):
+            return str(data["id"])
+        return None
+
+    def _calculate_incident_response_activities(
+        self,
+        incidents: List[Dict[str, Any]],
+        user_id: Optional[str],
+        user_tz: str = "UTC",
+    ) -> Dict[str, int]:
+        """Count incident response timestamps that fall outside business hours for a specific user.
+
+        Only counts timestamps where the user held the corresponding role:
+        - user (creator) -> created_at
+        - started_by -> started_at
+        - mitigated_by -> mitigated_at
+        - resolved_by -> resolved_at
+        """
+        after_hours = 0
+        weekend = 0
+        total = 0
+
+        if not user_id:
+            return {"incident_response_after_hours": 0, "incident_response_weekend": 0, "total_incident_responses": 0}
+
+        for incident in incidents:
+            if self.platform == "pagerduty":
+                continue
+
+            attrs = incident.get("attributes", {})
+
+            # Map each role to its corresponding timestamp
+            role_timestamp_pairs = [
+                ("user", "created_at"),
+                ("started_by", "started_at"),
+                ("mitigated_by", "mitigated_at"),
+                ("resolved_by", "resolved_at"),
+            ]
+
+            for role, ts_field in role_timestamp_pairs:
+                role_user_id = self._get_user_id_from_role(attrs, role)
+                if role_user_id != user_id:
+                    continue
+
+                ts_value = attrs.get(ts_field)
+                if not ts_value:
+                    continue
+
+                dt_utc = self._parse_iso_utc(ts_value)
+                if not dt_utc:
+                    continue
+
+                dt_local = self._to_local(dt_utc, user_tz)
+                if not dt_local:
+                    continue
+
+                total += 1
+
+                if dt_local.hour < BUSINESS_HOURS_START or dt_local.hour >= BUSINESS_HOURS_END:
+                    after_hours += 1
+
+                if dt_local.weekday() >= 5:
+                    weekend += 1
+
+        return {
+            "incident_response_after_hours": after_hours,
+            "incident_response_weekend": weekend,
+            "total_incident_responses": total,
+        }
 
     def _calculate_member_metrics(
         self,
@@ -2086,6 +2177,7 @@ class UnifiedBurnoutAnalyzer:
         include_weekends: bool,
         user_tz: str = "UTC",
         github_data: Optional[Dict[str, Any]] = None,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Calculate detailed metrics for a team member, including GitHub after-hours activity."""
         # Initialize counters
@@ -2183,12 +2275,17 @@ class UnifiedBurnoutAnalyzer:
 
         incidents_per_week = (safe_incidents_len / safe_days) * 7 if safe_days > 0 else 0
 
-        # After-hours activity is based only on voluntary user activity (GitHub commits, Slack messages)
-        # Incidents are excluded because being paged is not a choice — it doesn't reflect work-life boundaries
+        # Calculate incident response after-hours activity for this user
+        incident_response = self._calculate_incident_response_activities(incidents, user_id, user_tz)
+        incident_response_after_hours = incident_response["incident_response_after_hours"]
+        incident_response_weekend = incident_response["incident_response_weekend"]
+        total_incident_responses = incident_response["total_incident_responses"]
+
+        # After-hours activity includes GitHub commits + incident response timestamps
         # Slack after-hours data is merged in later via _enhance_metrics_with_slack_data
-        total_voluntary_after_hours = github_after_hours_commits
-        total_voluntary_weekend = github_weekend_commits
-        total_voluntary_activities = total_commits
+        total_voluntary_after_hours = github_after_hours_commits + incident_response_after_hours
+        total_voluntary_weekend = github_weekend_commits + incident_response_weekend
+        total_voluntary_activities = total_commits + total_incident_responses
 
         total_non_business_hours = total_voluntary_after_hours + total_voluntary_weekend
         after_hours_percentage = total_non_business_hours / total_voluntary_activities if total_voluntary_activities > 0 else 0
@@ -2215,6 +2312,10 @@ class UnifiedBurnoutAnalyzer:
             "github_weekend_commits": github_weekend_commits,
             "total_commits": total_commits,
             "total_activities": total_voluntary_activities,
+            # Incident response after-hours metrics
+            "incident_response_after_hours": incident_response_after_hours,
+            "incident_response_weekend": incident_response_weekend,
+            "total_incident_responses": total_incident_responses,
             # Time period for rate normalization (CBI/sRPE methodology)
             "days_analyzed": safe_days,
             "total_incidents": safe_incidents_len
@@ -2422,17 +2523,19 @@ class UnifiedBurnoutAnalyzer:
                 enhanced["slack_weekend_count"] = weekend_msgs
 
         # Recalculate after_hours_percentage to include Slack voluntary activity
-        # after_hours_percentage is based on GitHub + Slack only (not incidents)
+        # after_hours_percentage is based on GitHub + Slack + incident response timestamps
         total_messages = len(messages)
         slack_after_hours = enhanced.get("slack_after_hours_count", 0)
         slack_weekend = enhanced.get("slack_weekend_count", 0)
         prev_total_activities = enhanced.get("total_activities", 0)
         prev_github_after_hours = enhanced.get("github_after_hours_commits", 0)
         prev_github_weekend = enhanced.get("github_weekend_commits", 0)
+        prev_incident_after_hours = enhanced.get("incident_response_after_hours", 0)
+        prev_incident_weekend = enhanced.get("incident_response_weekend", 0)
 
         new_total_activities = prev_total_activities + total_messages
-        new_after_hours = prev_github_after_hours + slack_after_hours
-        new_weekend = prev_github_weekend + slack_weekend
+        new_after_hours = prev_github_after_hours + slack_after_hours + prev_incident_after_hours
+        new_weekend = prev_github_weekend + slack_weekend + prev_incident_weekend
         new_non_business = new_after_hours + new_weekend
 
         if new_total_activities > 0:
