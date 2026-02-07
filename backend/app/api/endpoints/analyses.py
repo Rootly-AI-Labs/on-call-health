@@ -653,7 +653,7 @@ async def get_analysis(
 _ANALYSIS_DATA_KEYS = [
     'team_analysis', 'team_health', 'team_summary', 'daily_trends',
     'metadata', 'data_sources', 'individual_daily_data', 'raw_incident_data',
-    'ai_team_insights', 'ai_enhanced', 'member_surveys',
+    'ai_team_insights', 'ai_enhanced',
     'partial_data', 'error', 'data_collection_successful', 'failure_stage',
 ]
 
@@ -1094,9 +1094,15 @@ async def regenerate_analysis_trends(
         # Update analysis data with daily trends
         analysis_data["daily_trends"] = daily_trends
         
-        # Save back to database
+        # Save back to database and invalidate Redis cache
         analysis.results = analysis_data
         db.commit()
+        redis_client = _get_redis_for_analysis()
+        if redis_client:
+            try:
+                redis_client.delete(f"analysis_data:{analysis.id}")
+            except Exception:
+                pass
         
         logger.info(f"Successfully regenerated {len(daily_trends)} daily trends for analysis {analysis_ref}")
         

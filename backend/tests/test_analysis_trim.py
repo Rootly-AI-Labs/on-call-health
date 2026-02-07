@@ -60,6 +60,20 @@ class TestTrimAnalysisData(unittest.TestCase):
         self.assertEqual(len(result), 4)
         self.assertFalse(result["data_collection_successful"])
 
+    def test_member_surveys_not_in_whitelist(self):
+        """member_surveys is added after trimming, so it should not be in the whitelist."""
+        self.assertNotIn("member_surveys", _ANALYSIS_DATA_KEYS)
+
+    def test_member_surveys_in_stored_results_is_stripped(self):
+        """If stored results contain member_surveys, trim should strip it
+        since the endpoint re-adds it from a fresh DB query."""
+        data = {
+            "team_analysis": {"members": []},
+            "member_surveys": {"old@example.com": {"survey_count_in_period": 1}},
+        }
+        result = _trim_analysis_data(data)
+        self.assertNotIn("member_surveys", result)
+
 
 if __name__ == "__main__":
     unittest.main()
