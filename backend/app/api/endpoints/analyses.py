@@ -423,7 +423,7 @@ async def list_analyses(
     integration_id: Optional[int] = Query(None, gt=0, description="Filter by integration ID"),
     limit: int = Query(20, gt=0, le=100, description="Results per page"),
     offset: int = Query(0, ge=0, description="Results offset"),
-    filter_status: Optional[str] = Query(None, alias="status", regex="^(pending|running|completed|failed)$", description="Filter by status"),
+    filter_status: Optional[str] = Query(None, alias="status", pattern="^(pending|running|completed|failed)$", description="Filter by status"),
     current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):
@@ -567,8 +567,8 @@ async def get_analysis_by_uuid(
     # Fetch survey data for team members within analysis timeline
     member_surveys = get_member_surveys(analysis, db)
 
-    # Add survey data to analysis results
-    analysis_data = analysis.results or {}
+    # Add survey data and strip unused keys to reduce payload size
+    analysis_data = _trim_analysis_data(analysis.results or {})
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
 
@@ -626,8 +626,8 @@ async def get_analysis(
     # Fetch survey data for team members within analysis timeline
     member_surveys = get_member_surveys(analysis, db)
 
-    # Add survey data to analysis results
-    analysis_data = analysis.results or {}
+    # Add survey data and strip unused keys to reduce payload size
+    analysis_data = _trim_analysis_data(analysis.results or {})
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
 
@@ -647,6 +647,19 @@ async def get_analysis(
         analysis_data=analysis_data,
         config=analysis.config
     )
+
+
+_ANALYSIS_DATA_KEYS = {
+    'team_analysis', 'team_health', 'team_summary', 'daily_trends',
+    'metadata', 'data_sources', 'individual_daily_data', 'raw_incident_data',
+    'ai_team_insights', 'ai_enhanced', 'member_surveys',
+    'partial_data', 'error', 'data_collection_successful', 'failure_stage',
+}
+
+
+def _trim_analysis_data(results: dict) -> dict:
+    """Strip keys the frontend doesn't use (insights, recommendations, period_summary, etc.)."""
+    return {k: v for k, v in results.items() if k in _ANALYSIS_DATA_KEYS}
 
 
 def _calculate_trend(combined_scores: list[float]) -> str | None:
@@ -829,8 +842,8 @@ async def get_analysis_by_identifier(
     # Fetch survey data for team members within analysis timeline
     member_surveys = get_member_surveys(analysis, db)
 
-    # Add survey data to analysis results
-    analysis_data = analysis.results or {}
+    # Add survey data and strip unused keys to reduce payload size
+    analysis_data = _trim_analysis_data(analysis.results or {})
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
 
