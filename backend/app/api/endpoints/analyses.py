@@ -546,17 +546,19 @@ async def get_analysis_by_uuid(
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
         # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-        most_recent = db.query(Analysis).filter(
+        most_recent = db.query(Analysis).options(
+            load_only(Analysis.id, Analysis.uuid)
+        ).filter(
             Analysis.organization_id == current_user.organization_id,
             Analysis.organization_id.isnot(None),
             Analysis.status == "completed"
         ).order_by(Analysis.created_at.desc()).first()
-        
+
         error_detail = "Analysis not found"
         if most_recent:
             most_recent_id = getattr(most_recent, 'uuid', None) or most_recent.id
             error_detail = f"Analysis not found. Most recent analysis available: {most_recent_id}"
-        
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_detail
@@ -806,17 +808,19 @@ async def get_analysis_by_identifier(
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
         # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-        most_recent = db.query(Analysis).filter(
+        most_recent = db.query(Analysis).options(
+            load_only(Analysis.id, Analysis.uuid)
+        ).filter(
             Analysis.organization_id == current_user.organization_id,
             Analysis.organization_id.isnot(None),
             Analysis.status == "completed"
         ).order_by(Analysis.created_at.desc()).first()
-        
+
         error_detail = "Analysis not found"
         if most_recent:
             most_recent_id = getattr(most_recent, 'uuid', None) or most_recent.id
             error_detail = f"Analysis not found. Most recent analysis available: {most_recent_id}"
-        
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_detail

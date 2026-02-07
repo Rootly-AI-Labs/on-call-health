@@ -413,10 +413,11 @@ async def get_github_status(
         except Exception:
             pass  # Token preview is optional
 
-        # Validate token by checking if it's still valid
+        # Validate token (uses Redis-backed cache with 15-min TTL)
         from app.services.integration_validator import IntegrationValidator
         validator = IntegrationValidator(db)
-        validation_result = await validator._validate_github(current_user.id)
+        all_results = await validator.validate_all_integrations(current_user.id, use_cache=True)
+        validation_result = all_results.get("github")
 
         token_valid = validation_result.get("valid", False) if validation_result else False
         token_error = validation_result.get("error") if validation_result and not token_valid else None
