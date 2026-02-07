@@ -314,7 +314,7 @@ export function TeamMembersList({
 
         {/* Incidents */}
         <td className="py-3 px-4">
-          <span className="text-sm tabular-nums text-neutral-700">{member.incident_count || 0}</span>
+          <span className="text-sm font-semibold tabular-nums text-neutral-700">{member.incident_count || 0}</span>
         </td>
 
         {/* On-Call Status */}
