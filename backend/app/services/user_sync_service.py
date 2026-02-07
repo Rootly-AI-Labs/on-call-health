@@ -398,9 +398,8 @@ class UserSyncService:
                 error_str = str(e.orig)
                 # Check for any of the UserCorrelation unique constraint violations
                 is_duplicate_key = any(constraint in error_str for constraint in [
-                    'uq_user_correlation_user_email',  # Old constraint (being removed)
-                    'uq_user_correlation_org_email_null_user',  # New: multi-tenant mode
-                    'uq_user_correlation_user_email_not_null'  # New: personal mode
+                    'uq_user_correlation_user_email',  # Personal correlations (user_id, email)
+                    'uq_user_correlations_org_email',  # Org roster (organization_id, email) WHERE user_id IS NULL
                 ])
 
                 if is_duplicate_key:

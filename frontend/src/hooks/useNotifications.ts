@@ -177,26 +177,16 @@ export function useNotifications() {
   async function handleAction(notification: Notification): Promise<void> {
     if (!notification.action_url) return
 
-    // Check if it's an invitation action - navigate to integrations page with org modal open
-    const invitationMatch = notification.action_url.match(/\/invitations\/accept\/(\d+)/)
-    if (invitationMatch) {
-      // Navigate to integrations page which will show org management modal with invitations
-      window.location.href = '/integrations?openOrgModal=true'
-      // Mark as read when navigating
-      await markAsRead(notification.id)
-      return
-    }
+    // Mark as read before navigating
+    await markAsRead(notification.id)
 
     // If external URL, open in new tab
-    if (notification.action_url.startsWith('http')) {
+    if (notification.action_url.startsWith('http://') || notification.action_url.startsWith('https://')) {
       window.open(notification.action_url, '_blank')
     } else {
-      // Internal URL, navigate
+      // Internal URL (including invitations), navigate directly
       window.location.href = notification.action_url
     }
-
-    // Mark as read when action is taken
-    await markAsRead(notification.id)
   }
 
   // Fetch on mount, when tab becomes visible, and poll as fallback

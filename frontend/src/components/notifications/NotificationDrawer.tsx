@@ -31,10 +31,8 @@ export function NotificationDrawer() {
   // Handle notification action and close panel
   const onAction = async (notification: any) => {
     await handleAction(notification)
-    // Only close drawer if not opening invitation modal
-    if (!notification.action_url?.includes('/invitations/accept/')) {
-      setIsOpen(false)
-    }
+    // Always close drawer after action
+    setIsOpen(false)
   }
 
   // Handle scroll for infinite loading

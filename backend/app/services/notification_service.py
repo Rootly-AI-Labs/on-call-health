@@ -30,7 +30,7 @@ class NotificationService:
             type='invitation',
             title=f"Invitation to join {invitation.organization.name}",
             message=f"You've been invited to join {invitation.organization.name} as a {invitation.role}.",
-            action_url=f"/integrations?openOrgModal=true",
+            action_url=f"/invitations/accept/{invitation.id}",
             action_text="View Invitation",
             organization_invitation_id=invitation.id,
             priority='high',
@@ -54,7 +54,7 @@ class NotificationService:
                 type='invitation',
                 title=f"{accepted_by.name or accepted_by.email} accepted your invitation",
                 message=f"{accepted_by.email} accepted your invitation and joined {invitation.organization.name} as a {invitation.role}.",
-                action_url=f"/integrations?tab=members",
+                action_url=f"/management?view=team",
                 action_text="View Team Members",
                 priority='high'
             )
@@ -76,7 +76,7 @@ class NotificationService:
                 type='integration',
                 title=f"New team member: {accepted_by.name or accepted_by.email}",
                 message=f"{accepted_by.email} accepted an invitation and joined {invitation.organization.name}.",
-                action_url=f"/integrations?tab=members",
+                action_url=f"/management?view=team",
                 action_text="View Members",
                 priority='normal'
             )
