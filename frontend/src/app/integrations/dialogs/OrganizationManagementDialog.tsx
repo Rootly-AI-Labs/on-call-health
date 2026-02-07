@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Users, Mail, Loader2, Search, ChevronLeft, ChevronRight, AlertCircle, Trash2 } from "lucide-react"
+import { Users, Mail, Loader2, Search, ChevronLeft, ChevronRight, AlertCircle, Trash2, Send, Info, ChevronDown, ChevronUp } from "lucide-react"
 import { useState } from "react"
 import { UserInfo } from "../types"
 import { toast } from "sonner"
@@ -98,6 +98,8 @@ export function OrganizationManagementDialog({
   // State from feature/management_page - search and pagination
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [showRoleTooltip, setShowRoleTooltip] = useState(false)
+  const [showPendingInvitations, setShowPendingInvitations] = useState(false)
 
   // Handler functions from HEAD
   const handleAcceptInvitation = async (invitationId: number, skipWarning = false) => {
@@ -229,25 +231,11 @@ export function OrganizationManagementDialog({
 
   const dialogContentBody = (
     <>
-      {/* Role descriptions with padding */}
-      <div className={asInlineView ? "px-6 py-3 bg-purple-100 rounded-lg mb-6 mx-6 mt-6" : "mt-4 px-4 py-3 bg-purple-100 rounded-lg"}>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex items-baseline space-x-2">
-              <span className="font-semibold text-neutral-900 min-w-[80px]">Admin</span>
-              <span className="text-neutral-700">Full access: manage members, integrations, run analyses, send surveys, and configure settings</span>
-            </div>
-            <div className="flex items-baseline space-x-2">
-              <span className="font-semibold text-neutral-900 min-w-[80px]">Member</span>
-              <span className="text-neutral-700">Can view team health data, run analyses, and send surveys</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
+      <div className="space-y-6">
           {/* Received Invitations - Show at top if user has any */}
           {receivedInvitations.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 px-1">
+            <div className={asInlineView ? "space-y-3 mx-6 mt-6" : "space-y-3"}>
+              <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-neutral-500" />
                 <h3 className="text-sm font-medium text-neutral-700">
                   Pending Invitation{receivedInvitations.length > 1 ? 's' : ''}
@@ -348,65 +336,88 @@ export function OrganizationManagementDialog({
 
           {/* Invite New Member Section - Only visible to admins */}
           {(userInfo?.role === 'admin') && (
-            <div className={asInlineView ? "p-6 border rounded-lg bg-white mx-6" : "p-6 border rounded-lg bg-white"}>
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <Mail className="w-5 h-5 text-purple-600" />
+            <div className={asInlineView ? "mx-6 mt-6 pb-6 border-b border-neutral-200" : "pb-6 border-b border-neutral-200"}>
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-neutral-900">Invite a team member</h3>
+                <div className="flex gap-3 items-end">
+                  <div className="flex flex-col">
+                    <label htmlFor="invite-email" className="text-xs font-medium text-neutral-600 mb-1">Email</label>
+                    <Input
+                      id="invite-email"
+                      type="email"
+                      placeholder="colleague@company.com"
+                      value={inviteEmail}
+                      onChange={(e) => onInviteEmailChange(e.target.value)}
+                      className="w-72"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label htmlFor="invite-role" className="text-xs font-medium text-neutral-600 mb-1">Role</label>
+                    <select
+                      id="invite-role"
+                      value={inviteRole}
+                      onChange={(e) => onInviteRoleChange(e.target.value)}
+                      className="px-3 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-sm h-10"
+                    >
+                      <option value="member">Member</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-xs font-medium text-neutral-600 mb-1">&nbsp;</label>
+                    <Button
+                      onClick={onInvite}
+                      disabled={isInviting || !inviteEmail.trim()}
+                      className="bg-purple-700 hover:bg-purple-800 h-10 px-4 py-2.5"
+                    >
+                      {isInviting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-2" />
+                          Invite
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900">Invite Team Member</h3>
-                    <p className="text-sm text-neutral-500 mt-1">Send an invitation to join your organization</p>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="invite-email" className="block text-sm font-medium text-neutral-700 mb-1.5">
-                        Email Address
-                      </label>
-                      <Input
-                        id="invite-email"
-                        type="email"
-                        placeholder="colleague@company.com"
-                        value={inviteEmail}
-                        onChange={(e) => onInviteEmailChange(e.target.value)}
-                        className="w-full"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="invite-role" className="block text-sm font-medium text-neutral-700 mb-1.5">
-                        Role
-                      </label>
-                      <select
-                        id="invite-role"
-                        value={inviteRole}
-                        onChange={(e) => onInviteRoleChange(e.target.value)}
-                        className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-                      >
-                        <option value="member">Member</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </div>
-                  </div>
+                {/* Pending Invitations Collapsible - Under Invite Section */}
+                {pendingInvitations.length > 0 && (
+                  <div className="mt-3">
+                    <button
+                      onClick={() => setShowPendingInvitations(!showPendingInvitations)}
+                      className="flex items-center gap-2 text-xs text-neutral-600 hover:text-neutral-900 transition-colors"
+                    >
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{pendingInvitations.length} pending invitation{pendingInvitations.length > 1 ? 's' : ''}</span>
+                      {showPendingInvitations ? (
+                        <ChevronUp className="w-3 h-3" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
 
-                  <Button
-                    onClick={onInvite}
-                    disabled={isInviting || !inviteEmail.trim()}
-                    className="w-full md:w-auto bg-purple-700 hover:bg-purple-800"
-                  >
-                    {isInviting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Sending Invitation...
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="w-4 h-4 mr-2" />
-                        Send Invitation
-                      </>
+                    {showPendingInvitations && (
+                      <div className="mt-3 space-y-2">
+                        {pendingInvitations.map((invitation) => (
+                          <div key={invitation.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-md border border-neutral-200 text-xs">
+                            <span className="font-medium text-neutral-900">{invitation.email}</span>
+                            <span className={`px-2 py-0.5 rounded-full capitalize ${
+                              invitation.role === 'admin'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {invitation.role}
+                            </span>
+                            <span className="text-neutral-600">Invited by {invitation.invited_by?.name || 'Unknown'}</span>
+                            <span className="text-neutral-500">Expires {new Date(invitation.expires_at).toLocaleDateString()}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
-                  </Button>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -419,21 +430,27 @@ export function OrganizationManagementDialog({
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Search Bar - above members table */}
+              {/* Team Members Header and Search Bar */}
               {orgMembers.length > 0 && (
-                <div className={asInlineView ? "px-6 mb-4" : "mb-4"}>
-                  <div className="relative max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                    <Input
-                      type="text"
-                      placeholder="Search members..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value)
-                        setCurrentPage(1)
-                      }}
-                      className="pl-9 w-full"
-                    />
+                <div className={asInlineView ? "px-6 mt-4 flex items-center justify-between" : "mt-4 flex items-center justify-between"}>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-neutral-900">Team Members</h3>
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 text-xs font-medium text-neutral-700">{orgMembers.length}</span>
+                  </div>
+                  <div className="w-80">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                      <Input
+                        type="text"
+                        placeholder="Search members..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value)
+                          setCurrentPage(1)
+                        }}
+                        className="pl-9 w-full"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -441,22 +458,51 @@ export function OrganizationManagementDialog({
               {/* Current Members */}
               {filteredMembers.length > 0 && (
                 <div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-neutral-200 bg-neutral-50">
+                  <div className="overflow-x-auto overflow-y-visible">
+                    <table className="w-full overflow-visible">
+                      <thead className="overflow-visible">
+                        <tr className="border-t border-b border-neutral-200 bg-neutral-50 overflow-visible">
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Name</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Role</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700 overflow-visible">
+                            <div className="flex items-center gap-2 relative overflow-visible">
+                              <span>Role</span>
+                              <button
+                                type="button"
+                                onMouseEnter={() => setShowRoleTooltip(true)}
+                                onMouseLeave={() => setShowRoleTooltip(false)}
+                                className="cursor-help"
+                              >
+                                <Info className="w-4 h-4 text-neutral-500 hover:text-neutral-700" />
+                              </button>
+                              {showRoleTooltip && (
+                                <div className="absolute bg-neutral-900 text-white text-xs rounded-md px-3 py-2 w-60 whitespace-normal pointer-events-auto" style={{
+                                  top: '100%',
+                                  left: '50%',
+                                  marginTop: '8px',
+                                  transform: 'translateX(-50%)',
+                                  zIndex: 9999
+                                }}>
+                                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-neutral-900"></div>
+                                  <div className="text-xs">
+                                    <strong>Admin:</strong> Full access: manage members, integrations, run analyses, send surveys, and configure settings.
+                                  </div>
+                                  <div className="text-xs mt-1">
+                                    <strong>Member:</strong> Can view team health data, run analyses, and send surveys.
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {paginatedMembers.map((member, index) => (
-                          <tr key={member.id} className={`border-b border-neutral-100 hover:bg-neutral-50 ${index === paginatedMembers.length - 1 ? 'border-b-0' : ''}`}>
-                            <td className="py-4 px-6">
+                          <tr key={member.id} className="border-b border-neutral-100 hover:bg-neutral-50">
+                            <td className="py-2 px-6">
                               <div className="flex items-center gap-3">
-                                <span className="font-medium text-neutral-900">
+                                <span className="text-sm font-medium text-neutral-900">
                                   {member.name}
                                   {member.is_current_user && (
                                     <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">You</span>
@@ -464,26 +510,26 @@ export function OrganizationManagementDialog({
                                 </span>
                               </div>
                             </td>
-                            <td className="py-4 px-6">
+                            <td className="py-2 px-6">
                               <span className="text-sm text-neutral-600">{member.email}</span>
                             </td>
-                            <td className="py-4 px-6">
+                            <td className="py-2 px-6">
                               {userInfo?.role === 'admin' && !member.is_current_user ? (
                                 <select
                                   value={member.role || 'member'}
                                   onChange={(e) => onRoleChange(member.id as number, e.target.value)}
-                                  className="text-sm px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                  className="text-sm px-2 py-1 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                                 >
                                   <option value="member">Member</option>
                                   <option value="admin">Admin</option>
                                 </select>
                               ) : (
-                                <span className="text-sm text-neutral-900 capitalize">
+                                <span className="text-sm text-neutral-900 capitalize px-3 py-2.5">
                                   {member.role?.replace('_', ' ') || 'member'}
                                 </span>
                               )}
                             </td>
-                            <td className="py-4 px-6">
+                            <td className="py-2 px-6">
                               <div className="flex justify-end">
                                 {!member.is_current_user && userInfo?.role === 'admin' && (
                                   confirmRemoveUserId === member.id ? (
@@ -517,10 +563,9 @@ export function OrganizationManagementDialog({
                                       variant="ghost"
                                       onClick={() => setConfirmRemoveUserId(member.id as number)}
                                       disabled={removingUserId !== null}
-                                      className="h-7 text-xs text-neutral-500 hover:text-red-600 hover:bg-red-50"
+                                      className="h-8 w-8 p-0 text-neutral-500 hover:text-red-600 hover:bg-red-50"
                                     >
-                                      <Trash2 className="w-3 h-3 mr-1" />
-                                      Remove
+                                      <Trash2 className="w-4 h-4" />
                                     </Button>
                                   )
                                 )}
@@ -532,85 +577,31 @@ export function OrganizationManagementDialog({
                     </table>
                   </div>
                   {/* Pagination Controls */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-200">
-                      <p className="text-sm text-neutral-600">
-                        Showing {startIndex + 1}-{Math.min(startIndex + TEAM_MEMBERS_PER_PAGE, filteredMembers.length)} of {filteredMembers.length}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                          disabled={currentPage === 1}
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </Button>
-                        <span className="text-sm text-neutral-600 px-3">
-                          Page {currentPage} of {totalPages}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                          disabled={currentPage === totalPages}
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </Button>
-                      </div>
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-200">
+                    <p className="text-sm text-neutral-600">
+                      Showing {startIndex + 1}-{Math.min(startIndex + TEAM_MEMBERS_PER_PAGE, filteredMembers.length)} of {filteredMembers.length}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-neutral-600">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="text-purple-700 hover:text-purple-800 h-8 w-8 p-0"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="text-purple-700 hover:text-purple-800 h-8 w-8 p-0"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* Pending Invitations */}
-              {pendingInvitations.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium mb-3 flex items-center space-x-2">
-                    <Mail className="w-5 h-5" />
-                    <span>Pending Invitations ({pendingInvitations.length})</span>
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-neutral-200 bg-neutral-50">
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Role</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Invited By</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Sent</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Expires</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pendingInvitations.map((invitation, index) => (
-                          <tr key={invitation.id} className={`border-b border-neutral-100 hover:bg-neutral-50 bg-yellow-50 ${index === pendingInvitations.length - 1 ? 'border-b-0' : ''}`}>
-                            <td className="py-4 px-6">
-                              <span className="text-sm font-medium text-neutral-900">{invitation.email}</span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 capitalize">
-                                {invitation.role?.replace('_', ' ') || 'member'}
-                              </span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span className="text-sm text-neutral-600">{invitation.invited_by?.name || 'Unknown'}</span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span className="text-xs text-neutral-500">{new Date(invitation.created_at).toLocaleDateString()}</span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span className="text-xs text-neutral-500">
-                                {invitation.is_expired ? (
-                                  <span className="text-red-600">Expired</span>
-                                ) : (
-                                  new Date(invitation.expires_at).toLocaleDateString()
-                                )}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
                   </div>
                 </div>
               )}
@@ -651,16 +642,6 @@ export function OrganizationManagementDialog({
   if (asInlineView) {
     return (
       <>
-        {/* Header with padding and border */}
-        <div className="p-6 border-b border-neutral-200">
-          <h2 className="text-xl font-semibold text-neutral-900">
-            {title}
-          </h2>
-          <p className="text-sm text-neutral-600 mt-1">
-            {subtitle}
-          </p>
-        </div>
-
         {/* Content */}
         {dialogContentBody}
       </>
