@@ -423,7 +423,7 @@ async def list_analyses(
     integration_id: Optional[int] = Query(None, gt=0, description="Filter by integration ID"),
     limit: int = Query(20, gt=0, le=100, description="Results per page"),
     offset: int = Query(0, ge=0, description="Results offset"),
-    filter_status: Optional[str] = Query(None, alias="status", regex="^(pending|running|completed|failed)$", description="Filter by status"),
+    filter_status: Optional[str] = Query(None, alias="status", pattern="^(pending|running|completed|failed)$", description="Filter by status"),
     current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
 ):

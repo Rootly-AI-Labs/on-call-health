@@ -519,7 +519,7 @@ async def exchange_auth_code_for_token(
 @router.patch("/users/{user_id}/role")
 async def update_user_role(
     user_id: int,
-    new_role: str = Query(..., regex="^(member|admin)$"),
+    new_role: str = Query(..., pattern="^(member|admin)$"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:

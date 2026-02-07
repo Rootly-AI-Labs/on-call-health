@@ -121,8 +121,26 @@ async def user_logging_middleware(request: Request, call_next: Callable) -> Resp
     set_user_context(context_value)
 
     try:
-        # Process the request - let FastAPI handle any exceptions normally
-        return await call_next(request)
+        start = time.time()
+        response = await call_next(request)
+        duration = time.time() - start
+
+        # Log slow requests (>5s) so we know when clients are likely timing out
+        if duration > 5 and not request.url.path.startswith(("/docs", "/openapi", "/health")):
+            logger.warning(
+                f"Slow request: {request.method} {request.url.path} "
+                f"took {duration:.1f}s (user={context_value})"
+            )
+
+        return response
+    except Exception as e:
+        duration = time.time() - start
+        # Client disconnect shows up as asyncio.CancelledError or similar
+        logger.warning(
+            f"Client disconnected: {request.method} {request.url.path} "
+            f"after {duration:.1f}s (user={context_value}): {type(e).__name__}"
+        )
+        raise
     finally:
         # Always clear the user context after request processing
         clear_user_context()
