@@ -47,7 +47,31 @@ export async function handleInvite(
       let errorMessage = 'Failed to send invitation'
       try {
         const errorData = JSON.parse(responseText)
-        errorMessage = errorData.detail || errorMessage
+        // Handle different error formats
+        if (errorData.detail) {
+          if (typeof errorData.detail === 'string') {
+            // Check if it's an email validation error
+            if (errorData.detail.toLowerCase().includes('email') ||
+                errorData.detail.toLowerCase().includes('invalid characters')) {
+              errorMessage = 'Please enter a valid email address'
+            } else {
+              errorMessage = errorData.detail
+            }
+          } else if (Array.isArray(errorData.detail)) {
+            // Check if it's a validation error array
+            const firstError = errorData.detail[0]
+            if (firstError && (firstError.type === 'value_error' ||
+                String(firstError.msg || '').toLowerCase().includes('email'))) {
+              errorMessage = 'Please enter a valid email address'
+            } else {
+              errorMessage = errorData.detail.map((d: any) => d.msg || String(d)).join(', ')
+            }
+          } else if (typeof errorData.detail === 'object') {
+            errorMessage = JSON.stringify(errorData.detail)
+          }
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        }
       } catch {
         errorMessage = responseText.includes('<!DOCTYPE')
           ? 'API server not available or wrong URL'
@@ -70,7 +94,15 @@ export async function handleInvite(
 
   } catch (error) {
     console.error('Failed to send invitation:', error)
-    toast.error(error instanceof Error ? error.message : "Failed to send invitation")
+    let errorMessage = "Failed to send invitation"
+    if (error instanceof Error) {
+      errorMessage = error.message
+    } else if (typeof error === 'string') {
+      errorMessage = error
+    } else if (error && typeof error === 'object' && 'detail' in error) {
+      errorMessage = String(error.detail)
+    }
+    toast.error(errorMessage)
   } finally {
     setIsInviting(false)
   }
@@ -90,8 +122,15 @@ export async function handleRoleChange(
     return
   }
 
+  // Validate role to prevent injection attacks
+  const allowedRoles = ['admin', 'member']
+  if (!allowedRoles.includes(newRole)) {
+    toast.error("Invalid role specified")
+    return
+  }
+
   try {
-    const response = await fetch(`${API_BASE}/auth/users/${userId}/role?new_role=${newRole}`, {
+    const response = await fetch(`${API_BASE}/auth/users/${userId}/role?new_role=${encodeURIComponent(newRole)}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${authToken}`,

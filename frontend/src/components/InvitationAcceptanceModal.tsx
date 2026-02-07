@@ -170,10 +170,10 @@ export function InvitationAcceptanceModal({
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Building2 className="w-5 h-5" />
-            <span>Organization Invitation</span>
+            <span>Team Invitation</span>
           </DialogTitle>
           <DialogDescription>
-            You've been invited to join an organization
+            You've been invited to join a team
           </DialogDescription>
         </DialogHeader>
 
@@ -254,7 +254,7 @@ export function InvitationAcceptanceModal({
 
             <div className="text-center">
               <p className="text-xs text-neutral-500">
-                By accepting this invitation, you'll join the organization and gain access to team health analytics and integrations.
+                By accepting this invitation, you'll join the team and gain access to team health analytics and integrations.
               </p>
             </div>
           </div>
