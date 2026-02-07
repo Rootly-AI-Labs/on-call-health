@@ -32,6 +32,9 @@ import {
   Pencil,
   CheckCircle,
   Users,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react"
 import { API_BASE, type Integration } from "@/app/integrations/types"
 import { UserMappingDrawer } from "./components/UserMappingDrawer"
@@ -87,9 +90,14 @@ function TeamPageContent() {
   // Search state
   const [searchQuery, setSearchQuery] = useState("")
 
+  // Sort state
+  const [sortBy, setSortBy] = useState<'name' | 'email' | 'oncall' | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
   // Cache to track which integrations have already been loaded
   const syncedUsersCache = useRef<Map<string, SyncedUser[]>>(new Map())
   const recipientsCache = useRef<Map<string, Set<number>>>(new Map())
+  const lastSyncInfoCache = useRef<Map<string, {synced_at: string; synced_by: {id: number; name: string; email: string}} | null>>(new Map())
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isMountedRef = useRef(true)
 
@@ -301,6 +309,13 @@ function TeamPageContent() {
       const cachedUsers = syncedUsersCache.current.get(requestedOrg)!
       setSyncedUsers(cachedUsers)
 
+      // Restore cached last sync info
+      if (lastSyncInfoCache.current.has(requestedOrg)) {
+        setLastSyncInfo(lastSyncInfoCache.current.get(requestedOrg)!)
+      } else {
+        setLastSyncInfo(null)
+      }
+
       if (recipientsCache.current.has(requestedOrg)) {
         const cachedRecipients = recipientsCache.current.get(requestedOrg)!
         const validUserIds = new Set(cachedUsers.map(u => u.id))
@@ -339,7 +354,11 @@ function TeamPageContent() {
         const users = data.users || []
         setSyncedUsers(users)
         syncedUsersCache.current.set(requestedOrg, users)
-        setLastSyncInfo(data.last_sync || null)
+
+        // Cache last sync info
+        const syncInfo = data.last_sync || null
+        setLastSyncInfo(syncInfo)
+        lastSyncInfoCache.current.set(requestedOrg, syncInfo)
 
         // Load saved recipients
         const recipientIds = new Set<number>(users.filter((u: any) => u.is_survey_recipient).map((u: any) => u.id as number))
@@ -398,6 +417,7 @@ function TeamPageContent() {
       // Clear cache only after successful sync
       if (selectedOrganization) {
         syncedUsersCache.current.delete(selectedOrganization)
+        lastSyncInfoCache.current.delete(selectedOrganization)
       }
 
       setSyncProgress({
@@ -541,16 +561,37 @@ function TeamPageContent() {
   // Since the integrations array only contains Rootly and PagerDuty entries, length > 0 is sufficient
   const hasPrimaryIntegration = integrations.length > 0
 
-  // Filter users based on search query
-  const filteredUsers = syncedUsers.filter(user => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      user.email?.toLowerCase().includes(query) ||
-      user.github_username?.toLowerCase().includes(query) ||
-      user.jira_email?.toLowerCase().includes(query)
-    )
-  })
+  // Filter and sort users
+  const filteredUsers = syncedUsers
+    .filter(user => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        const matchesSearch = (
+          user.email?.toLowerCase().includes(query) ||
+          user.github_username?.toLowerCase().includes(query) ||
+          user.jira_email?.toLowerCase().includes(query)
+        )
+        if (!matchesSearch) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      if (!sortBy) return 0
+
+      let comparison = 0
+      if (sortBy === 'name') {
+        const aName = a.email?.split('@')[0] || ''
+        const bName = b.email?.split('@')[0] || ''
+        comparison = aName.localeCompare(bName)
+      } else if (sortBy === 'email') {
+        comparison = (a.email || '').localeCompare(b.email || '')
+      } else if (sortBy === 'oncall') {
+        comparison = (a.is_oncall ? 1 : 0) - (b.is_oncall ? 1 : 0)
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
 
   // Pagination
   const totalPages = Math.ceil(filteredUsers.length / TEAM_MEMBERS_PER_PAGE)
@@ -566,6 +607,28 @@ function TeamPageContent() {
     return integrations
   }
 
+  // Handle column header click for sorting
+  const handleSort = (column: 'name' | 'email' | 'oncall') => {
+    if (sortBy === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New column, default to ascending
+      setSortBy(column)
+      setSortDirection('asc')
+    }
+  }
+
+  // Get sort icon for column
+  const getSortIcon = (column: 'name' | 'email' | 'oncall') => {
+    if (sortBy !== column) {
+      return <ArrowUpDown className="w-4 h-4 text-neutral-400" />
+    }
+    return sortDirection === 'asc'
+      ? <ArrowUp className="w-4 h-4 text-purple-700" />
+      : <ArrowDown className="w-4 h-4 text-purple-700" />
+  }
+
   return (
     <>
       <TopPanel />
@@ -574,27 +637,32 @@ function TeamPageContent() {
           {/* Header with View Mode Toggle */}
           <div className="mb-8 flex items-end justify-end gap-6">
             {/* View Mode Toggle */}
-            <div className="flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
+            <div className="relative flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('organization')}
-                className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
+                className={`relative z-10 px-4 py-2 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'organization'
-                    ? 'bg-neutral-100 text-neutral-900'
+                    ? 'text-purple-700'
                     : 'text-neutral-600 hover:text-neutral-900'
                 }`}
               >
-                Organization
+                Synced Org
               </button>
               <button
                 onClick={() => setViewMode('company')}
-                className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
+                className={`relative z-10 px-4 py-2 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'company'
-                    ? 'bg-neutral-100 text-neutral-900'
+                    ? 'text-purple-700'
                     : 'text-neutral-600 hover:text-neutral-900'
                 }`}
               >
-                Team
+                Team Roles
               </button>
+              <div
+                className={`absolute top-1 bottom-1 bg-purple-100 rounded transition-all duration-300 ease-in-out ${
+                  viewMode === 'organization' ? 'left-1 w-[calc(50%-0.25rem)]' : 'left-[calc(50%+0.125rem)] w-[calc(50%-0.375rem)]'
+                }`}
+              />
             </div>
           </div>
 
@@ -624,7 +692,7 @@ function TeamPageContent() {
 
                     {/* Search Bar and Organization Selector - Only show when primary integration exists */}
                     {hasPrimaryIntegration && (
-                      <div className="mb-4 flex items-end gap-4">
+                      <div className="flex items-end gap-4">
                         {/* Search Bar - shorter */}
                         <div className="w-80">
                           <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">&nbsp;</label>
@@ -732,9 +800,33 @@ function TeamPageContent() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-neutral-200 bg-neutral-50">
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Name</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">On-Call Status</th>
+                          <th className="text-left py-3 px-6">
+                            <button
+                              onClick={() => handleSort('name')}
+                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
+                            >
+                              Name
+                              {getSortIcon('name')}
+                            </button>
+                          </th>
+                          <th className="text-left py-3 px-6">
+                            <button
+                              onClick={() => handleSort('email')}
+                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
+                            >
+                              Email
+                              {getSortIcon('email')}
+                            </button>
+                          </th>
+                          <th className="text-left py-3 px-6">
+                            <button
+                              onClick={() => handleSort('oncall')}
+                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
+                            >
+                              On-Call Status
+                              {getSortIcon('oncall')}
+                            </button>
+                          </th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Integrations</th>
                           <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700"></th>
                         </tr>

@@ -35,7 +35,7 @@ def get_encryption_key() -> bytes:
     """
     from base64 import urlsafe_b64encode
 
-    key = settings.ENCRYPTION_KEY.encode()
+    key = settings.JWT_SECRET_KEY.encode()
     # Ensure key is 32 bytes for Fernet (consistent with other integration files)
     key = urlsafe_b64encode(key[:32].ljust(32, b'\0'))
 
