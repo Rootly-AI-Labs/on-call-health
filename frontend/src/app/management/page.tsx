@@ -27,6 +27,7 @@ import {
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Loader2,
   Search,
   Pencil,
@@ -112,6 +113,10 @@ function TeamPageContent() {
   // User mapping drawer state
   const [selectedUserForMapping, setSelectedUserForMapping] = useState<any | null>(null)
   const [mappingDrawerOpen, setMappingDrawerOpen] = useState(false)
+
+  // Inline mapping dropdown state
+  const [openMappingUserId, setOpenMappingUserId] = useState<number | null>(null)
+  const [expandedIntegration, setExpandedIntegration] = useState<string | null>(null)
 
   // Sync confirmation modal state
   const [showSyncConfirmModal, setShowSyncConfirmModal] = useState(false)
@@ -634,13 +639,23 @@ function TeamPageContent() {
       <TopPanel />
       <main className="min-h-screen bg-neutral-50 p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
-          {/* Header with View Mode Toggle */}
-          <div className="mb-8 flex items-end justify-end gap-6">
+          {/* Header with Title and View Mode Toggle */}
+          <div className="mb-6 flex items-start justify-between pl-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-neutral-900">
+                {viewMode === 'organization' ? 'Organization Management' : 'Team Management'}
+              </h1>
+              <p className="text-sm text-neutral-600 mt-1">
+                {viewMode === 'organization'
+                  ? 'Sync team data, manage incident response integrations, and track on-call status'
+                  : 'Add team members, assign roles, manage access permissions, and control who can view and edit team data'}
+              </p>
+            </div>
             {/* View Mode Toggle */}
             <div className="relative flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('organization')}
-                className={`relative z-10 px-4 py-2 text-sm font-medium rounded transition-all duration-200 ${
+                className={`relative z-10 px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'organization'
                     ? 'text-purple-700'
                     : 'text-neutral-600 hover:text-neutral-900'
@@ -650,7 +665,7 @@ function TeamPageContent() {
               </button>
               <button
                 onClick={() => setViewMode('company')}
-                className={`relative z-10 px-4 py-2 text-sm font-medium rounded transition-all duration-200 ${
+                className={`relative z-10 px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'company'
                     ? 'text-purple-700'
                     : 'text-neutral-600 hover:text-neutral-900'
@@ -672,37 +687,22 @@ function TeamPageContent() {
               {viewMode === 'organization' ? (
                 <>
                   {/* Organization View */}
-                  {/* Header with Search and Actions */}
+                  {/* Header with Organization Selector and Sync Button */}
                   <div className="p-6 border-b border-neutral-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h2 className="text-xl font-semibold text-neutral-900">Organization Management</h2>
-                        <p className="text-sm text-neutral-600 mt-1">Sync team data, manage incident response integrations, and track on-call status</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Button
-                          onClick={() => setShowSyncConfirmModal(true)}
-                          disabled={loadingSyncedUsers || !hasPrimaryIntegration}
-                          className="bg-purple-700 hover:bg-purple-800"
-                        >
-                          Sync Now
-                        </Button>
-                      </div>
-                    </div>
 
                     {/* Organization Selector and Members Section - Only show when primary integration exists */}
                     {hasPrimaryIntegration && (
                       <div className="space-y-4">
-                        {/* Top row: Organization Selector */}
-                        <div className="flex items-end gap-4">
+                        {/* Top row: Organization Selector and Sync Button */}
+                        <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
                           <div className="flex-shrink-0">
-                            <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">Select Organization</label>
+                            <label className="text-sm font-medium text-neutral-900 mb-2 block">Select Organization</label>
                             <Select
                               value={selectedOrganization}
                               onValueChange={setSelectedOrganization}
                               disabled={loadingIntegrations || !hasPrimaryIntegration}
                             >
-                              <SelectTrigger className="w-72">
+                              <SelectTrigger className="w-64">
                                 <SelectValue placeholder="Select an organization..." />
                               </SelectTrigger>
                               <SelectContent>
@@ -714,11 +714,31 @@ function TeamPageContent() {
                               </SelectContent>
                             </Select>
                           </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <Button
+                              onClick={() => setShowSyncConfirmModal(true)}
+                              disabled={loadingSyncedUsers || !hasPrimaryIntegration}
+                              className="bg-purple-700 hover:bg-purple-800 text-white"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Sync Now
+                            </Button>
+                            {lastSyncInfo && (
+                              <p className="text-xs text-neutral-500">
+                                Last synced {new Date(lastSyncInfo.synced_at).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
                         </div>
 
                         {/* Bottom row: Organization Members and Search Bar */}
                         <div className="flex items-center justify-between">
-                          <h3 className="text-sm font-semibold text-neutral-900">Organization Members <span className="text-neutral-500 font-normal">{syncedUsers.length}</span></h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-semibold text-neutral-900">Organization Members</h3>
+                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 text-xs font-medium text-neutral-700">{syncedUsers.length}</span>
+                          </div>
                           <div className="w-80">
                             <div className="relative">
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
@@ -727,7 +747,7 @@ function TeamPageContent() {
                                 placeholder="Search members..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 w-full"
+                                className="pl-9 w-full border-neutral-300"
                               />
                             </div>
                           </div>
@@ -791,23 +811,14 @@ function TeamPageContent() {
               ) : (
                 // TABLE
                 <>
-                  {/* Last Sync Info */}
-                  {lastSyncInfo && (
-                    <div className="px-6 py-3 bg-neutral-50 border-b border-neutral-200">
-                      <p className="text-sm text-neutral-600">
-                        Last synced {new Date(lastSyncInfo.synced_at).toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-neutral-200 bg-neutral-100">
+                        <tr className="border-b border-neutral-200 bg-neutral-50">
                           <th className="text-left py-3 px-6">
                             <button
                               onClick={() => handleSort('name')}
-                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
+                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
                             >
                               Name
                               {getSortIcon('name')}
@@ -817,7 +828,7 @@ function TeamPageContent() {
                           <th className="text-left py-3 px-6">
                             <button
                               onClick={() => handleSort('oncall')}
-                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
+                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
                             >
                               On-Call Status
                               {getSortIcon('oncall')}
@@ -847,7 +858,7 @@ function TeamPageContent() {
                                         .substring(0, 2)}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <span className="font-medium text-neutral-900 capitalize">
+                                  <span className="text-sm font-medium text-neutral-900 capitalize">
                                     {displayName.replace(/[._]/g, ' ')}
                                   </span>
                                 </div>
@@ -898,13 +909,130 @@ function TeamPageContent() {
                                 </div>
                               </td>
                               <td className="py-3 px-6">
-                                <button
-                                  className="text-neutral-400 hover:text-neutral-600 transition-colors"
-                                  onClick={() => openMappingDrawer(user)}
-                                  title="Edit integration mappings"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </button>
+                                <div className="relative">
+                                  <button
+                                    className="text-neutral-400 hover:text-neutral-600 transition-colors"
+                                    onClick={() => setOpenMappingUserId(openMappingUserId === user.id ? null : user.id)}
+                                    title="Edit integration mappings"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+
+                                  {/* Inline Mapping Dropdown */}
+                                  {openMappingUserId === user.id && (
+                                    <div className="absolute right-0 top-8 w-72 bg-white border border-neutral-200 rounded-lg shadow-lg z-50 p-4">
+                                      <div className="mb-3">
+                                        <h4 className="text-sm font-semibold text-neutral-900">Integration Mappings</h4>
+                                        <p className="text-xs text-neutral-600">{user.email}</p>
+                                      </div>
+                                      <div className="space-y-2">
+                                        {/* GitHub */}
+                                        {connectedIntegrations.has('github') && (
+                                          <div className="border border-neutral-200 rounded">
+                                            <button
+                                              onClick={() => setExpandedIntegration(expandedIntegration === 'github' ? null : 'github')}
+                                              className="w-full flex items-center justify-between p-2 hover:bg-neutral-50"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                                                </svg>
+                                                <div className="text-left">
+                                                  <div className="text-sm font-medium">GitHub</div>
+                                                  <div className="text-xs text-red-600">{user.github_username || 'Not mapped'}</div>
+                                                </div>
+                                              </div>
+                                              <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'github' ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {expandedIntegration === 'github' && (
+                                              <div className="p-2 border-t border-neutral-200">
+                                                <input
+                                                  type="text"
+                                                  placeholder="Search GitHub users..."
+                                                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
+                                                />
+                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">adam-dev</button>
+                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">alex-c</button>
+                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">brianlee</button>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {/* Jira */}
+                                        {connectedIntegrations.has('jira') && (
+                                          <div className="border border-neutral-200 rounded">
+                                            <button
+                                              onClick={() => setExpandedIntegration(expandedIntegration === 'jira' ? null : 'jira')}
+                                              className="w-full flex items-center justify-between p-2 hover:bg-neutral-50"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <svg className="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                                                  <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.004-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z"/>
+                                                </svg>
+                                                <div className="text-left">
+                                                  <div className="text-sm font-medium">Jira</div>
+                                                  <div className="text-xs text-red-600">{user.jira_email || 'Not mapped'}</div>
+                                                </div>
+                                              </div>
+                                              <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'jira' ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {expandedIntegration === 'jira' && (
+                                              <div className="p-2 border-t border-neutral-200">
+                                                <input
+                                                  type="text"
+                                                  placeholder="Search Jira users..."
+                                                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
+                                                />
+                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">User 1</button>
+                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">User 2</button>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {/* Linear */}
+                                        {connectedIntegrations.has('linear') && (
+                                          <div className="border border-neutral-200 rounded">
+                                            <button
+                                              onClick={() => setExpandedIntegration(expandedIntegration === 'linear' ? null : 'linear')}
+                                              className="w-full flex items-center justify-between p-2 hover:bg-neutral-50"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <svg className="w-4 h-4" viewBox="0 0 100 100" fill="none">
+                                                  <path d="M1.22541 61.5228L37.9346 98.232C40.1747 100.472 43.6923 100.472 45.9324 98.232L98.7757 45.3887C101.016 43.1486 101.016 39.631 98.7757 37.3909L62.0665 0.681699C59.8264 -1.55841 56.3088 -1.55841 54.0687 0.681699L1.22541 53.525C-1.01469 55.7651 -1.01469 59.2827 1.22541 61.5228Z" fill="rgb(94, 114, 228)"/>
+                                                  <path d="M55.5019 47.4581L60.8303 52.7865L61.4006 53.3568C62.5458 54.502 62.5458 56.3545 61.4006 57.4997L55.4498 63.4505C54.3046 64.5957 52.4521 64.5957 51.3069 63.4505L50.7366 62.8802L35.3864 47.5300C34.2412 46.3848 34.2412 44.5323 35.3864 43.3871L41.3372 37.4363C42.4824 36.2911 44.3349 36.2911 45.4801 37.4363L45.9854 37.9416" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                                                </svg>
+                                                <div className="text-left">
+                                                  <div className="text-sm font-medium">Linear</div>
+                                                  <div className="text-xs text-red-600">{user.linear_email || 'Not mapped'}</div>
+                                                </div>
+                                              </div>
+                                              <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'linear' ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {expandedIntegration === 'linear' && (
+                                              <div className="p-2 border-t border-neutral-200">
+                                                <input
+                                                  type="text"
+                                                  placeholder="Search Linear users..."
+                                                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
+                                                />
+                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">User 1</button>
+                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">User 2</button>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           )
@@ -920,24 +1048,24 @@ function TeamPageContent() {
                         Showing {startIndex + 1}-{Math.min(startIndex + TEAM_MEMBERS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length}
                       </p>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                          disabled={currentPage === 1}
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </Button>
-                        <span className="text-sm text-neutral-600 px-3">
+                        <span className="text-sm text-purple-700">
                           Page {currentPage} of {totalPages}
                         </span>
                         <Button
                           variant="outline"
-                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                          className="text-purple-700 hover:text-purple-800 h-8 w-8 p-0"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
                           onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                           disabled={currentPage === totalPages}
+                          className="text-purple-700 hover:text-purple-800 h-8 w-8 p-0"
                         >
-                          <ChevronRight className="w-4 h-4" />
+                          <ChevronRight className="w-3.5 h-3.5" />
                         </Button>
                       </div>
                     </div>
