@@ -2,6 +2,7 @@
 Burnout analysis API endpoints.
 """
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
@@ -9,7 +10,7 @@ from uuid import uuid4
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import func, over
-from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm import Session, defer, load_only
 from sqlalchemy.exc import OperationalError
 
 from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
@@ -531,7 +532,7 @@ async def get_analysis_by_uuid(
             )
 
         # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-        analysis = db.query(Analysis).filter(
+        analysis = db.query(Analysis).options(defer(Analysis.results)).filter(
             Analysis.uuid == analysis_uuid,
             Analysis.organization_id == current_user.organization_id,
             Analysis.organization_id.isnot(None)
@@ -567,8 +568,8 @@ async def get_analysis_by_uuid(
     # Fetch survey data for team members within analysis timeline
     member_surveys = get_member_surveys(analysis, db)
 
-    # Add survey data and strip unused keys to reduce payload size
-    analysis_data = _trim_analysis_data(analysis.results or {})
+    # Extract only frontend-used keys from results at DB level (avoids loading 30MB+ into Python)
+    analysis_data = _load_analysis_data(db, analysis.id)
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
 
@@ -599,7 +600,7 @@ async def get_analysis(
     """Get a specific analysis result."""
     # Simplified: Filter by user_id only (no organization_id requirement)
     # TODO: Re-enable organization_id filtering after multi-tenant migration is stable
-    analysis = db.query(Analysis).filter(
+    analysis = db.query(Analysis).options(defer(Analysis.results)).filter(
         Analysis.id == analysis_id,
         Analysis.user_id == current_user.id
     ).first()
@@ -626,8 +627,8 @@ async def get_analysis(
     # Fetch survey data for team members within analysis timeline
     member_surveys = get_member_surveys(analysis, db)
 
-    # Add survey data and strip unused keys to reduce payload size
-    analysis_data = _trim_analysis_data(analysis.results or {})
+    # Extract only frontend-used keys from results at DB level (avoids loading 30MB+ into Python)
+    analysis_data = _load_analysis_data(db, analysis.id)
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
 
@@ -649,17 +650,76 @@ async def get_analysis(
     )
 
 
-_ANALYSIS_DATA_KEYS = {
+_ANALYSIS_DATA_KEYS = [
     'team_analysis', 'team_health', 'team_summary', 'daily_trends',
     'metadata', 'data_sources', 'individual_daily_data', 'raw_incident_data',
     'ai_team_insights', 'ai_enhanced',
     'partial_data', 'error', 'data_collection_successful', 'failure_stage',
-}
+]
+
+# Build the SQL once: SELECT results->'key1', results->'key2', ... FROM analyses WHERE id = :id
+_RESULTS_SELECT_COLS = ", ".join(f"results->'{k}'" for k in _ANALYSIS_DATA_KEYS)
+_RESULTS_EXTRACT_SQL = f"SELECT {_RESULTS_SELECT_COLS} FROM analyses WHERE id = :id"
 
 
 def _trim_analysis_data(results: dict) -> dict:
     """Strip keys the frontend doesn't use (insights, recommendations, period_summary, etc.)."""
     return {k: v for k, v in results.items() if k in _ANALYSIS_DATA_KEYS}
+
+
+def _get_redis_for_analysis() -> Optional[Any]:
+    """Get Redis client for analysis data cache."""
+    try:
+        redis_url = os.getenv("REDIS_URL")
+        if not redis_url:
+            return None
+        import redis
+        client = redis.from_url(redis_url, decode_responses=True)
+        client.ping()
+        return client
+    except Exception:
+        return None
+
+
+_ANALYSIS_CACHE_TTL = 3600  # 1 hour — results are immutable once completed
+
+
+def _load_analysis_data(db: Session, analysis_id: int) -> dict:
+    """Load frontend-used keys from analysis results, with Redis cache.
+
+    Cache flow:
+    1. Check Redis for cached trimmed results
+    2. On miss, extract only needed keys from DB using PostgreSQL JSON operators
+    3. Store in Redis for subsequent requests
+    """
+    import json as _json
+    cache_key = f"analysis_data:{analysis_id}"
+
+    # Try Redis cache first
+    redis_client = _get_redis_for_analysis()
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return _json.loads(cached)
+        except Exception as e:
+            logger.warning(f"Redis read error for analysis {analysis_id}: {e}")
+
+    # Cache miss — extract from DB
+    from sqlalchemy import text as sa_text
+    row = db.execute(sa_text(_RESULTS_EXTRACT_SQL), {"id": analysis_id}).first()
+    if not row:
+        return {}
+    data = {k: row[i] for i, k in enumerate(_ANALYSIS_DATA_KEYS) if row[i] is not None}
+
+    # Store in Redis
+    if redis_client and data:
+        try:
+            redis_client.setex(cache_key, _ANALYSIS_CACHE_TTL, _json.dumps(data))
+        except Exception as e:
+            logger.warning(f"Redis write error for analysis {analysis_id}: {e}")
+
+    return data
 
 
 def _calculate_trend(combined_scores: list[float]) -> str | None:
@@ -777,7 +837,7 @@ def is_uuid(value: str) -> bool:
 
 
 @router.get("/by-id/{analysis_identifier}", response_model=AnalysisResponse)
-async def get_analysis_by_identifier(
+async def get_analysis_by_identifier(  # noqa: C901
     analysis_identifier: str,
     current_user: User = Depends(get_current_user_flexible),
     db: Session = Depends(get_db)
@@ -795,7 +855,7 @@ async def get_analysis_by_identifier(
     if is_uuid(analysis_identifier):
         try:
             # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-            analysis = db.query(Analysis).filter(
+            analysis = db.query(Analysis).options(defer(Analysis.results)).filter(
                 Analysis.uuid == analysis_identifier,
                 Analysis.organization_id == current_user.organization_id,
                 Analysis.organization_id.isnot(None)
@@ -809,7 +869,7 @@ async def get_analysis_by_identifier(
         try:
             analysis_id = int(analysis_identifier)
             # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-            analysis = db.query(Analysis).filter(
+            analysis = db.query(Analysis).options(defer(Analysis.results)).filter(
                 Analysis.id == analysis_id,
                 Analysis.organization_id == current_user.organization_id,
                 Analysis.organization_id.isnot(None)
@@ -839,23 +899,25 @@ async def get_analysis_by_identifier(
             detail=error_detail
         )
 
-    # Fetch survey data for team members within analysis timeline
+    import time as _time
+    t0 = _time.time()
     member_surveys = get_member_surveys(analysis, db)
-
-    # Add survey data and strip unused keys to reduce payload size
-    analysis_data = _trim_analysis_data(analysis.results or {})
+    t1 = _time.time()
+    analysis_data = _load_analysis_data(db, analysis.id)
+    t2 = _time.time()
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
+    logger.info(
+        f"get_analysis_by_identifier timing: surveys={t1-t0:.2f}s, "
+        f"results_extract={t2-t1:.2f}s, analysis_id={analysis.id}"
+    )
 
     return AnalysisResponse(
         id=analysis.id,
         uuid=getattr(analysis, 'uuid', None),
         integration_id=analysis.rootly_integration_id,
-
-        # Include new integration fields
         integration_name=analysis.integration_name,
         platform=analysis.platform,
-
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
@@ -1023,9 +1085,15 @@ async def regenerate_analysis_trends(
         # Update analysis data with daily trends
         analysis_data["daily_trends"] = daily_trends
         
-        # Save back to database
+        # Save back to database and invalidate Redis cache
         analysis.results = analysis_data
         db.commit()
+        redis_client = _get_redis_for_analysis()
+        if redis_client:
+            try:
+                redis_client.delete(f"analysis_data:{analysis.id}")
+            except Exception:
+                pass
         
         logger.info(f"Successfully regenerated {len(daily_trends)} daily trends for analysis {analysis_ref}")
         
