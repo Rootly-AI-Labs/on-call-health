@@ -252,9 +252,9 @@ export function UserIncidentCard({
         {hasSeverityData && incidentCount > 0 && !isPagerDuty && (
           <div className={`grid ${rootlyCounts.sev0 > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
             {rootlyCounts.sev0 > 0 && (
-              <div className="bg-purple-50 rounded-lg p-2 text-center">
-                <div className="text-xs font-semibold text-purple-600">SEV0</div>
-                <div className="text-lg font-bold text-purple-600">{rootlyCounts.sev0}</div>
+              <div className="bg-red-100 rounded-lg p-2 text-center">
+                <div className="text-xs font-semibold text-red-800">SEV0</div>
+                <div className="text-lg font-bold text-red-800">{rootlyCounts.sev0}</div>
               </div>
             )}
             <div className="bg-red-50 rounded-lg p-2 text-center">
@@ -312,7 +312,7 @@ export function UserIncidentCard({
                   // Get severity color
                   const getSeverityColor = (sev: string) => {
                     const s = sev.toLowerCase()
-                    if (s.includes('sev0') || s.includes('critical') || s.includes('emergency')) return 'bg-purple-100 text-purple-700'
+                    if (s.includes('sev0') || s.includes('critical') || s.includes('emergency')) return 'bg-red-200 text-red-800'
                     if (s.includes('sev1') || s.includes('high')) return 'bg-red-100 text-red-700'
                     if (s.includes('sev2') || s.includes('medium')) return 'bg-orange-100 text-orange-700'
                     if (s.includes('sev3')) return 'bg-yellow-100 text-yellow-700'
