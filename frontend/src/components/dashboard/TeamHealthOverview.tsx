@@ -463,9 +463,9 @@ export function TeamHealthOverview({
                   // Rootly: Show standard SEV0-SEV4
                   <div className={`mt-4 grid ${severityBreakdown.sev0_count > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
                     {severityBreakdown.sev0_count > 0 && (
-                      <div className="bg-purple-50 rounded-lg p-2 text-center">
-                        <div className="text-xs font-semibold text-purple-600">SEV0</div>
-                        <div className="text-lg font-bold text-purple-600">
+                      <div className="bg-red-100 rounded-lg p-2 text-center">
+                        <div className="text-xs font-semibold text-red-800">SEV0</div>
+                        <div className="text-lg font-bold text-red-800">
                           {severityBreakdown.sev0_count}
                         </div>
                       </div>
