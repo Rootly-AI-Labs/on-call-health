@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Users, Mail, Loader2, Search, ChevronLeft, ChevronRight, AlertCircle, Trash2, Send, Info } from "lucide-react"
+import { Users, Mail, Loader2, Search, ChevronLeft, ChevronRight, AlertCircle, Trash2, Send, Info, ChevronDown, ChevronUp } from "lucide-react"
 import { useState } from "react"
 import { UserInfo } from "../types"
 import { toast } from "sonner"
@@ -99,6 +99,7 @@ export function OrganizationManagementDialog({
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [showRoleTooltip, setShowRoleTooltip] = useState(false)
+  const [showPendingInvitations, setShowPendingInvitations] = useState(false)
 
   // Handler functions from HEAD
   const handleAcceptInvitation = async (invitationId: number, skipWarning = false) => {
@@ -335,7 +336,7 @@ export function OrganizationManagementDialog({
 
           {/* Invite New Member Section - Only visible to admins */}
           {(userInfo?.role === 'admin') && (
-            <div className={asInlineView ? "mx-6 mt-6" : ""}>
+            <div className={asInlineView ? "mx-6 mt-6 pb-6 border-b border-neutral-200" : "pb-6 border-b border-neutral-200"}>
               <div className="space-y-3">
                 <h3 className="text-sm font-medium text-neutral-900">Invite a team member</h3>
                 <div className="flex gap-3 items-end">
@@ -380,6 +381,43 @@ export function OrganizationManagementDialog({
                     </Button>
                   </div>
                 </div>
+
+                {/* Pending Invitations Collapsible - Under Invite Section */}
+                {pendingInvitations.length > 0 && (
+                  <div className="mt-3">
+                    <button
+                      onClick={() => setShowPendingInvitations(!showPendingInvitations)}
+                      className="flex items-center gap-2 text-xs text-neutral-600 hover:text-neutral-900 transition-colors"
+                    >
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{pendingInvitations.length} pending invitation{pendingInvitations.length > 1 ? 's' : ''}</span>
+                      {showPendingInvitations ? (
+                        <ChevronUp className="w-3 h-3" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
+
+                    {showPendingInvitations && (
+                      <div className="mt-3 space-y-2">
+                        {pendingInvitations.map((invitation) => (
+                          <div key={invitation.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-md border border-neutral-200 text-xs">
+                            <span className="font-medium text-neutral-900">{invitation.email}</span>
+                            <span className={`px-2 py-0.5 rounded-full capitalize ${
+                              invitation.role === 'admin'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {invitation.role}
+                            </span>
+                            <span className="text-neutral-600">Invited by {invitation.invited_by?.name || 'Unknown'}</span>
+                            <span className="text-neutral-500">Expires {new Date(invitation.expires_at).toLocaleDateString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -394,8 +432,11 @@ export function OrganizationManagementDialog({
             <div className="space-y-6">
               {/* Team Members Header and Search Bar */}
               {orgMembers.length > 0 && (
-                <div className={asInlineView ? "px-6 mb-4 flex items-center justify-between" : "mb-4 flex items-center justify-between"}>
-                  <h3 className="text-sm font-semibold text-neutral-900">Team Members <span className="text-neutral-500 font-normal">{orgMembers.length}</span></h3>
+                <div className={asInlineView ? "px-6 mt-4 flex items-center justify-between" : "mt-4 flex items-center justify-between"}>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-neutral-900">Team Members</h3>
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 text-xs font-medium text-neutral-700">{orgMembers.length}</span>
+                  </div>
                   <div className="w-80">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
@@ -420,10 +461,10 @@ export function OrganizationManagementDialog({
                   <div className="overflow-x-auto overflow-y-visible">
                     <table className="w-full overflow-visible">
                       <thead className="overflow-visible">
-                        <tr className="border-b border-neutral-200 bg-neutral-100 overflow-visible">
-                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Name</th>
-                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Email</th>
-                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700 overflow-visible">
+                        <tr className="border-t border-b border-neutral-200 bg-neutral-50 overflow-visible">
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Name</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700 overflow-visible">
                             <div className="flex items-center gap-2 relative overflow-visible">
                               <span>Role</span>
                               <button
@@ -453,7 +494,7 @@ export function OrganizationManagementDialog({
                               )}
                             </div>
                           </th>
-                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700"></th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -461,7 +502,7 @@ export function OrganizationManagementDialog({
                           <tr key={member.id} className="border-b border-neutral-100 hover:bg-neutral-50">
                             <td className="py-2 px-6">
                               <div className="flex items-center gap-3">
-                                <span className="font-medium text-neutral-900">
+                                <span className="text-sm font-medium text-neutral-900">
                                   {member.name}
                                   {member.is_current_user && (
                                     <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">You</span>
@@ -541,78 +582,26 @@ export function OrganizationManagementDialog({
                       Showing {startIndex + 1}-{Math.min(startIndex + TEAM_MEMBERS_PER_PAGE, filteredMembers.length)} of {filteredMembers.length}
                     </p>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                      <span className="text-sm text-neutral-600 px-3">
+                      <span className="text-sm text-neutral-600">
                         Page {currentPage} of {totalPages}
                       </span>
                       <Button
                         variant="outline"
-                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="text-purple-700 hover:text-purple-800 h-8 w-8 p-0"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="outline"
                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                         disabled={currentPage === totalPages}
+                        className="text-purple-700 hover:text-purple-800 h-8 w-8 p-0"
                       >
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="w-3.5 h-3.5" />
                       </Button>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Pending Invitations */}
-              {pendingInvitations.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium mb-3 flex items-center space-x-2">
-                    <Mail className="w-5 h-5" />
-                    <span>Pending Invitations ({pendingInvitations.length})</span>
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-neutral-200 bg-neutral-100">
-                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Email</th>
-                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Role</th>
-                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Invited By</th>
-                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Sent</th>
-                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Expires</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pendingInvitations.map((invitation, index) => (
-                          <tr key={invitation.id} className="border-b border-neutral-100 hover:bg-neutral-50 bg-yellow-50">
-                            <td className="py-4 px-6">
-                              <span className="text-sm font-medium text-neutral-900">{invitation.email}</span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 capitalize">
-                                {invitation.role?.replace('_', ' ') || 'member'}
-                              </span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span className="text-sm text-neutral-600">{invitation.invited_by?.name || 'Unknown'}</span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span className="text-xs text-neutral-500">{new Date(invitation.created_at).toLocaleDateString()}</span>
-                            </td>
-                            <td className="py-4 px-6">
-                              <span className="text-xs text-neutral-500">
-                                {invitation.is_expired ? (
-                                  <span className="text-red-600">Expired</span>
-                                ) : (
-                                  new Date(invitation.expires_at).toLocaleDateString()
-                                )}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
                   </div>
                 </div>
               )}
@@ -653,16 +642,6 @@ export function OrganizationManagementDialog({
   if (asInlineView) {
     return (
       <>
-        {/* Header with padding and border */}
-        <div className="p-6 border-b border-neutral-200">
-          <h2 className="text-xl font-semibold text-neutral-900">
-            {title}
-          </h2>
-          <p className="text-sm text-neutral-600 mt-1">
-            {subtitle}
-          </p>
-        </div>
-
         {/* Content */}
         {dialogContentBody}
       </>
