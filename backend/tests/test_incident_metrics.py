@@ -1180,5 +1180,117 @@ class TestGitHubFallbackNoEstimate(unittest.TestCase):
         self.assertEqual(weekend_commits, 0)
 
 
+class TestPagerDutyDailyDataEmailLookup(unittest.TestCase):
+    """Test that PagerDuty incidents are correctly attributed to users in daily data
+    even when assigned_to lacks an email field."""
+
+    def _simulate_daily_data_assignment(self, incidents, team_analysis):
+        """Simulate the email resolution logic from _generate_daily_trends."""
+        user_id_to_email = {}
+        individual_daily_data = {}
+
+        for user in team_analysis:
+            if user.get('user_email') and user.get('user_id'):
+                user_key = user['user_email'].lower()
+                individual_daily_data[user_key] = defaultdict(lambda: {"incident_count": 0})
+                user_id_to_email[str(user['user_id'])] = user['user_email']
+
+        for incident in incidents:
+            assigned_to = incident.get("assigned_to", {})
+            user_id = assigned_to.get("id") if assigned_to else None
+            user_email = assigned_to.get("email") if assigned_to else None
+
+            # The fix: fallback to user_id_to_email mapping
+            if not user_email and user_id:
+                user_email = user_id_to_email.get(str(user_id))
+
+            if user_email:
+                user_key = user_email.lower()
+                date_str = incident.get("created_at", "")[:10]
+                if user_key in individual_daily_data:
+                    individual_daily_data[user_key][date_str]["incident_count"] += 1
+
+        return individual_daily_data
+
+    def test_pagerduty_incidents_with_email(self):
+        """Incidents with email in assigned_to are counted correctly."""
+        team_analysis = [{"user_email": "dan@example.com", "user_id": "P123"}]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z", "assigned_to": {"id": "P123", "email": "dan@example.com"}},
+            {"created_at": "2024-01-16T14:00:00Z", "assigned_to": {"id": "P123", "email": "dan@example.com"}},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        self.assertEqual(total, 2)
+
+    def test_pagerduty_incidents_without_email_uses_id_lookup(self):
+        """Incidents missing email in assigned_to still count via user_id lookup."""
+        team_analysis = [{"user_email": "dan@example.com", "user_id": "P123"}]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z", "assigned_to": {"id": "P123"}},
+            {"created_at": "2024-01-16T14:00:00Z", "assigned_to": {"id": "P123"}},
+            {"created_at": "2024-01-17T09:00:00Z", "assigned_to": {"id": "P123"}},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        self.assertEqual(total, 3)
+
+    def test_pagerduty_mixed_email_and_no_email(self):
+        """Mix of incidents with and without email all get counted."""
+        team_analysis = [{"user_email": "dan@example.com", "user_id": "P123"}]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z", "assigned_to": {"id": "P123", "email": "dan@example.com"}},
+            {"created_at": "2024-01-16T14:00:00Z", "assigned_to": {"id": "P123"}},
+            {"created_at": "2024-01-17T09:00:00Z", "assigned_to": {"id": "P123"}},
+            {"created_at": "2024-01-18T22:00:00Z", "assigned_to": {"id": "P123", "email": "dan@example.com"}},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        self.assertEqual(total, 4)
+
+    def test_pagerduty_unknown_user_id_skipped(self):
+        """Incidents with unrecognized user_id and no email are silently skipped."""
+        team_analysis = [{"user_email": "dan@example.com", "user_id": "P123"}]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z", "assigned_to": {"id": "PUNKNOWN"}},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        self.assertEqual(total, 0)
+
+    def test_pagerduty_no_assigned_to_skipped(self):
+        """Incidents with no assigned_to field are skipped."""
+        team_analysis = [{"user_email": "dan@example.com", "user_id": "P123"}]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z"},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        self.assertEqual(total, 0)
+
+    def test_multiple_users_attributed_correctly(self):
+        """Incidents are attributed to the correct user when multiple users exist."""
+        team_analysis = [
+            {"user_email": "dan@example.com", "user_id": "P123"},
+            {"user_email": "alice@example.com", "user_id": "P456"},
+        ]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z", "assigned_to": {"id": "P123"}},
+            {"created_at": "2024-01-15T14:00:00Z", "assigned_to": {"id": "P456"}},
+            {"created_at": "2024-01-16T09:00:00Z", "assigned_to": {"id": "P123"}},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        dan_total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        alice_total = sum(d["incident_count"] for d in result["alice@example.com"].values())
+        self.assertEqual(dan_total, 2)
+        self.assertEqual(alice_total, 1)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
