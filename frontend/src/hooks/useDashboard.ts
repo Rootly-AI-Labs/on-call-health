@@ -312,8 +312,9 @@ export default function useDashboard() {
             }
           }
         } catch (e) {
-          }
-        
+          console.warn('Failed to parse cached integrations:', e)
+        }
+
         // Set loading to false when using cache
         setLoadingIntegrations(false)
         setHasDataFromCache(true)
@@ -392,6 +393,7 @@ export default function useDashboard() {
             setSlackIntegration(slackData.integration)
           }
         } catch (e) {
+          console.warn('Failed to parse cached integration data:', e)
         }
       }
 
@@ -2175,9 +2177,9 @@ export default function useDashboard() {
   
   // Helper function to get color based on severity
   const getFactorColor = (value) => {
-    if (value >= 7) return '#DC2626' // Red - Critical
-    if (value >= 5) return '#F59E0B' // Orange - Warning  
-    if (value >= 3) return '#10B981' // Green - Good
+    if (value >= 70) return '#DC2626' // Red - Critical
+    if (value >= 50) return '#F59E0B' // Orange - Warning
+    if (value >= 30) return '#10B981' // Green - Good
     return '#6B7280' // Gray - Low risk
   }
   
@@ -2226,79 +2228,38 @@ export default function useDashboard() {
 
   const allActiveMembers = membersWithOchScores;
 
-  const burnoutFactors = useMemo(() => (allActiveMembers.length > 0) ? [
-    {
-      factor: "Workload Intensity",
-      value: (() => {
-        if (allActiveMembers.length === 0) return null;
+  const burnoutFactors = useMemo(() => {
+    if (allActiveMembers.length === 0) return [];
 
-        // Use backend-calculated workload factors
-        const workloadScores = allActiveMembers
-          .map((m: any) => m?.factors?.workload ?? 0)
-          .filter(score => score > 0);
+    // Aggregate per-member OCH factors into team-level averages
+    const factorTotals: Record<string, { sum: number; count: number }> = {};
 
-        if (workloadScores.length === 0) return 0;
+    for (const member of allActiveMembers) {
+      const factors = (member as any)?.och_factors?.all;
+      if (!Array.isArray(factors)) continue;
+      for (const f of factors) {
+        if (!f?.name || typeof f.percentage !== 'number') continue;
+        if (!factorTotals[f.name]) factorTotals[f.name] = { sum: 0, count: 0 };
+        factorTotals[f.name].sum += f.percentage;
+        factorTotals[f.name].count += 1;
+      }
+    }
 
-        const sum = workloadScores.reduce((total, score) => total + score, 0);
-        const average = sum / workloadScores.length;
-        // Convert 0-10 scale to OCH 0-100 scale (whole integer)
-        return Math.round(average * 10);
-      })(),
-      metrics: (() => {
-        const affectedCount = allActiveMembers.filter(m => (m?.factors?.workload ?? 0) >= 5).length
-        return `${affectedCount} of ${allActiveMembers.length} members at medium/high risk`
-      })()
-    },
-    {
-      factor: "After Hours Activity",
-      value: (() => {
-        if (allActiveMembers.length === 0) return null;
-
-        // Use backend-calculated after_hours factors
-        const afterHoursScores = allActiveMembers
-          .map((m: any) => m?.factors?.after_hours ?? 0)
-          .filter(score => score > 0);
-
-        if (afterHoursScores.length === 0) return 0;
-
-        const sum = afterHoursScores.reduce((total, score) => total + score, 0);
-        const average = sum / afterHoursScores.length;
-        // Convert 0-10 scale to OCH 0-100 scale (whole integer)
-        return Math.round(average * 10);
-      })(),
-      metrics: (() => {
-        const affectedCount = allActiveMembers.filter(m => (m?.factors?.after_hours ?? 0) >= 5).length
-        return `${affectedCount} of ${allActiveMembers.length} members at medium/high risk`
-      })()
-    },
-    {
-      factor: "Incident Load",
-      value: (() => {
-        if (allActiveMembers.length === 0) return null;
-
-        // Use backend-calculated incident_load factors
-        const incidentLoadScores = allActiveMembers
-          .map((m: any) => m?.factors?.incident_load ?? 0)
-          .filter(score => score > 0);
-
-        if (incidentLoadScores.length === 0) return 0;
-
-        const sum = incidentLoadScores.reduce((a: number, b: number) => a + b, 0);
-        const average = sum / incidentLoadScores.length;
-        // Convert 0-10 scale to OCH 0-100 scale (whole integer)
-        return Math.round(average * 10);
-      })(),
-      metrics: (() => {
-        const affectedCount = allActiveMembers.filter(m => (m?.factors?.incident_load ?? 0) >= 5).length
-        return `${affectedCount} of ${allActiveMembers.length} members at medium/high risk`
-      })()
-    },
-  ].map(factor => ({
-    ...factor,
-    color: getFactorColor(factor.value!),
-    recommendation: getRecommendation(factor.factor),
-    severity: factor.value! >= 70 ? 'Critical' : factor.value! >= 50 ? 'Poor' : factor.value! >= 30 ? 'Fair' : 'Good'
-  })) : [], [allActiveMembers]);
+    return Object.entries(factorTotals)
+      .map(([name, { sum, count }]) => {
+        const avgPct = sum / count;
+        return {
+          factor: name,
+          value: Math.round(avgPct),
+          metrics: `${count} of ${allActiveMembers.length} members affected`,
+          color: getFactorColor(Math.round(avgPct)),
+          recommendation: getRecommendation(name),
+          severity: avgPct >= 70 ? 'Critical' as const : avgPct >= 50 ? 'Poor' as const : avgPct >= 30 ? 'Fair' as const : 'Good' as const,
+        };
+      })
+      .filter(f => f.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [allActiveMembers]);
   
   // Get high-risk factors for emphasis (OCH scale 0-100)
   const highRiskFactors = burnoutFactors.filter(f => f.value >= 50).sort((a, b) => b.value - a.value);

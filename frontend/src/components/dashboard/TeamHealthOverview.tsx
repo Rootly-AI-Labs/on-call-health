@@ -117,8 +117,8 @@ export function TeamHealthOverview({
         style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-2">
           <div className="text-purple-300 font-semibold mb-2">On-Call Health Risk Level</div>
-          <div className="text-neutral-500 text-sm">
-            On-Call Health risk levels range from <strong>0 to 100</strong>, where higher scores indicate a higher risk of overwork.
+          <div className="text-neutral-300 text-xs leading-relaxed">
+            Compound score from <strong>0 to 100</strong> combining on-call hours, incident frequency, after-hours pages, and workload distribution. Higher scores indicate higher risk of overwork and burnout.
           </div>
         </div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
@@ -192,62 +192,69 @@ export function TeamHealthOverview({
           </CardHeader>
           <CardContent className="pb-0">
             {currentAnalysis?.analysis_data?.team_health || (currentAnalysis?.analysis_data?.team_analysis && currentAnalysis?.status === 'completed') ? (
-              <div>
-                <div className="flex items-start space-x-3">
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900">
-                      {(() => {
-                        const teamOchScore = calculateTeamOCHScore(currentAnalysis)
-                        if (teamOchScore !== null) {
-                          return (
-                            <>
-                              <span>{teamOchScore}</span>
-                              <span
-                                className="text-xs text-gray-500 cursor-help ml-1"
-                                onMouseEnter={(e) => showTooltip('ocb-score-tooltip', e.currentTarget.getBoundingClientRect(), 180, 120)}
-                                onMouseLeave={() => hideTooltip('ocb-score-tooltip')}
-                              >
-                                Risk Level
-                              </span>
-                            </>
-                          )
-                        }
+              (() => {
+                const teamOchScore = calculateTeamOCHScore(currentAnalysis)
+                const scoreValue = teamOchScore ?? (() => {
+                  if (historicalTrends?.daily_trends?.length > 0) return Math.round(historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1].overall_score * 10)
+                  if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) return Math.round(currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1].overall_score * 10)
+                  if (currentAnalysis?.analysis_data?.team_health) return Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)
+                  if (currentAnalysis?.analysis_data?.team_summary) return Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10)
+                  return null
+                })()
+                const barColor = scoreValue === null ? 'bg-neutral-300'
+                  : scoreValue >= 75 ? 'bg-red-500'
+                  : scoreValue >= 50 ? 'bg-orange-500'
+                  : scoreValue >= 25 ? 'bg-yellow-500'
+                  : 'bg-green-500'
 
-                        // Fallback to daily trends
-                        if (historicalTrends?.daily_trends?.length > 0) {
-                          const latestTrend = historicalTrends.daily_trends[historicalTrends.daily_trends.length - 1]
-                          return `${Math.round(latestTrend.overall_score * 10)}%`
-                        }
-                        if (currentAnalysis?.analysis_data?.daily_trends?.length > 0) {
-                          const latestTrend = currentAnalysis.analysis_data.daily_trends[currentAnalysis.analysis_data.daily_trends.length - 1]
-                          return `${Math.round(latestTrend.overall_score * 10)}%`
-                        }
-                        if (currentAnalysis?.analysis_data?.team_health) {
-                          return `${Math.round(currentAnalysis.analysis_data.team_health.overall_score * 10)}%`
-                        }
-                        if (currentAnalysis?.analysis_data?.team_summary) {
-                          return `${Math.round(currentAnalysis.analysis_data.team_summary.average_score * 10)}%`
-                        }
-                        return "No data"
-                      })()}
+                return (
+                  <div>
+                    {/* Score */}
+                    <div className="text-center mb-3">
+                      <div className="text-3xl font-bold text-neutral-900">
+                        {scoreValue !== null ? scoreValue : 'N/A'}
+                        <span className="text-sm font-normal text-neutral-400 ml-0.5">/100</span>
+                      </div>
+                      <p className="text-xs text-neutral-500 inline-flex items-center gap-1">
+                        Risk Level
+                        <Info
+                          className="w-3 h-3 text-neutral-400 cursor-help hover:text-neutral-600 transition-colors"
+                          onMouseEnter={(e) => showTooltip('och-score-tooltip', e.currentTarget.getBoundingClientRect(), 180, 120)}
+                          onMouseLeave={() => hideTooltip('och-score-tooltip')}
+                        />
+                      </p>
                     </div>
-                    <div className="text-xs text-gray-500">/100</div>
+
+                    {/* Progress bar */}
+                    {scoreValue !== null && (
+                      <div className="mb-3">
+                        <div className="flex h-2 rounded-full overflow-hidden bg-neutral-100">
+                          <div className={`${barColor} rounded-full transition-all`} style={{ width: `${Math.min(scoreValue, 100)}%` }} />
+                        </div>
+                        <div className="flex justify-between mt-1">
+                          <span className="text-[10px] text-neutral-400">Healthy</span>
+                          <span className="text-[10px] text-neutral-400">Critical</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status */}
+                    <div className="flex items-center justify-center space-x-1">
+                      <div className="text-sm font-medium text-purple-600">
+                        {getHealthStatusLabel(getHealthPercentage(currentAnalysis, historicalTrends))}
+                      </div>
+                      <Info
+                        className="w-3 h-3 text-purple-500 cursor-help"
+                        onMouseEnter={(e) => showTooltip('health-rubric-tooltip', e.currentTarget.getBoundingClientRect(), 220, 160)}
+                        onMouseLeave={() => hideTooltip('health-rubric-tooltip')}
+                      />
+                    </div>
+                    <p className="text-xs text-neutral-500 text-center mt-0.5">
+                      {getHealthStatusDescription(getHealthPercentage(currentAnalysis, historicalTrends))}
+                    </p>
                   </div>
-                  </div>
-                <div className="mt-2 flex items-center space-x-1">
-                  <div className="text-sm font-medium text-purple-600">
-                    {getHealthStatusLabel(getHealthPercentage(currentAnalysis, historicalTrends))}
-                  </div>
-                  <Info
-                    className="w-3 h-3 text-purple-500"
-                    onMouseEnter={(e) => showTooltip('health-rubric-tooltip', e.currentTarget.getBoundingClientRect(), 220, 160)}
-                    onMouseLeave={() => hideTooltip('health-rubric-tooltip')}
-                  />
-                </div>
-                <p className="text-xs text-neutral-700 mt-1">
-                  {getHealthStatusDescription(getHealthPercentage(currentAnalysis, historicalTrends))}
-                </p>
-              </div>
+                )
+              })()
             ) : (
               <div className="text-neutral-500">
                 {currentAnalysis?.status === 'failed' ? 'Analysis failed' : 'Analysis in progress...'}
@@ -275,7 +282,7 @@ export function TeamHealthOverview({
                     if (members && members.length > 0) {
                       // Only include on-call members (those with incidents during the analysis period)
                       const onCallMembers = members.filter((m: any) => m.incident_count > 0);
-                      
+
                       const riskCounts = { critical: 0, high: 0, medium: 0, low: 0 };
 
                       onCallMembers.forEach((member: any) => {
@@ -289,40 +296,47 @@ export function TeamHealthOverview({
                         // No fallback - only count members with OCH risk levels
                       });
 
+                      const atRiskTotal = riskCounts.critical + riskCounts.high + riskCounts.medium;
+
+                      if (atRiskTotal === 0) {
+                        return (
+                          <div className="text-center py-3">
+                            <div className="text-2xl font-bold text-green-600 mb-1">0</div>
+                            <div className="text-sm text-green-700 font-medium">Team shows healthy levels</div>
+                            <div className="text-xs text-neutral-500 mt-1">{riskCounts.low} member{riskCounts.low !== 1 ? 's' : ''} with low risk</div>
+                          </div>
+                        );
+                      }
+
+                      const totalOnCall = onCallMembers.length || 1;
+
                       return (
                         <>
-                          {riskCounts.critical > 0 && (
-                            <div className="flex items-center space-x-2">
-                              <div className="text-2xl font-bold text-red-800">{riskCounts.critical}</div>
-                              <span className="text-sm text-neutral-700">Critical (risk level 75-100)</span>
+                          {/* Summary number */}
+                          <div className="text-center mb-3">
+                            <div className="text-3xl font-bold text-neutral-900">{atRiskTotal}</div>
+                            <p className="text-xs text-neutral-500">members at risk</p>
+                          </div>
+
+                          {/* Risk breakdown - single row matching Total Incidents style */}
+                          <div className="grid grid-cols-4 gap-2">
+                            <div className="bg-red-50 rounded-lg p-2 text-center">
+                              <div className="text-xs font-semibold text-red-800">Critical</div>
+                              <div className="text-lg font-bold text-red-700">{riskCounts.critical}</div>
                             </div>
-                          )}
-                          {riskCounts.high > 0 && (
-                            <div className="flex items-center space-x-2">
-                              <div className="text-2xl font-bold text-red-600">{riskCounts.high}</div>
-                              <span className="text-sm text-neutral-700">High (risk level 50-74)</span>
+                            <div className="bg-orange-50 rounded-lg p-2 text-center">
+                              <div className="text-xs font-semibold text-orange-700">High</div>
+                              <div className="text-lg font-bold text-orange-600">{riskCounts.high}</div>
                             </div>
-                          )}
-                          {riskCounts.medium > 0 && (
-                            <div className="flex items-center space-x-2">
-                              <div className="text-2xl font-bold text-orange-600">{riskCounts.medium}</div>
-                              <span className="text-sm text-neutral-700">Medium (risk level 25-49)</span>
+                            <div className="bg-yellow-50 rounded-lg p-2 text-center">
+                              <div className="text-xs font-semibold text-yellow-700">Medium</div>
+                              <div className="text-lg font-bold text-yellow-600">{riskCounts.medium}</div>
                             </div>
-                          )}
-                          {/* Only show low risk count if it's the majority or no other risks */}
-                          {(riskCounts.low > 0 && (riskCounts.critical + riskCounts.high + riskCounts.medium === 0)) && (
-                            <div className="flex items-center space-x-2">
-                              <div className="text-2xl font-bold text-green-600">{riskCounts.low}</div>
-                              <span className="text-sm text-neutral-700">Low (risk level 0-24)</span>
+                            <div className="bg-green-50 rounded-lg p-2 text-center">
+                              <div className="text-xs font-semibold text-green-700">Low</div>
+                              <div className="text-lg font-bold text-green-600">{riskCounts.low}</div>
                             </div>
-                          )}
-                          {/* Show "Everyone healthy" message if all low risk */}
-                          {(riskCounts.critical + riskCounts.high + riskCounts.medium === 0) && (
-                            <div className="text-center py-2">
-                              <div className="text-sm text-green-700 font-medium">🎉 Team shows healthy levels</div>
-                              <div className="text-xs text-green-600">{riskCounts.low} member{riskCounts.low !== 1 ? 's' : ''} with low risk of overwork</div>
-                            </div>
-                          )}
+                          </div>
                         </>
                       );
                     }
@@ -348,8 +362,8 @@ export function TeamHealthOverview({
                     );
                   })()}
                 </div>
-                <p className="text-xs text-neutral-700 mt-2">
-                  Out of {Array.isArray(currentAnalysis.analysis_data.team_analysis) ? currentAnalysis.analysis_data.team_analysis.length : (currentAnalysis.analysis_data.team_analysis?.members?.length || 0)} members
+                <p className="text-xs text-neutral-400 mt-3 text-center">
+                  {Array.isArray(currentAnalysis.analysis_data.team_analysis) ? currentAnalysis.analysis_data.team_analysis.length : (currentAnalysis.analysis_data.team_analysis?.members?.length || 0)} total members
                 </p>
               </div>
             ) : (
@@ -368,16 +382,18 @@ export function TeamHealthOverview({
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-0">
-            <div className="text-2xl font-bold text-neutral-900">
-              {(currentAnalysis.analysis_data as any)?.metadata?.total_incidents !== undefined
-                ? (currentAnalysis.analysis_data as any).metadata.total_incidents
-                : (currentAnalysis.analysis_data as any)?.team_analysis?.total_incidents !== undefined
-                  ? (currentAnalysis.analysis_data as any).team_analysis.total_incidents
-                  : currentAnalysis.analysis_data?.partial_data?.incidents?.length || 0}
+            <div className="text-center mb-3">
+              <div className="text-3xl font-bold text-neutral-900">
+                {(currentAnalysis.analysis_data as any)?.metadata?.total_incidents !== undefined
+                  ? (currentAnalysis.analysis_data as any).metadata.total_incidents
+                  : (currentAnalysis.analysis_data as any)?.team_analysis?.total_incidents !== undefined
+                    ? (currentAnalysis.analysis_data as any).team_analysis.total_incidents
+                    : currentAnalysis.analysis_data?.partial_data?.incidents?.length || 0}
+              </div>
+              <p className="text-xs text-neutral-500">
+                In the last {currentAnalysis.time_range || 30} days
+              </p>
             </div>
-            <p className="text-xs text-neutral-700 mt-1">
-              In the last {currentAnalysis.time_range || 30} days
-            </p>
             {(() => {
               // Only show severity breakdown if we have real data - no fake/generated data
               const metadataBreakdown = (currentAnalysis.analysis_data as any)?.metadata?.severity_breakdown;
@@ -447,9 +463,9 @@ export function TeamHealthOverview({
                   // Rootly: Show standard SEV0-SEV4
                   <div className={`mt-4 grid ${severityBreakdown.sev0_count > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
                     {severityBreakdown.sev0_count > 0 && (
-                      <div className="bg-purple-50 rounded-lg p-2 text-center">
-                        <div className="text-xs font-semibold text-purple-600">SEV0</div>
-                        <div className="text-lg font-bold text-purple-600">
+                      <div className="bg-red-100 rounded-lg p-2 text-center">
+                        <div className="text-xs font-semibold text-red-800">SEV0</div>
+                        <div className="text-lg font-bold text-red-800">
                           {severityBreakdown.sev0_count}
                         </div>
                       </div>
