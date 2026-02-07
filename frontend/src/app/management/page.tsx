@@ -838,7 +838,7 @@ function TeamPageContent() {
 
                           return (
                             <tr key={user.id} className={`border-b border-neutral-100 hover:bg-neutral-50 ${index === paginatedUsers.length - 1 ? 'border-b-0' : ''}`}>
-                              <td className="py-4 px-6">
+                              <td className="py-3 px-6">
                                 <div className="flex items-center gap-3">
                                   <Avatar className="w-9 h-9">
                                     {user.avatar_url && <AvatarImage src={user.avatar_url} alt={displayName} />}
@@ -856,10 +856,10 @@ function TeamPageContent() {
                                   </span>
                                 </div>
                               </td>
-                              <td className="py-4 px-6">
+                              <td className="py-3 px-6">
                                 <span className="text-sm text-neutral-600">{user.email}</span>
                               </td>
-                              <td className="py-4 px-6">
+                              <td className="py-3 px-6">
                                 {user.is_oncall ? (
                                   <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
                                     <span className="w-1.5 h-1.5 bg-green-600 rounded-full mr-1.5"></span>
@@ -872,7 +872,7 @@ function TeamPageContent() {
                                   </Badge>
                                 )}
                               </td>
-                              <td className="py-4 px-6">
+                              <td className="py-3 px-6">
                                 <div className="flex items-center gap-2">
                                   {integrations.length > 0 ? (
                                     integrations.map((integration) => (
@@ -901,7 +901,7 @@ function TeamPageContent() {
                                   )}
                                 </div>
                               </td>
-                              <td className="py-4 px-6">
+                              <td className="py-3 px-6">
                                 <button
                                   className="text-neutral-400 hover:text-neutral-600 transition-colors"
                                   onClick={() => openMappingDrawer(user)}
