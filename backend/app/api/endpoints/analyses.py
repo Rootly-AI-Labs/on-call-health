@@ -2,6 +2,7 @@
 Burnout analysis API endpoints.
 """
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
@@ -666,17 +667,59 @@ def _trim_analysis_data(results: dict) -> dict:
     return {k: v for k, v in results.items() if k in _ANALYSIS_DATA_KEYS}
 
 
-def _load_analysis_data(db: Session, analysis_id: int) -> dict:
-    """Extract only frontend-used keys from results JSON at DB level.
+def _get_redis_for_analysis() -> Optional[Any]:
+    """Get Redis client for analysis data cache."""
+    try:
+        redis_url = os.getenv("REDIS_URL")
+        if not redis_url:
+            return None
+        import redis
+        client = redis.from_url(redis_url, decode_responses=True)
+        client.ping()
+        return client
+    except Exception:
+        return None
 
-    Instead of loading the full 30MB+ results column into Python,
-    uses PostgreSQL JSON operators to extract only the needed keys.
+
+_ANALYSIS_CACHE_TTL = 3600  # 1 hour — results are immutable once completed
+
+
+def _load_analysis_data(db: Session, analysis_id: int) -> dict:
+    """Load frontend-used keys from analysis results, with Redis cache.
+
+    Cache flow:
+    1. Check Redis for cached trimmed results
+    2. On miss, extract only needed keys from DB using PostgreSQL JSON operators
+    3. Store in Redis for subsequent requests
     """
+    import json as _json
+    cache_key = f"analysis_data:{analysis_id}"
+
+    # Try Redis cache first
+    redis_client = _get_redis_for_analysis()
+    if redis_client:
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return _json.loads(cached)
+        except Exception as e:
+            logger.warning(f"Redis read error for analysis {analysis_id}: {e}")
+
+    # Cache miss — extract from DB
     from sqlalchemy import text as sa_text
     row = db.execute(sa_text(_RESULTS_EXTRACT_SQL), {"id": analysis_id}).first()
     if not row:
         return {}
-    return {k: row[i] for i, k in enumerate(_ANALYSIS_DATA_KEYS) if row[i] is not None}
+    data = {k: row[i] for i, k in enumerate(_ANALYSIS_DATA_KEYS) if row[i] is not None}
+
+    # Store in Redis
+    if redis_client and data:
+        try:
+            redis_client.setex(cache_key, _ANALYSIS_CACHE_TTL, _json.dumps(data))
+        except Exception as e:
+            logger.warning(f"Redis write error for analysis {analysis_id}: {e}")
+
+    return data
 
 
 def _calculate_trend(combined_scores: list[float]) -> str | None:
