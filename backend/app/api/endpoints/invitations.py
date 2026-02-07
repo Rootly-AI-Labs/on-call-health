@@ -304,7 +304,7 @@ async def accept_invitation_page(
         # (organizations should have a single shared Slack workspace)
         # NOTE: This deletion is part of the atomic transaction and will be rolled back
         # if any subsequent operation fails, ensuring data consistency
-        from app.models.slack import SlackIntegration
+        from ...models.slack_integration import SlackIntegration
         personal_slack = db.query(SlackIntegration).filter(
             SlackIntegration.user_id == current_user.id,
             SlackIntegration.organization_id.is_(None)
@@ -399,7 +399,7 @@ async def accept_invitation_api(
         # (organizations should have a single shared Slack workspace)
         # NOTE: This deletion is part of the atomic transaction and will be rolled back
         # if any subsequent operation fails, ensuring data consistency
-        from app.models.slack import SlackIntegration
+        from ...models.slack_integration import SlackIntegration
         personal_slack = db.query(SlackIntegration).filter(
             SlackIntegration.user_id == current_user.id,
             SlackIntegration.organization_id.is_(None)

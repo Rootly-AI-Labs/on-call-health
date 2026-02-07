@@ -149,9 +149,11 @@ export function UnifiedSlackCard({
       const statusData = await statusResponse.json()
 
       if (statusData.diagnosis.has_workspace_mapping) {
-        const workspaceName = statusData.organization_workspace_mappings?.[0]?.workspace_name ||
-                             statusData.user_workspace_mappings?.[0]?.workspace_name ||
-                             'Unknown workspace'
+        const rawWorkspaceName = statusData.organization_workspace_mappings?.[0]?.workspace_name ||
+                                statusData.user_workspace_mappings?.[0]?.workspace_name ||
+                                'Unknown workspace'
+        // Sanitize workspace name to prevent XSS (remove any HTML/script tags)
+        const workspaceName = rawWorkspaceName.replace(/<[^>]*>/g, '')
         toast.success(`✅ Workspace is properly registered! /oncall-health command should work.\n\nRegistered workspace: ${workspaceName}`)
       } else {
         if (!slackIntegration?.workspace_id) {
@@ -294,7 +296,7 @@ export function UnifiedSlackCard({
                                      userInfo?.role === 'super_admin' ||
                                      !userInfo?.organization_id
                 if (!canDisconnect) {
-                  toast.error('Only admins can manage Slack integration')
+                  toast.error('Only organization admins can manage Slack integration')
                   return
                 }
                 setSlackSurveyDisconnectDialogOpen(true)
