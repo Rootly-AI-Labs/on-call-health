@@ -1085,9 +1085,15 @@ async def regenerate_analysis_trends(
         # Update analysis data with daily trends
         analysis_data["daily_trends"] = daily_trends
         
-        # Save back to database
+        # Save back to database and invalidate Redis cache
         analysis.results = analysis_data
         db.commit()
+        redis_client = _get_redis_for_analysis()
+        if redis_client:
+            try:
+                redis_client.delete(f"analysis_data:{analysis.id}")
+            except Exception:
+                pass
         
         logger.info(f"Successfully regenerated {len(daily_trends)} daily trends for analysis {analysis_ref}")
         
