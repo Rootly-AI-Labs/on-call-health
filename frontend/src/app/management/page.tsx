@@ -356,6 +356,11 @@ function TeamPageContent() {
     }
   }, [openMappingUserId])
 
+  // Reset search query when switching integrations to prevent stale search state
+  useEffect(() => {
+    setIntegrationSearchQuery("")
+  }, [expandedIntegration])
+
   // Load integration users when expanded
   useEffect(() => {
     if (!expandedIntegration || !selectedOrganization) return
@@ -387,7 +392,6 @@ function TeamPageContent() {
     setLoadingIntegrationUsers(true)
     try {
       const users = await fetchJiraUsers(selectedOrganization)
-      console.log('Jira users loaded:', users)
       setJiraUsers(users || [])
     } catch (error) {
       console.error('Error loading Jira users:', error)
@@ -403,7 +407,6 @@ function TeamPageContent() {
     setLoadingIntegrationUsers(true)
     try {
       const users = await fetchLinearUsers(selectedOrganization)
-      console.log('Linear users loaded:', users)
       setLinearUsers(users || [])
     } catch (error) {
       console.error('Error loading Linear users:', error)
