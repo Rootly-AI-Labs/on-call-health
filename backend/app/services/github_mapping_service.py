@@ -228,7 +228,9 @@ class GitHubMappingService:
             result = await collect_team_github_data(
                 team_emails=emails,
                 days=days,
-                github_token=github_token
+                github_token=github_token,
+                user_id=user_id,
+                email_to_name=email_to_name
             )
             if result is None:
                 logger.warning("collect_team_github_data returned None - possible API or auth issue")

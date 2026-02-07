@@ -210,7 +210,6 @@ export function TeamMembersList({
     return false;
   };
 
-  const isJiraEnabled = isDataSourceEnabled('jira');
   
   const isLoading = !currentAnalysis || !currentAnalysis.analysis_data
 
@@ -314,7 +313,7 @@ export function TeamMembersList({
 
         {/* Incidents */}
         <td className="py-3 px-4">
-          <span className="text-sm tabular-nums text-neutral-700">{member.incident_count || 0}</span>
+          <span className="text-sm font-semibold tabular-nums text-neutral-700">{member.incident_count || 0}</span>
         </td>
 
         {/* On-Call Status */}
@@ -326,55 +325,92 @@ export function TeamMembersList({
           )}
         </td>
 
-        {/* Data Sources */}
+        {/* Data Sources - mapped icons first, then greyed-out unmapped */}
         <td className="py-3 px-4">
-          <div className="flex gap-1">
-            {member.github_username && connectedIntegrations.has('github') && isDataSourceEnabled('github') && (
-              <div className="flex items-center justify-center w-5 h-5 bg-neutral-200 rounded-full" title="GitHub">
-                <svg className="w-3 h-3 text-neutral-700" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
-                </svg>
+          {(() => {
+            const githubEnabled = connectedIntegrations.has('github') && isDataSourceEnabled('github');
+            const slackEnabled = connectedIntegrations.has('slack') && isDataSourceEnabled('slack');
+            const jiraEnabled = connectedIntegrations.has('jira') && isDataSourceEnabled('jira');
+            const linearEnabled = connectedIntegrations.has('linear') && isDataSourceEnabled('linear');
+
+            const hasSurvey = !!currentAnalysis?.analysis_data?.member_surveys?.[member.user_email];
+
+            const integrations = [
+              ...(githubEnabled ? [{ key: 'github', mapped: !!member.github_username, title: member.github_username ? `GitHub: ${member.github_username}` : 'GitHub: not mapped' }] : []),
+              ...(slackEnabled ? [{ key: 'slack', mapped: !!member.slack_user_id, title: member.slack_user_id ? 'Slack: mapped' : 'Slack: not mapped' }] : []),
+              ...(jiraEnabled ? [{ key: 'jira', mapped: !!member.jira_account_id, title: member.jira_account_id ? 'Jira: mapped' : 'Jira: not mapped' }] : []),
+              ...(linearEnabled ? [{ key: 'linear', mapped: !!member.linear_user_id, title: member.linear_user_id ? 'Linear: mapped' : 'Linear: not mapped' }] : []),
+            ];
+
+            // Mapped first, then unmapped
+            const sorted = [...integrations.filter(i => i.mapped), ...integrations.filter(i => !i.mapped)];
+
+            const renderIcon = (key: string, mapped: boolean, title: string) => {
+              const opacity = mapped ? '' : 'opacity-25';
+              switch (key) {
+                case 'github':
+                  return (
+                    <div key={key} className={`flex items-center justify-center w-5 h-5 bg-neutral-200 rounded-full ${opacity}`} title={title}>
+                      <svg className="w-3 h-3 text-neutral-700" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+                      </svg>
+                    </div>
+                  );
+                case 'slack':
+                  return (
+                    <div key={key} className={`flex items-center justify-center w-5 h-5 bg-white rounded-full border border-neutral-200 ${opacity}`} title={title}>
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
+                        <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z" fill="#E01E5A"/>
+                        <path d="M6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/>
+                        <path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834z" fill="#36C5F0"/>
+                        <path d="M8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/>
+                        <path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834z" fill="#2EB67D"/>
+                        <path d="M17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/>
+                        <path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52z" fill="#ECB22E"/>
+                        <path d="M15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/>
+                      </svg>
+                    </div>
+                  );
+                case 'jira':
+                  return (
+                    <div key={key} className={`flex items-center justify-center w-5 h-5 bg-blue-50 rounded-full border border-blue-200 ${opacity}`} title={title}>
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
+                        <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z" fill="#2684FF"/>
+                      </svg>
+                    </div>
+                  );
+                case 'linear':
+                  return (
+                    <div key={key} className={`flex items-center justify-center w-5 h-5 ${opacity}`} title={title}>
+                      <Image src="/images/linear-logo.png" alt="Linear" width={14} height={14} />
+                    </div>
+                  );
+                default:
+                  return null;
+              }
+            };
+
+            return (
+              <div className="flex gap-1">
+                {/* Primary platform icon */}
+                {member.rootly_user_id && (
+                  <div className="flex items-center justify-center w-5 h-5 rounded" title="Rootly">
+                    <Image src="/images/rootly-logo-icon.jpg" alt="Rootly" width={14} height={14} className="rounded" />
+                  </div>
+                )}
+                {/* Mapped integrations first, then unmapped */}
+                {sorted.map(i => <span key={i.key}>{renderIcon(i.key, i.mapped, i.title)}</span>)}
+                {/* Survey */}
+                {hasSurvey && (
+                  <div className="flex items-center justify-center w-5 h-5 bg-blue-50 rounded-full border border-blue-200" title="Survey Data Available">
+                    <svg className="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                )}
               </div>
-            )}
-            {member.slack_user_id && connectedIntegrations.has('slack') && isDataSourceEnabled('slack') && (
-              <div className="flex items-center justify-center w-5 h-5 bg-white rounded-full border border-neutral-200" title="Slack">
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
-                  <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z" fill="#E01E5A"/>
-                  <path d="M6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/>
-                  <path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834z" fill="#36C5F0"/>
-                  <path d="M8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/>
-                  <path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834z" fill="#2EB67D"/>
-                  <path d="M17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/>
-                  <path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52z" fill="#ECB22E"/>
-                  <path d="M15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/>
-                </svg>
-              </div>
-            )}
-            {isJiraEnabled && member.jira_account_id && connectedIntegrations.has('jira') && isDataSourceEnabled('jira') && (
-              <div className="flex items-center justify-center w-5 h-5 bg-blue-50 rounded-full border border-blue-200" title="Jira">
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
-                  <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z" fill="#2684FF"/>
-                </svg>
-              </div>
-            )}
-            {member.linear_user_id && connectedIntegrations.has('linear') && isDataSourceEnabled('linear') && (
-              <div className="flex items-center justify-center w-5 h-5" title="Linear">
-                <Image src="/images/linear-logo.png" alt="Linear" width={14} height={14} />
-              </div>
-            )}
-            {member.rootly_user_id && (
-              <div className="flex items-center justify-center w-5 h-5 rounded" title="Rootly">
-                <Image src="/images/rootly-logo-icon.jpg" alt="Rootly" width={14} height={14} className="rounded" />
-              </div>
-            )}
-            {currentAnalysis?.analysis_data?.member_surveys?.[member.user_email] && (
-              <div className="flex items-center justify-center w-5 h-5 bg-blue-50 rounded-full border border-blue-200" title="Survey Data Available">
-                <svg className="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-            )}
-          </div>
+            );
+          })()}
         </td>
       </tr>
     )

@@ -238,6 +238,14 @@ function DashboardContent() {
     setMounted(true)
   }, [])
 
+  // Auto-open analysis dialog when redirected from integrations page with ?run=true
+  useEffect(() => {
+    if (mounted && searchParams.get('run') === 'true' && !analysisRunning) {
+      startAnalysis()
+      router.replace('/dashboard', { scroll: false })
+    }
+  }, [mounted, searchParams, analysisRunning, startAnalysis, router])
+
   // Derive connected integrations from useDashboard data (avoids 4 duplicate API calls)
   const connectedIntegrations = useMemo(() => {
     const connected = new Set<string>()
