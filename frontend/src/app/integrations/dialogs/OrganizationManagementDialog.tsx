@@ -234,8 +234,8 @@ export function OrganizationManagementDialog({
       <div className="space-y-6">
           {/* Received Invitations - Show at top if user has any */}
           {receivedInvitations.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 px-1">
+            <div className={asInlineView ? "space-y-3 mx-6 mt-6" : "space-y-3"}>
+              <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-neutral-500" />
                 <h3 className="text-sm font-medium text-neutral-700">
                   Pending Invitation{receivedInvitations.length > 1 ? 's' : ''}

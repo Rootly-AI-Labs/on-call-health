@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, Suspense } from "react"
+import { createPortal } from "react-dom"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { TopPanel } from "@/components/TopPanel"
@@ -41,6 +42,12 @@ import { API_BASE, type Integration } from "@/app/integrations/types"
 import { UserMappingDrawer } from "./components/UserMappingDrawer"
 import { OrganizationManagementDialog } from "@/app/integrations/dialogs/OrganizationManagementDialog"
 import * as OrganizationHandlers from "@/app/integrations/handlers/organization-handlers"
+import {
+  fetchGithubUsers,
+  fetchJiraUsers,
+  fetchLinearUsers,
+  updateUserCorrelation,
+} from "./handlers/user-mapping-handlers"
 
 const TEAM_MEMBERS_PER_PAGE = 10
 
@@ -101,6 +108,7 @@ function TeamPageContent() {
   const lastSyncInfoCache = useRef<Map<string, {synced_at: string; synced_by: {id: number; name: string; email: string}} | null>>(new Map())
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isMountedRef = useRef(true)
+  const mappingDropdownRef = useRef<HTMLDivElement>(null)
 
   // Survey recipient selection state
   const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
@@ -117,6 +125,13 @@ function TeamPageContent() {
   // Inline mapping dropdown state
   const [openMappingUserId, setOpenMappingUserId] = useState<number | null>(null)
   const [expandedIntegration, setExpandedIntegration] = useState<string | null>(null)
+  const [popupPosition, setPopupPosition] = useState<{ top?: number; bottom?: number; right: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [githubUsers, setGithubUsers] = useState<string[]>([])
+  const [jiraUsers, setJiraUsers] = useState<any[]>([])
+  const [linearUsers, setLinearUsers] = useState<any[]>([])
+  const [loadingIntegrationUsers, setLoadingIntegrationUsers] = useState(false)
+  const [integrationSearchQuery, setIntegrationSearchQuery] = useState("")
 
   // Sync confirmation modal state
   const [showSyncConfirmModal, setShowSyncConfirmModal] = useState(false)
@@ -301,6 +316,123 @@ function TeamPageContent() {
       loadOrganizationData()
     }
   }, [viewMode])
+
+  // Close mapping dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mappingDropdownRef.current && !mappingDropdownRef.current.contains(event.target as Node)) {
+        setOpenMappingUserId(null)
+        setExpandedIntegration(null)
+        setPopupPosition(null)
+      }
+    }
+
+    if (openMappingUserId !== null) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openMappingUserId])
+
+  // Close mapping dropdown when scrolling (but not when scrolling inside the popup)
+  useEffect(() => {
+    const handleScroll = (event: Event) => {
+      // Don't close if scrolling inside the popup
+      if (mappingDropdownRef.current && mappingDropdownRef.current.contains(event.target as Node)) {
+        return
+      }
+
+      if (openMappingUserId !== null) {
+        setOpenMappingUserId(null)
+        setExpandedIntegration(null)
+        setPopupPosition(null)
+      }
+    }
+
+    if (openMappingUserId !== null) {
+      window.addEventListener('scroll', handleScroll, true) // Use capture phase to catch all scrolls
+      return () => window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [openMappingUserId])
+
+  // Load integration users when expanded
+  useEffect(() => {
+    if (!expandedIntegration || !selectedOrganization) return
+
+    if (expandedIntegration === 'github' && githubUsers.length === 0) {
+      loadGithubUsersForMapping()
+    } else if (expandedIntegration === 'jira' && jiraUsers.length === 0) {
+      loadJiraUsersForMapping()
+    } else if (expandedIntegration === 'linear' && linearUsers.length === 0) {
+      loadLinearUsersForMapping()
+    }
+  }, [expandedIntegration, selectedOrganization, githubUsers.length, jiraUsers.length, linearUsers.length])
+
+  const loadGithubUsersForMapping = async () => {
+    if (!selectedOrganization) return
+    setLoadingIntegrationUsers(true)
+    try {
+      const users = await fetchGithubUsers(selectedOrganization)
+      setGithubUsers(users)
+    } catch (error) {
+      toast.error("Failed to load GitHub users")
+    } finally {
+      setLoadingIntegrationUsers(false)
+    }
+  }
+
+  const loadJiraUsersForMapping = async () => {
+    if (!selectedOrganization) return
+    setLoadingIntegrationUsers(true)
+    try {
+      const users = await fetchJiraUsers(selectedOrganization)
+      console.log('Jira users loaded:', users)
+      setJiraUsers(users || [])
+    } catch (error) {
+      console.error('Error loading Jira users:', error)
+      toast.error("Failed to load Jira users")
+      setJiraUsers([])
+    } finally {
+      setLoadingIntegrationUsers(false)
+    }
+  }
+
+  const loadLinearUsersForMapping = async () => {
+    if (!selectedOrganization) return
+    setLoadingIntegrationUsers(true)
+    try {
+      const users = await fetchLinearUsers(selectedOrganization)
+      console.log('Linear users loaded:', users)
+      setLinearUsers(users || [])
+    } catch (error) {
+      console.error('Error loading Linear users:', error)
+      toast.error("Failed to load Linear users")
+      setLinearUsers([])
+    } finally {
+      setLoadingIntegrationUsers(false)
+    }
+  }
+
+  const handleUserMapping = async (userId: number, integrationType: string, integrationUserId: string) => {
+    try {
+      // Build the updates object based on integration type
+      const updates: any = {}
+      if (integrationType === 'github') {
+        updates.github_username = integrationUserId
+      } else if (integrationType === 'jira') {
+        updates.jira_account_id = integrationUserId
+      } else if (integrationType === 'linear') {
+        updates.linear_user_id = integrationUserId
+      }
+
+      await updateUserCorrelation(userId, updates)
+      toast.success("User mapping updated successfully")
+      await fetchSyncedUsers(false, false, true) // Refresh the users list
+      setOpenMappingUserId(null)
+      setExpandedIntegration(null)
+    } catch (error) {
+      toast.error("Failed to update user mapping")
+    }
+  }
 
   // Fetch synced users from database (memoized to avoid stale closures)
   const fetchSyncedUsers = useCallback(async (showToast = false, autoSync = false, forceRefresh = false) => {
@@ -612,6 +744,20 @@ function TeamPageContent() {
     return integrations
   }
 
+  // Get display name for Jira user from account ID
+  const getJiraDisplayName = (accountId: string | null | undefined) => {
+    if (!accountId) return 'Not mapped'
+    const jiraUser = jiraUsers.find(u => u.account_id === accountId || u.accountId === accountId)
+    return jiraUser?.display_name || jiraUser?.displayName || jiraUser?.email || jiraUser?.emailAddress || accountId
+  }
+
+  // Get display name for Linear user from user ID
+  const getLinearDisplayName = (userId: string | null | undefined) => {
+    if (!userId) return 'Not mapped'
+    const linearUser = linearUsers.find(u => u.id === userId)
+    return linearUser?.name || linearUser?.email || userId
+  }
+
   // Handle column header click for sorting
   const handleSort = (column: 'name' | 'email' | 'oncall') => {
     if (sortBy === column) {
@@ -714,7 +860,7 @@ function TeamPageContent() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="flex flex-col items-end gap-1">
+                          <div className="flex flex-col items-end gap-2">
                             <Button
                               onClick={() => setShowSyncConfirmModal(true)}
                               disabled={loadingSyncedUsers || !hasPrimaryIntegration}
@@ -911,21 +1057,68 @@ function TeamPageContent() {
                               <td className="py-3 px-6">
                                 <div className="relative">
                                   <button
+                                    ref={buttonRef}
                                     className="text-neutral-400 hover:text-neutral-600 transition-colors"
-                                    onClick={() => setOpenMappingUserId(openMappingUserId === user.id ? null : user.id)}
+                                    onClick={(e) => {
+                                      if (openMappingUserId === user.id) {
+                                        setOpenMappingUserId(null)
+                                        setPopupPosition(null)
+                                      } else {
+                                        const rect = e.currentTarget.getBoundingClientRect()
+                                        const estimatedPopupHeight = 400 // Estimated height of the popup
+                                        const spaceBelow = window.innerHeight - rect.bottom
+                                        const spaceAbove = rect.top
+
+                                        // If not enough space below and more space above, position above
+                                        if (spaceBelow < estimatedPopupHeight && spaceAbove > spaceBelow) {
+                                          setPopupPosition({
+                                            bottom: window.innerHeight - rect.top + 8,
+                                            right: window.innerWidth - rect.right
+                                          })
+                                        } else {
+                                          // Position below
+                                          setPopupPosition({
+                                            top: rect.bottom + 8,
+                                            right: window.innerWidth - rect.right
+                                          })
+                                        }
+                                        setOpenMappingUserId(user.id)
+                                      }
+                                    }}
                                     title="Edit integration mappings"
                                   >
                                     <Pencil className="w-4 h-4" />
                                   </button>
 
-                                  {/* Inline Mapping Dropdown */}
-                                  {openMappingUserId === user.id && (
-                                    <div className="absolute right-0 top-8 w-72 bg-white border border-neutral-200 rounded-lg shadow-lg z-50 p-4">
-                                      <div className="mb-3">
-                                        <h4 className="text-sm font-semibold text-neutral-900">Integration Mappings</h4>
-                                        <p className="text-xs text-neutral-600">{user.email}</p>
-                                      </div>
-                                      <div className="space-y-2">
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+
+                    {/* Inline Mapping Dropdown (Portal) */}
+                    {openMappingUserId !== null && popupPosition && typeof window !== 'undefined' && (() => {
+                      const user = filteredUsers.find(u => u.id === openMappingUserId)
+                      if (!user) return null
+
+                      return createPortal(
+                        <div
+                          ref={mappingDropdownRef}
+                          className="fixed w-72 bg-white border border-neutral-200 rounded-lg shadow-lg z-50 p-4 max-h-96 overflow-y-auto"
+                          style={{
+                            ...(popupPosition.top !== undefined && { top: `${popupPosition.top}px` }),
+                            ...(popupPosition.bottom !== undefined && { bottom: `${popupPosition.bottom}px` }),
+                            right: `${popupPosition.right}px`
+                          }}
+                        >
+                          <div className={connectedIntegrations.size > 0 ? "mb-3" : "mb-0"}>
+                            <h4 className="text-sm font-semibold text-neutral-900">Integration Mappings</h4>
+                            <p className="text-xs text-neutral-600">{user.email}</p>
+                          </div>
+                                      {connectedIntegrations.size > 0 ? (
+                                        <div className="space-y-2">
                                         {/* GitHub */}
                                         {connectedIntegrations.has('github') && (
                                           <div className="border border-neutral-200 rounded">
@@ -939,7 +1132,9 @@ function TeamPageContent() {
                                                 </svg>
                                                 <div className="text-left">
                                                   <div className="text-sm font-medium">GitHub</div>
-                                                  <div className="text-xs text-red-600">{user.github_username || 'Not mapped'}</div>
+                                                  <div className={`text-xs ${user.github_username ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {user.github_username || 'Not mapped'}
+                                                  </div>
                                                 </div>
                                               </div>
                                               <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'github' ? 'rotate-180' : ''}`} />
@@ -949,12 +1144,42 @@ function TeamPageContent() {
                                                 <input
                                                   type="text"
                                                   placeholder="Search GitHub users..."
+                                                  value={integrationSearchQuery}
+                                                  onChange={(e) => setIntegrationSearchQuery(e.target.value)}
                                                   className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
                                                 />
                                                 <div className="max-h-32 overflow-y-auto space-y-1">
-                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">adam-dev</button>
-                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">alex-c</button>
-                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">brianlee</button>
+                                                  {loadingIntegrationUsers ? (
+                                                    <div className="text-center py-2">
+                                                      <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      {user.github_username && (
+                                                        <button
+                                                          onClick={() => handleUserMapping(user.id, 'github', '')}
+                                                          className="w-full text-left px-2 py-1 text-sm hover:bg-red-50 text-red-600 rounded border-b border-neutral-200 mb-1"
+                                                        >
+                                                          Clear mapping
+                                                        </button>
+                                                      )}
+                                                      {githubUsers.filter(u => u.toLowerCase().includes(integrationSearchQuery.toLowerCase())).length > 0 ? (
+                                                        githubUsers
+                                                          .filter(u => u.toLowerCase().includes(integrationSearchQuery.toLowerCase()))
+                                                          .map((username) => (
+                                                            <button
+                                                              key={username}
+                                                              onClick={() => handleUserMapping(user.id, 'github', username)}
+                                                              className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded"
+                                                            >
+                                                              {username}
+                                                            </button>
+                                                          ))
+                                                      ) : (
+                                                        <p className="text-xs text-neutral-500 text-center py-2">No users found</p>
+                                                      )}
+                                                    </>
+                                                  )}
                                                 </div>
                                               </div>
                                             )}
@@ -974,7 +1199,9 @@ function TeamPageContent() {
                                                 </svg>
                                                 <div className="text-left">
                                                   <div className="text-sm font-medium">Jira</div>
-                                                  <div className="text-xs text-red-600">{user.jira_email || 'Not mapped'}</div>
+                                                  <div className={`text-xs ${user.jira_account_id ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {user.jira_account_id ? getJiraDisplayName(user.jira_account_id) : 'Not mapped'}
+                                                  </div>
                                                 </div>
                                               </div>
                                               <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'jira' ? 'rotate-180' : ''}`} />
@@ -984,11 +1211,50 @@ function TeamPageContent() {
                                                 <input
                                                   type="text"
                                                   placeholder="Search Jira users..."
+                                                  value={integrationSearchQuery}
+                                                  onChange={(e) => setIntegrationSearchQuery(e.target.value)}
                                                   className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
                                                 />
                                                 <div className="max-h-32 overflow-y-auto space-y-1">
-                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">User 1</button>
-                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">User 2</button>
+                                                  {loadingIntegrationUsers ? (
+                                                    <div className="text-center py-2">
+                                                      <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      {user.jira_account_id && (
+                                                        <button
+                                                          onClick={() => handleUserMapping(user.id, 'jira', '')}
+                                                          className="w-full text-left px-2 py-1 text-sm hover:bg-red-50 text-red-600 rounded border-b border-neutral-200 mb-1"
+                                                        >
+                                                          Clear mapping
+                                                        </button>
+                                                      )}
+                                                      {(jiraUsers || []).filter(u => {
+                                                        const name = u.display_name || u.displayName || u.email || u.emailAddress || ''
+                                                        return name.toLowerCase().includes(integrationSearchQuery.toLowerCase())
+                                                      }).length > 0 ? (
+                                                        (jiraUsers || [])
+                                                          .filter(u => {
+                                                            const name = u.display_name || u.displayName || u.email || u.emailAddress || ''
+                                                            return name.toLowerCase().includes(integrationSearchQuery.toLowerCase())
+                                                          })
+                                                          .map((jiraUser, idx) => (
+                                                            <button
+                                                              key={jiraUser.account_id || jiraUser.accountId || `jira-${idx}`}
+                                                              onClick={() => handleUserMapping(user.id, 'jira', jiraUser.account_id || jiraUser.accountId)}
+                                                              className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded"
+                                                            >
+                                                              {jiraUser.display_name || jiraUser.displayName || jiraUser.email || jiraUser.emailAddress}
+                                                            </button>
+                                                          ))
+                                                      ) : (
+                                                        <p className="text-xs text-neutral-500 text-center py-2">
+                                                          {jiraUsers.length === 0 ? 'No Jira users available' : 'No users found'}
+                                                        </p>
+                                                      )}
+                                                    </>
+                                                  )}
                                                 </div>
                                               </div>
                                             )}
@@ -1003,13 +1269,12 @@ function TeamPageContent() {
                                               className="w-full flex items-center justify-between p-2 hover:bg-neutral-50"
                                             >
                                               <div className="flex items-center gap-2">
-                                                <svg className="w-4 h-4" viewBox="0 0 100 100" fill="none">
-                                                  <path d="M1.22541 61.5228L37.9346 98.232C40.1747 100.472 43.6923 100.472 45.9324 98.232L98.7757 45.3887C101.016 43.1486 101.016 39.631 98.7757 37.3909L62.0665 0.681699C59.8264 -1.55841 56.3088 -1.55841 54.0687 0.681699L1.22541 53.525C-1.01469 55.7651 -1.01469 59.2827 1.22541 61.5228Z" fill="rgb(94, 114, 228)"/>
-                                                  <path d="M55.5019 47.4581L60.8303 52.7865L61.4006 53.3568C62.5458 54.502 62.5458 56.3545 61.4006 57.4997L55.4498 63.4505C54.3046 64.5957 52.4521 64.5957 51.3069 63.4505L50.7366 62.8802L35.3864 47.5300C34.2412 46.3848 34.2412 44.5323 35.3864 43.3871L41.3372 37.4363C42.4824 36.2911 44.3349 36.2911 45.4801 37.4363L45.9854 37.9416" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-                                                </svg>
+                                                <Image src="/images/linear-logo.png" alt="Linear" width={16} height={16} />
                                                 <div className="text-left">
                                                   <div className="text-sm font-medium">Linear</div>
-                                                  <div className="text-xs text-red-600">{user.linear_email || 'Not mapped'}</div>
+                                                  <div className={`text-xs ${user.linear_user_id ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {user.linear_user_id ? getLinearDisplayName(user.linear_user_id) : 'Not mapped'}
+                                                  </div>
                                                 </div>
                                               </div>
                                               <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'linear' ? 'rotate-180' : ''}`} />
@@ -1019,26 +1284,55 @@ function TeamPageContent() {
                                                 <input
                                                   type="text"
                                                   placeholder="Search Linear users..."
+                                                  value={integrationSearchQuery}
+                                                  onChange={(e) => setIntegrationSearchQuery(e.target.value)}
                                                   className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
                                                 />
                                                 <div className="max-h-32 overflow-y-auto space-y-1">
-                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">User 1</button>
-                                                  <button className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded">User 2</button>
+                                                  {loadingIntegrationUsers ? (
+                                                    <div className="text-center py-2">
+                                                      <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      {user.linear_user_id && (
+                                                        <button
+                                                          onClick={() => handleUserMapping(user.id, 'linear', '')}
+                                                          className="w-full text-left px-2 py-1 text-sm hover:bg-red-50 text-red-600 rounded border-b border-neutral-200 mb-1"
+                                                        >
+                                                          Clear mapping
+                                                        </button>
+                                                      )}
+                                                      {linearUsers.filter(u => (u.name || u.email || '').toLowerCase().includes(integrationSearchQuery.toLowerCase())).length > 0 ? (
+                                                        linearUsers
+                                                          .filter(u => (u.name || u.email || '').toLowerCase().includes(integrationSearchQuery.toLowerCase()))
+                                                          .map((linearUser) => (
+                                                            <button
+                                                              key={linearUser.id}
+                                                              onClick={() => handleUserMapping(user.id, 'linear', linearUser.id)}
+                                                              className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded"
+                                                            >
+                                                              {linearUser.name || linearUser.email}
+                                                            </button>
+                                                          ))
+                                                      ) : (
+                                                        <p className="text-xs text-neutral-500 text-center py-2">No users found</p>
+                                                      )}
+                                                    </>
+                                                  )}
                                                 </div>
                                               </div>
                                             )}
                                           </div>
                                         )}
                                       </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                          ) : (
+                            <p className="text-xs text-neutral-500 text-center py-2">No integrations connected</p>
+                          )}
+                        </div>,
+                        document.body
+                      )
+                    })()}
                   </div>
 
                   {/* Pagination */}

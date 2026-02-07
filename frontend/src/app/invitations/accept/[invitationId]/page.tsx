@@ -304,7 +304,7 @@ export default function AcceptInvitationPage() {
           <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
             <Building2 className="h-8 w-8 text-blue-600" />
           </div>
-          <CardTitle className="text-2xl">Organization Invitation</CardTitle>
+          <CardTitle className="text-2xl">Team Invitation</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-6">
