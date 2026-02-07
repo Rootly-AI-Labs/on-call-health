@@ -480,18 +480,33 @@ async def connect_jira_manual(
             detail="Failed to save integration"
         )
 
+    # Capture values before background task (avoid DetachedInstanceError)
+    bg_user_id = current_user.id
+
     # Trigger background sync immediately after successful save
     import asyncio
     from ...services.jira_user_sync_service import JiraUserSyncService
 
     async def sync_in_background():
         """Background task wrapper that catches and logs errors."""
+        from ...models import get_db
+        db_gen = get_db()
+        bg_db = next(db_gen)
         try:
-            sync_service = JiraUserSyncService(db)
-            await sync_service.sync_jira_users(current_user)
-            logger.info(f"[Jira] Background sync completed for user {current_user.id}")
+            bg_user = bg_db.query(User).filter(User.id == bg_user_id).first()
+            if not bg_user:
+                logger.error(f"[Jira] Background sync: user {bg_user_id} not found")
+                return
+            sync_service = JiraUserSyncService(bg_db)
+            await sync_service.sync_jira_users(bg_user)
+            logger.info(f"[Jira] Background sync completed for user {bg_user_id}")
         except Exception as e:
-            logger.error(f"[Jira] Background sync failed for user {current_user.id}: {e}")
+            logger.error(f"[Jira] Background sync failed for user {bg_user_id}: {e}")
+        finally:
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass
 
     # Fire and forget background sync
     asyncio.create_task(sync_in_background())

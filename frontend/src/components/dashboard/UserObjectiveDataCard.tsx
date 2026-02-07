@@ -608,19 +608,24 @@ export function UserObjectiveDataCard({
                       const data = payload[0]?.payload
                       const metricValue = data?.[config.dataKey] || 0
                       const meanScore = data?.meanScore || 0
-                      const percentageChange = meanScore !== 0 ? ((metricValue - meanScore) / meanScore) * 100 : 0
-                      const isPositive = percentageChange <= 0
+                      const diff = metricValue - meanScore
+                      const isAbove = diff > 0
+                      const isEqual = diff === 0
 
                       return (
-                        <div className="bg-neutral-900/95 p-3 border border-neutral-700 rounded-lg shadow-lg">
+                        <div className="bg-neutral-900/95 p-3 border border-neutral-700 rounded-lg shadow-lg min-w-[160px]">
                           <p className="text-sm font-medium text-neutral-300 mb-2">{data?.date}</p>
-                          <p className={`text-base font-bold mb-2 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-                            {percentageChange >= 0 ? '↑' : '↓'} {Math.abs(percentageChange).toFixed(1)}%
-                          </p>
                           <p className="text-sm text-neutral-300">
-                            {config.label}: <span className="font-semibold">{metricValue}</span>
+                            {config.label}: <span className="text-lg font-bold text-white">{metricValue}</span>
                           </p>
-                          <p className="text-xs text-neutral-400 mt-1">Mean: {meanScore}</p>
+                          <p className="text-xs text-neutral-400 mt-1">
+                            Mean: {meanScore}
+                            {!isEqual && (
+                              <span className={`ml-2 font-medium ${isAbove ? 'text-red-400' : 'text-green-400'}`}>
+                                ({isAbove ? '+' : ''}{diff} {isAbove ? 'above' : 'below'})
+                              </span>
+                            )}
+                          </p>
                         </div>
                       )
                     }}

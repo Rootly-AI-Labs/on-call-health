@@ -253,7 +253,7 @@ export function TeamMembersList({
     return (
       <tr
         key={`member-${index}-${member.user_email}`}
-        className="cursor-pointer hover:bg-neutral-50 transition-colors border-b border-neutral-100 last:border-b-0"
+        className={`cursor-pointer hover:bg-neutral-100 transition-colors border-b border-neutral-100 last:border-b-0 ${index % 2 === 1 ? 'bg-neutral-50' : ''}`}
         onClick={() => handleMemberClick(member, trendInfo)}
       >
         {/* Avatar + Name */}
@@ -309,9 +309,6 @@ export function TeamMembersList({
                   : `Stable (${Math.round(trendInfo.firstHalfScore)} → ${Math.round(trendInfo.secondHalfScore)})`}
               </div>
             )}
-          </div>
-          <div className="text-[11px] text-neutral-400 mt-0.5">
-            {Math.round(trendInfo.firstHalfScore)} → {Math.round(trendInfo.secondHalfScore)}
           </div>
         </td>
 

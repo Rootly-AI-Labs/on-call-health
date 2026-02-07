@@ -379,49 +379,70 @@ export function MemberDetailModal({
 
               <div className="mt-4 space-y-6">
                 {/* Overall Risk Level - Always shown first */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 space-y-1.5">
-                        <CardTitle>Risk Level</CardTitle>
-                        <CardDescription>On-Call Health assessment</CardDescription>
-                      </div>
-                      {(() => {
-                        const riskInfo = getOCHRiskInfo(memberData?.och_score)
-                        return (
+                {(() => {
+                  const score = memberData?.och_score
+                  const scoreNum = score !== undefined ? Math.round(score) : null
+                  const riskInfo = getOCHRiskInfo(score)
+                  const barColor = scoreNum === null ? 'bg-neutral-300'
+                    : scoreNum >= 75 ? 'bg-red-500'
+                    : scoreNum >= 50 ? 'bg-orange-500'
+                    : scoreNum >= 25 ? 'bg-yellow-500'
+                    : 'bg-green-500'
+                  const hasBreakdown = memberData?.och_personal_score !== undefined && memberData?.och_work_score !== undefined
+
+                  return (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 space-y-1.5">
+                            <CardTitle>Risk Level</CardTitle>
+                            <CardDescription>On-Call Health assessment</CardDescription>
+                          </div>
                           <Badge className={`px-3 py-1 text-sm ${getOCHBadgeColor(riskInfo.level)}`}>
                             {riskInfo.label}
                           </Badge>
-                        )
-                      })()}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0 pb-6">
-                    {/* Overall score */}
-                    <div className="text-center mb-4">
-                      <div className={`text-3xl font-bold ${getOCHScoreColor(memberData?.och_score)}`}>
-                        {memberData?.och_score !== undefined
-                          ? `${memberData.och_score.toFixed(0)}/100`
-                          : 'N/A'}
-                      </div>
-                      <p className="text-sm text-neutral-500">Overall Risk Score</p>
-                    </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0 pb-6">
+                        <div className="mb-4">
+                          {/* Score centered above bar */}
+                          <div className="text-center mb-2">
+                            <span className={`text-4xl font-bold ${getOCHScoreColor(score)}`}>
+                              {scoreNum !== null ? scoreNum : 'N/A'}
+                            </span>
+                            <span className="text-lg text-neutral-400 ml-1">/100</span>
+                          </div>
+                          {/* Bar + labels */}
+                          {scoreNum !== null && (
+                            <div>
+                              <div className="flex h-3 rounded-full overflow-hidden bg-neutral-100">
+                                <div className={`${barColor} rounded-full transition-all`} style={{ width: `${Math.min(scoreNum, 100)}%` }} />
+                              </div>
+                              <div className="flex justify-between mt-1">
+                                <span className="text-[10px] text-neutral-400">Healthy</span>
+                                <span className="text-[10px] text-neutral-400">Critical</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
 
-                    {/* Personal/Work-Related breakdown */}
-                    {memberData?.och_personal_score !== undefined && memberData?.och_work_score !== undefined && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-blue-50 rounded-lg p-2 text-center">
-                          <div className="text-xs font-semibold text-blue-600">Personal</div>
-                          <div className="text-lg font-bold text-blue-600">{memberData.och_personal_score.toFixed(0)}</div>
-                        </div>
-                        <div className="bg-orange-50 rounded-lg p-2 text-center">
-                          <div className="text-xs font-semibold text-orange-600">Work-Related</div>
-                          <div className="text-lg font-bold text-orange-600">{memberData.och_work_score.toFixed(0)}</div>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                        {/* Personal/Work-Related breakdown */}
+                        {hasBreakdown && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-blue-50 rounded-lg p-2 text-center">
+                              <div className="text-xs font-semibold text-blue-600">Personal</div>
+                              <div className="text-lg font-bold text-blue-600">{memberData.och_personal_score.toFixed(0)}</div>
+                            </div>
+                            <div className="bg-orange-50 rounded-lg p-2 text-center">
+                              <div className="text-xs font-semibold text-orange-600">Work-Related</div>
+                              <div className="text-lg font-bold text-orange-600">{memberData.och_work_score.toFixed(0)}</div>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+                })()}
 
                 {/* Dynamic tile ordering - tiles with data appear first */}
                 {(() => {

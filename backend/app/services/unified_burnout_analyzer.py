@@ -4099,16 +4099,18 @@ class UnifiedBurnoutAnalyzer:
                                 daily_data[date_str]["after_hours_incidents_count"] += 1
                             
                             # Track users involved - handle both platforms
-                            user_id = None
-                            user_email = None
-                            
+                            involved_user_emails = set()
+
                             if self.platform == "pagerduty":
                                 # PagerDuty format - Use enhanced assignment extraction results
                                 assigned_to = incident.get("assigned_to", {})
                                 if assigned_to and isinstance(assigned_to, dict):
                                     user_id = assigned_to.get("id")
                                     user_email = assigned_to.get("email")
-                                    
+                                    # Fallback: look up email from user_id mapping when incident lacks email
+                                    if not user_email and user_id:
+                                        user_email = user_id_to_email.get(str(user_id))
+
                                     # DEBUG: Log PagerDuty user mapping for first few incidents
                                     if user_id and len(daily_data) <= 3:
                                         assignment_method = assigned_to.get("assignment_method", "unknown")
@@ -4117,28 +4119,30 @@ class UnifiedBurnoutAnalyzer:
                                             logger.info(f"PagerDuty ENHANCED user mapped: {user_email} (ID: {user_id}) via {assignment_method} [{confidence}]")
                                         else:
                                             logger.warning(f"PagerDuty ENHANCED user ID {user_id} has no email - method: {assignment_method}")
-                                    
+
                                     if user_id:
                                         daily_data[date_str]["users_involved"].add(user_id)
+                                    if user_email:
+                                        involved_user_emails.add(user_email.lower())
                             else:  # Rootly
-                                # Rootly format - Extract user ID and map to email
+                                # Rootly format - Extract ALL involved users (matches _map_user_incidents)
                                 attrs = incident.get("attributes", {})
                                 if attrs:
-                                    user_info = attrs.get("user", {})
-                                    if isinstance(user_info, dict) and "data" in user_info:
-                                        user_data = user_info.get("data", {})
-                                        user_id = user_data.get("id")
-                                        # Use ID-to-email mapping instead of direct email extraction
-                                        user_email = user_id_to_email.get(str(user_id)) if user_id else None
-                                        if user_id:
-                                            daily_data[date_str]["users_involved"].add(user_id)
-                                            
-                                        # DEBUG: Log user extraction for first few incidents
-                                        if len(daily_data) <= 3:
-                                            logger.debug(f"Processing incident for user {user_email} (ID: {user_id})")
-                            
-                            # Track individual user daily data - now updating pre-initialized structure
-                            if user_email:
+                                    # Check all user roles: creator, started_by, resolved_by, mitigated_by
+                                    for role_field in ("user", "started_by", "resolved_by", "mitigated_by"):
+                                        role_info = attrs.get(role_field, {})
+                                        if isinstance(role_info, dict) and "data" in role_info:
+                                            role_data = role_info.get("data", {})
+                                            if isinstance(role_data, dict):
+                                                rid = role_data.get("id")
+                                                if rid:
+                                                    daily_data[date_str]["users_involved"].add(rid)
+                                                    remail = user_id_to_email.get(str(rid))
+                                                    if remail:
+                                                        involved_user_emails.add(remail.lower())
+
+                            # Track individual user daily data for ALL involved users
+                            for user_email in involved_user_emails:
                                 user_key = user_email.lower()
                                 
                                 # User should already exist in our pre-initialized structure
