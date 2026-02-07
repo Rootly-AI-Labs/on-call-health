@@ -652,7 +652,7 @@ async def get_analysis(
 _ANALYSIS_DATA_KEYS = {
     'team_analysis', 'team_health', 'team_summary', 'daily_trends',
     'metadata', 'data_sources', 'individual_daily_data', 'raw_incident_data',
-    'ai_team_insights', 'ai_enhanced', 'member_surveys',
+    'ai_team_insights', 'ai_enhanced',
     'partial_data', 'error', 'data_collection_successful', 'failure_stage',
 }
 
