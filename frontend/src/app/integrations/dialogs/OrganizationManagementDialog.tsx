@@ -444,17 +444,17 @@ export function OrganizationManagementDialog({
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-neutral-200 bg-neutral-50">
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Name</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Role</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700"></th>
+                        <tr className="border-b border-neutral-200 bg-neutral-100">
+                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Name</th>
+                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Email</th>
+                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Role</th>
+                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {paginatedMembers.map((member, index) => (
-                          <tr key={member.id} className={`border-b border-neutral-100 hover:bg-neutral-50 ${index === paginatedMembers.length - 1 ? 'border-b-0' : ''}`}>
-                            <td className="py-3 px-6">
+                          <tr key={member.id} className="border-b border-neutral-100 hover:bg-neutral-50">
+                            <td className="py-2 px-6">
                               <div className="flex items-center gap-3">
                                 <span className="font-medium text-neutral-900">
                                   {member.name}
@@ -464,15 +464,15 @@ export function OrganizationManagementDialog({
                                 </span>
                               </div>
                             </td>
-                            <td className="py-3 px-6">
+                            <td className="py-2 px-6">
                               <span className="text-sm text-neutral-600">{member.email}</span>
                             </td>
-                            <td className="py-3 px-6">
+                            <td className="py-2 px-6">
                               {userInfo?.role === 'admin' && !member.is_current_user ? (
                                 <select
                                   value={member.role || 'member'}
                                   onChange={(e) => onRoleChange(member.id as number, e.target.value)}
-                                  className="text-sm px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                  className="text-sm px-2 py-1 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                                 >
                                   <option value="member">Member</option>
                                   <option value="admin">Admin</option>
@@ -483,7 +483,7 @@ export function OrganizationManagementDialog({
                                 </span>
                               )}
                             </td>
-                            <td className="py-3 px-6">
+                            <td className="py-2 px-6">
                               <div className="flex justify-end">
                                 {!member.is_current_user && userInfo?.role === 'admin' && (
                                   confirmRemoveUserId === member.id ? (
@@ -531,34 +531,32 @@ export function OrganizationManagementDialog({
                     </table>
                   </div>
                   {/* Pagination Controls */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-200">
-                      <p className="text-sm text-neutral-600">
-                        Showing {startIndex + 1}-{Math.min(startIndex + TEAM_MEMBERS_PER_PAGE, filteredMembers.length)} of {filteredMembers.length}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                          disabled={currentPage === 1}
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </Button>
-                        <span className="text-sm text-neutral-600 px-3">
-                          Page {currentPage} of {totalPages}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                          disabled={currentPage === totalPages}
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </Button>
-                      </div>
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-200">
+                    <p className="text-sm text-neutral-600">
+                      Showing {startIndex + 1}-{Math.min(startIndex + TEAM_MEMBERS_PER_PAGE, filteredMembers.length)} of {filteredMembers.length}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <span className="text-sm text-neutral-600 px-3">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
 
@@ -572,17 +570,17 @@ export function OrganizationManagementDialog({
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-neutral-200 bg-neutral-50">
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Role</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Invited By</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Sent</th>
-                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Expires</th>
+                        <tr className="border-b border-neutral-200 bg-neutral-100">
+                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Email</th>
+                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Role</th>
+                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Invited By</th>
+                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Sent</th>
+                          <th className="text-left py-2 px-6 text-sm font-semibold text-neutral-700">Expires</th>
                         </tr>
                       </thead>
                       <tbody>
                         {pendingInvitations.map((invitation, index) => (
-                          <tr key={invitation.id} className={`border-b border-neutral-100 hover:bg-neutral-50 bg-yellow-50 ${index === pendingInvitations.length - 1 ? 'border-b-0' : ''}`}>
+                          <tr key={invitation.id} className="border-b border-neutral-100 hover:bg-neutral-50 bg-yellow-50">
                             <td className="py-4 px-6">
                               <span className="text-sm font-medium text-neutral-900">{invitation.email}</span>
                             </td>

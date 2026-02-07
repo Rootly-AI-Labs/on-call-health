@@ -799,7 +799,7 @@ function TeamPageContent() {
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-neutral-200 bg-neutral-50">
+                        <tr className="border-b border-neutral-200 bg-neutral-100">
                           <th className="text-left py-3 px-6">
                             <button
                               onClick={() => handleSort('name')}
