@@ -116,9 +116,9 @@ export function InvitationAcceptanceModal({
         onAccepted?.()
         onClose()
 
-        // Redirect to integrations page after short delay
+        // Redirect to team management page after short delay
         setTimeout(() => {
-          window.location.href = '/integrations'
+          window.location.href = '/management?view=team'
         }, 500)
       }
     } catch (error: any) {

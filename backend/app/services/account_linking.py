@@ -383,30 +383,22 @@ class AccountLinkingService:
                 logger.info(f"No domain found in email {email}")
                 return
 
-            # Shared domains (Gmail, etc.) - check for invitation
+            # Shared domains (Gmail, etc.) - do NOT auto-accept invitations
+            # Users must explicitly accept invitations via the invitation page
             shared_domains = {'gmail.com', 'googlemail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'hey.com'}
             if domain in shared_domains:
-                # Look for pending invitation
+                # Check for pending invitation (for logging purposes only)
                 invitation = self.db.query(OrganizationInvitation).filter(
                     OrganizationInvitation.email == email,
                     OrganizationInvitation.status == 'pending'
                 ).first()
 
                 if invitation and not invitation.is_expired:
-                    # Accept invitation automatically on OAuth
-                    user.organization_id = invitation.organization_id
-                    # Use role from invitation (admin/member/viewer)
-                    user.role = invitation.role
-                    user.joined_org_at = datetime.now()
-
-                    # Mark invitation as accepted
-                    invitation.status = 'accepted'
-                    invitation.used_at = datetime.now()
-
-                    logger.info(f"Auto-accepted invitation for {email} to org {invitation.organization_id} as {user.role}")
+                    # DO NOT auto-accept - user must explicitly accept via /invitations/accept/{id}
+                    logger.info(f"Pending invitation found for {email} to org {invitation.organization_id}, but NOT auto-accepting (user must accept manually)")
                 else:
                     logger.info(f"No pending invitation found for {email}")
-                # else: Leave user unassigned, they need manual invitation
+                # Leave user unassigned until they manually accept the invitation via the UI
 
             else:
                 # Company domain - get or create organization
