@@ -667,17 +667,26 @@ def _trim_analysis_data(results: dict) -> dict:
     return {k: v for k, v in results.items() if k in _ANALYSIS_DATA_KEYS}
 
 
-def _get_redis_for_analysis() -> Optional[Any]:
-    """Get Redis client for analysis data cache."""
+_redis_client = None
+_redis_checked = False
+
+
+def _get_redis_for_analysis():
+    """Get cached Redis client for analysis data cache (singleton)."""
+    global _redis_client, _redis_checked
+    if _redis_checked:
+        return _redis_client
+    _redis_checked = True
     try:
         redis_url = os.getenv("REDIS_URL")
         if not redis_url:
             return None
         import redis
-        client = redis.from_url(redis_url, decode_responses=True)
-        client.ping()
-        return client
+        _redis_client = redis.from_url(redis_url, decode_responses=True)
+        _redis_client.ping()
+        return _redis_client
     except Exception:
+        _redis_client = None
         return None
 
 
