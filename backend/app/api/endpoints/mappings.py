@@ -208,40 +208,34 @@ async def get_platform_mappings(
     """Get recent integration mappings for a specific target platform, including manual mappings and user names."""
     try:
         from ...models import UserMapping, Analysis
-        import json
-        
+
         # Get user names and check if GitHub was enabled in the most recent completed analysis
         user_name_lookup = {}
         github_was_enabled = False
-        recent_analysis = db.query(Analysis).filter(
-            Analysis.user_id == current_user.id,
-            Analysis.status == "completed",
-            Analysis.results.isnot(None)
-        ).order_by(Analysis.created_at.desc()).first()
-        
-        if recent_analysis and recent_analysis.results:
+        from sqlalchemy import text as sa_text
+        # Extract only needed fields from JSON at DB level to avoid loading 30MB+ results
+        row = db.execute(
+            sa_text(
+                "SELECT results->'data_sources'->'github_data', "
+                "results->'team_analysis'->'members' "
+                "FROM analyses WHERE user_id = :uid AND status = 'completed' "
+                "AND results IS NOT NULL ORDER BY created_at DESC LIMIT 1"
+            ),
+            {"uid": current_user.id}
+        ).first()
+
+        if row:
             try:
-                results = json.loads(recent_analysis.results) if isinstance(recent_analysis.results, str) else recent_analysis.results
-                
-                # Check if GitHub was enabled in the analysis
-                data_sources = results.get("data_sources", {})
-                github_was_enabled = data_sources.get("github_data", False) if isinstance(data_sources, dict) else "github" in data_sources
-                
-                team_analysis = results.get("team_analysis", {})
-                members = team_analysis.get("members", []) if isinstance(team_analysis, dict) else team_analysis
-                
-                # Build email to name lookup
+                github_was_enabled = bool(row[0]) if row[0] is not None else False
+                members = row[1] if isinstance(row[1], list) else []
                 for member in members:
                     email = member.get("user_email")
                     name = member.get("user_name")
                     if email and name:
                         user_name_lookup[email.lower()] = name
-                        
-                logger.info(f"🔍 DEBUG: Loaded {len(user_name_lookup)} user names from analysis {recent_analysis.id}")
-                logger.info(f"🔍 DEBUG: GitHub was enabled in analysis: {github_was_enabled}")
             except Exception as e:
                 logger.warning(f"Could not extract user names from analysis: {e}")
-        
+
         # Get most recent integration mappings, limited to prevent UI overload
         integration_mappings = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id,
@@ -312,24 +306,21 @@ async def get_success_rates(
     If platform is specified, returns statistics for that platform only."""
     try:
         from ...models import UserMapping, Analysis
-        import json
         logger.info(f"🔍 DEBUG: Getting success rates for user {current_user.id}, platform: {platform}")
         
         # Check if GitHub was enabled in the most recent analysis
         github_was_enabled = False
-        recent_analysis = db.query(Analysis).filter(
-            Analysis.user_id == current_user.id,
-            Analysis.status == "completed",
-            Analysis.results.isnot(None)
-        ).order_by(Analysis.created_at.desc()).first()
-        
-        if recent_analysis and recent_analysis.results:
-            try:
-                results = json.loads(recent_analysis.results) if isinstance(recent_analysis.results, str) else recent_analysis.results
-                data_sources = results.get("data_sources", {})
-                github_was_enabled = data_sources.get("github_data", False) if isinstance(data_sources, dict) else "github" in data_sources
-            except Exception as e:
-                logger.warning(f"Could not check if GitHub was enabled: {e}")
+        from sqlalchemy import text as sa_text
+        row = db.execute(
+            sa_text(
+                "SELECT results->'data_sources'->'github_data' "
+                "FROM analyses WHERE user_id = :uid AND status = 'completed' "
+                "AND results IS NOT NULL ORDER BY created_at DESC LIMIT 1"
+            ),
+            {"uid": current_user.id}
+        ).first()
+        if row and row[0] is not None:
+            github_was_enabled = bool(row[0])
         
         # Get integration mappings for this user, optionally filtered by platform
         query = db.query(IntegrationMapping).filter(
