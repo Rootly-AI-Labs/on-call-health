@@ -392,21 +392,24 @@ export function OrganizationManagementDialog({
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Search Bar - above members table */}
+              {/* Team Members Header and Search Bar */}
               {orgMembers.length > 0 && (
-                <div className={asInlineView ? "px-6 mb-4" : "mb-4"}>
-                  <div className="relative max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                    <Input
-                      type="text"
-                      placeholder="Search members..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value)
-                        setCurrentPage(1)
-                      }}
-                      className="pl-9 w-full"
-                    />
+                <div className={asInlineView ? "px-6 mb-4 flex items-center justify-between" : "mb-4 flex items-center justify-between"}>
+                  <h3 className="text-sm font-semibold text-neutral-900">Team Members <span className="text-neutral-500 font-normal">{orgMembers.length}</span></h3>
+                  <div className="w-80">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                      <Input
+                        type="text"
+                        placeholder="Search members..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value)
+                          setCurrentPage(1)
+                        }}
+                        className="pl-9 w-full"
+                      />
+                    </div>
                   </div>
                 </div>
               )}

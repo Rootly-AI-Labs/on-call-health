@@ -690,43 +690,47 @@ function TeamPageContent() {
                       </div>
                     </div>
 
-                    {/* Search Bar and Organization Selector - Only show when primary integration exists */}
+                    {/* Organization Selector and Members Section - Only show when primary integration exists */}
                     {hasPrimaryIntegration && (
-                      <div className="flex items-end gap-4">
-                        {/* Search Bar - shorter */}
-                        <div className="w-80">
-                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">&nbsp;</label>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                            <Input
-                              type="text"
-                              placeholder="Search members..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="pl-9 w-full"
-                            />
+                      <div className="space-y-4">
+                        {/* Top row: Organization Selector */}
+                        <div className="flex items-end gap-4">
+                          <div className="flex-shrink-0">
+                            <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">Select Organization</label>
+                            <Select
+                              value={selectedOrganization}
+                              onValueChange={setSelectedOrganization}
+                              disabled={loadingIntegrations || !hasPrimaryIntegration}
+                            >
+                              <SelectTrigger className="w-72">
+                                <SelectValue placeholder="Select an organization..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {integrations.map((integration) => (
+                                  <SelectItem key={integration.id} value={integration.id.toString()}>
+                                    {integration.name || `Integration #${integration.id}`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
 
-                        {/* Organization Selector - wider on the right */}
-                        <div className="flex-shrink-0">
-                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">Select Organization</label>
-                          <Select
-                            value={selectedOrganization}
-                            onValueChange={setSelectedOrganization}
-                            disabled={loadingIntegrations || !hasPrimaryIntegration}
-                          >
-                            <SelectTrigger className="w-72">
-                              <SelectValue placeholder="Select an organization..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {integrations.map((integration) => (
-                                <SelectItem key={integration.id} value={integration.id.toString()}>
-                                  {integration.name || `Integration #${integration.id}`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        {/* Bottom row: Organization Members and Search Bar */}
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold text-neutral-900">Organization Members <span className="text-neutral-500 font-normal">{syncedUsers.length}</span></h3>
+                          <div className="w-80">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                              <Input
+                                type="text"
+                                placeholder="Search members..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 w-full"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
