@@ -117,8 +117,8 @@ export function TeamHealthOverview({
         style={{ top: '-200px', left: '-200px' }}>
         <div className="space-y-2">
           <div className="text-purple-300 font-semibold mb-2">On-Call Health Risk Level</div>
-          <div className="text-neutral-500 text-sm">
-            On-Call Health risk levels range from <strong>0 to 100</strong>, where higher scores indicate a higher risk of overwork.
+          <div className="text-neutral-300 text-xs leading-relaxed">
+            Compound score from <strong>0 to 100</strong> combining on-call hours, incident frequency, after-hours pages, and workload distribution. Higher scores indicate higher risk of overwork and burnout.
           </div>
         </div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
@@ -202,12 +202,13 @@ export function TeamHealthOverview({
                           return (
                             <>
                               <span>{teamOchScore}</span>
-                              <span
-                                className="text-xs text-gray-500 cursor-help ml-1"
-                                onMouseEnter={(e) => showTooltip('ocb-score-tooltip', e.currentTarget.getBoundingClientRect(), 180, 120)}
-                                onMouseLeave={() => hideTooltip('ocb-score-tooltip')}
-                              >
+                              <span className="text-xs text-gray-500 ml-1 inline-flex items-center gap-1">
                                 Risk Level
+                                <Info
+                                  className="w-3 h-3 text-neutral-400 cursor-help hover:text-neutral-600 transition-colors"
+                                  onMouseEnter={(e) => showTooltip('och-score-tooltip', e.currentTarget.getBoundingClientRect(), 180, 120)}
+                                  onMouseLeave={() => hideTooltip('och-score-tooltip')}
+                                />
                               </span>
                             </>
                           )
