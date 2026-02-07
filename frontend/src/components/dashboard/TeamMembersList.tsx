@@ -389,7 +389,7 @@ export function TeamMembersList({
         <tr className="border-b border-neutral-200">
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Member</th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Risk Level</th>
-          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Trend (30d)</th>
+          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Trend ({currentAnalysis?.time_range || 30}d)</th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Incidents</th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Status</th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Data Sources</th>
