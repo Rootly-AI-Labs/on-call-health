@@ -2089,10 +2089,19 @@ class UnifiedBurnoutAnalyzer:
     def _get_user_id_from_role(self, attrs: Dict[str, Any], role: str) -> Optional[str]:
         """Extract user ID from an incident role attribute (user, started_by, resolved_by, mitigated_by)."""
         role_data = attrs.get(role)
-        if role_data and isinstance(role_data, dict):
-            data = role_data.get("data")
-            if data and isinstance(data, dict) and data.get("id"):
-                return str(data["id"])
+        if not role_data:
+            return None
+        if not isinstance(role_data, dict):
+            logger.debug(f"Unexpected type for role '{role}': {type(role_data).__name__}")
+            return None
+        data = role_data.get("data")
+        if not data:
+            return None
+        if not isinstance(data, dict):
+            logger.debug(f"Unexpected type for role '{role}' data: {type(data).__name__}")
+            return None
+        if data.get("id"):
+            return str(data["id"])
         return None
 
     def _calculate_incident_response_activities(
