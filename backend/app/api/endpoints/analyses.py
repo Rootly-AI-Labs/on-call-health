@@ -667,26 +667,32 @@ def _trim_analysis_data(results: dict) -> dict:
     return {k: v for k, v in results.items() if k in _ANALYSIS_DATA_KEYS}
 
 
+import threading
+
 _redis_client = None
 _redis_checked = False
+_redis_lock = threading.Lock()
 
 
 def _get_redis_for_analysis():
-    """Get cached Redis client for analysis data cache (singleton)."""
+    """Get cached Redis client for analysis data cache (singleton, thread-safe)."""
     global _redis_client, _redis_checked
     if _redis_checked:
         return _redis_client
-    _redis_checked = True
-    try:
-        redis_url = os.getenv("REDIS_URL")
-        if not redis_url:
-            return None
-        import redis
-        _redis_client = redis.from_url(redis_url, decode_responses=True)
-        _redis_client.ping()
-        return _redis_client
-    except Exception:
-        _redis_client = None
+    with _redis_lock:
+        if _redis_checked:
+            return _redis_client
+        _redis_checked = True
+        try:
+            redis_url = os.getenv("REDIS_URL")
+            if not redis_url:
+                return None
+            import redis
+            _redis_client = redis.from_url(redis_url, decode_responses=True)
+            _redis_client.ping()
+            return _redis_client
+        except Exception:
+            _redis_client = None
         return None
 
 
