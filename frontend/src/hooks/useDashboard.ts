@@ -1192,7 +1192,7 @@ export default function useDashboard() {
 
       let rootlyResponse, pagerdutyResponse, githubResponse, slackResponse, jiraResponse, linearResponse
       try {
-        [rootlyResponse, pagerdutyResponse, githubResponse, slackResponse, jiraResponse, linearResponse] = await Promise.all([
+        const settled = await Promise.allSettled([
           fetch(`${API_BASE}/rootly/integrations`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
           }),
@@ -1212,16 +1212,22 @@ export default function useDashboard() {
             headers: { 'Authorization': `Bearer ${authToken}` }
           })
         ])
+        rootlyResponse = settled[0].status === 'fulfilled' ? settled[0].value : null
+        pagerdutyResponse = settled[1].status === 'fulfilled' ? settled[1].value : null
+        githubResponse = settled[2].status === 'fulfilled' ? settled[2].value : null
+        slackResponse = settled[3].status === 'fulfilled' ? settled[3].value : null
+        jiraResponse = settled[4].status === 'fulfilled' ? settled[4].value : null
+        linearResponse = settled[5].status === 'fulfilled' ? settled[5].value : null
       } catch (networkError) {
         throw new Error('Cannot connect to backend server. Please check if the backend is running and try again.')
       }
 
-      const rootlyData = rootlyResponse.ok ? await rootlyResponse.json() : { integrations: [] }
-      const pagerdutyData = pagerdutyResponse.ok ? await pagerdutyResponse.json() : { integrations: [] }
-      const githubData = githubResponse.ok ? await githubResponse.json() : { connected: false, integration: null }
-      const slackData = slackResponse.ok ? await slackResponse.json() : { connected: false, integration: null }
-      const jiraData = jiraResponse.ok ? await jiraResponse.json() : { connected: false, integration: null }
-      const linearData = linearResponse.ok ? await linearResponse.json() : { connected: false, integration: null }
+      const rootlyData = rootlyResponse?.ok ? await rootlyResponse.json() : { integrations: [] }
+      const pagerdutyData = pagerdutyResponse?.ok ? await pagerdutyResponse.json() : { integrations: [] }
+      const githubData = githubResponse?.ok ? await githubResponse.json() : { connected: false, integration: null }
+      const slackData = slackResponse?.ok ? await slackResponse.json() : { connected: false, integration: null }
+      const jiraData = jiraResponse?.ok ? await jiraResponse.json() : { connected: false, integration: null }
+      const linearData = linearResponse?.ok ? await linearResponse.json() : { connected: false, integration: null }
 
 
       // Set GitHub, Slack, and Jira integration states
