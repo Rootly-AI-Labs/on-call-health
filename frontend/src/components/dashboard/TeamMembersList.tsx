@@ -310,9 +310,6 @@ export function TeamMembersList({
               </div>
             )}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-0.5">
-            {Math.round(trendInfo.firstHalfScore)} → {Math.round(trendInfo.secondHalfScore)}
-          </div>
         </td>
 
         {/* Incidents */}
