@@ -2201,7 +2201,7 @@ export default function IntegrationsPage() {
               </h3>
               <p className="text-neutral-700">
                 You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected.
-                Run your first analysis to identify overwork patterns across your team.
+                {' '}<Link href="/dashboard?run=true" className="text-purple-700 font-semibold hover:underline">Run</Link> your first analysis to identify overwork patterns across your team.
               </p>
             </div>
           </div>
