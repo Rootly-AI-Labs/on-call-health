@@ -312,8 +312,9 @@ export default function useDashboard() {
             }
           }
         } catch (e) {
-          }
-        
+          console.warn('Failed to parse cached integrations:', e)
+        }
+
         // Set loading to false when using cache
         setLoadingIntegrations(false)
         setHasDataFromCache(true)
@@ -392,6 +393,7 @@ export default function useDashboard() {
             setSlackIntegration(slackData.integration)
           }
         } catch (e) {
+          console.warn('Failed to parse cached integration data:', e)
         }
       }
 
@@ -2175,9 +2177,9 @@ export default function useDashboard() {
   
   // Helper function to get color based on severity
   const getFactorColor = (value) => {
-    if (value >= 7) return '#DC2626' // Red - Critical
-    if (value >= 5) return '#F59E0B' // Orange - Warning  
-    if (value >= 3) return '#10B981' // Green - Good
+    if (value >= 70) return '#DC2626' // Red - Critical
+    if (value >= 50) return '#F59E0B' // Orange - Warning
+    if (value >= 30) return '#10B981' // Green - Good
     return '#6B7280' // Gray - Low risk
   }
   
