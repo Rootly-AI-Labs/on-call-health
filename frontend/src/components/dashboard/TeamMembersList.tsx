@@ -210,7 +210,6 @@ export function TeamMembersList({
     return false;
   };
 
-  const isJiraEnabled = isDataSourceEnabled('jira');
   
   const isLoading = !currentAnalysis || !currentAnalysis.analysis_data
 
@@ -400,7 +399,7 @@ export function TeamMembersList({
                   </div>
                 )}
                 {/* Mapped integrations first, then unmapped */}
-                {sorted.map(i => renderIcon(i.key, i.mapped, i.title))}
+                {sorted.map(i => <span key={i.key}>{renderIcon(i.key, i.mapped, i.title)}</span>)}
                 {/* Survey */}
                 {hasSurvey && (
                   <div className="flex items-center justify-center w-5 h-5 bg-blue-50 rounded-full border border-blue-200" title="Survey Data Available">
