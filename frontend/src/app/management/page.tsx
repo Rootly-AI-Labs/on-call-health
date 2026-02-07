@@ -356,10 +356,10 @@ function TeamPageContent() {
     }
   }, [openMappingUserId])
 
-  // Reset search query when switching integrations to prevent stale search state
+  // Reset search query when switching integrations or users to prevent stale search state
   useEffect(() => {
     setIntegrationSearchQuery("")
-  }, [expandedIntegration])
+  }, [expandedIntegration, openMappingUserId])
 
   // Load integration users when expanded
   useEffect(() => {
