@@ -1994,6 +1994,9 @@ class UnifiedBurnoutAnalyzer:
         # Add GitHub activity if available
         if github_data and github_data.get("activity_data"):
             result["github_activity"] = github_data["activity_data"]
+            # Propagate github_username from collected data if not already set
+            if not result.get("github_username") and github_data.get("username"):
+                result["github_username"] = github_data["username"]
 
             # Check if GitHub activity indicates high risk
             github_indicators = github_data.get("activity_data", {}).get("burnout_indicators", {})
