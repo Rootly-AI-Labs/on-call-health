@@ -1,7 +1,7 @@
 """Tests for analysis data trimming to ensure frontend receives only needed keys."""
 import unittest
 
-from app.api.endpoints.analyses import _trim_analysis_data, _ANALYSIS_DATA_KEYS
+from app.api.endpoints.analyses import _trim_analysis_data, _load_analysis_data, _ANALYSIS_DATA_KEYS
 
 
 class TestTrimAnalysisData(unittest.TestCase):
@@ -10,7 +10,7 @@ class TestTrimAnalysisData(unittest.TestCase):
         """All keys the frontend uses should be preserved."""
         data = {k: f"value_{k}" for k in _ANALYSIS_DATA_KEYS}
         result = _trim_analysis_data(data)
-        self.assertEqual(set(result.keys()), _ANALYSIS_DATA_KEYS)
+        self.assertEqual(set(result.keys()), set(_ANALYSIS_DATA_KEYS))
 
     def test_strips_unused_keys(self):
         """Keys the frontend doesn't use should be removed."""
