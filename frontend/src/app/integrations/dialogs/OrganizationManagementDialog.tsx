@@ -454,7 +454,7 @@ export function OrganizationManagementDialog({
                       <tbody>
                         {paginatedMembers.map((member, index) => (
                           <tr key={member.id} className={`border-b border-neutral-100 hover:bg-neutral-50 ${index === paginatedMembers.length - 1 ? 'border-b-0' : ''}`}>
-                            <td className="py-4 px-6">
+                            <td className="py-3 px-6">
                               <div className="flex items-center gap-3">
                                 <span className="font-medium text-neutral-900">
                                   {member.name}
@@ -464,10 +464,10 @@ export function OrganizationManagementDialog({
                                 </span>
                               </div>
                             </td>
-                            <td className="py-4 px-6">
+                            <td className="py-3 px-6">
                               <span className="text-sm text-neutral-600">{member.email}</span>
                             </td>
-                            <td className="py-4 px-6">
+                            <td className="py-3 px-6">
                               {userInfo?.role === 'admin' && !member.is_current_user ? (
                                 <select
                                   value={member.role || 'member'}
@@ -483,7 +483,7 @@ export function OrganizationManagementDialog({
                                 </span>
                               )}
                             </td>
-                            <td className="py-4 px-6">
+                            <td className="py-3 px-6">
                               <div className="flex justify-end">
                                 {!member.is_current_user && userInfo?.role === 'admin' && (
                                   confirmRemoveUserId === member.id ? (
@@ -517,10 +517,9 @@ export function OrganizationManagementDialog({
                                       variant="ghost"
                                       onClick={() => setConfirmRemoveUserId(member.id as number)}
                                       disabled={removingUserId !== null}
-                                      className="h-7 text-xs text-neutral-500 hover:text-red-600 hover:bg-red-50"
+                                      className="h-8 w-8 p-0 text-neutral-500 hover:text-red-600 hover:bg-red-50"
                                     >
-                                      <Trash2 className="w-3 h-3 mr-1" />
-                                      Remove
+                                      <Trash2 className="w-4 h-4" />
                                     </Button>
                                   )
                                 )}
