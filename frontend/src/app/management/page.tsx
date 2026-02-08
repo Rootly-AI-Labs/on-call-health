@@ -326,6 +326,9 @@ function TeamPageContent() {
         setOpenMappingUserId(null)
         setExpandedIntegration(null)
         setPopupPosition(null)
+        setGithubUsers([])
+        setJiraUsers([])
+        setLinearUsers([])
       }
     }
 
@@ -347,6 +350,9 @@ function TeamPageContent() {
         setOpenMappingUserId(null)
         setExpandedIntegration(null)
         setPopupPosition(null)
+        setGithubUsers([])
+        setJiraUsers([])
+        setLinearUsers([])
       }
     }
 
@@ -361,18 +367,31 @@ function TeamPageContent() {
     setIntegrationSearchQuery("")
   }, [expandedIntegration, openMappingUserId])
 
-  // Load integration users when expanded
+  // Pre-load all integration users when mapping popup opens
   useEffect(() => {
-    if (!expandedIntegration || !selectedOrganization) return
+    if (!openMappingUserId || !selectedOrganization) return
 
-    if (expandedIntegration === 'github' && githubUsers.length === 0) {
-      loadGithubUsersForMapping()
-    } else if (expandedIntegration === 'jira' && jiraUsers.length === 0) {
-      loadJiraUsersForMapping()
-    } else if (expandedIntegration === 'linear' && linearUsers.length === 0) {
-      loadLinearUsersForMapping()
+    // Load all connected integration users in parallel
+    const loadAllIntegrationUsers = async () => {
+      const promises = []
+
+      if (connectedIntegrations.has('github') && githubUsers.length === 0) {
+        promises.push(loadGithubUsersForMapping())
+      }
+      if (connectedIntegrations.has('jira') && jiraUsers.length === 0) {
+        promises.push(loadJiraUsersForMapping())
+      }
+      if (connectedIntegrations.has('linear') && linearUsers.length === 0) {
+        promises.push(loadLinearUsersForMapping())
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises)
+      }
     }
-  }, [expandedIntegration, selectedOrganization, githubUsers.length, jiraUsers.length, linearUsers.length])
+
+    loadAllIntegrationUsers()
+  }, [openMappingUserId, selectedOrganization, connectedIntegrations])
 
   const loadGithubUsersForMapping = async () => {
     if (!selectedOrganization) return
@@ -434,6 +453,9 @@ function TeamPageContent() {
       await fetchSyncedUsers(false, false, true) // Refresh the users list
       setOpenMappingUserId(null)
       setExpandedIntegration(null)
+      setGithubUsers([])
+      setJiraUsers([])
+      setLinearUsers([])
     } catch (error) {
       toast.error("Failed to update user mapping")
     }
@@ -755,24 +777,65 @@ function TeamPageContent() {
   // Get integration logos for a user (filtered by currently connected integrations)
   const getUserIntegrations = (user: any) => {
     const integrations = []
-    if (user.github_username && connectedIntegrations.has('github')) integrations.push('github')
-    if (user.jira_account_id && connectedIntegrations.has('jira')) integrations.push('jira')
-    if (user.linear_user_id && connectedIntegrations.has('linear')) integrations.push('linear')
+
+    // Only show GitHub if user is mapped AND exists in fetched data
+    if (user.github_username && connectedIntegrations.has('github')) {
+      // GitHub usernames are display names, so just check if it exists in the list
+      // If githubUsers array is empty, we haven't loaded yet, so be conservative
+      if (githubUsers.length === 0 || githubUsers.includes(user.github_username)) {
+        integrations.push('github')
+      }
+    }
+
+    // Only show Jira if user is mapped AND exists in fetched data
+    if (user.jira_account_id && connectedIntegrations.has('jira')) {
+      // Jira uses account IDs, need to find the user in the array
+      // If jiraUsers array is empty, we haven't loaded yet, so be conservative
+      if (jiraUsers.length === 0 || jiraUsers.some(u =>
+        u.account_id === user.jira_account_id || u.accountId === user.jira_account_id
+      )) {
+        integrations.push('jira')
+      }
+    }
+
+    // Only show Linear if user is mapped AND exists in fetched data
+    if (user.linear_user_id && connectedIntegrations.has('linear')) {
+      // Linear uses user IDs, need to find the user in the array
+      // If linearUsers array is empty, we haven't loaded yet, so be conservative
+      if (linearUsers.length === 0 || linearUsers.some(u => u.id === user.linear_user_id)) {
+        integrations.push('linear')
+      }
+    }
+
     return integrations
   }
 
   // Get display name for Jira user from account ID
   const getJiraDisplayName = (accountId: string | null | undefined) => {
     if (!accountId) return 'Not mapped'
+
+    // Show loading indicator until data is actually loaded (prevents ID flash)
+    if (jiraUsers.length === 0) {
+      return 'Loading...'
+    }
+
     const jiraUser = jiraUsers.find(u => u.account_id === accountId || u.accountId === accountId)
-    return jiraUser?.display_name || jiraUser?.displayName || jiraUser?.email || jiraUser?.emailAddress || accountId
+    // Never show raw ID - show "Unmapped" instead for privacy
+    return jiraUser?.display_name || jiraUser?.displayName || jiraUser?.email || jiraUser?.emailAddress || 'Unmapped'
   }
 
   // Get display name for Linear user from user ID
   const getLinearDisplayName = (userId: string | null | undefined) => {
     if (!userId) return 'Not mapped'
+
+    // Show loading indicator until data is actually loaded (prevents ID flash)
+    if (linearUsers.length === 0) {
+      return 'Loading...'
+    }
+
     const linearUser = linearUsers.find(u => u.id === userId)
-    return linearUser?.name || linearUser?.email || userId
+    // Never show raw ID - show "Unmapped" instead for privacy
+    return linearUser?.name || linearUser?.email || 'Unmapped'
   }
 
   // Handle column header click for sorting
