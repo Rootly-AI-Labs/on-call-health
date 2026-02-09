@@ -40,14 +40,8 @@ export function BaseRiskFactorsCard({
   loading = false,
   className = ""
 }: BaseRiskFactorsCardProps): React.ReactElement {
-  // Dynamically scale the chart so low values still fill the space.
-  // Round up to the nearest "nice" ceiling (10, 20, 25, 50, 100).
-  const maxValue = Math.max(...factorsData.map(d => d.value), 0)
-  const niceSteps = [10, 20, 25, 50, 100]
-  const dynamicMax = niceSteps.find(s => s >= maxValue * 1.2) ?? 100
-  const effectiveDomain: [number, number] = domain[1] !== 100
-    ? domain                         // respect explicit caller override
-    : [0, Math.max(dynamicMax, 10)]  // auto-scale when using default
+  // Use fixed 0-100 scale for consistent axis representation
+  const effectiveDomain: [number, number] = [0, 100]
   const ringCount = 5
   const radiusTicks = Array.from({ length: ringCount + 1 }, (_, index) => {
     const raw = (effectiveDomain[1] / ringCount) * index
@@ -136,7 +130,6 @@ export function BaseRiskFactorsCard({
               />
               <PolarRadiusAxis
                 domain={effectiveDomain}
-                ticks={radiusTicks}
                 tick={false}
                 angle={90}
               />
