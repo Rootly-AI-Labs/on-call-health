@@ -417,7 +417,7 @@ export function OrganizationManagementDialog({
                   <div className="mt-3">
                     <button
                       onClick={() => setShowPendingInvitations(!showPendingInvitations)}
-                      className="flex items-center gap-2 text-xs text-neutral-600 hover:text-neutral-900 transition-colors"
+                      className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700 transition-colors"
                     >
                       <AlertCircle className="w-3.5 h-3.5" />
                       <span>{pendingInvitations.length} pending invitation{pendingInvitations.length > 1 ? 's' : ''}</span>
@@ -431,7 +431,7 @@ export function OrganizationManagementDialog({
                     {showPendingInvitations && (
                       <div className="mt-3 space-y-2">
                         {pendingInvitations.map((invitation) => (
-                          <div key={invitation.id} className="flex items-center justify-between gap-3 p-3 bg-neutral-50 rounded-md border border-neutral-200 text-xs">
+                          <div key={invitation.id} className="flex items-center justify-between gap-3 p-3 bg-blue-50 rounded-md border border-blue-200 text-xs">
                             <span className="font-medium text-neutral-900 flex-shrink-0">{invitation.email}</span>
                             <span className={`px-2 py-0.5 rounded-full capitalize flex-shrink-0 ${
                               invitation.role === 'admin'
