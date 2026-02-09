@@ -139,9 +139,15 @@ export function OrganizationManagementDialog({
           localStorage.setItem('user_role', data.role)
         }
 
-        // Reload page with modal open to reflect new org membership
+        // Reload page to reflect new org membership
         setTimeout(() => {
-          window.location.href = '/integrations?openOrgModal=true'
+          // Stay on the same page if already on management, otherwise go to integrations
+          const currentPath = window.location.pathname
+          if (currentPath === '/management') {
+            window.location.href = '/management?view=team'
+          } else {
+            window.location.href = '/integrations?openOrgModal=true'
+          }
         }, 500)
       }
     } catch (error: any) {
