@@ -225,12 +225,11 @@ export function OrganizationManagementDialog({
         }
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
         throw new Error(data.detail || 'Failed to cancel invitation')
       }
-
-      const data = await response.json()
 
       if (data.success) {
         toast.success(`Invitation to ${email} has been cancelled`)
