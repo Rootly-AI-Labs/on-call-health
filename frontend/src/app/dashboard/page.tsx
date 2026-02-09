@@ -41,7 +41,6 @@ import {
   Users,
   Star,
   Info,
-  BarChart3,
   CalendarIcon,
   ArrowRight,
   RefreshCw,
@@ -753,18 +752,7 @@ function DashboardContent() {
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="space-y-1.5">
-                          <CardTitle className="flex items-center space-x-2">
-                            {highRiskFactors.length > 0 ? (
-                              <>
-                                <span>Risk Factors</span>
-                              </>
-                            ) : (
-                              <>
-                                <BarChart3 className="w-5 h-5 text-blue-500" />
-                                <span>Risk Factors</span>
-                              </>
-                            )}
-                          </CardTitle>
+                          <CardTitle>Risk Factors</CardTitle>
                           <CardDescription>
                             Current factors affecting team health
                           </CardDescription>
