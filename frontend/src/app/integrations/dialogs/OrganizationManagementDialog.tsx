@@ -290,70 +290,48 @@ export function OrganizationManagementDialog({
                             Expires {new Date(invitation.expires_at).toLocaleDateString()}
                           </p>
 
-                          {/* Warning when confirming org switch */}
-                          {confirmingInvitationId === invitation.id && userInfo?.organization_id && (
-                            <div className="mt-3 flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
-                              <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                              <p className="text-xs text-amber-900">
-                                You will leave your current organization to join <span className="font-medium">{invitation.organization_name}</span>
-                              </p>
+                          {/* Warning about leaving current org - Always visible if user is in an org */}
+                          {userInfo?.organization_id && (
+                            <div className="mt-3 flex items-start gap-2 p-3 rounded-md bg-orange-50 border-2 border-orange-300">
+                              <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-sm font-semibold text-orange-900 mb-1">
+                                  ⚠️ You will leave your current organization
+                                </p>
+                                <p className="text-xs text-orange-800">
+                                  Accepting this invitation will remove you from your current organization and move you to <span className="font-semibold">{invitation.organization_name}</span>
+                                </p>
+                              </div>
                             </div>
                           )}
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {confirmingInvitationId === invitation.id ? (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => handleAcceptInvitation(invitation.id, true)}
-                                disabled={processingInvitationId !== null}
-                                className="bg-neutral-900 hover:bg-neutral-800 text-white"
-                              >
-                                {processingInvitationId === invitation.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  'Confirm'
-                                )}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setConfirmingInvitationId(null)}
-                                disabled={processingInvitationId !== null}
-                              >
-                                Cancel
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleRejectInvitation(invitation.id)}
-                                disabled={processingInvitationId !== null}
-                                className="text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
-                              >
-                                {processingInvitationId === invitation.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  'Decline'
-                                )}
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleAcceptInvitation(invitation.id)}
-                                disabled={processingInvitationId !== null}
-                                className="bg-neutral-900 hover:bg-neutral-800 text-white"
-                              >
-                                {processingInvitationId === invitation.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  'Accept'
-                                )}
-                              </Button>
-                            </>
-                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRejectInvitation(invitation.id)}
+                            disabled={processingInvitationId !== null}
+                            className="text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
+                          >
+                            {processingInvitationId === invitation.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              'Decline'
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleAcceptInvitation(invitation.id)}
+                            disabled={processingInvitationId !== null}
+                            className="bg-neutral-900 hover:bg-neutral-800 text-white"
+                          >
+                            {processingInvitationId === invitation.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              'Accept'
+                            )}
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -682,32 +660,135 @@ export function OrganizationManagementDialog({
     </>
   )
 
+  // Get the invitation being confirmed for the modal
+  const confirmingInvitation = receivedInvitations.find(inv => inv.id === confirmingInvitationId)
+
   // If inline view, render content without Dialog wrapper
   if (asInlineView) {
     return (
       <>
         {/* Content */}
         {dialogContentBody}
+
+        {/* Confirmation Modal */}
+        {confirmingInvitation && userInfo?.organization_id && (
+          <Dialog open={!!confirmingInvitationId} onOpenChange={() => setConfirmingInvitationId(null)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-orange-600" />
+                  <span>Leave Current Organization?</span>
+                </DialogTitle>
+                <DialogDescription className="text-left pt-4">
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-neutral-900">
+                      You are about to leave your current organization and join <span className="font-semibold text-orange-600">{confirmingInvitation.organization_name}</span>.
+                    </p>
+                    <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                      <p className="text-xs text-orange-900">
+                        <span className="font-semibold">⚠️ Warning:</span> This action will remove you from your current organization. You will lose access to all data and resources associated with it.
+                      </p>
+                    </div>
+                    <p className="text-sm text-neutral-600">
+                      Are you sure you want to continue?
+                    </p>
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => setConfirmingInvitationId(null)}
+                  disabled={processingInvitationId !== null}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => handleAcceptInvitation(confirmingInvitationId!, true)}
+                  disabled={processingInvitationId !== null}
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  {processingInvitationId === confirmingInvitationId ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Yes, Leave and Join'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </>
     )
   }
 
   // Original modal rendering
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Users className="w-5 h-5" />
-            <span>{title}</span>
-          </DialogTitle>
-          <DialogDescription>
-            {subtitle}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Users className="w-5 h-5" />
+              <span>{title}</span>
+            </DialogTitle>
+            <DialogDescription>
+              {subtitle}
+            </DialogDescription>
+          </DialogHeader>
 
-        {dialogContentBody}
-      </DialogContent>
-    </Dialog>
+          {dialogContentBody}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Modal */}
+      {confirmingInvitation && userInfo?.organization_id && (
+        <Dialog open={!!confirmingInvitationId} onOpenChange={() => setConfirmingInvitationId(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-orange-600" />
+                <span>Leave Current Organization?</span>
+              </DialogTitle>
+              <DialogDescription className="text-left pt-4">
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-neutral-900">
+                    You are about to leave your current organization and join <span className="font-semibold text-orange-600">{confirmingInvitation.organization_name}</span>.
+                  </p>
+                  <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                    <p className="text-xs text-orange-900">
+                      <span className="font-semibold">⚠️ Warning:</span> This action will remove you from your current organization. You will lose access to all data and resources associated with it.
+                    </p>
+                  </div>
+                  <p className="text-sm text-neutral-600">
+                    Are you sure you want to continue?
+                  </p>
+                </div>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setConfirmingInvitationId(null)}
+                disabled={processingInvitationId !== null}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleAcceptInvitation(confirmingInvitationId!, true)}
+                disabled={processingInvitationId !== null}
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                {processingInvitationId === confirmingInvitationId ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Yes, Leave and Join'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   )
 }
