@@ -904,10 +904,19 @@ class UserSyncService:
             )
 
             # Get all synced users without GitHub usernames
-            correlations = self.db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == user.id,
-                UserCorrelation.github_username.is_(None)
-            ).all()
+            # For org mode: match team roster (user_id IS NULL)
+            # For personal mode: match personal correlations (user_id == user.id)
+            if user.organization_id:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.github_username.is_(None)
+                ).all()
+            else:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user.id,
+                    UserCorrelation.github_username.is_(None)
+                ).all()
 
             if not correlations:
                 logger.info("No users need GitHub matching")
@@ -1076,10 +1085,19 @@ class UserSyncService:
                 return {"matched": 0, "skipped": 0}
 
             # Get all synced users without Jira account IDs
-            correlations = self.db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == user.id,
-                UserCorrelation.jira_account_id.is_(None)
-            ).all()
+            # For org mode: match team roster (user_id IS NULL)
+            # For personal mode: match personal correlations (user_id == user.id)
+            if user.organization_id:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.jira_account_id.is_(None)
+                ).all()
+            else:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user.id,
+                    UserCorrelation.jira_account_id.is_(None)
+                ).all()
 
             if not correlations:
                 logger.info("No users need Jira matching")
@@ -1226,10 +1244,19 @@ class UserSyncService:
                 return {"matched": 0, "skipped": 0}
 
             # Get all synced users without Linear account IDs
-            correlations = self.db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == user.id,
-                UserCorrelation.linear_user_id.is_(None)
-            ).all()
+            # For org mode: match team roster (user_id IS NULL)
+            # For personal mode: match personal correlations (user_id == user.id)
+            if user.organization_id:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.linear_user_id.is_(None)
+                ).all()
+            else:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user.id,
+                    UserCorrelation.linear_user_id.is_(None)
+                ).all()
 
             if not correlations:
                 logger.info("No users need Linear matching")
