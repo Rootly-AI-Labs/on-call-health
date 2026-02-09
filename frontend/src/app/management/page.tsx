@@ -313,12 +313,13 @@ function TeamPageContent() {
     const userOrgId = localStorage.getItem('user_organization_id')
 
     if (userName && userEmail) {
+      const parsedOrgId = userOrgId ? parseInt(userOrgId, 10) : null
       setUserInfo({
         name: userName,
         email: userEmail,
         role: userRole,
         id: userId,
-        organization_id: userOrgId ? parseInt(userOrgId) : null
+        organization_id: parsedOrgId && !isNaN(parsedOrgId) ? parsedOrgId : null
       })
     }
   }, [])
