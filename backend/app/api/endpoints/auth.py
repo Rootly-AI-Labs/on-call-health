@@ -570,12 +570,36 @@ async def update_user_role(
             detail="Cannot change your own role"
         )
 
-    # Prevent demoting super admins
+    # Prevent demoting super admins (with exceptions)
     if target_user.is_super_admin and new_role != 'super_admin':
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot demote super admins. Promote another admin to super admin first."
-        )
+        # Only super admins can demote other super admins
+        if not current_user.is_super_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only super admins can demote other super admins"
+            )
+
+        # Check if this is the last super admin
+        other_super_admin_count = db.query(User).filter(
+            User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None),
+            User.role == 'super_admin',
+            User.status == 'active',
+            User.id != target_user.id
+        ).count()
+
+        if other_super_admin_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot demote the last super admin. Promote another admin to super admin first."
+            )
+
+        # Only allow demotion to admin, not member or viewer
+        if new_role not in ['admin']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Super admins can only be demoted to admin role"
+            )
 
     # Prevent demoting the last admin (includes super_admin)
     if target_user.is_admin and new_role not in ['admin', 'super_admin']:
@@ -1125,8 +1149,8 @@ async def password_login(
     }
 
 
-@router.post("/organizations/transfer-super-admin")
-async def transfer_super_admin(
+@router.post("/organizations/promote-to-super-admin")
+async def promote_to_super_admin(
     target_user_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -1140,14 +1164,14 @@ async def transfer_super_admin(
     if not current_user.is_super_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only super admins can transfer super admin status"
+            detail="Only super admins can promote other admins to super admin"
         )
 
     # Check if current user is in an organization
     if not current_user.organization_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You must be in an organization to transfer super admin status"
+            detail="You must be in an organization to promote users to super admin"
         )
 
     # Get the target user

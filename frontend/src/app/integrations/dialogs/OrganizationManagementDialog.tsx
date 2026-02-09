@@ -201,12 +201,12 @@ export function OrganizationManagementDialog({
     }
   }
 
-  const handleTransferSuperAdmin = async (userId: number, userName: string) => {
+  const handlePromoteToSuperAdmin = async (userId: number, userName: string) => {
     setTransferringSuperAdmin(userId)
     setConfirmTransferSuperAdmin(null)
     try {
       const token = localStorage.getItem('auth_token')
-      const response = await fetch(`${API_BASE}/auth/organizations/transfer-super-admin`, {
+      const response = await fetch(`${API_BASE}/auth/organizations/promote-to-super-admin`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -217,7 +217,7 @@ export function OrganizationManagementDialog({
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.detail || 'Failed to transfer super admin status')
+        throw new Error(data.detail || 'Failed to promote to super admin')
       }
 
       const data = await response.json()
@@ -476,9 +476,6 @@ export function OrganizationManagementDialog({
                                   >
                                     <option value="member">Member</option>
                                     <option value="admin">Admin</option>
-                                    {userInfo?.is_super_admin && (
-                                      <option value="super_admin">Super Admin</option>
-                                    )}
                                   </select>
                                   {!['admin', 'super_admin'].includes(userInfo?.role || '') && (
                                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-neutral-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
@@ -496,7 +493,7 @@ export function OrganizationManagementDialog({
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => handleTransferSuperAdmin(member.id as number, member.name)}
+                                      onClick={() => handlePromoteToSuperAdmin(member.id as number, member.name)}
                                       disabled={transferringSuperAdmin !== null}
                                       className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50"
                                     >
