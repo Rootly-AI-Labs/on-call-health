@@ -816,15 +816,33 @@ function DashboardContent() {
                                     </span>
                                   </div>
 
-                                  <div className="w-full bg-neutral-300 rounded-full h-2 mb-2" title={`${Math.round(factor.value)}%`}>
-                                    {/* Unified bar color */}
+                                  <div
+                                    className="w-full relative mb-2 cursor-default"
+                                    onMouseEnter={(e) => {
+                                      const tooltip = e.currentTarget.querySelector('[data-bar-tooltip]') as HTMLElement
+                                      if (tooltip) tooltip.style.opacity = '1'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      const tooltip = e.currentTarget.querySelector('[data-bar-tooltip]') as HTMLElement
+                                      if (tooltip) tooltip.style.opacity = '0'
+                                    }}
+                                  >
+                                    <div className="bg-neutral-300 rounded-full h-2">
+                                      <div
+                                        className="h-2 rounded-full transition-all duration-500"
+                                        style={{
+                                          width: `${Math.max(factor.value, 2)}%`,
+                                          backgroundColor: color,
+                                        }}
+                                      />
+                                    </div>
                                     <div
-                                      className="h-2 rounded-full transition-all duration-500"
-                                      style={{
-                                        width: `${Math.max(factor.value, 2)}%`,
-                                        backgroundColor: color,
-                                      }}
-                                    />
+                                      data-bar-tooltip
+                                      className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-neutral-900 text-white text-xs font-medium pointer-events-none z-50 transition-opacity"
+                                      style={{ opacity: 0 }}
+                                    >
+                                      {Math.round(factor.value)}%
+                                    </div>
                                   </div>
 
                                   <div className="text-sm text-neutral-700">

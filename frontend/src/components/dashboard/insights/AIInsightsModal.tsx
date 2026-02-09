@@ -53,14 +53,13 @@ export function AIInsightsModal({ isOpen, onClose, currentAnalysis }: AIInsights
             <div className="flex items-center space-x-2">
               <Sparkles className="w-6 h-6 text-blue-600" />
               <DialogTitle>AI Team Insights</DialogTitle>
-              <Badge variant="secondary" className="text-xs">AI Enhanced</Badge>
             </div>
             {aiInsights?.llm_team_analysis && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCopy}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 mr-6"
               >
                 {copied ? (
                   <>

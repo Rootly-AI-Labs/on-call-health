@@ -2167,14 +2167,10 @@ export default function IntegrationsPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {/* Introduction Text */}
-        <div className="text-center mb-2 max-w-2xl mx-auto">
-          <h2 className="text-4xl font-bold text-black">Connect Your Incident Management Platform</h2>
-        </div>
-
-        {/* No integrations message - Show right below intro */}
+        {/* Introduction Text - only show when no incident management integration connected */}
         {integrations.length === 0 && !loadingRootly && !loadingPagerDuty && (
           <div className="text-center mb-6 max-w-2xl mx-auto">
+            <h2 className="text-4xl font-bold text-black mb-2">Connect Your Incident Management Platform</h2>
             <p className="text-lg font-medium text-neutral-700">Add a Rootly or PagerDuty integration to get started!</p>
           </div>
         )}
