@@ -1222,12 +1222,22 @@ class MigrationRunner:
                 "sql_file": "2026_01_26_add_last_modified_to_survey_schedules.sql"
             },
             {
-                "name": "043_add_sync_tracking_to_rootly_integrations",
+                "name": "043_add_super_admin",
+                "description": "Add is_super_admin flag for org continuity - ensures at least one super admin per org",
+                "sql_file": "2026_02_05_add_super_admin.sql"
+            },
+            {
+                "name": "044_convert_super_admin_flag_to_role",
+                "description": "Convert is_super_admin flag to super_admin role - cleaner role-based permissions",
+                "sql_file": "2026_02_05_convert_super_admin_flag_to_role.sql"
+            },
+            {
+                "name": "045_add_sync_tracking_to_rootly_integrations",
                 "description": "Add last_synced_by and last_synced_at columns to track who last synced each integration",
                 "sql_file": "2026_02_06_add_sync_tracking_to_rootly_integrations.sql"
             },
             {
-                "name": "044_optimize_get_platform_mappings",
+                "name": "046_optimize_get_platform_mappings",
                 "description": "Add composite indexes to optimize get_platform_mappings endpoint",
                 "sql_file": "2026_02_06_optimize_get_platform_mappings.sql"
             },

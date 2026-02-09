@@ -531,7 +531,7 @@ async def update_user_role(
     new_role = new_role.lower()
 
     # Check if current user is admin
-    if current_user.role != 'admin':
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins can change user roles"
@@ -616,7 +616,7 @@ async def get_promotable_users(
     Used when sole admin needs to promote someone before deleting their account.
     """
     # Check if current user is admin
-    if current_user.role != 'admin':
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins can view promotable users"
@@ -695,12 +695,12 @@ async def delete_current_user_account(
         )
 
     # Additional safety check - prevent deletion if user is sole admin WITH other team members
-    if current_user.organization_id and current_user.role == 'admin':
+    if current_user.organization_id and current_user.is_admin:
         # Check if there are other admins
         other_admins = db.query(User).filter(
             User.organization_id == current_user.organization_id,
             User.organization_id.isnot(None),
-            User.role == 'admin',
+            User.role.in_(['admin', 'super_admin']),
             User.id != current_user.id,
             User.status == 'active'
         ).count()
@@ -935,7 +935,7 @@ async def remove_organization_member(
         )
 
     # Safety check 2: Must be an admin
-    if current_user.role != 'admin':
+    if not current_user.is_admin:
         raise HTTPException(
             status_code=403,
             detail="Only organization admins can remove members"
@@ -1086,5 +1086,87 @@ async def password_login(
             "id": user.id,
             "email": user.email,
             "name": user.name
+        }
+    }
+
+
+class PromoteToSuperAdminRequest(BaseValidatedModel):
+    """Request model for promoting a user to super admin."""
+    target_user_id: int = Field(..., gt=0, description="ID of the user to promote")
+
+
+@router.post("/organizations/promote-to-super-admin")
+async def promote_to_super_admin(
+    request: PromoteToSuperAdminRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Promote another admin to super admin (does not remove current user's super admin status).
+    Only super admins can promote other admins to super admin.
+    This allows organizations to have multiple super admins.
+    """
+    # Check if current user is super admin
+    if not current_user.is_super_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super admins can promote other admins to super admin"
+        )
+
+    # Check if current user is in an organization
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must be in an organization to promote users to super admin"
+        )
+
+    # Get the target user
+    target_user = db.query(User).filter(
+        User.id == request.target_user_id,
+        User.status == 'active'
+    ).first()
+
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target user not found"
+        )
+
+    # Check if target user is in the same organization
+    if target_user.organization_id != current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Target user must be in the same organization"
+        )
+
+    # Check if target user is an admin (but not already super admin)
+    if target_user.role not in ['admin', 'super_admin']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Target user must be an admin to become super admin"
+        )
+
+    # Check if target is already super admin
+    if target_user.is_super_admin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Target user is already a super admin"
+        )
+
+    # Promote target user to super admin role
+    target_user.role = 'super_admin'
+    db.commit()
+
+    logger.info(
+        f"Super admin promoted: {target_user.id} ({target_user.email}) "
+        f"by {current_user.id} ({current_user.email}) in org {current_user.organization_id}"
+    )
+
+    return {
+        "message": f"Successfully promoted {target_user.name} to super admin",
+        "new_super_admin": {
+            "id": target_user.id,
+            "email": target_user.email,
+            "name": target_user.name
         }
     }

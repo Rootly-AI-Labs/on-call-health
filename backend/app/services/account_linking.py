@@ -428,8 +428,8 @@ class AccountLinkingService:
                 ).count()
 
                 user.organization_id = organization.id
-                # First user is admin, subsequent users are members
-                user.role = 'admin' if existing_users == 0 else 'member'
+                # First user is super admin, subsequent users are members
+                user.role = 'super_admin' if existing_users == 0 else 'member'
                 user.joined_org_at = datetime.now()
 
                 logger.info(f"Auto-assigned {email} to org {organization.id} ({organization.name}) as {user.role}")

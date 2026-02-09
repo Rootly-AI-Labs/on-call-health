@@ -232,6 +232,7 @@ export interface UserInfo {
   organization_id?: number
   id?: number
   role?: string
+  is_super_admin?: boolean
 }
 
 // Validation Schemas
