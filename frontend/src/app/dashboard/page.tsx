@@ -821,7 +821,7 @@ function DashboardContent() {
                                     <div
                                       className="h-2 rounded-full transition-all duration-500"
                                       style={{
-                                        width: `${factor.value}%`,
+                                        width: `${Math.max(factor.value, 2)}%`,
                                         backgroundColor: color,
                                       }}
                                     />
