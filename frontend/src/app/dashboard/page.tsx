@@ -756,7 +756,7 @@ function DashboardContent() {
                           <CardDescription>
                             Current factors affecting team health
                           </CardDescription>
-                        </div>
+                        </div>                        {/* commented out the vie affected members 
                         <button
                           onClick={() => setShowAllRiskFactorsPopup(true)}
                           className="flex items-center gap-1 text-red-600 hover:text-red-700 transition-colors text-sm font-medium whitespace-nowrap ml-4"
@@ -764,6 +764,7 @@ function DashboardContent() {
                           View Affected Members
                           <ArrowRight className="w-4 h-4" />
                         </button>
+                      */}
                       </div>
                     </CardHeader>
 
