@@ -1428,9 +1428,11 @@ async def get_synced_users(
         if current_user.organization_id:
             # Organization mode: show all team members in the org
             # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+            # Only show org roster (user_id IS NULL), not personal correlations
             query = db.query(UserCorrelation).filter(
                 UserCorrelation.organization_id.isnot(None),
-                UserCorrelation.organization_id == current_user.organization_id
+                UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.user_id.is_(None)
             )
         else:
             # Personal mode: show user's own correlations
