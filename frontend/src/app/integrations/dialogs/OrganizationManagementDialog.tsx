@@ -218,7 +218,7 @@ export function OrganizationManagementDialog({
     setProcessingInvitationId(invitationId)
     try {
       const token = localStorage.getItem('auth_token')
-      const response = await fetch(`${API_BASE}/invitations/${invitationId}`, {
+      const response = await fetch(`${API_BASE}/api/invitations/${invitationId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
