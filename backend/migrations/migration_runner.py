@@ -1222,6 +1222,11 @@ class MigrationRunner:
                 "sql_file": "2026_01_26_add_last_modified_to_survey_schedules.sql"
             },
             {
+                "name": "042a_add_partial_unique_constraints_user_correlation",
+                "description": "Add partial unique constraints to prevent duplicate user_correlations and auto-clean existing duplicates",
+                "sql_file": "2026_02_02_add_partial_unique_constraints_user_correlation.sql"
+            },
+            {
                 "name": "043_add_sync_tracking_to_rootly_integrations",
                 "description": "Add last_synced_by and last_synced_at columns to track who last synced each integration",
                 "sql_file": "2026_02_06_add_sync_tracking_to_rootly_integrations.sql"
