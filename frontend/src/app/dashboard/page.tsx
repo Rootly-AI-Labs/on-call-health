@@ -816,7 +816,7 @@ function DashboardContent() {
                                     </span>
                                   </div>
 
-                                  <div className="w-full bg-neutral-300 rounded-full h-2 mb-2">
+                                  <div className="w-full bg-neutral-300 rounded-full h-2 mb-2 group relative cursor-default" title={`${Math.round(factor.value)}%`}>
                                     {/* Unified bar color */}
                                     <div
                                       className="h-2 rounded-full transition-all duration-500"
@@ -825,6 +825,9 @@ function DashboardContent() {
                                         backgroundColor: color,
                                       }}
                                     />
+                                    <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-neutral-900 text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                      {Math.round(factor.value)}%
+                                    </span>
                                   </div>
 
                                   <div className="text-sm text-neutral-700">
