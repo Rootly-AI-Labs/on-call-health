@@ -290,13 +290,18 @@ export function OrganizationManagementDialog({
                             Expires {new Date(invitation.expires_at).toLocaleDateString()}
                           </p>
 
-                          {/* Warning when confirming org switch */}
-                          {confirmingInvitationId === invitation.id && userInfo?.organization_id && (
-                            <div className="mt-3 flex items-start gap-2 p-3 rounded-md bg-amber-50 border border-amber-200">
-                              <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                              <p className="text-xs text-amber-900">
-                                You will leave your current organization to join <span className="font-medium">{invitation.organization_name}</span>
-                              </p>
+                          {/* Warning about leaving current org - Always visible if user is in an org */}
+                          {userInfo?.organization_id && (
+                            <div className="mt-3 flex items-start gap-2 p-3 rounded-md bg-orange-50 border-2 border-orange-300">
+                              <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-sm font-semibold text-orange-900 mb-1">
+                                  ⚠️ You will leave your current organization
+                                </p>
+                                <p className="text-xs text-orange-800">
+                                  Accepting this invitation will remove you from your current organization and move you to <span className="font-semibold">{invitation.organization_name}</span>
+                                </p>
+                              </div>
                             </div>
                           )}
                         </div>
