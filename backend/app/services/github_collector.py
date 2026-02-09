@@ -61,7 +61,20 @@ class GitHubCollector:
                 if manual_username:
                     return manual_username
 
-            # No fallback matching during analysis - use "Sync Members" on integrations page
+            # FALLBACK: Try name-based matching against org members
+            if full_name and token:
+                try:
+                    from .enhanced_github_matcher import EnhancedGitHubMatcher
+                    matcher = EnhancedGitHubMatcher(token, self.organizations)
+                    name_match = await matcher.match_name_to_github(full_name, fallback_email=email)
+                    if name_match:
+                        logger.info(f"✅ [NAME_FALLBACK] Matched {email} -> {name_match} via name '{full_name}'")
+                        return name_match
+                    else:
+                        logger.debug(f"[NAME_FALLBACK] No match found for name '{full_name}' ({email})")
+                except Exception as e:
+                    logger.warning(f"⚠️ [NAME_FALLBACK] Error during name matching for '{full_name}': {e}")
+
             return None
 
         except Exception as e:
@@ -380,10 +393,10 @@ class GitHubCollector:
                         after_hours_commits += after_hours_count
                         weekend_commits += weekend_count
 
-            # Fall back to estimates if we couldn't fetch detailed data
+            # If we couldn't fetch detailed commit data, report zeros rather than guessing
             if not daily_commits_data:
-                after_hours_commits = int(total_commits * 0.15)  # Estimate 15% after hours
-                weekend_commits = int(total_commits * 0.1)       # Estimate 10% weekend
+                after_hours_commits = 0
+                weekend_commits = 0
 
             total_reviews = int(total_prs * 1.5)             # Estimate 1.5 reviews per PR
 
@@ -743,7 +756,7 @@ class GitHubCollector:
         self.last_request_time = time.time()
 
 
-async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None, timezone: str = 'UTC') -> Dict[str, Dict]:
+async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None, timezone: str = 'UTC', email_to_name: Optional[Dict[str, str]] = None) -> Dict[str, Dict]:
     """
     Collect GitHub data for all team members.
 
@@ -753,6 +766,7 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
         github_token: GitHub API token for real data collection
         user_id: User ID for checking manual mappings
         timezone: User's timezone for business hours calculation (default: 'UTC')
+        email_to_name: Optional mapping of email -> full name for name-based matching
 
     Returns:
         Dict mapping email -> github_activity_data
@@ -762,7 +776,8 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
 
     for email in team_emails:
         try:
-            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, timezone=timezone)
+            full_name = email_to_name.get(email) if email_to_name else None
+            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, full_name=full_name, timezone=timezone)
             if user_data:
                 github_data[email] = user_data
         except Exception as e:

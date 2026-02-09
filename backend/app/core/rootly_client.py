@@ -680,8 +680,8 @@ class RootlyAPIClient:
                         "page[size]": actual_page_size,
                         "filter[created_at][gte]": start_date.isoformat(),
                         "filter[created_at][lte]": end_date.isoformat(),
-                        "include": "severity,user,started_by,resolved_by",
-                        "fields[incidents]": "created_at,started_at,acknowledged_at,resolved_at,mitigated_at,severity,user,title,status"
+                        "include": "severity,user,started_by,resolved_by,mitigated_by",
+                        "fields[incidents]": "created_at,started_at,acknowledged_at,resolved_at,mitigated_at,mitigated_by,started_by,resolved_by,severity,user,title,status"
                     }
 
                     params_encoded = urlencode(params)

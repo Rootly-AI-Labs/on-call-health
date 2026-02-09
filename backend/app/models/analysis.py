@@ -2,7 +2,7 @@
 Analysis model for storing burnout analysis results.
 """
 import uuid as uuid_module
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON
+from sqlalchemy import Column, Index, Integer, String, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -28,6 +28,11 @@ class Analysis(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     
+    __table_args__ = (
+        Index('idx_analyses_user_created', 'user_id', created_at.desc()),
+        Index('idx_analyses_org_status_created', 'organization_id', 'status', created_at.desc()),
+    )
+
     # Relationships
     user = relationship("User", back_populates="analyses")
     organization = relationship("Organization", back_populates="analyses")

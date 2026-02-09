@@ -6,6 +6,7 @@ Falls back to fuzzy name matching if email is unavailable or no email match foun
 import logging
 from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from difflib import SequenceMatcher
 from app.models import User, UserCorrelation, JiraIntegration
 from app.auth.integration_oauth import jira_integration_oauth
@@ -124,7 +125,10 @@ class JiraUserSyncService:
                 users_page = response.json()
 
                 if not users_page:
+                    logger.debug(f"[Jira] Empty page returned at startAt={start_at}")
                     break
+
+                logger.debug(f"[Jira] Processing {len(users_page)} users from page at startAt={start_at}")
 
                 # Extract relevant user data - only real users with accountId and displayName
                 for user in users_page:

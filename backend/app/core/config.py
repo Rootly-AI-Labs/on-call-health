@@ -21,29 +21,12 @@ class Settings:
             "For local development, use PostgreSQL (e.g., postgresql://user:password@localhost/dbname)"
         )
     
-    # JWT
+    # JWT - also used for integration token encryption
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY")
     if not JWT_SECRET_KEY:
-        if _IS_PRODUCTION:
-            raise ValueError("JWT_SECRET_KEY environment variable is required")
-        else:
-            raise ValueError(
-                "JWT_SECRET_KEY environment variable is required. "
-                "Generate with: openssl rand -hex 32"
-            )
+        raise ValueError("JWT_SECRET_KEY environment variable is required")
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
-
-    # Token Encryption (separate from JWT signing for security)
-    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY")
-    if not ENCRYPTION_KEY:
-        if _IS_PRODUCTION:
-            raise ValueError("ENCRYPTION_KEY environment variable is required")
-        else:
-            raise ValueError(
-                "ENCRYPTION_KEY environment variable is required. "
-                "Generate with: openssl rand -base64 32"
-            )
 
     # Frontend URL for survey links
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")

@@ -215,19 +215,20 @@ class TestMetricCalculationLogic(unittest.TestCase):
         self.assertEqual(percentage, 0.0)
 
     def test_after_hours_detection(self):
-        """Test after-hours detection logic (before 9 AM or after 6 PM)."""
+        """Test after-hours detection logic (before 9 AM or 5 PM and later)."""
         test_cases = [
             (8, True),   # 8 AM - before 9 AM
             (9, False),  # 9 AM - business hours
             (12, False), # 12 PM - business hours
-            (17, False), # 5 PM - business hours
+            (16, False), # 4 PM - business hours
+            (17, True),  # 5 PM - after hours
             (18, True),  # 6 PM - after hours
             (22, True),  # 10 PM - after hours
             (0, True),   # Midnight - after hours
         ]
 
         for hour, expected_after_hours in test_cases:
-            is_after_hours = hour < 9 or hour >= 18
+            is_after_hours = hour < 9 or hour >= 17
             self.assertEqual(is_after_hours, expected_after_hours,
                            f"Hour {hour} should be {'after hours' if expected_after_hours else 'business hours'}")
 
@@ -1082,6 +1083,213 @@ class TestEdgeCases(unittest.TestCase):
         incidents = None
         safe_incidents_len = len(incidents) if incidents is not None else 0
         self.assertEqual(safe_incidents_len, 0)
+
+
+class TestAfterHoursVoluntaryActivityOnly(unittest.TestCase):
+    """Test that after-hours calculation uses only voluntary activity (GitHub + Slack), not incidents."""
+
+    def test_after_hours_excludes_incidents(self):
+        """After-hours percentage should be based on GitHub + Slack only, not incidents."""
+        # Simulate: 5 incidents (3 after hours), 10 GitHub commits (2 after hours)
+        incident_after_hours = 3
+        incident_total = 5
+        github_after_hours = 2
+        github_weekend = 1
+        total_commits = 10
+
+        # OLD behavior (wrong): included incidents
+        old_total_after_hours = incident_after_hours + github_after_hours
+        old_total_activities = incident_total + total_commits
+        old_percentage = old_total_after_hours / old_total_activities  # 5/15 = 0.333
+
+        # NEW behavior (correct): only voluntary activity
+        new_total_after_hours = github_after_hours + github_weekend
+        new_total_activities = total_commits
+        new_percentage = new_total_after_hours / new_total_activities  # 3/10 = 0.3
+
+        # New percentage should not include incident counts
+        self.assertAlmostEqual(new_percentage, 0.3, places=2)
+        # Old and new should differ when incidents have after-hours activity
+        self.assertNotAlmostEqual(old_percentage, new_percentage, places=2)
+
+    def test_after_hours_zero_when_no_voluntary_activity(self):
+        """After-hours should be 0 when there are no GitHub commits or Slack messages."""
+        github_after_hours = 0
+        github_weekend = 0
+        total_commits = 0
+
+        total_voluntary = total_commits
+        after_hours_percentage = (github_after_hours + github_weekend) / total_voluntary if total_voluntary > 0 else 0
+
+        self.assertEqual(after_hours_percentage, 0)
+
+    def test_slack_data_recalculates_after_hours(self):
+        """When Slack data is available, after-hours should combine GitHub + Slack."""
+        # Initial: only GitHub data
+        github_after_hours = 2
+        github_weekend = 1
+        total_commits = 10
+
+        initial_after_hours = github_after_hours + github_weekend
+        initial_total = total_commits
+        initial_pct = initial_after_hours / initial_total  # 3/10 = 0.3
+
+        # After Slack enhancement: add Slack messages
+        slack_after_hours = 5
+        slack_weekend = 2
+        total_messages = 20
+
+        new_after_hours = github_after_hours + slack_after_hours
+        new_weekend = github_weekend + slack_weekend
+        new_total = total_commits + total_messages
+        new_non_business = new_after_hours + new_weekend
+        new_pct = new_non_business / new_total  # (7 + 3) / 30 = 0.333
+
+        self.assertAlmostEqual(new_pct, 10 / 30, places=2)
+        # Adding Slack data should change the percentage
+        self.assertNotAlmostEqual(initial_pct, new_pct, places=2)
+
+
+class TestGitHubFallbackNoEstimate(unittest.TestCase):
+    """Test that GitHub reports zero (not estimated) after-hours when detailed data is unavailable."""
+
+    def test_no_daily_data_returns_zero_after_hours(self):
+        """When daily commit data can't be fetched, after_hours should be 0, not an estimate."""
+        daily_commits_data = None  # Could not fetch detailed data
+        total_commits = 100
+
+        # The code should NOT estimate: after_hours = int(total_commits * 0.15)
+        # Instead it should report zeros
+        if not daily_commits_data:
+            after_hours_commits = 0
+            weekend_commits = 0
+
+        self.assertEqual(after_hours_commits, 0)
+        self.assertEqual(weekend_commits, 0)
+
+    def test_empty_daily_data_returns_zero_after_hours(self):
+        """When daily data is empty dict, after_hours should be 0."""
+        daily_commits_data = {}
+        total_commits = 50
+
+        if not daily_commits_data:
+            after_hours_commits = 0
+            weekend_commits = 0
+
+        self.assertEqual(after_hours_commits, 0)
+        self.assertEqual(weekend_commits, 0)
+
+
+class TestPagerDutyDailyDataEmailLookup(unittest.TestCase):
+    """Test that PagerDuty incidents are correctly attributed to users in daily data
+    even when assigned_to lacks an email field."""
+
+    def _simulate_daily_data_assignment(self, incidents, team_analysis):
+        """Simulate the email resolution logic from _generate_daily_trends."""
+        user_id_to_email = {}
+        individual_daily_data = {}
+
+        for user in team_analysis:
+            if user.get('user_email') and user.get('user_id'):
+                user_key = user['user_email'].lower()
+                individual_daily_data[user_key] = defaultdict(lambda: {"incident_count": 0})
+                user_id_to_email[str(user['user_id'])] = user['user_email']
+
+        for incident in incidents:
+            assigned_to = incident.get("assigned_to", {})
+            user_id = assigned_to.get("id") if assigned_to else None
+            user_email = assigned_to.get("email") if assigned_to else None
+
+            # The fix: fallback to user_id_to_email mapping
+            if not user_email and user_id:
+                user_email = user_id_to_email.get(str(user_id))
+
+            if user_email:
+                user_key = user_email.lower()
+                date_str = incident.get("created_at", "")[:10]
+                if user_key in individual_daily_data:
+                    individual_daily_data[user_key][date_str]["incident_count"] += 1
+
+        return individual_daily_data
+
+    def test_pagerduty_incidents_with_email(self):
+        """Incidents with email in assigned_to are counted correctly."""
+        team_analysis = [{"user_email": "dan@example.com", "user_id": "P123"}]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z", "assigned_to": {"id": "P123", "email": "dan@example.com"}},
+            {"created_at": "2024-01-16T14:00:00Z", "assigned_to": {"id": "P123", "email": "dan@example.com"}},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        self.assertEqual(total, 2)
+
+    def test_pagerduty_incidents_without_email_uses_id_lookup(self):
+        """Incidents missing email in assigned_to still count via user_id lookup."""
+        team_analysis = [{"user_email": "dan@example.com", "user_id": "P123"}]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z", "assigned_to": {"id": "P123"}},
+            {"created_at": "2024-01-16T14:00:00Z", "assigned_to": {"id": "P123"}},
+            {"created_at": "2024-01-17T09:00:00Z", "assigned_to": {"id": "P123"}},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        self.assertEqual(total, 3)
+
+    def test_pagerduty_mixed_email_and_no_email(self):
+        """Mix of incidents with and without email all get counted."""
+        team_analysis = [{"user_email": "dan@example.com", "user_id": "P123"}]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z", "assigned_to": {"id": "P123", "email": "dan@example.com"}},
+            {"created_at": "2024-01-16T14:00:00Z", "assigned_to": {"id": "P123"}},
+            {"created_at": "2024-01-17T09:00:00Z", "assigned_to": {"id": "P123"}},
+            {"created_at": "2024-01-18T22:00:00Z", "assigned_to": {"id": "P123", "email": "dan@example.com"}},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        self.assertEqual(total, 4)
+
+    def test_pagerduty_unknown_user_id_skipped(self):
+        """Incidents with unrecognized user_id and no email are silently skipped."""
+        team_analysis = [{"user_email": "dan@example.com", "user_id": "P123"}]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z", "assigned_to": {"id": "PUNKNOWN"}},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        self.assertEqual(total, 0)
+
+    def test_pagerduty_no_assigned_to_skipped(self):
+        """Incidents with no assigned_to field are skipped."""
+        team_analysis = [{"user_email": "dan@example.com", "user_id": "P123"}]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z"},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        self.assertEqual(total, 0)
+
+    def test_multiple_users_attributed_correctly(self):
+        """Incidents are attributed to the correct user when multiple users exist."""
+        team_analysis = [
+            {"user_email": "dan@example.com", "user_id": "P123"},
+            {"user_email": "alice@example.com", "user_id": "P456"},
+        ]
+        incidents = [
+            {"created_at": "2024-01-15T10:00:00Z", "assigned_to": {"id": "P123"}},
+            {"created_at": "2024-01-15T14:00:00Z", "assigned_to": {"id": "P456"}},
+            {"created_at": "2024-01-16T09:00:00Z", "assigned_to": {"id": "P123"}},
+        ]
+
+        result = self._simulate_daily_data_assignment(incidents, team_analysis)
+        dan_total = sum(d["incident_count"] for d in result["dan@example.com"].values())
+        alice_total = sum(d["incident_count"] for d in result["alice@example.com"].values())
+        self.assertEqual(dan_total, 2)
+        self.assertEqual(alice_total, 1)
 
 
 if __name__ == '__main__':

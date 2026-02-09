@@ -1,7 +1,7 @@
 """
 Slack workspace mapping model for correlating Slack workspaces to organizations.
 """
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Boolean
+from sqlalchemy import Column, Index, Integer, String, DateTime, ForeignKey, UniqueConstraint, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -43,6 +43,8 @@ class SlackWorkspaceMapping(Base):
     # Constraints
     __table_args__ = (
         UniqueConstraint('workspace_id', name='unique_workspace_id'),
+        Index('idx_slack_workspace_org_status', 'organization_id', 'status'),
+        Index('idx_slack_workspace_owner_status', 'owner_user_id', 'status'),
     )
 
     def to_dict(self):

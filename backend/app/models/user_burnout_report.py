@@ -1,7 +1,7 @@
 """
 User Burnout Report model for storing self-reported burnout assessments.
 """
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, Boolean, UniqueConstraint
+from sqlalchemy import Column, Index, Integer, String, DateTime, Text, ForeignKey, JSON, Boolean, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -19,6 +19,7 @@ class UserBurnoutReport(Base):
             'organization_id', 'email', 'submitted_at',
             name='uq_burnout_report_org_email_timestamp'
         ),
+        Index('idx_user_burnout_reports_email_submitted', 'email', 'submitted_at'),
     )
 
     id = Column(Integer, primary_key=True, index=True)

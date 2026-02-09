@@ -1,7 +1,7 @@
 """
 Jira workspace mapping model for correlating Jira sites to organizations.
 """
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Boolean, JSON
+from sqlalchemy import Column, Index, Integer, String, DateTime, ForeignKey, UniqueConstraint, Boolean, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -54,6 +54,7 @@ class JiraWorkspaceMapping(Base):
     # Constraints
     __table_args__ = (
         UniqueConstraint('jira_cloud_id', name='unique_jira_cloud_id'),
+        Index('idx_jira_workspace_cloud_org', 'jira_cloud_id', 'organization_id'),
     )
 
     def to_dict(self):

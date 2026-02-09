@@ -1231,6 +1231,16 @@ class MigrationRunner:
                 "description": "Convert is_super_admin flag to super_admin role - cleaner role-based permissions",
                 "sql_file": "2026_02_05_convert_super_admin_flag_to_role.sql"
             },
+            {
+                "name": "045_add_sync_tracking_to_rootly_integrations",
+                "description": "Add last_synced_by and last_synced_at columns to track who last synced each integration",
+                "sql_file": "2026_02_06_add_sync_tracking_to_rootly_integrations.sql"
+            },
+            {
+                "name": "046_optimize_get_platform_mappings",
+                "description": "Add composite indexes to optimize get_platform_mappings endpoint",
+                "sql_file": "2026_02_06_optimize_get_platform_mappings.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 

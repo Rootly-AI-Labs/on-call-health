@@ -44,7 +44,7 @@ REQUESTED_SCOPES = ["read"]
 # Encryption helpers (same as Jira)
 # -------------------------------
 def get_encryption_key() -> bytes:
-    key = settings.ENCRYPTION_KEY.encode()
+    key = settings.JWT_SECRET_KEY.encode()
     return base64.urlsafe_b64encode(key[:32].ljust(32, b"\0"))
 
 
@@ -376,10 +376,11 @@ async def get_linear_status(
     except Exception:
         pass
 
-    # Validate token
+    # Validate token (uses Redis-backed cache with 15-min TTL)
     from app.services.integration_validator import IntegrationValidator
     validator = IntegrationValidator(db)
-    validation_result = await validator._validate_linear(current_user.id)
+    all_results = await validator.validate_all_integrations(current_user.id, use_cache=True)
+    validation_result = all_results.get("linear")
 
     token_valid = validation_result.get("valid", False) if validation_result else False
     token_error = validation_result.get("error") if validation_result and not token_valid else None

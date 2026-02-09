@@ -422,6 +422,16 @@ async def accept_invitation_api(
         # Notify admins about the acceptance
         notification_service.create_invitation_accepted_notification(invitation, current_user)
 
+        # Mark the original invitation notification as acted upon
+        original_notification = db.query(UserNotification).filter(
+            UserNotification.organization_invitation_id == invitation.id,
+            UserNotification.email == current_user.email
+        ).first()
+
+        if original_notification:
+            original_notification.mark_as_acted()
+            db.commit()
+
         return {
             "success": True,
             "message": f"Successfully joined {invitation.organization.name}!",

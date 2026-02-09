@@ -45,6 +45,7 @@ import {
   CalendarIcon,
   ArrowRight,
   RefreshCw,
+  Loader2,
 } from "lucide-react"
 
 // Helper function for platform-based colors
@@ -236,6 +237,24 @@ function DashboardContent() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Auto-open analysis dialog when redirected from integrations page with ?run=true
+  useEffect(() => {
+    if (mounted && searchParams.get('run') === 'true' && !analysisRunning) {
+      startAnalysis()
+      router.replace('/dashboard', { scroll: false })
+    }
+  }, [mounted, searchParams, analysisRunning, startAnalysis, router])
+
+  // Derive connected integrations from useDashboard data (avoids 4 duplicate API calls)
+  const connectedIntegrations = useMemo(() => {
+    const connected = new Set<string>()
+    if (githubIntegration) connected.add('github')
+    if (slackIntegration) connected.add('slack')
+    if (jiraIntegration) connected.add('jira')
+    if (linearIntegration) connected.add('linear')
+    return connected
+  }, [githubIntegration, slackIntegration, jiraIntegration, linearIntegration])
 
   // GitHub All Metrics Popup State
   const [showAllMetricsPopup, setShowAllMetricsPopup] = useState(false)
@@ -851,6 +870,7 @@ function DashboardContent() {
                 setSelectedMember={setSelectedMember}
                 getRiskColor={getRiskColor}
                 getProgressColor={getProgressColor}
+                connectedIntegrations={connectedIntegrations}
               />
             </>
           )}
@@ -1294,9 +1314,14 @@ function DashboardContent() {
                 <label className="text-sm font-medium text-neutral-700 mb-2 block">
                   Additional Data Sources
                 </label>
+                {isLoadingGitHubSlack ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
+                  </div>
+                ) : (
                 <div className="grid grid-cols-2 gap-3">
                   {/* GitHub Toggle Card */}
-                  {true && (
+                  {connectedIntegrations.has('github') && (
                     <div className={`border rounded-lg p-3 transition-all ${includeGithub && githubIntegration ? 'border-neutral-900 bg-neutral-100' : 'border-neutral-200 bg-white'}`}>
                       {/* Always show GitHub content immediately, no skeleton loader */}
                       {(
@@ -1371,7 +1396,7 @@ function DashboardContent() {
                   )}
 
                   {/* Jira Toggle Card */}
-                  {true && (
+                  {connectedIntegrations.has('jira') && (
                     <div className={`border rounded-lg p-3 transition-all ${includeJira && jiraIntegration ? 'border-blue-500 bg-blue-50' : 'border-neutral-200 bg-white'}`}>
                       {/* Always show Jira content immediately, no skeleton loader */}
                       {(
@@ -1414,7 +1439,7 @@ function DashboardContent() {
                   )}
 
                   {/* Linear Toggle Card */}
-                  {true && (
+                  {connectedIntegrations.has('linear') && (
                     <div className={`border rounded-lg p-3 transition-all ${includeLinear && linearIntegration ? 'border-purple-500 bg-purple-50' : 'border-neutral-200 bg-white'}`}>
                       {(
                         <>
@@ -1443,6 +1468,7 @@ function DashboardContent() {
                     </div>
                   )}
                 </div>
+                )}
               </div>
             )}
 

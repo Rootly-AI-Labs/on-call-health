@@ -47,7 +47,7 @@ REQUESTED_SCOPES = [
 # Encryption helpers
 # -------------------------------
 def get_encryption_key() -> bytes:
-    key = settings.ENCRYPTION_KEY.encode()
+    key = settings.JWT_SECRET_KEY.encode()
     # Ensure 32 bytes for Fernet
     return base64.urlsafe_b64encode(key[:32].ljust(32, b"\0"))
 
@@ -480,18 +480,33 @@ async def connect_jira_manual(
             detail="Failed to save integration"
         )
 
+    # Capture values before background task (avoid DetachedInstanceError)
+    bg_user_id = current_user.id
+
     # Trigger background sync immediately after successful save
     import asyncio
     from ...services.jira_user_sync_service import JiraUserSyncService
 
     async def sync_in_background():
         """Background task wrapper that catches and logs errors."""
+        from ...models import get_db
+        db_gen = get_db()
+        bg_db = next(db_gen)
         try:
-            sync_service = JiraUserSyncService(db)
-            await sync_service.sync_jira_users(current_user)
-            logger.info(f"[Jira] Background sync completed for user {current_user.id}")
+            bg_user = bg_db.query(User).filter(User.id == bg_user_id).first()
+            if not bg_user:
+                logger.error(f"[Jira] Background sync: user {bg_user_id} not found")
+                return
+            sync_service = JiraUserSyncService(bg_db)
+            await sync_service.sync_jira_users(bg_user)
+            logger.info(f"[Jira] Background sync completed for user {bg_user_id}")
         except Exception as e:
-            logger.error(f"[Jira] Background sync failed for user {current_user.id}: {e}")
+            logger.error(f"[Jira] Background sync failed for user {bg_user_id}: {e}")
+        finally:
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass
 
     # Fire and forget background sync
     asyncio.create_task(sync_in_background())
@@ -531,10 +546,11 @@ async def get_jira_status(
     except Exception:
         pass
 
-    # Validate token
+    # Validate token (uses Redis-backed cache with 15-min TTL)
     from app.services.integration_validator import IntegrationValidator
     validator = IntegrationValidator(db)
-    validation_result = await validator._validate_jira(current_user.id)
+    all_results = await validator.validate_all_integrations(current_user.id, use_cache=True)
+    validation_result = all_results.get("jira")
 
     token_valid = validation_result.get("valid", False) if validation_result else False
     token_error = validation_result.get("error") if validation_result and not token_valid else None
@@ -1374,6 +1390,10 @@ async def get_jira_users(
             integration.jira_cloud_id
         )
 
+        logger.info("[Jira] Fetched %d total users from sync service", len(jira_users))
+        for u in jira_users:
+            logger.debug(f"[Jira] User: {u.get('display_name')} ({u.get('account_id')}) - Email: {u.get('email')} - Active: {u.get('active')}")
+
         # Filter to ensure we only return valid users with display names and account IDs
         valid_users = [
             {
@@ -1385,7 +1405,7 @@ async def get_jira_users(
             if u.get("account_id") and u.get("display_name")
         ]
 
-        logger.info("[Jira] Retrieved %d valid users for dropdown", len(valid_users))
+        logger.info("[Jira] Retrieved %d valid users for dropdown (from %d total)", len(valid_users), len(jira_users))
 
         return {
             "success": True,
