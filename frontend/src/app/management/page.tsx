@@ -110,6 +110,7 @@ function TeamPageContent() {
   const isMountedRef = useRef(true)
   const mappingDropdownRef = useRef<HTMLDivElement>(null)
   const hasShownSyncModal = useRef(false)
+  const prevOrganizationRef = useRef<string>("")
 
   // Survey recipient selection state
   const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
@@ -274,6 +275,13 @@ function TeamPageContent() {
     }
   }, [selectedOrganization])
 
+  // Clear integration users data when organization changes to force fresh data load
+  useEffect(() => {
+    setGithubUsers([])
+    setJiraUsers([])
+    setLinearUsers([])
+  }, [selectedOrganization])
+
   // Cleanup timeout on unmount and mark component as unmounted
   useEffect(() => {
     return () => {
@@ -326,9 +334,7 @@ function TeamPageContent() {
         setOpenMappingUserId(null)
         setExpandedIntegration(null)
         setPopupPosition(null)
-        setGithubUsers([])
-        setJiraUsers([])
-        setLinearUsers([])
+        // Keep integration users data cached for performance and to maintain logo visibility
       }
     }
 
@@ -350,9 +356,7 @@ function TeamPageContent() {
         setOpenMappingUserId(null)
         setExpandedIntegration(null)
         setPopupPosition(null)
-        setGithubUsers([])
-        setJiraUsers([])
-        setLinearUsers([])
+        // Keep integration users data cached for performance and to maintain logo visibility
       }
     }
 
@@ -367,7 +371,38 @@ function TeamPageContent() {
     setIntegrationSearchQuery("")
   }, [expandedIntegration, openMappingUserId])
 
-  // Pre-load all integration users when mapping popup opens
+  // Load integration users data on page load to show logos immediately
+  useEffect(() => {
+    if (!selectedOrganization || viewMode !== 'organization') return
+
+    // Check if organization changed
+    const orgChanged = prevOrganizationRef.current !== selectedOrganization
+    prevOrganizationRef.current = selectedOrganization
+
+    // Load all connected integration users in parallel
+    const loadAllIntegrationUsers = async () => {
+      const promises = []
+
+      // If organization changed, always load. Otherwise, only load if not already loaded
+      if (connectedIntegrations.has('github') && (orgChanged || githubUsers.length === 0)) {
+        promises.push(loadGithubUsersForMapping())
+      }
+      if (connectedIntegrations.has('jira') && (orgChanged || jiraUsers.length === 0)) {
+        promises.push(loadJiraUsersForMapping())
+      }
+      if (connectedIntegrations.has('linear') && (orgChanged || linearUsers.length === 0)) {
+        promises.push(loadLinearUsersForMapping())
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises)
+      }
+    }
+
+    loadAllIntegrationUsers()
+  }, [selectedOrganization, connectedIntegrations, viewMode])
+
+  // Pre-load all integration users when mapping popup opens (if not already loaded)
   useEffect(() => {
     if (!openMappingUserId || !selectedOrganization) return
 
@@ -453,9 +488,7 @@ function TeamPageContent() {
       await fetchSyncedUsers(false, false, true) // Refresh the users list
       setOpenMappingUserId(null)
       setExpandedIntegration(null)
-      setGithubUsers([])
-      setJiraUsers([])
-      setLinearUsers([])
+      // Keep integration users data cached for performance and to maintain logo visibility
     } catch (error) {
       toast.error("Failed to update user mapping")
     }
