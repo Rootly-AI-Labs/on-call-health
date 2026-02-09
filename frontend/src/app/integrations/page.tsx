@@ -2565,7 +2565,7 @@ export default function IntegrationsPage() {
                     </Select>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {filteredIntegrations.map((integration) => {
                       const isExpanded = expandedIntegrations.has(integration.id)
 
