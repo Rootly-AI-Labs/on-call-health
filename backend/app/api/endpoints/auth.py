@@ -559,6 +559,29 @@ async def update_user_role(
             detail="Cannot change your own role"
         )
 
+    # Prevent demoting super admin unless you are also a super admin
+    if target_user.role == 'super_admin' and not current_user.is_super_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super admins can demote other super admins"
+        )
+
+    # Prevent demoting the last super admin
+    if target_user.role == 'super_admin':
+        super_admin_count = db.query(User).filter(
+            User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None),
+            User.role == 'super_admin',
+            User.status == 'active',
+            User.id != target_user.id
+        ).count()
+
+        if super_admin_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot demote the last super admin. Promote another admin to super admin first."
+            )
+
     # Prevent demoting the last admin
     if target_user.role == 'admin' and new_role != 'admin':
         admin_count = db.query(User).filter(
@@ -693,6 +716,23 @@ async def delete_current_user_account(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email confirmation does not match your account email"
         )
+
+    # Prevent deletion if user is the last super admin in the organization
+    if current_user.organization_id and current_user.is_super_admin:
+        other_super_admins = db.query(User).filter(
+            User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None),
+            User.role == 'super_admin',
+            User.id != current_user.id,
+            User.status == 'active'
+        ).count()
+
+        if other_super_admins == 0:
+            logger.warning(f"Account deletion blocked - user {current_user.id} is the last super admin")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You are the last super admin. Please promote another admin to super admin before deleting your account."
+            )
 
     # Additional safety check - prevent deletion if user is sole admin WITH other team members
     if current_user.organization_id and current_user.is_admin:
@@ -966,14 +1006,37 @@ async def remove_organization_member(
             detail="User is not in your organization"
         )
 
-    # Safety check 5: If removing an admin, ensure there's at least one other admin
+    # Safety check 5: Only super admins can remove other super admins
+    if target_user.role == 'super_admin' and not current_user.is_super_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Only super admins can remove other super admins"
+        )
+
+    # Safety check 6: Cannot remove the last super admin
+    if target_user.role == 'super_admin':
+        other_super_admin_count = db.query(User).filter(
+            User.organization_id == current_user.organization_id,
+            User.organization_id.isnot(None),
+            User.role == 'super_admin',
+            User.id != user_id,
+            User.status == 'active'
+        ).count()
+
+        if other_super_admin_count == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot remove the last super admin. Promote another admin to super admin first."
+            )
+
+    # Safety check 7: If removing an admin, ensure there's at least one other admin
     if target_user.role == 'admin':
         # Count other admins in the organization
         # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         other_admin_count = db.query(User).filter(
             User.organization_id == current_user.organization_id,
             User.organization_id.isnot(None),
-            User.role == 'admin',
+            User.role.in_(['admin', 'super_admin']),
             User.id != user_id,
             User.status == 'active'
         ).count()

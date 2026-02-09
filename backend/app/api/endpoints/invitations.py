@@ -292,12 +292,23 @@ async def accept_invitation_page(
             detail="This invitation is for a different email address"
         )
 
-    # Check if user is already in an organization
+    # Check if user is switching organizations
     if current_user.organization_id and current_user.organization_id != invitation.organization_id:
-        raise HTTPException(
-            status_code=400,
-            detail="You are already a member of another organization"
-        )
+        # Prevent the last super admin from leaving their organization
+        if current_user.is_super_admin:
+            other_super_admins = db.query(User).filter(
+                User.organization_id == current_user.organization_id,
+                User.organization_id.isnot(None),
+                User.role == 'super_admin',
+                User.id != current_user.id,
+                User.status == 'active'
+            ).count()
+
+            if other_super_admins == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="You are the last super admin in your organization. Please promote another admin to super admin before switching organizations."
+                )
 
     # Process acceptance
     try:
@@ -386,12 +397,23 @@ async def accept_invitation_api(
             detail="This invitation is for a different email address"
         )
 
-    # Check if user is already in an organization
+    # Check if user is switching organizations
     if current_user.organization_id and current_user.organization_id != invitation.organization_id:
-        raise HTTPException(
-            status_code=400,
-            detail="You are already a member of another organization"
-        )
+        # Prevent the last super admin from leaving their organization
+        if current_user.is_super_admin:
+            other_super_admins = db.query(User).filter(
+                User.organization_id == current_user.organization_id,
+                User.organization_id.isnot(None),
+                User.role == 'super_admin',
+                User.id != current_user.id,
+                User.status == 'active'
+            ).count()
+
+            if other_super_admins == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="You are the last super admin in your organization. Please promote another admin to super admin before switching organizations."
+                )
 
     # Process acceptance
     try:
