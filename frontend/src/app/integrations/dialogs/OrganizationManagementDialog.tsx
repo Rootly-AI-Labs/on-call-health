@@ -216,8 +216,15 @@ export function OrganizationManagementDialog({
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.detail || 'Failed to promote to super admin')
+        let errorMessage = 'Failed to promote to super admin'
+        try {
+          const data = await response.json()
+          errorMessage = data.detail || errorMessage
+        } catch (e) {
+          // Response is not JSON, use status text
+          errorMessage = response.statusText || errorMessage
+        }
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
@@ -362,7 +369,7 @@ export function OrganizationManagementDialog({
           )}
 
           {/* Invite New Member Section - Only visible to admins */}
-          {(userInfo?.role === 'admin') && (
+          {['admin', 'super_admin'].includes(userInfo?.role || '') && (
             <div className="p-6 border rounded-lg bg-white">
               <div className="flex items-start space-x-4">
                 <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">

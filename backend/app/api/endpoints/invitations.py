@@ -6,10 +6,13 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
+import logging
 
 from ...models import get_db, User, OrganizationInvitation, Organization, UserNotification, OAuthProvider
 from ...auth.dependencies import get_current_active_user, get_current_user_optional
 from ...services.notification_service import NotificationService
+
+logger = logging.getLogger(__name__)
 
 class CreateInvitationRequest(BaseModel):
     email: EmailStr
@@ -34,7 +37,7 @@ async def create_invitation(
         raise HTTPException(status_code=400, detail="You must be part of an organization to invite others")
 
     # Check if user can invite (admin only)
-    if current_user.role != 'admin':
+    if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can invite users")
 
     # Check if user already exists with this email
@@ -149,7 +152,7 @@ async def list_pending_invitations(
         raise HTTPException(status_code=400, detail="Invalid email format")
 
     # Check if user can view invitations (admin only)
-    if current_user.role != 'admin':
+    if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only organization admins can view invitations")
 
     try:
@@ -490,7 +493,7 @@ async def resend_invitation(
     if (not current_user.organization_id or
         not invitation.organization_id or
         current_user.organization_id != invitation.organization_id or
-        current_user.role != 'admin'):
+        not current_user.is_admin):
         raise HTTPException(status_code=403, detail="Not authorized to resend this invitation")
 
     if invitation.status == "accepted":
@@ -606,7 +609,7 @@ async def revoke_invitation(
         (current_user.organization_id and
          invitation.organization_id and
          current_user.organization_id == invitation.organization_id and
-         current_user.role == 'admin') or
+         current_user.is_admin) or
         current_user.id == invitation.invited_by
     ):
         raise HTTPException(status_code=403, detail="Not authorized to revoke this invitation")

@@ -2,10 +2,19 @@
 -- Date: 2026-02-05
 -- Description: Migrate from is_super_admin boolean column to role-based approach
 
--- Step 1: Convert users with is_super_admin=true to role='super_admin'
-UPDATE users
-SET role = 'super_admin'
-WHERE is_super_admin = TRUE AND status = 'active';
+-- Step 1: Convert users with is_super_admin=true to role='super_admin' (only if column exists)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'is_super_admin'
+    ) THEN
+        UPDATE users
+        SET role = 'super_admin'
+        WHERE is_super_admin = TRUE AND status = 'active';
+    END IF;
+END $$;
 
 -- Step 2: Drop the is_super_admin column
 ALTER TABLE users DROP COLUMN IF EXISTS is_super_admin;
