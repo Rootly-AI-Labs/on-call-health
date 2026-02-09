@@ -3,6 +3,7 @@ Organization invitations API endpoints.
 """
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
@@ -10,6 +11,8 @@ from pydantic import BaseModel, EmailStr
 from ...models import get_db, User, OrganizationInvitation, Organization, UserNotification, OAuthProvider
 from ...auth.dependencies import get_current_active_user, get_current_user_optional
 from ...services.notification_service import NotificationService
+
+logger = logging.getLogger(__name__)
 
 class CreateInvitationRequest(BaseModel):
     email: EmailStr
