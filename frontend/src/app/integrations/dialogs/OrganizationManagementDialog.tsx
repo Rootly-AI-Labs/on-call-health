@@ -514,7 +514,7 @@ export function OrganizationManagementDialog({
                               <span className="text-sm text-neutral-600">{member.email}</span>
                             </td>
                             <td className="py-2 px-6">
-                              {userInfo?.role === 'admin' && !member.is_current_user ? (
+                              {['admin', 'super_admin'].includes(userInfo?.role || '') && !member.is_current_user && !member.is_super_admin ? (
                                 <select
                                   value={member.role || 'member'}
                                   onChange={(e) => onRoleChange(member.id as number, e.target.value)}
@@ -524,14 +524,21 @@ export function OrganizationManagementDialog({
                                   <option value="admin">Admin</option>
                                 </select>
                               ) : (
-                                <span className="text-sm text-neutral-900 capitalize px-3 py-2.5">
+                                <span className={`text-sm font-medium capitalize px-3 py-2.5 inline-flex items-center gap-2 ${
+                                  member.is_super_admin ? 'text-purple-700' : 'text-neutral-900'
+                                }`}>
                                   {member.role?.replace('_', ' ') || 'member'}
+                                  {member.is_super_admin && (
+                                    <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700 font-semibold">
+                                      Super Admin
+                                    </span>
+                                  )}
                                 </span>
                               )}
                             </td>
                             <td className="py-2 px-6">
                               <div className="flex justify-end">
-                                {!member.is_current_user && userInfo?.role === 'admin' && (
+                                {!member.is_current_user && !member.is_super_admin && ['admin', 'super_admin'].includes(userInfo?.role || '') && (
                                   confirmRemoveUserId === member.id ? (
                                     <div className="flex items-center gap-2">
                                       <Button
