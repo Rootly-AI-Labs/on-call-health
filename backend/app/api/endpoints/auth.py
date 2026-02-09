@@ -564,7 +564,7 @@ async def update_user_role(
         admin_count = db.query(User).filter(
             User.organization_id == current_user.organization_id,
             User.organization_id.isnot(None),
-            User.role == 'admin',
+            User.role.in_(['admin', 'super_admin']),
             User.status == 'active',
             User.id != target_user.id
         ).count()

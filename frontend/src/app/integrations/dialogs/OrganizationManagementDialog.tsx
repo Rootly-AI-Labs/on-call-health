@@ -19,6 +19,7 @@ interface OrganizationMember {
   role: string
   status: 'active' | 'pending'
   is_current_user: boolean
+  is_super_admin?: boolean
   joined_at?: string
   invited_at?: string
   expires_at?: string
