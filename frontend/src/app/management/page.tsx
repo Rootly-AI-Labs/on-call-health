@@ -310,13 +310,15 @@ function TeamPageContent() {
     const userEmail = localStorage.getItem('user_email')
     const userRole = localStorage.getItem('user_role')
     const userId = localStorage.getItem('user_id')
+    const userOrgId = localStorage.getItem('user_organization_id')
 
     if (userName && userEmail) {
       setUserInfo({
         name: userName,
         email: userEmail,
         role: userRole,
-        id: userId
+        id: userId,
+        organization_id: userOrgId ? parseInt(userOrgId) : null
       })
     }
   }, [])
