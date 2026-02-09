@@ -196,9 +196,9 @@ export default function LandingPage() {
             </h1>
 
             <p className="text-lg lg:text-xl lg:pr-10 mb-4 relative lg:-top-3">
-              An open source tool that looks for early warning signs of
+              An open source tool that looks for signs of overload in
               <br />
-              overload in your on-call engineers.
+              your on-call engineers.
             </p>
 
             {/* OAuth Login Buttons */}
