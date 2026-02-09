@@ -524,14 +524,13 @@ export function OrganizationManagementDialog({
                                   <option value="admin">Admin</option>
                                 </select>
                               ) : (
-                                <span className={`text-sm font-medium capitalize px-3 py-2.5 inline-flex items-center gap-2 ${
-                                  member.is_super_admin ? 'text-purple-700' : 'text-neutral-900'
-                                }`}>
-                                  {member.role?.replace('_', ' ') || 'member'}
-                                  {member.is_super_admin && (
+                                <span className="text-sm font-medium capitalize px-3 py-2.5">
+                                  {member.is_super_admin ? (
                                     <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700 font-semibold">
                                       Super Admin
                                     </span>
+                                  ) : (
+                                    <span className="text-neutral-900">{member.role?.replace('_', ' ') || 'member'}</span>
                                   )}
                                 </span>
                               )}
