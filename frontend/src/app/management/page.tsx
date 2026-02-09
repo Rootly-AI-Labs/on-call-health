@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, Suspense } from "react"
+import { createPortal } from "react-dom"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { TopPanel } from "@/components/TopPanel"
@@ -27,6 +28,7 @@ import {
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Loader2,
   Search,
   Pencil,
@@ -40,6 +42,12 @@ import { API_BASE, type Integration } from "@/app/integrations/types"
 import { UserMappingDrawer } from "./components/UserMappingDrawer"
 import { OrganizationManagementDialog } from "@/app/integrations/dialogs/OrganizationManagementDialog"
 import * as OrganizationHandlers from "@/app/integrations/handlers/organization-handlers"
+import {
+  fetchGithubUsers,
+  fetchJiraUsers,
+  fetchLinearUsers,
+  updateUserCorrelation,
+} from "./handlers/user-mapping-handlers"
 
 const TEAM_MEMBERS_PER_PAGE = 10
 
@@ -100,6 +108,9 @@ function TeamPageContent() {
   const lastSyncInfoCache = useRef<Map<string, {synced_at: string; synced_by: {id: number; name: string; email: string}} | null>>(new Map())
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isMountedRef = useRef(true)
+  const mappingDropdownRef = useRef<HTMLDivElement>(null)
+  const hasShownSyncModal = useRef(false)
+  const prevOrganizationRef = useRef<string>("")
 
   // Survey recipient selection state
   const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set())
@@ -113,6 +124,17 @@ function TeamPageContent() {
   const [selectedUserForMapping, setSelectedUserForMapping] = useState<any | null>(null)
   const [mappingDrawerOpen, setMappingDrawerOpen] = useState(false)
 
+  // Inline mapping dropdown state
+  const [openMappingUserId, setOpenMappingUserId] = useState<number | null>(null)
+  const [expandedIntegration, setExpandedIntegration] = useState<string | null>(null)
+  const [popupPosition, setPopupPosition] = useState<{ top?: number; bottom?: number; right: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [githubUsers, setGithubUsers] = useState<string[]>([])
+  const [jiraUsers, setJiraUsers] = useState<any[]>([])
+  const [linearUsers, setLinearUsers] = useState<any[]>([])
+  const [loadingIntegrationUsers, setLoadingIntegrationUsers] = useState(false)
+  const [integrationSearchQuery, setIntegrationSearchQuery] = useState("")
+
   // Sync confirmation modal state
   const [showSyncConfirmModal, setShowSyncConfirmModal] = useState(false)
   const [syncProgress, setSyncProgress] = useState<{
@@ -122,6 +144,7 @@ function TeamPageContent() {
     results?: {
       created?: number
       updated?: number
+      skipped?: number
       github_matched?: number
       jira_matched?: number
       linear_matched?: number
@@ -253,6 +276,13 @@ function TeamPageContent() {
     }
   }, [selectedOrganization])
 
+  // Clear integration users data when organization changes to force fresh data load
+  useEffect(() => {
+    setGithubUsers([])
+    setJiraUsers([])
+    setLinearUsers([])
+  }, [selectedOrganization])
+
   // Cleanup timeout on unmount and mark component as unmounted
   useEffect(() => {
     return () => {
@@ -265,11 +295,12 @@ function TeamPageContent() {
   }, [])
 
 
-  // Auto-open sync modal if redirected from integrations page
+  // Auto-open sync modal if redirected from integrations page (only once)
   useEffect(() => {
     const syncParam = searchParams.get("sync")
-    if (syncParam === "true" && selectedOrganization && !loadingIntegrations) {
+    if (syncParam === "true" && selectedOrganization && !loadingIntegrations && !hasShownSyncModal.current) {
       setShowSyncConfirmModal(true)
+      hasShownSyncModal.current = true
     }
   }, [searchParams, selectedOrganization, loadingIntegrations])
 
@@ -296,6 +327,173 @@ function TeamPageContent() {
       loadOrganizationData()
     }
   }, [viewMode])
+
+  // Close mapping dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mappingDropdownRef.current && !mappingDropdownRef.current.contains(event.target as Node)) {
+        setOpenMappingUserId(null)
+        setExpandedIntegration(null)
+        setPopupPosition(null)
+        // Keep integration users data cached for performance and to maintain logo visibility
+      }
+    }
+
+    if (openMappingUserId !== null) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openMappingUserId])
+
+  // Close mapping dropdown when scrolling (but not when scrolling inside the popup)
+  useEffect(() => {
+    const handleScroll = (event: Event) => {
+      // Don't close if scrolling inside the popup
+      if (mappingDropdownRef.current && mappingDropdownRef.current.contains(event.target as Node)) {
+        return
+      }
+
+      if (openMappingUserId !== null) {
+        setOpenMappingUserId(null)
+        setExpandedIntegration(null)
+        setPopupPosition(null)
+        // Keep integration users data cached for performance and to maintain logo visibility
+      }
+    }
+
+    if (openMappingUserId !== null) {
+      window.addEventListener('scroll', handleScroll, true) // Use capture phase to catch all scrolls
+      return () => window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [openMappingUserId])
+
+  // Reset search query when switching integrations or users to prevent stale search state
+  useEffect(() => {
+    setIntegrationSearchQuery("")
+  }, [expandedIntegration, openMappingUserId])
+
+  // Load integration users data on page load to show logos immediately
+  useEffect(() => {
+    if (!selectedOrganization || viewMode !== 'organization') return
+
+    // Check if organization changed
+    const orgChanged = prevOrganizationRef.current !== selectedOrganization
+    prevOrganizationRef.current = selectedOrganization
+
+    // Load all connected integration users in parallel
+    const loadAllIntegrationUsers = async () => {
+      const promises = []
+
+      // If organization changed, always load. Otherwise, only load if not already loaded
+      if (connectedIntegrations.has('github') && (orgChanged || githubUsers.length === 0)) {
+        promises.push(loadGithubUsersForMapping())
+      }
+      if (connectedIntegrations.has('jira') && (orgChanged || jiraUsers.length === 0)) {
+        promises.push(loadJiraUsersForMapping())
+      }
+      if (connectedIntegrations.has('linear') && (orgChanged || linearUsers.length === 0)) {
+        promises.push(loadLinearUsersForMapping())
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises)
+      }
+    }
+
+    loadAllIntegrationUsers()
+  }, [selectedOrganization, connectedIntegrations, viewMode])
+
+  // Pre-load all integration users when mapping popup opens (if not already loaded)
+  useEffect(() => {
+    if (!openMappingUserId || !selectedOrganization) return
+
+    // Load all connected integration users in parallel
+    const loadAllIntegrationUsers = async () => {
+      const promises = []
+
+      if (connectedIntegrations.has('github') && githubUsers.length === 0) {
+        promises.push(loadGithubUsersForMapping())
+      }
+      if (connectedIntegrations.has('jira') && jiraUsers.length === 0) {
+        promises.push(loadJiraUsersForMapping())
+      }
+      if (connectedIntegrations.has('linear') && linearUsers.length === 0) {
+        promises.push(loadLinearUsersForMapping())
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises)
+      }
+    }
+
+    loadAllIntegrationUsers()
+  }, [openMappingUserId, selectedOrganization, connectedIntegrations])
+
+  const loadGithubUsersForMapping = async () => {
+    if (!selectedOrganization) return
+    setLoadingIntegrationUsers(true)
+    try {
+      const users = await fetchGithubUsers(selectedOrganization)
+      setGithubUsers(users)
+    } catch (error) {
+      toast.error("Failed to load GitHub users")
+    } finally {
+      setLoadingIntegrationUsers(false)
+    }
+  }
+
+  const loadJiraUsersForMapping = async () => {
+    if (!selectedOrganization) return
+    setLoadingIntegrationUsers(true)
+    try {
+      const users = await fetchJiraUsers(selectedOrganization)
+      setJiraUsers(users || [])
+    } catch (error) {
+      console.error('Error loading Jira users:', error)
+      toast.error("Failed to load Jira users")
+      setJiraUsers([])
+    } finally {
+      setLoadingIntegrationUsers(false)
+    }
+  }
+
+  const loadLinearUsersForMapping = async () => {
+    if (!selectedOrganization) return
+    setLoadingIntegrationUsers(true)
+    try {
+      const users = await fetchLinearUsers(selectedOrganization)
+      setLinearUsers(users || [])
+    } catch (error) {
+      console.error('Error loading Linear users:', error)
+      toast.error("Failed to load Linear users")
+      setLinearUsers([])
+    } finally {
+      setLoadingIntegrationUsers(false)
+    }
+  }
+
+  const handleUserMapping = async (userId: number, integrationType: string, integrationUserId: string) => {
+    try {
+      // Build the updates object based on integration type
+      const updates: any = {}
+      if (integrationType === 'github') {
+        updates.github_username = integrationUserId
+      } else if (integrationType === 'jira') {
+        updates.jira_account_id = integrationUserId
+      } else if (integrationType === 'linear') {
+        updates.linear_user_id = integrationUserId
+      }
+
+      await updateUserCorrelation(userId, updates)
+      toast.success("User mapping updated successfully")
+      await fetchSyncedUsers(false, false, true) // Refresh the users list
+      setOpenMappingUserId(null)
+      setExpandedIntegration(null)
+      // Keep integration users data cached for performance and to maintain logo visibility
+    } catch (error) {
+      toast.error("Failed to update user mapping")
+    }
+  }
 
   // Fetch synced users from database (memoized to avoid stale closures)
   const fetchSyncedUsers = useCallback(async (showToast = false, autoSync = false, forceRefresh = false) => {
@@ -344,13 +542,19 @@ function TeamPageContent() {
         }
       )
 
-      // Ignore stale responses if user switched organizations
+      // Check immediately after fetch completes
       if (requestedOrg !== selectedOrganization) {
         return
       }
 
       if (response.ok) {
         const data = await response.json()
+
+        // Check again after JSON parsing to prevent race conditions
+        if (requestedOrg !== selectedOrganization) {
+          return
+        }
+
         const users = data.users || []
         setSyncedUsers(users)
         syncedUsersCache.current.set(requestedOrg, users)
@@ -420,16 +624,25 @@ function TeamPageContent() {
         lastSyncInfoCache.current.delete(selectedOrganization)
       }
 
+      // Calculate unchanged users: total - created - updated - skipped
+      // Note: backend's "skipped" means users with no email (invalid), not unchanged users
+      const created = syncResults.stats?.created || 0
+      const updated = syncResults.stats?.updated || 0
+      const skipped = syncResults.stats?.skipped || 0
+      const total = syncResults.stats?.total || 0
+      const unchanged = Math.max(0, total - created - updated - skipped)
+
       setSyncProgress({
         stage: "Sync Complete!",
         details: "Your users have been successfully synced",
         isLoading: false,
         results: {
-          created: syncResults.created,
-          updated: syncResults.updated,
-          github_matched: syncResults.github_matched,
-          jira_matched: syncResults.jira_matched,
-          linear_matched: syncResults.linear_matched,
+          created: syncResults.stats?.created,
+          updated: syncResults.stats?.updated,
+          skipped: unchanged, // Show unchanged count instead of backend's "skipped" (invalid users)
+          github_matched: syncResults.stats?.github_matched,
+          jira_matched: syncResults.stats?.jira_matched,
+          linear_matched: syncResults.stats?.linear_matched,
         }
       })
 
@@ -448,8 +661,8 @@ function TeamPageContent() {
           if (isMountedRef.current) {
             setShowSyncConfirmModal(false)
             setSyncProgress(null)
+            syncTimeoutRef.current = null
           }
-          syncTimeoutRef.current = null
         }, 2000)
       }
     }
@@ -511,16 +724,22 @@ function TeamPageContent() {
     }
 
     try {
-      const recipientIds = Array.from(selectedRecipients)
-
-      // Validate recipient IDs are valid positive integers (not NaN, Infinity, or floats)
-      if (!recipientIds.every(id =>
+      // Convert Set to Array and validate/filter for type safety
+      const recipientIds = Array.from(selectedRecipients).filter(id =>
         typeof id === 'number' &&
         Number.isFinite(id) &&
         Number.isInteger(id) &&
         id > 0
-      )) {
-        toast.error("Invalid recipient IDs")
+      )
+
+      // Check if any invalid IDs were filtered out
+      if (recipientIds.length !== selectedRecipients.size) {
+        console.warn('Some invalid recipient IDs were filtered out')
+      }
+
+      // Ensure we have valid IDs to send
+      if (recipientIds.length === 0 && selectedRecipients.size > 0) {
+        toast.error("No valid recipient IDs found")
         setSavingRecipients(false)
         return
       }
@@ -601,10 +820,62 @@ function TeamPageContent() {
   // Get integration logos for a user (filtered by currently connected integrations)
   const getUserIntegrations = (user: any) => {
     const integrations = []
-    if (user.github_username && connectedIntegrations.has('github')) integrations.push('github')
-    if (user.jira_account_id && connectedIntegrations.has('jira')) integrations.push('jira')
-    if (user.linear_user_id && connectedIntegrations.has('linear')) integrations.push('linear')
+
+    // Only show GitHub if user is mapped AND exists in current integration data
+    if (user.github_username && connectedIntegrations.has('github')) {
+      // Only show logo if data is loaded AND user exists in the current integration
+      if (githubUsers.length > 0 && githubUsers.includes(user.github_username)) {
+        integrations.push('github')
+      }
+    }
+
+    // Only show Jira if user is mapped AND exists in current integration data
+    if (user.jira_account_id && connectedIntegrations.has('jira')) {
+      // Only show logo if data is loaded AND user exists in the current integration
+      if (jiraUsers.length > 0 && jiraUsers.some(u =>
+        u.account_id === user.jira_account_id || u.accountId === user.jira_account_id
+      )) {
+        integrations.push('jira')
+      }
+    }
+
+    // Only show Linear if user is mapped AND exists in current integration data
+    if (user.linear_user_id && connectedIntegrations.has('linear')) {
+      // Only show logo if data is loaded AND user exists in the current integration
+      if (linearUsers.length > 0 && linearUsers.some(u => u.id === user.linear_user_id)) {
+        integrations.push('linear')
+      }
+    }
+
     return integrations
+  }
+
+  // Get display name for Jira user from account ID
+  const getJiraDisplayName = (accountId: string | null | undefined) => {
+    if (!accountId) return 'Not mapped'
+
+    // Show loading indicator until data is actually loaded (prevents ID flash)
+    if (jiraUsers.length === 0) {
+      return 'Loading...'
+    }
+
+    const jiraUser = jiraUsers.find(u => u.account_id === accountId || u.accountId === accountId)
+    // Never show raw ID - show "Unmapped" instead for privacy
+    return jiraUser?.display_name || jiraUser?.displayName || jiraUser?.email || jiraUser?.emailAddress || 'Unmapped'
+  }
+
+  // Get display name for Linear user from user ID
+  const getLinearDisplayName = (userId: string | null | undefined) => {
+    if (!userId) return 'Not mapped'
+
+    // Show loading indicator until data is actually loaded (prevents ID flash)
+    if (linearUsers.length === 0) {
+      return 'Loading...'
+    }
+
+    const linearUser = linearUsers.find(u => u.id === userId)
+    // Never show raw ID - show "Unmapped" instead for privacy
+    return linearUser?.name || linearUser?.email || 'Unmapped'
   }
 
   // Handle column header click for sorting
@@ -634,13 +905,23 @@ function TeamPageContent() {
       <TopPanel />
       <main className="min-h-screen bg-neutral-50 p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
-          {/* Header with View Mode Toggle */}
-          <div className="mb-8 flex items-end justify-end gap-6">
+          {/* Header with Title and View Mode Toggle */}
+          <div className="mb-6 flex items-start justify-between pl-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-neutral-900">
+                {viewMode === 'organization' ? 'Organization Management' : 'Team Management'}
+              </h1>
+              <p className="text-sm text-neutral-600 mt-1">
+                {viewMode === 'organization'
+                  ? 'Sync team data, manage incident response integrations, and track on-call status'
+                  : 'Add team members, assign roles, manage access permissions, and control who can view and edit team data'}
+              </p>
+            </div>
             {/* View Mode Toggle */}
             <div className="relative flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('organization')}
-                className={`relative z-10 px-4 py-2 text-sm font-medium rounded transition-all duration-200 ${
+                className={`relative z-10 px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'organization'
                     ? 'text-purple-700'
                     : 'text-neutral-600 hover:text-neutral-900'
@@ -650,7 +931,7 @@ function TeamPageContent() {
               </button>
               <button
                 onClick={() => setViewMode('company')}
-                className={`relative z-10 px-4 py-2 text-sm font-medium rounded transition-all duration-200 ${
+                className={`relative z-10 px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'company'
                     ? 'text-purple-700'
                     : 'text-neutral-600 hover:text-neutral-900'
@@ -672,61 +953,73 @@ function TeamPageContent() {
               {viewMode === 'organization' ? (
                 <>
                   {/* Organization View */}
-                  {/* Header with Search and Actions */}
+                  {/* Header with Organization Selector and Sync Button */}
                   <div className="p-6 border-b border-neutral-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h2 className="text-xl font-semibold text-neutral-900">Organization Management</h2>
-                        <p className="text-sm text-neutral-600 mt-1">Sync team data, manage incident response integrations, and track on-call status</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Button
-                          onClick={() => setShowSyncConfirmModal(true)}
-                          disabled={loadingSyncedUsers || !hasPrimaryIntegration}
-                          className="bg-purple-700 hover:bg-purple-800"
-                        >
-                          Sync Now
-                        </Button>
-                      </div>
-                    </div>
 
-                    {/* Search Bar and Organization Selector - Only show when primary integration exists */}
+                    {/* Organization Selector and Members Section - Only show when primary integration exists */}
                     {hasPrimaryIntegration && (
-                      <div className="flex items-end gap-4">
-                        {/* Search Bar - shorter */}
-                        <div className="w-80">
-                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">&nbsp;</label>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                            <Input
-                              type="text"
-                              placeholder="Search members..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="pl-9 w-full"
-                            />
+                      <div className="space-y-4">
+                        {/* Top row: Organization Selector and Sync Button */}
+                        <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
+                          <div className="flex-shrink-0">
+                            <label className="text-sm font-medium text-neutral-900 mb-2 block">Select Organization</label>
+                            <Select
+                              value={selectedOrganization}
+                              onValueChange={setSelectedOrganization}
+                              disabled={loadingIntegrations || !hasPrimaryIntegration}
+                            >
+                              <SelectTrigger className="w-64">
+                                <SelectValue placeholder="Select an organization..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {integrations.map((integration) => (
+                                  <SelectItem key={integration.id} value={integration.id.toString()}>
+                                    {integration.name || `Integration #${integration.id}`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <Button
+                              onClick={() => {
+                                setSyncProgress(null) // Reset sync progress when opening modal
+                                setShowSyncConfirmModal(true)
+                              }}
+                              disabled={loadingSyncedUsers || !hasPrimaryIntegration}
+                              className="bg-purple-700 hover:bg-purple-800 text-white"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Sync Now
+                            </Button>
+                            {lastSyncInfo && (
+                              <p className="text-xs text-neutral-500">
+                                Last synced {new Date(lastSyncInfo.synced_at).toLocaleString()}
+                              </p>
+                            )}
                           </div>
                         </div>
 
-                        {/* Organization Selector - wider on the right */}
-                        <div className="flex-shrink-0">
-                          <label className="text-xs font-semibold text-neutral-700 mb-1.5 block">Select Organization</label>
-                          <Select
-                            value={selectedOrganization}
-                            onValueChange={setSelectedOrganization}
-                            disabled={loadingIntegrations || !hasPrimaryIntegration}
-                          >
-                            <SelectTrigger className="w-72">
-                              <SelectValue placeholder="Select an organization..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {integrations.map((integration) => (
-                                <SelectItem key={integration.id} value={integration.id.toString()}>
-                                  {integration.name || `Integration #${integration.id}`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        {/* Bottom row: Organization Members and Search Bar */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-semibold text-neutral-900">Organization Members</h3>
+                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 text-xs font-medium text-neutral-700">{syncedUsers.length}</span>
+                          </div>
+                          <div className="w-80">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                              <Input
+                                type="text"
+                                placeholder="Search members..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 w-full border-neutral-300"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -787,15 +1080,6 @@ function TeamPageContent() {
               ) : (
                 // TABLE
                 <>
-                  {/* Last Sync Info */}
-                  {lastSyncInfo && (
-                    <div className="px-6 py-3 bg-neutral-50 border-b border-neutral-200">
-                      <p className="text-sm text-neutral-600">
-                        Last synced {new Date(lastSyncInfo.synced_at).toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
@@ -803,25 +1087,17 @@ function TeamPageContent() {
                           <th className="text-left py-3 px-6">
                             <button
                               onClick={() => handleSort('name')}
-                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
+                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
                             >
                               Name
                               {getSortIcon('name')}
                             </button>
                           </th>
-                          <th className="text-left py-3 px-6">
-                            <button
-                              onClick={() => handleSort('email')}
-                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
-                            >
-                              Email
-                              {getSortIcon('email')}
-                            </button>
-                          </th>
+                          <th className="text-left py-3 px-6 text-sm font-semibold text-neutral-700">Email</th>
                           <th className="text-left py-3 px-6">
                             <button
                               onClick={() => handleSort('oncall')}
-                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-purple-700 transition-colors"
+                              className="flex items-center gap-2 text-sm font-semibold text-neutral-700 hover:text-neutral-900 transition-colors"
                             >
                               On-Call Status
                               {getSortIcon('oncall')}
@@ -838,7 +1114,7 @@ function TeamPageContent() {
 
                           return (
                             <tr key={user.id} className={`border-b border-neutral-100 hover:bg-neutral-50 ${index === paginatedUsers.length - 1 ? 'border-b-0' : ''}`}>
-                              <td className="py-4 px-6">
+                              <td className="py-3 px-6">
                                 <div className="flex items-center gap-3">
                                   <Avatar className="w-9 h-9">
                                     {user.avatar_url && <AvatarImage src={user.avatar_url} alt={displayName} />}
@@ -851,15 +1127,15 @@ function TeamPageContent() {
                                         .substring(0, 2)}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <span className="font-medium text-neutral-900 capitalize">
+                                  <span className="text-sm font-medium text-neutral-900 capitalize">
                                     {displayName.replace(/[._]/g, ' ')}
                                   </span>
                                 </div>
                               </td>
-                              <td className="py-4 px-6">
+                              <td className="py-3 px-6">
                                 <span className="text-sm text-neutral-600">{user.email}</span>
                               </td>
-                              <td className="py-4 px-6">
+                              <td className="py-3 px-6">
                                 {user.is_oncall ? (
                                   <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
                                     <span className="w-1.5 h-1.5 bg-green-600 rounded-full mr-1.5"></span>
@@ -872,7 +1148,7 @@ function TeamPageContent() {
                                   </Badge>
                                 )}
                               </td>
-                              <td className="py-4 px-6">
+                              <td className="py-3 px-6">
                                 <div className="flex items-center gap-2">
                                   {integrations.length > 0 ? (
                                     integrations.map((integration) => (
@@ -901,20 +1177,285 @@ function TeamPageContent() {
                                   )}
                                 </div>
                               </td>
-                              <td className="py-4 px-6">
-                                <button
-                                  className="text-neutral-400 hover:text-neutral-600 transition-colors"
-                                  onClick={() => openMappingDrawer(user)}
-                                  title="Edit integration mappings"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </button>
+                              <td className="py-3 px-6">
+                                <div className="relative">
+                                  <button
+                                    ref={buttonRef}
+                                    className="text-neutral-400 hover:text-neutral-600 transition-colors"
+                                    onClick={(e) => {
+                                      if (openMappingUserId === user.id) {
+                                        setOpenMappingUserId(null)
+                                        setPopupPosition(null)
+                                      } else {
+                                        const rect = e.currentTarget.getBoundingClientRect()
+                                        const estimatedPopupHeight = 400 // Estimated height of the popup
+                                        const spaceBelow = window.innerHeight - rect.bottom
+                                        const spaceAbove = rect.top
+
+                                        // If not enough space below and more space above, position above
+                                        if (spaceBelow < estimatedPopupHeight && spaceAbove > spaceBelow) {
+                                          setPopupPosition({
+                                            bottom: window.innerHeight - rect.top + 8,
+                                            right: window.innerWidth - rect.right
+                                          })
+                                        } else {
+                                          // Position below
+                                          setPopupPosition({
+                                            top: rect.bottom + 8,
+                                            right: window.innerWidth - rect.right
+                                          })
+                                        }
+                                        setOpenMappingUserId(user.id)
+                                      }
+                                    }}
+                                    title="Edit integration mappings"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+
+                                </div>
                               </td>
                             </tr>
                           )
                         })}
                       </tbody>
                     </table>
+
+                    {/* Inline Mapping Dropdown (Portal) */}
+                    {openMappingUserId !== null && popupPosition && typeof window !== 'undefined' && (() => {
+                      const user = filteredUsers.find(u => u.id === openMappingUserId)
+                      if (!user) return null
+
+                      return createPortal(
+                        <div
+                          ref={mappingDropdownRef}
+                          className="fixed w-72 bg-white border border-neutral-200 rounded-lg shadow-lg z-50 p-4 max-h-96 overflow-y-auto"
+                          style={{
+                            ...(popupPosition.top !== undefined && { top: `${popupPosition.top}px` }),
+                            ...(popupPosition.bottom !== undefined && { bottom: `${popupPosition.bottom}px` }),
+                            right: `${popupPosition.right}px`
+                          }}
+                        >
+                          <div className={connectedIntegrations.size > 0 ? "mb-3" : "mb-0"}>
+                            <h4 className="text-sm font-semibold text-neutral-900">Integration Mappings</h4>
+                            <p className="text-xs text-neutral-600">{user.email}</p>
+                          </div>
+                                      {connectedIntegrations.size > 0 ? (
+                                        <div className="space-y-2">
+                                        {/* GitHub */}
+                                        {connectedIntegrations.has('github') && (
+                                          <div className="border border-neutral-200 rounded">
+                                            <button
+                                              onClick={() => setExpandedIntegration(expandedIntegration === 'github' ? null : 'github')}
+                                              className="w-full flex items-center justify-between p-2 hover:bg-neutral-50"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                                                </svg>
+                                                <div className="text-left">
+                                                  <div className="text-sm font-medium">GitHub</div>
+                                                  <div className={`text-xs ${user.github_username ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {user.github_username || 'Not mapped'}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'github' ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {expandedIntegration === 'github' && (
+                                              <div className="p-2 border-t border-neutral-200">
+                                                <input
+                                                  type="text"
+                                                  placeholder="Search GitHub users..."
+                                                  value={integrationSearchQuery}
+                                                  onChange={(e) => setIntegrationSearchQuery(e.target.value)}
+                                                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
+                                                />
+                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                  {loadingIntegrationUsers ? (
+                                                    <div className="text-center py-2">
+                                                      <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      {user.github_username && (
+                                                        <button
+                                                          onClick={() => handleUserMapping(user.id, 'github', '')}
+                                                          className="w-full text-left px-2 py-1 text-sm hover:bg-red-50 text-red-600 rounded border-b border-neutral-200 mb-1"
+                                                        >
+                                                          Clear mapping
+                                                        </button>
+                                                      )}
+                                                      {githubUsers.filter(u => u.toLowerCase().includes(integrationSearchQuery.toLowerCase())).length > 0 ? (
+                                                        githubUsers
+                                                          .filter(u => u.toLowerCase().includes(integrationSearchQuery.toLowerCase()))
+                                                          .map((username) => (
+                                                            <button
+                                                              key={username}
+                                                              onClick={() => handleUserMapping(user.id, 'github', username)}
+                                                              className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded"
+                                                            >
+                                                              {username}
+                                                            </button>
+                                                          ))
+                                                      ) : (
+                                                        <p className="text-xs text-neutral-500 text-center py-2">No users found</p>
+                                                      )}
+                                                    </>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {/* Jira */}
+                                        {connectedIntegrations.has('jira') && (
+                                          <div className="border border-neutral-200 rounded">
+                                            <button
+                                              onClick={() => setExpandedIntegration(expandedIntegration === 'jira' ? null : 'jira')}
+                                              className="w-full flex items-center justify-between p-2 hover:bg-neutral-50"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <svg className="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                                                  <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.004-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z"/>
+                                                </svg>
+                                                <div className="text-left">
+                                                  <div className="text-sm font-medium">Jira</div>
+                                                  <div className={`text-xs ${user.jira_account_id ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {user.jira_account_id ? getJiraDisplayName(user.jira_account_id) : 'Not mapped'}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'jira' ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {expandedIntegration === 'jira' && (
+                                              <div className="p-2 border-t border-neutral-200">
+                                                <input
+                                                  type="text"
+                                                  placeholder="Search Jira users..."
+                                                  value={integrationSearchQuery}
+                                                  onChange={(e) => setIntegrationSearchQuery(e.target.value)}
+                                                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
+                                                />
+                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                  {loadingIntegrationUsers ? (
+                                                    <div className="text-center py-2">
+                                                      <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      {user.jira_account_id && (
+                                                        <button
+                                                          onClick={() => handleUserMapping(user.id, 'jira', '')}
+                                                          className="w-full text-left px-2 py-1 text-sm hover:bg-red-50 text-red-600 rounded border-b border-neutral-200 mb-1"
+                                                        >
+                                                          Clear mapping
+                                                        </button>
+                                                      )}
+                                                      {(jiraUsers || []).filter(u => {
+                                                        const name = u.display_name || u.displayName || u.email || u.emailAddress || ''
+                                                        return name.toLowerCase().includes(integrationSearchQuery.toLowerCase())
+                                                      }).length > 0 ? (
+                                                        (jiraUsers || [])
+                                                          .filter(u => {
+                                                            const name = u.display_name || u.displayName || u.email || u.emailAddress || ''
+                                                            return name.toLowerCase().includes(integrationSearchQuery.toLowerCase())
+                                                          })
+                                                          .map((jiraUser, idx) => (
+                                                            <button
+                                                              key={jiraUser.account_id || jiraUser.accountId || `jira-${idx}`}
+                                                              onClick={() => handleUserMapping(user.id, 'jira', jiraUser.account_id || jiraUser.accountId)}
+                                                              className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded"
+                                                            >
+                                                              {jiraUser.display_name || jiraUser.displayName || jiraUser.email || jiraUser.emailAddress}
+                                                            </button>
+                                                          ))
+                                                      ) : (
+                                                        <p className="text-xs text-neutral-500 text-center py-2">
+                                                          {jiraUsers.length === 0 ? 'No Jira users available' : 'No users found'}
+                                                        </p>
+                                                      )}
+                                                    </>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {/* Linear */}
+                                        {connectedIntegrations.has('linear') && (
+                                          <div className="border border-neutral-200 rounded">
+                                            <button
+                                              onClick={() => setExpandedIntegration(expandedIntegration === 'linear' ? null : 'linear')}
+                                              className="w-full flex items-center justify-between p-2 hover:bg-neutral-50"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <Image src="/images/linear-logo.png" alt="Linear" width={16} height={16} />
+                                                <div className="text-left">
+                                                  <div className="text-sm font-medium">Linear</div>
+                                                  <div className={`text-xs ${user.linear_user_id ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {user.linear_user_id ? getLinearDisplayName(user.linear_user_id) : 'Not mapped'}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'linear' ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {expandedIntegration === 'linear' && (
+                                              <div className="p-2 border-t border-neutral-200">
+                                                <input
+                                                  type="text"
+                                                  placeholder="Search Linear users..."
+                                                  value={integrationSearchQuery}
+                                                  onChange={(e) => setIntegrationSearchQuery(e.target.value)}
+                                                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
+                                                />
+                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                  {loadingIntegrationUsers ? (
+                                                    <div className="text-center py-2">
+                                                      <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      {user.linear_user_id && (
+                                                        <button
+                                                          onClick={() => handleUserMapping(user.id, 'linear', '')}
+                                                          className="w-full text-left px-2 py-1 text-sm hover:bg-red-50 text-red-600 rounded border-b border-neutral-200 mb-1"
+                                                        >
+                                                          Clear mapping
+                                                        </button>
+                                                      )}
+                                                      {linearUsers.filter(u => (u.name || u.email || '').toLowerCase().includes(integrationSearchQuery.toLowerCase())).length > 0 ? (
+                                                        linearUsers
+                                                          .filter(u => (u.name || u.email || '').toLowerCase().includes(integrationSearchQuery.toLowerCase()))
+                                                          .map((linearUser) => (
+                                                            <button
+                                                              key={linearUser.id}
+                                                              onClick={() => handleUserMapping(user.id, 'linear', linearUser.id)}
+                                                              className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded"
+                                                            >
+                                                              {linearUser.name || linearUser.email}
+                                                            </button>
+                                                          ))
+                                                      ) : (
+                                                        <p className="text-xs text-neutral-500 text-center py-2">No users found</p>
+                                                      )}
+                                                    </>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                          ) : (
+                            <p className="text-xs text-neutral-500 text-center py-2">No integrations connected</p>
+                          )}
+                        </div>,
+                        document.body
+                      )
+                    })()}
                   </div>
 
                   {/* Pagination */}
@@ -924,24 +1465,24 @@ function TeamPageContent() {
                         Showing {startIndex + 1}-{Math.min(startIndex + TEAM_MEMBERS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length}
                       </p>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                          disabled={currentPage === 1}
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </Button>
-                        <span className="text-sm text-neutral-600 px-3">
+                        <span className="text-sm text-purple-700">
                           Page {currentPage} of {totalPages}
                         </span>
                         <Button
                           variant="outline"
-                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                          className="text-purple-700 hover:text-purple-800 h-8 w-8 p-0"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
                           onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                           disabled={currentPage === totalPages}
+                          className="text-purple-700 hover:text-purple-800 h-8 w-8 p-0"
                         >
-                          <ChevronRight className="w-4 h-4" />
+                          <ChevronRight className="w-3.5 h-3.5" />
                         </Button>
                       </div>
                     </div>
@@ -1008,48 +1549,143 @@ function TeamPageContent() {
             </>
           ) : (
             <>
-              <DialogHeader>
-                <DialogTitle>{syncProgress.stage}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  {syncProgress.isLoading && <Loader2 className="w-5 h-5 animate-spin text-purple-700" />}
-                  <p className="text-sm text-neutral-600">{syncProgress.details}</p>
-                </div>
+              {syncProgress.isLoading ? (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>{syncProgress.stage}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 animate-spin text-purple-700" />
+                      <p className="text-sm text-neutral-600">{syncProgress.details}</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <DialogHeader className="sr-only">
+                    <DialogTitle>Sync Complete</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-6 px-6">
+                    {/* Success Icon */}
+                    <div className="flex justify-center mb-4">
+                      <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                        <CheckCircle className="w-7 h-7 text-green-600" />
+                      </div>
+                    </div>
 
-                {syncProgress.results && (
-                  <div className="space-y-2 pt-4 border-t">
-                    <p className="font-semibold text-sm">Sync Results:</p>
-                    {syncProgress.results.created !== undefined && syncProgress.results.created > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                        <span>{syncProgress.results.created} created</span>
-                      </div>
+                    {/* Title */}
+                    <h2 className="text-xl font-semibold text-center mb-2">Sync Complete</h2>
+
+                    {/* Subtitle */}
+                    {syncProgress.results && (
+                      <p className="text-sm text-neutral-600 text-center mb-6">
+                        {(syncProgress.results.created || 0) + (syncProgress.results.updated || 0) + (syncProgress.results.skipped || 0)} users processed successfully
+                      </p>
                     )}
-                    {syncProgress.results.updated !== undefined && syncProgress.results.updated > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                        <span>{syncProgress.results.updated} updated</span>
-                      </div>
-                    )}
-                    {syncProgress.results.github_matched !== undefined && syncProgress.results.github_matched > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-4 h-4 text-blue-600" />
-                        <span>{syncProgress.results.github_matched} GitHub matched</span>
-                      </div>
+
+                    {syncProgress.results && (
+                      <>
+                        {/* Stats Grid - Unified Box */}
+                        <div className="border rounded-lg mb-6">
+                          <div className="grid grid-cols-3 divide-x">
+                            {/* Created */}
+                            <div className="p-4 text-center">
+                              <div className="text-2xl font-bold text-neutral-900 mb-1">
+                                {syncProgress.results.created || 0}
+                              </div>
+                              <div className="text-sm text-neutral-600">Created</div>
+                            </div>
+
+                            {/* Updated */}
+                            <div className="p-4 text-center">
+                              <div className="text-2xl font-bold text-neutral-900 mb-1">
+                                {syncProgress.results.updated || 0}
+                              </div>
+                              <div className="text-sm text-neutral-600">Updated</div>
+                            </div>
+
+                            {/* Unchanged */}
+                            <div className="p-4 text-center">
+                              <div className="text-2xl font-bold text-neutral-900 mb-1">
+                                {syncProgress.results.skipped || 0}
+                              </div>
+                              <div className="text-sm text-neutral-600">Unchanged</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Newly Mapped Integrations */}
+                        {(syncProgress.results.github_matched !== undefined ||
+                          syncProgress.results.jira_matched !== undefined ||
+                          syncProgress.results.linear_matched !== undefined) && (
+                          <div className="border rounded-lg p-4">
+                            <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
+                              Newly Mapped Integrations
+                            </div>
+                            <div className="space-y-3">
+                              {/* GitHub */}
+                              {syncProgress.results.github_matched !== undefined && (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                                    </svg>
+                                    <span className="text-sm font-medium text-neutral-700">GitHub</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900">
+                                    {syncProgress.results.github_matched}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Jira */}
+                              {syncProgress.results.jira_matched !== undefined && (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z"/>
+                                    </svg>
+                                    <span className="text-sm font-medium text-neutral-700">Jira</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900">
+                                    {syncProgress.results.jira_matched}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Linear */}
+                              {syncProgress.results.linear_matched !== undefined && (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Image src="/images/linear-logo.png" alt="Linear" width={20} height={20} />
+                                    <span className="text-sm font-medium text-neutral-700">Linear</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900">
+                                    {syncProgress.results.linear_matched}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
-                )}
-              </div>
-              {!syncProgress.isLoading && (
-                <DialogFooter>
-                  <Button onClick={() => {
-                    setShowSyncConfirmModal(false)
-                    setSyncProgress(null)
-                  }} className="bg-purple-700 hover:bg-purple-800">
-                    Close
-                  </Button>
-                </DialogFooter>
+
+                  {/* Footer Button */}
+                  <DialogFooter className="px-6 pb-6">
+                    <Button
+                      onClick={() => {
+                        setShowSyncConfirmModal(false)
+                        setSyncProgress(null)
+                      }}
+                      className="w-full bg-purple-700 hover:bg-purple-800"
+                    >
+                      Done
+                    </Button>
+                  </DialogFooter>
+                </>
               )}
             </>
           )}

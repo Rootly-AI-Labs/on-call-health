@@ -121,9 +121,9 @@ export function BaseRiskFactorsCard({
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 pb-2">
-        <div className="flex-1 min-h-[320px]">
+        <div className="flex-1 min-h-[220px]">
           <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={factorsData} cx="50%" cy="55%" outerRadius="95%">
+            <RadarChart data={factorsData} cx="50%" cy="48%" outerRadius="70%">
               <PolarGrid gridType="polygon" />
               <PolarAngleAxis
                 dataKey="factor"
