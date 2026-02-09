@@ -2161,232 +2161,65 @@ export default function IntegrationsPage() {
   const hasSlackSurvey = slackIntegration?.connection_type === 'oauth'
   const hasSlackEnhanced = slackIntegration && slackIntegration.connection_type !== 'oauth'
 
+  // Close active enhancement tab when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const enhancedSection = document.querySelector('[data-enhancement-section]')
+      if (enhancedSection && !enhancedSection.contains(event.target as Node)) {
+        setActiveEnhancementTab(null)
+      }
+    }
+
+    if (activeEnhancementTab) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [activeEnhancementTab])
+
+  // Close active incident management tab and form when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const incidentSection = document.querySelector('[data-incident-section]')
+      if (incidentSection && !incidentSection.contains(event.target as Node)) {
+        setActiveTab(null)
+        setAddingPlatform(null)
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
+
   return (
     <div className="min-h-screen bg-neutral-100">
       <TopPanel />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+        {/* Incident Management Platform Card */}
+        <Card className="mb-8 max-w-3xl mx-auto" data-incident-section>
+          <CardContent className="p-8">
         {/* Introduction Text */}
         <div className="text-center mb-2 max-w-2xl mx-auto">
           <h2 className="text-4xl font-bold text-black">Connect Your Incident Management Platform</h2>
         </div>
 
-        {/* No integrations message - Show right below intro */}
-        {integrations.length === 0 && !loadingRootly && !loadingPagerDuty && (
+        {/* Integration Status Message */}
+        {!loadingRootly && !loadingPagerDuty && (
           <div className="text-center mb-6 max-w-2xl mx-auto">
-            <p className="text-lg font-medium text-neutral-700">Add a Rootly or PagerDuty integration to get started!</p>
-          </div>
-        )}
-
-        {/* Ready for Analysis CTA - Always visible when integrations exist */}
-        {(loadingRootly || loadingPagerDuty) ? (
-          <div className="bg-neutral-200 border border-neutral-200 rounded-lg p-6 mb-8 max-w-2xl mx-auto animate-pulse">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-neutral-300 rounded-full mx-auto mb-4"></div>
-              <div className="h-6 bg-neutral-300 rounded w-80 mx-auto mb-2"></div>
-              <div className="h-4 bg-neutral-300 rounded w-96 mx-auto mb-2"></div>
-              <div className="h-4 bg-neutral-300 rounded w-72 mx-auto mb-4"></div>
-              <div className="h-10 bg-neutral-300 rounded w-40 mx-auto"></div>
-            </div>
-          </div>
-        ) : integrations.length > 0 && (
-          <div className="bg-white border border-neutral-300 rounded-lg p-6 mb-8 max-w-2xl mx-auto">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-purple-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-neutral-900 mb-2">
-                Ready to analyze your team's risk!
-              </h3>
-              <p className="text-neutral-700">
-                You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected.
-                {' '}<Link href="/dashboard?run=true" className="text-purple-700 font-semibold hover:underline">Run</Link> your first analysis to identify overwork patterns across your team.
+            {integrations.length === 0 ? (
+              <p className="text-lg font-medium text-neutral-700">Add a Rootly or PagerDuty integration to get started!</p>
+            ) : (
+              <p className="text-lg font-medium text-neutral-700">
+                You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected!{' '}
+                <Link href="/dashboard?run=true" className="text-purple-700 font-semibold hover:underline">Run an Analysis</Link> to view your team's risk
               </p>
-            </div>
-          </div>
-        )}
-
-        {/* Dashboard Organization Selector */}
-        {integrations.length > 0 && (
-          <div className="max-w-2xl mx-auto mb-6">
-            <div className="bg-white border-2 border-neutral-300 rounded-lg p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-neutral-700 flex-shrink-0">
-                  <Settings className="w-6 h-6 text-purple-600" />
-                  <span className="font-semibold text-lg">Active Organization</span>
-                </div>
-                <Select
-                  value={selectedOrganization}
-                  onValueChange={async (value) => {
-                    // Update state immediately for instant UI response
-                    setSelectedOrganization(value)
-                    localStorage.setItem('selected_organization', value)
-
-                    // Only show toast and check permissions if selecting a different organization
-                    if (value !== selectedOrganization) {
-                      const selected = integrations.find(i => i.id.toString() === value)
-                      if (selected) {
-                        toast.success(`${selected.name} set as default`)
-
-                        // Show sync modal after switching organizations
-                        setTimeout(() => {
-                          setPostIntegrationModalType(selected.platform as 'rootly' | 'pagerduty')
-                          setShowPostIntegrationSyncModal(true)
-                        }, 500)
-
-                        // Check permissions in background (non-blocking)
-                        try {
-                          const authToken = localStorage.getItem('auth_token')
-                          const response = await fetch(
-                            `${API_BASE}/${selected.platform}/integrations/${selected.id}/permissions`,
-                            {
-                              headers: {
-                                'Authorization': `Bearer ${authToken}`,
-                                'Content-Type': 'application/json'
-                              }
-                            }
-                          )
-
-                          if (response.ok) {
-                            const data = await response.json()
-
-                            if (data.has_users === false || data.has_incidents === false) {
-                              const missing = [
-                                !data.has_users && 'Users access',
-                                !data.has_incidents && 'Incidents access'
-                              ].filter(Boolean) as string[]
-
-                              setTokenErrorType('permissions')
-                              setTokenErrorIntegrationName(selected.name)
-                              setTokenErrorMissingPermissions(missing)
-                              setTokenErrorModalOpen(true)
-                              setHasTokenError(true)
-                            } else {
-                              // Token is valid and has permissions
-                              setHasTokenError(false)
-                            }
-                          } else if (response.status === 401 || response.status === 403) {
-                            setTokenErrorType('expired')
-                            setTokenErrorIntegrationName(selected.name)
-                            setTokenErrorMissingPermissions([])
-                            setTokenErrorModalOpen(true)
-                            setHasTokenError(true)
-                          }
-                        } catch (error) {
-                          console.error('Error checking integration permissions:', error)
-                        }
-                      }
-                    }
-                  }}
-                >
-                  <SelectTrigger className="flex-1 h-10 bg-slate-50 border-neutral-300 hover:bg-slate-100 transition-colors">
-                    <SelectValue placeholder="Select organization">
-                      {selectedOrganization && (() => {
-                        const selected = integrations.find(i => i.id.toString() === selectedOrganization)
-                        if (selected) {
-                          return (
-                            <div className="flex items-center justify-between w-full">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-3 h-3 rounded-full ${
-                                  selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
-                                }`}></div>
-                                <span className="font-medium text-base">{selected.name}</span>
-                              </div>
-                              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
-                            </div>
-                          )
-                        }
-                        return null
-                      })()}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="max-w-md">
-                    {/* Group integrations by platform */}
-                    {(() => {
-                      const rootlyIntegrations = integrations.filter(i => i.platform === 'rootly')
-                      const pagerdutyIntegrations = integrations.filter(i => i.platform === 'pagerduty')
-
-                      return (
-                        <>
-                          {/* Rootly Integrations */}
-                          {rootlyIntegrations.map((integration) => {
-                            // Check if integration has permission issues
-                            const hasPermissionIssues = integration.permissions?.users?.access !== null &&
-                                                       integration.permissions?.incidents?.access !== null &&
-                                                       (!integration.permissions?.users?.access || !integration.permissions?.incidents?.access)
-
-                            return (
-                              <SelectItem
-                                key={integration.id}
-                                value={integration.id.toString()}
-                                className="cursor-pointer"
-                              >
-                                <div className="flex items-center justify-between w-full gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                                    <span className="font-medium text-base">{integration.name}</span>
-                                    {hasPermissionIssues && (
-                                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
-                                        Missing Permissions
-                                      </span>
-                                    )}
-                                  </div>
-                                  {selectedOrganization === integration.id.toString() && (
-                                    <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
-                                  )}
-                                </div>
-                              </SelectItem>
-                            )
-                          })}
-
-                          {/* Separator between platforms */}
-                          {rootlyIntegrations.length > 0 && pagerdutyIntegrations.length > 0 && (
-                            <div className="my-1 border-t border-neutral-200"></div>
-                          )}
-
-                          {/* PagerDuty Integrations */}
-                          {pagerdutyIntegrations.map((integration) => {
-                            // Check if integration has permission issues
-                            const hasPermissionIssues = integration.permissions?.users?.access !== null &&
-                                                       integration.permissions?.incidents?.access !== null &&
-                                                       (!integration.permissions?.users?.access || !integration.permissions?.incidents?.access)
-
-                            return (
-                              <SelectItem
-                                key={integration.id}
-                                value={integration.id.toString()}
-                                className="cursor-pointer"
-                              >
-                                <div className="flex items-center justify-between w-full gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                                    <span className="font-medium text-base">{integration.name}</span>
-                                    {hasPermissionIssues && (
-                                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
-                                        Missing Permissions
-                                      </span>
-                                    )}
-                                  </div>
-                                  {selectedOrganization === integration.id.toString() && (
-                                    <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
-                                  )}
-                                </div>
-                              </SelectItem>
-                            )
-                          })}
-                        </>
-                      )
-                    })()}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* Platform Selection Cards */}
-        <div className="grid md:grid-cols-2 gap-4 mb-6 max-w-2xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-4 mb-6 max-w-4xl mx-auto">
           {/* Rootly Card */}
           {loadingRootly ? (
             <Card className="border-2 border-neutral-200 p-4 flex items-center justify-center relative h-20 animate-pulse">
@@ -2395,10 +2228,10 @@ export default function IntegrationsPage() {
             </Card>
           ) : (
               <Card
-                className={`border-2 transition-all cursor-pointer hover:shadow-md ${
+                className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
                   activeTab === 'rootly'
                     ? 'border-purple-500 shadow-md bg-white'
-                    : 'border-neutral-200 hover:border-purple-500'
+                    : 'border-neutral-300 hover:border-purple-500'
                 } p-4 flex items-center justify-center relative h-20`}
                 onClick={() => {
                   setActiveTab('rootly')
@@ -2408,10 +2241,6 @@ export default function IntegrationsPage() {
                   setPreviewData(null)
                   setDuplicateInfo(null)
                   setTokenError(null)
-                  // Scroll to form
-                  setTimeout(() => {
-                    formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  }, 100)
                 }}
               >
                 {activeTab === 'rootly' && (
@@ -2450,10 +2279,10 @@ export default function IntegrationsPage() {
             </Card>
           ) : (
             <Card
-              className={`border-2 transition-all cursor-pointer hover:shadow-md ${
+              className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
                 activeTab === 'pagerduty'
                   ? 'border-green-500 shadow-md bg-white'
-                  : 'border-neutral-200 hover:border-green-300'
+                  : 'border-neutral-300 hover:border-green-300'
               } p-4 flex items-center justify-center relative h-20`}
               onClick={() => {
                 setActiveTab('pagerduty')
@@ -2463,10 +2292,6 @@ export default function IntegrationsPage() {
                 setPreviewData(null)
                 setDuplicateInfo(null)
                 setTokenError(null)
-                // Scroll to form
-                setTimeout(() => {
-                  formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }, 100)
               }}
             >
               {activeTab === 'pagerduty' && (
@@ -2569,18 +2394,188 @@ export default function IntegrationsPage() {
                 </CardContent>
               </Card>
             ) : integrations.length > 0 && filteredIntegrations.length > 0 ? (
-              <Card className="max-w-2xl mx-auto">
-                <CardContent className="p-6 space-y-4">
-                  {filteredIntegrations.map((integration) => {
-                    const isExpanded = expandedIntegrations.has(integration.id)
+              <Card className="max-w-4xl mx-auto">
+                <CardContent className="p-6">
+                  {/* Active Organization Selector */}
+                  <div className="flex items-center gap-3 pb-4 border-b border-neutral-200 mb-4">
+                    <span className="font-semibold text-base text-neutral-700 whitespace-nowrap">Active Organization:</span>
+                    <Select
+                      value={selectedOrganization}
+                      onValueChange={async (value) => {
+                        // Update state immediately for instant UI response
+                        setSelectedOrganization(value)
+                        localStorage.setItem('selected_organization', value)
 
-                    return (
-                    <div key={integration.id} className={`
-                      rounded-lg border relative transition-all
-                      ${integration.platform === 'rootly' ? 'border-green-200 bg-green-50' : 'border-green-200 bg-green-50'}
-                      ${savingIntegrationId === integration.id ? 'opacity-75' : ''}
-                      ${isExpanded ? 'p-4' : 'p-3'}
-                    `}>
+                        // Only show toast and check permissions if selecting a different organization
+                        if (value !== selectedOrganization) {
+                          const selected = integrations.find(i => i.id.toString() === value)
+                          if (selected) {
+                            toast.success(`${selected.name} set as default`)
+
+                            // Show sync modal after switching organizations
+                            setTimeout(() => {
+                              setPostIntegrationModalType(selected.platform as 'rootly' | 'pagerduty')
+                              setShowPostIntegrationSyncModal(true)
+                            }, 500)
+
+                            // Check permissions in background (non-blocking)
+                            try {
+                              const authToken = localStorage.getItem('auth_token')
+                              const response = await fetch(
+                                `${API_BASE}/${selected.platform}/integrations/${selected.id}/permissions`,
+                                {
+                                  headers: {
+                                    'Authorization': `Bearer ${authToken}`,
+                                    'Content-Type': 'application/json'
+                                  }
+                                }
+                              )
+
+                              if (response.ok) {
+                                const data = await response.json()
+
+                                if (data.has_users === false || data.has_incidents === false) {
+                                  const missing = [
+                                    !data.has_users && 'Users access',
+                                    !data.has_incidents && 'Incidents access'
+                                  ].filter(Boolean) as string[]
+
+                                  setTokenErrorType('permissions')
+                                  setTokenErrorIntegrationName(selected.name)
+                                  setTokenErrorMissingPermissions(missing)
+                                  setTokenErrorModalOpen(true)
+                                  setHasTokenError(true)
+                                } else {
+                                  // Token is valid and has permissions
+                                  setHasTokenError(false)
+                                }
+                              } else if (response.status === 401 || response.status === 403) {
+                                setTokenErrorType('expired')
+                                setTokenErrorIntegrationName(selected.name)
+                                setTokenErrorMissingPermissions([])
+                                setTokenErrorModalOpen(true)
+                                setHasTokenError(true)
+                              }
+                            } catch (error) {
+                              console.error('Error checking integration permissions:', error)
+                            }
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="flex-1 h-10 border-neutral-300 hover:border-neutral-400 transition-colors">
+                        <SelectValue placeholder="Select organization">
+                          {selectedOrganization && (() => {
+                            const selected = integrations.find(i => i.id.toString() === selectedOrganization)
+                            if (selected) {
+                              return (
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-3 h-3 rounded-full ${
+                                      selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
+                                    }`}></div>
+                                    <span className="font-medium text-base">{selected.name}</span>
+                                  </div>
+                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-4" />
+                                </div>
+                              )
+                            }
+                            return null
+                          })()}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="max-w-md">
+                        {/* Group integrations by platform */}
+                        {(() => {
+                          const rootlyIntegrations = integrations.filter(i => i.platform === 'rootly')
+                          const pagerdutyIntegrations = integrations.filter(i => i.platform === 'pagerduty')
+
+                          return (
+                            <>
+                              {/* Rootly Integrations */}
+                              {rootlyIntegrations.map((integration) => {
+                                // Check if integration has permission issues
+                                const hasPermissionIssues = integration.permissions?.users?.access !== null &&
+                                                           integration.permissions?.incidents?.access !== null &&
+                                                           (!integration.permissions?.users?.access || !integration.permissions?.incidents?.access)
+
+                                return (
+                                  <SelectItem
+                                    key={integration.id}
+                                    value={integration.id.toString()}
+                                    className="cursor-pointer"
+                                  >
+                                    <div className="flex items-center justify-between w-full gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                                        <span className="font-medium text-base">{integration.name}</span>
+                                        {hasPermissionIssues && (
+                                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
+                                            Missing Permissions
+                                          </span>
+                                        )}
+                                      </div>
+                                      {selectedOrganization === integration.id.toString() && (
+                                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                )
+                              })}
+
+                              {/* Separator between platforms */}
+                              {rootlyIntegrations.length > 0 && pagerdutyIntegrations.length > 0 && (
+                                <div className="my-1 border-t border-neutral-200"></div>
+                              )}
+
+                              {/* PagerDuty Integrations */}
+                              {pagerdutyIntegrations.map((integration) => {
+                                // Check if integration has permission issues
+                                const hasPermissionIssues = integration.permissions?.users?.access !== null &&
+                                                           integration.permissions?.incidents?.access !== null &&
+                                                           (!integration.permissions?.users?.access || !integration.permissions?.incidents?.access)
+
+                                return (
+                                  <SelectItem
+                                    key={integration.id}
+                                    value={integration.id.toString()}
+                                    className="cursor-pointer"
+                                  >
+                                    <div className="flex items-center justify-between w-full gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                                        <span className="font-medium text-base">{integration.name}</span>
+                                        {hasPermissionIssues && (
+                                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
+                                            Missing Permissions
+                                          </span>
+                                        )}
+                                      </div>
+                                      {selectedOrganization === integration.id.toString() && (
+                                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                )
+                              })}
+                            </>
+                          )
+                        })()}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-4">
+                    {filteredIntegrations.map((integration) => {
+                      const isExpanded = expandedIntegrations.has(integration.id)
+
+                      return (
+                      <div key={integration.id} className={`
+                        rounded-lg border relative transition-all
+                        ${integration.platform === 'rootly' ? 'border-green-200 bg-green-50' : 'border-green-200 bg-green-50'}
+                        ${savingIntegrationId === integration.id ? 'opacity-75' : ''}
+                        ${isExpanded ? 'p-4' : 'p-3'}
+                      `}>
                       {/* Saving overlay */}
                       {savingIntegrationId === integration.id && (
                         <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center rounded-lg z-10">
@@ -2810,9 +2805,10 @@ export default function IntegrationsPage() {
                           </div>
                         </div>
                       )}
-                    </div>
-                    )
-                  })}
+                      </div>
+                      )
+                    })}
+                  </div>
 
                   {/* Skeleton card while reloading integrations */}
                   {reloadingIntegrations && (
@@ -2860,9 +2856,14 @@ export default function IntegrationsPage() {
               </Card>
             ) : null}
         </div>
+          </CardContent>
+        </Card>
 
+        {/* Enhanced Integrations Card */}
+        <Card className="mb-8 max-w-3xl mx-auto" data-enhancement-section>
+          <CardContent className="p-8">
         {/* Enhanced Integrations Section */}
-        <div className="mt-16 space-y-8">
+        <div className="space-y-8">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-neutral-900 mb-3">Enhanced Integrations</h2>
             <p className="text-lg text-neutral-600 mb-2">
@@ -2882,10 +2883,10 @@ export default function IntegrationsPage() {
               </Card>
             ) : (
                 <Card
-                  className={`border-2 transition-all cursor-pointer hover:shadow-md ${
+                  className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
                     activeEnhancementTab === 'github'
                       ? 'border-neutral-500 shadow-md bg-neutral-100'
-                      : 'border-neutral-200 hover:border-neutral-300'
+                      : 'border-neutral-300 hover:border-neutral-400'
                   } p-4 flex items-center justify-center relative h-20`}
                   onClick={() => {
                     setActiveEnhancementTab(activeEnhancementTab === 'github' ? null : 'github')
@@ -2931,10 +2932,10 @@ export default function IntegrationsPage() {
               </Card>
             ) : (
               <Card
-                className={`border-2 transition-all cursor-pointer hover:shadow-md ${
+                className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
                   activeEnhancementTab === 'slack'
                     ? 'border-purple-500 shadow-md bg-purple-200'
-                    : 'border-neutral-200 hover:border-purple-500'
+                    : 'border-neutral-300 hover:border-purple-500'
                 } p-4 flex items-center justify-center relative h-20`}
                 onClick={() => {
                   setActiveEnhancementTab(activeEnhancementTab === 'slack' ? null : 'slack')
@@ -2978,10 +2979,10 @@ export default function IntegrationsPage() {
               </Card>
             ) : (
               <Card
-                className={`border-2 transition-all cursor-pointer hover:shadow-md ${
+                className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
                   activeEnhancementTab === 'jira'
                     ? 'border-blue-500 shadow-md bg-blue-50'
-                    : 'border-neutral-200 hover:border-blue-300'
+                    : 'border-neutral-300 hover:border-blue-300'
                 } p-4 flex items-center justify-center relative h-20`}
                 onClick={() => {
                   setActiveEnhancementTab(activeEnhancementTab === 'jira' ? null : 'jira')
@@ -3026,10 +3027,10 @@ export default function IntegrationsPage() {
               </Card>
             ) : (
               <Card
-                className={`border-2 transition-all cursor-pointer hover:shadow-md ${
+                className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
                   activeEnhancementTab === 'linear'
                     ? 'border-neutral-800 shadow-md bg-neutral-100'
-                    : 'border-neutral-200 hover:border-neutral-400'
+                    : 'border-neutral-300 hover:border-neutral-400'
                 } p-4 flex items-center justify-center relative h-20`}
                 onClick={() => {
                   setActiveEnhancementTab(activeEnhancementTab === 'linear' ? null : 'linear')
@@ -3142,11 +3143,10 @@ export default function IntegrationsPage() {
             )}
 
           </div>
-        </div>
 
-        {/* AI Insights Section */}
-        <div className="mt-16 space-y-8">
-          <AIInsightsCard
+          {/* AI Insights Section */}
+          <div className="mt-8 pt-8 border-t border-neutral-200">
+            <AIInsightsCard
             llmConfig={llmConfig}
             onConnect={async (token, provider, useSystemToken, switchToCustom = false) => {
               await AIHandlers.handleConnectAI(
@@ -3335,6 +3335,9 @@ export default function IntegrationsPage() {
             </div>
           </div>
         )}
+        </div>
+          </CardContent>
+        </Card>
 
       </main>
 
