@@ -144,6 +144,7 @@ function TeamPageContent() {
     results?: {
       created?: number
       updated?: number
+      skipped?: number
       github_matched?: number
       jira_matched?: number
       linear_matched?: number
@@ -623,16 +624,25 @@ function TeamPageContent() {
         lastSyncInfoCache.current.delete(selectedOrganization)
       }
 
+      // Calculate unchanged users: total - created - updated - skipped
+      // Note: backend's "skipped" means users with no email (invalid), not unchanged users
+      const created = syncResults.stats?.created || 0
+      const updated = syncResults.stats?.updated || 0
+      const skipped = syncResults.stats?.skipped || 0
+      const total = syncResults.stats?.total || 0
+      const unchanged = Math.max(0, total - created - updated - skipped)
+
       setSyncProgress({
         stage: "Sync Complete!",
         details: "Your users have been successfully synced",
         isLoading: false,
         results: {
-          created: syncResults.created,
-          updated: syncResults.updated,
-          github_matched: syncResults.github_matched,
-          jira_matched: syncResults.jira_matched,
-          linear_matched: syncResults.linear_matched,
+          created: syncResults.stats?.created,
+          updated: syncResults.stats?.updated,
+          skipped: unchanged, // Show unchanged count instead of backend's "skipped" (invalid users)
+          github_matched: syncResults.stats?.github_matched,
+          jira_matched: syncResults.stats?.jira_matched,
+          linear_matched: syncResults.stats?.linear_matched,
         }
       })
 
@@ -972,7 +982,10 @@ function TeamPageContent() {
                           </div>
                           <div className="flex flex-col items-end gap-2">
                             <Button
-                              onClick={() => setShowSyncConfirmModal(true)}
+                              onClick={() => {
+                                setSyncProgress(null) // Reset sync progress when opening modal
+                                setShowSyncConfirmModal(true)
+                              }}
                               disabled={loadingSyncedUsers || !hasPrimaryIntegration}
                               className="bg-purple-700 hover:bg-purple-800 text-white"
                             >
@@ -1536,48 +1549,143 @@ function TeamPageContent() {
             </>
           ) : (
             <>
-              <DialogHeader>
-                <DialogTitle>{syncProgress.stage}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  {syncProgress.isLoading && <Loader2 className="w-5 h-5 animate-spin text-purple-700" />}
-                  <p className="text-sm text-neutral-600">{syncProgress.details}</p>
-                </div>
+              {syncProgress.isLoading ? (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>{syncProgress.stage}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 animate-spin text-purple-700" />
+                      <p className="text-sm text-neutral-600">{syncProgress.details}</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <DialogHeader className="sr-only">
+                    <DialogTitle>Sync Complete</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-6 px-6">
+                    {/* Success Icon */}
+                    <div className="flex justify-center mb-4">
+                      <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                        <CheckCircle className="w-7 h-7 text-green-600" />
+                      </div>
+                    </div>
 
-                {syncProgress.results && (
-                  <div className="space-y-2 pt-4 border-t">
-                    <p className="font-semibold text-sm">Sync Results:</p>
-                    {syncProgress.results.created !== undefined && syncProgress.results.created > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                        <span>{syncProgress.results.created} created</span>
-                      </div>
+                    {/* Title */}
+                    <h2 className="text-xl font-semibold text-center mb-2">Sync Complete</h2>
+
+                    {/* Subtitle */}
+                    {syncProgress.results && (
+                      <p className="text-sm text-neutral-600 text-center mb-6">
+                        {(syncProgress.results.created || 0) + (syncProgress.results.updated || 0) + (syncProgress.results.skipped || 0)} users processed successfully
+                      </p>
                     )}
-                    {syncProgress.results.updated !== undefined && syncProgress.results.updated > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                        <span>{syncProgress.results.updated} updated</span>
-                      </div>
-                    )}
-                    {syncProgress.results.github_matched !== undefined && syncProgress.results.github_matched > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-4 h-4 text-blue-600" />
-                        <span>{syncProgress.results.github_matched} GitHub matched</span>
-                      </div>
+
+                    {syncProgress.results && (
+                      <>
+                        {/* Stats Grid - Unified Box */}
+                        <div className="border rounded-lg mb-6">
+                          <div className="grid grid-cols-3 divide-x">
+                            {/* Created */}
+                            <div className="p-4 text-center">
+                              <div className="text-2xl font-bold text-neutral-900 mb-1">
+                                {syncProgress.results.created || 0}
+                              </div>
+                              <div className="text-sm text-neutral-600">Created</div>
+                            </div>
+
+                            {/* Updated */}
+                            <div className="p-4 text-center">
+                              <div className="text-2xl font-bold text-neutral-900 mb-1">
+                                {syncProgress.results.updated || 0}
+                              </div>
+                              <div className="text-sm text-neutral-600">Updated</div>
+                            </div>
+
+                            {/* Unchanged */}
+                            <div className="p-4 text-center">
+                              <div className="text-2xl font-bold text-neutral-900 mb-1">
+                                {syncProgress.results.skipped || 0}
+                              </div>
+                              <div className="text-sm text-neutral-600">Unchanged</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Newly Mapped Integrations */}
+                        {(syncProgress.results.github_matched !== undefined ||
+                          syncProgress.results.jira_matched !== undefined ||
+                          syncProgress.results.linear_matched !== undefined) && (
+                          <div className="border rounded-lg p-4">
+                            <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
+                              Newly Mapped Integrations
+                            </div>
+                            <div className="space-y-3">
+                              {/* GitHub */}
+                              {syncProgress.results.github_matched !== undefined && (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                                    </svg>
+                                    <span className="text-sm font-medium text-neutral-700">GitHub</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900">
+                                    {syncProgress.results.github_matched}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Jira */}
+                              {syncProgress.results.jira_matched !== undefined && (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0z"/>
+                                    </svg>
+                                    <span className="text-sm font-medium text-neutral-700">Jira</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900">
+                                    {syncProgress.results.jira_matched}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Linear */}
+                              {syncProgress.results.linear_matched !== undefined && (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Image src="/images/linear-logo.png" alt="Linear" width={20} height={20} />
+                                    <span className="text-sm font-medium text-neutral-700">Linear</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900">
+                                    {syncProgress.results.linear_matched}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
-                )}
-              </div>
-              {!syncProgress.isLoading && (
-                <DialogFooter>
-                  <Button onClick={() => {
-                    setShowSyncConfirmModal(false)
-                    setSyncProgress(null)
-                  }} className="bg-purple-700 hover:bg-purple-800">
-                    Close
-                  </Button>
-                </DialogFooter>
+
+                  {/* Footer Button */}
+                  <DialogFooter className="px-6 pb-6">
+                    <Button
+                      onClick={() => {
+                        setShowSyncConfirmModal(false)
+                        setSyncProgress(null)
+                      }}
+                      className="w-full bg-purple-700 hover:bg-purple-800"
+                    >
+                      Done
+                    </Button>
+                  </DialogFooter>
+                </>
               )}
             </>
           )}
