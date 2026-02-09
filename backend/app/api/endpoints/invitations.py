@@ -37,10 +37,10 @@ async def create_invitation(
     if current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can invite users")
 
-    # Check if user already exists with this email
+    # Check if user already exists with this email in the SAME organization
     existing_user = db.query(User).filter(User.email.ilike(request.email)).first()
-    if existing_user and existing_user.organization_id:
-        raise HTTPException(status_code=400, detail="User with this email already belongs to an organization")
+    if existing_user and existing_user.organization_id == current_user.organization_id:
+        raise HTTPException(status_code=400, detail="User is already a member of your organization")
 
     # Check for pending invitation with same email to same org
     # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
