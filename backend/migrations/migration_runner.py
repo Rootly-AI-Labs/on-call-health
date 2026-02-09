@@ -1236,6 +1236,11 @@ class MigrationRunner:
                 "description": "Add composite indexes to optimize get_platform_mappings endpoint",
                 "sql_file": "2026_02_06_optimize_get_platform_mappings.sql"
             },
+            {
+                "name": "045_consolidate_survey_periods_to_team_roster",
+                "description": "Update survey_periods to reference team roster user_correlations instead of personal correlations",
+                "sql_file": "2026_02_09_consolidate_survey_periods_to_team_roster.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 
