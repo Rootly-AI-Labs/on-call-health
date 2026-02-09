@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Users, Mail, Loader2, Search, ChevronLeft, ChevronRight, AlertCircle, Trash2, Send, Info, ChevronDown, ChevronUp } from "lucide-react"
+import { Users, Mail, Loader2, Search, ChevronLeft, ChevronRight, AlertCircle, Trash2, Send, Info, ChevronDown, ChevronUp, X } from "lucide-react"
 import { useState } from "react"
 import { UserInfo } from "../types"
 import { toast } from "sonner"
@@ -214,6 +214,36 @@ export function OrganizationManagementDialog({
     }
   }
 
+  const handleCancelInvitation = async (invitationId: number, email: string) => {
+    setProcessingInvitationId(invitationId)
+    try {
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`${API_BASE}/invitations/${invitationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.detail || 'Failed to cancel invitation')
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(`Invitation to ${email} has been cancelled`)
+        await onRefreshOrgData()
+      }
+    } catch (error: any) {
+      console.error('Error cancelling invitation:', error)
+      toast.error(error.message || 'Failed to cancel invitation')
+    } finally {
+      setProcessingInvitationId(null)
+    }
+  }
+
   // Filter members based on search query (from feature/management_page)
   const filteredMembers = orgMembers.filter((member) => {
     if (!searchQuery) return true
@@ -401,17 +431,32 @@ export function OrganizationManagementDialog({
                     {showPendingInvitations && (
                       <div className="mt-3 space-y-2">
                         {pendingInvitations.map((invitation) => (
-                          <div key={invitation.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-md border border-neutral-200 text-xs">
-                            <span className="font-medium text-neutral-900">{invitation.email}</span>
-                            <span className={`px-2 py-0.5 rounded-full capitalize ${
+                          <div key={invitation.id} className="flex items-center justify-between gap-3 p-3 bg-neutral-50 rounded-md border border-neutral-200 text-xs">
+                            <span className="font-medium text-neutral-900 flex-shrink-0">{invitation.email}</span>
+                            <span className={`px-2 py-0.5 rounded-full capitalize flex-shrink-0 ${
                               invitation.role === 'admin'
                                 ? 'bg-red-100 text-red-800'
                                 : 'bg-yellow-100 text-yellow-800'
                             }`}>
                               {invitation.role}
                             </span>
-                            <span className="text-neutral-600">Invited by {invitation.invited_by?.name || 'Unknown'}</span>
-                            <span className="text-neutral-500">Expires {new Date(invitation.expires_at).toLocaleDateString()}</span>
+                            <span className="text-neutral-600 flex-shrink-0">Invited by {invitation.invited_by?.name || 'Unknown'}</span>
+                            <span className="text-neutral-500 flex-shrink-0">Expires {new Date(invitation.expires_at).toLocaleDateString()}</span>
+                            <button
+                              onClick={() => handleCancelInvitation(invitation.id, invitation.email)}
+                              disabled={processingInvitationId === invitation.id}
+                              className="flex items-center gap-1 px-2 py-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                              title="Cancel invitation"
+                            >
+                              {processingInvitationId === invitation.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <>
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Cancel</span>
+                                </>
+                              )}
+                            </button>
                           </div>
                         ))}
                       </div>
