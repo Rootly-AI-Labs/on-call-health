@@ -2232,26 +2232,31 @@ export default function useDashboard() {
     if (allActiveMembers.length === 0) return [];
 
     // Aggregate per-member OCH factors into team-level averages
-    const factorTotals: Record<string, { sum: number; count: number }> = {};
+    // Count members with scores >= 50 (affected threshold)
+    const factorTotals: Record<string, { sum: number; count: number; affected: number }> = {};
 
     for (const member of allActiveMembers) {
       const factors = (member as any)?.och_factors?.all;
       if (!Array.isArray(factors)) continue;
       for (const f of factors) {
         if (!f?.name || typeof f.percentage !== 'number') continue;
-        if (!factorTotals[f.name]) factorTotals[f.name] = { sum: 0, count: 0 };
+        if (!factorTotals[f.name]) factorTotals[f.name] = { sum: 0, count: 0, affected: 0 };
         factorTotals[f.name].sum += f.percentage;
         factorTotals[f.name].count += 1;
+        // Count members at or above the affected threshold (50/100)
+        if (f.percentage >= 50) {
+          factorTotals[f.name].affected += 1;
+        }
       }
     }
 
     return Object.entries(factorTotals)
-      .map(([name, { sum, count }]) => {
+      .map(([name, { sum, count, affected }]) => {
         const avgPct = sum / count;
         return {
           factor: name,
           value: Math.round(avgPct),
-          metrics: `${count} of ${allActiveMembers.length} members affected`,
+          metrics: `${affected} of ${allActiveMembers.length} members affected`,
           color: getFactorColor(Math.round(avgPct)),
           recommendation: getRecommendation(name),
           severity: avgPct >= 70 ? 'Critical' as const : avgPct >= 50 ? 'Poor' as const : avgPct >= 30 ? 'Fair' as const : 'Good' as const,
