@@ -30,7 +30,7 @@ class NotificationService:
             type='invitation',
             title=f"Invitation to join {invitation.organization.name}",
             message=f"You've been invited to join {invitation.organization.name} as a {invitation.role}.",
-            action_url=f"/invitations/accept/{invitation.id}",
+            action_url="/management",
             action_text="View Invitation",
             organization_invitation_id=invitation.id,
             priority='high',
