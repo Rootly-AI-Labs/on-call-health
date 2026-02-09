@@ -1009,7 +1009,11 @@ function TeamPageContent() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <h3 className="text-sm font-semibold text-neutral-900">Organization Members</h3>
-                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 text-xs font-medium text-neutral-700">{syncedUsers.length}</span>
+                            {loadingSyncedUsers ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                            ) : (
+                              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 text-xs font-medium text-neutral-700">{syncedUsers.length}</span>
+                            )}
                           </div>
                           <div className="w-80">
                             <div className="relative">
