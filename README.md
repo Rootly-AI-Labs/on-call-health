@@ -21,7 +21,7 @@ Get started at [www.oncallhealth.ai](https://www.oncallhealth.ai/) or [self-host
 
 ##  Methodology
 
-On-call Health takes inspiration from the [CBI](https://emerge.ucsd.edu/r_2qfb6wi4uepyugd/) to measure overwork risk in professional settings. On-call Health isn't a medical or diagnostic tool; it is designed to help identify patterns and trends that may suggest overwork.
+On-call Health measures overwork risk in professional settings. On-call Health isn't a medical or diagnostic tool; it is designed to help identify patterns and trends that may suggest overwork.
 
 The tool is centered around 2 main metrics:
 * **On-Call Health (OCH) Score** — A composite score derived from all collected signals, reflecting an individual's incident response workload.
