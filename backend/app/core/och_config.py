@@ -2,8 +2,7 @@
 On-Call Health (OCH) Configuration Module
 
 This module implements the On-Call Health methodology for burnout assessment.
-OCH is inspired by the Copenhagen Burnout Inventory (CBI) which is scientifically validated
-and specifically adapted for software engineers and on-call work.
+OCH is scientifically informed and specifically adapted for software engineers and on-call work.
 
 OCH uses two dimensions for software engineers:
 1. Personal Burnout (6 items) - Physical and psychological fatigue/exhaustion
@@ -25,7 +24,7 @@ class OCHDimension(Enum):
 
 @dataclass
 class OCHConfig:
-    """On-Call Health Configuration - inspired by Copenhagen Burnout Inventory"""
+    """On-Call Health Configuration"""
 
     # OCH Dimension Weights (must sum to 1.0)
     # Research-informed: Personal factors (work-life balance) contribute more to burnout

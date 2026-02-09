@@ -127,8 +127,8 @@ class UnifiedBurnoutAnalyzer:
         self.jira_token = jira_token
         self.linear_token = linear_token
 
-        # Using On-Call Health (OCH) methodology (inspired by Copenhagen Burnout Inventory)
-        logger.info("Unified analyzer using Copenhagen Burnout Inventory methodology")
+        # Using On-Call Health (OCH) methodology
+        logger.info("Unified analyzer using On-Call Health (OCH) methodology")
         self.organization_name = organization_name
 
         # Store synced users if provided (from Team Sync feature)
@@ -1917,7 +1917,7 @@ class UnifiedBurnoutAnalyzer:
         composite_och = calculate_composite_och_score(personal_och['score'], work_och['score'])
         
         # Prepare enhanced metrics with research insights for OCH reasoning
-        # Use rate-based compound trauma calculation (CBI/sRPE methodology)
+        # Use rate-based compound trauma calculation (OCH/sRPE methodology)
         days_analyzed = metrics.get("days_analyzed") or 30
         weeks_analyzed = max(1, days_analyzed / 7)
         critical_incidents_raw = severity_dist.get('sev0', 0) + severity_dist.get('sev1', 0)
@@ -2316,7 +2316,7 @@ class UnifiedBurnoutAnalyzer:
             "incident_response_after_hours": incident_response_after_hours,
             "incident_response_weekend": incident_response_weekend,
             "total_incident_responses": total_incident_responses,
-            # Time period for rate normalization (CBI/sRPE methodology)
+            # Time period for rate normalization (OCH/sRPE methodology)
             "days_analyzed": safe_days,
             "total_incidents": safe_incidents_len
         }
@@ -2883,12 +2883,12 @@ class UnifiedBurnoutAnalyzer:
     
     def _calculate_work_burnout_och(self, metrics: Dict[str, Any]) -> float:
         """
-        Calculate Work-Related Burnout using CBI/sRPE-inspired methodology (0-10 scale).
+        Calculate Work-Related Burnout using OCH/sRPE-inspired methodology (0-10 scale).
 
         Key principle: Use WEEKLY RATES instead of raw counts to ensure consistent
         scoring across different analysis periods (7, 30, 90 days).
 
-        Based on Copenhagen Burnout Inventory (averaged scores) and sRPE (rate-based load).
+        Based on OCH (averaged scores) and sRPE (rate-based load).
         """
         severity_dist = metrics.get("severity_distribution", {}) or {}
 
@@ -3032,7 +3032,7 @@ class UnifiedBurnoutAnalyzer:
         Calculate compound trauma factor based on WEEKLY RATE of critical incidents.
 
         This rate-based approach ensures consistent scoring across different analysis
-        periods (7, 30, 90 days), following CBI/sRPE methodology principles.
+        periods (7, 30, 90 days), following OCH/sRPE methodology principles.
 
         Research basis: Sustained high-frequency critical incidents create compound trauma.
         - 1.5-3 critical/week: 10% compound effect (sustained moderate stress)
@@ -4668,7 +4668,7 @@ class UnifiedBurnoutAnalyzer:
         - 50-74: Poor (orange)
         - 75-100: Critical (red)
         
-        Based on Copenhagen Burnout Inventory methodology. NO hardcoded values.
+        Uses OCH scoring model. NO hardcoded values.
         """
         
         try:

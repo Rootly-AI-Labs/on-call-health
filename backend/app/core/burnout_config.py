@@ -5,7 +5,7 @@ This module provides a single source of truth for all burnout calculation parame
 risk thresholds, scoring weights, and factor calculations. This ensures consistency
 across all analyzers and components.
 
-Based on the Copenhagen Burnout Inventory (CBI) and On-Call Health (OCH) methodology.
+Uses the OCH scoring model for risk assessment.
 """
 from typing import Dict, Tuple, Any
 from dataclasses import dataclass
@@ -16,7 +16,7 @@ class BurnoutConfig:
     """Centralized configuration for burnout analysis."""
     
     # Risk Level Thresholds (0-10 scale where higher = more burnout)
-    # Based on clinical research and Copenhagen Burnout Inventory percentile distributions
+    # Based on clinical research and OCH percentile distributions
     RISK_THRESHOLDS = {
         'low': (0.0, 3.0),        # 0-30% - Healthy work patterns
         'medium': (3.0, 5.5),     # 30-55% - Some stress signals
@@ -24,7 +24,7 @@ class BurnoutConfig:
         'critical': (7.5, 10.0)   # 75-100% - Severe burnout indicators
     }
 
-    # Copenhagen Burnout Inventory Dimension Weights (must sum to 1.0)
+    # OCH Dimension Weights (must sum to 1.0)
     # Based on OCH methodology - only 2 dimensions for software engineers
     # Research shows personal factors (work-life balance) contribute more to burnout
     OCH_WEIGHTS = {
