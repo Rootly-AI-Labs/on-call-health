@@ -778,31 +778,28 @@ function TeamPageContent() {
   const getUserIntegrations = (user: any) => {
     const integrations = []
 
-    // Only show GitHub if user is mapped AND exists in fetched data
+    // Only show GitHub if user is mapped AND exists in current integration data
     if (user.github_username && connectedIntegrations.has('github')) {
-      // GitHub usernames are display names, so just check if it exists in the list
-      // If githubUsers array is empty, we haven't loaded yet, so be conservative
-      if (githubUsers.length === 0 || githubUsers.includes(user.github_username)) {
+      // Only show logo if data is loaded AND user exists in the current integration
+      if (githubUsers.length > 0 && githubUsers.includes(user.github_username)) {
         integrations.push('github')
       }
     }
 
-    // Only show Jira if user is mapped AND exists in fetched data
+    // Only show Jira if user is mapped AND exists in current integration data
     if (user.jira_account_id && connectedIntegrations.has('jira')) {
-      // Jira uses account IDs, need to find the user in the array
-      // If jiraUsers array is empty, we haven't loaded yet, so be conservative
-      if (jiraUsers.length === 0 || jiraUsers.some(u =>
+      // Only show logo if data is loaded AND user exists in the current integration
+      if (jiraUsers.length > 0 && jiraUsers.some(u =>
         u.account_id === user.jira_account_id || u.accountId === user.jira_account_id
       )) {
         integrations.push('jira')
       }
     }
 
-    // Only show Linear if user is mapped AND exists in fetched data
+    // Only show Linear if user is mapped AND exists in current integration data
     if (user.linear_user_id && connectedIntegrations.has('linear')) {
-      // Linear uses user IDs, need to find the user in the array
-      // If linearUsers array is empty, we haven't loaded yet, so be conservative
-      if (linearUsers.length === 0 || linearUsers.some(u => u.id === user.linear_user_id)) {
+      // Only show logo if data is loaded AND user exists in the current integration
+      if (linearUsers.length > 0 && linearUsers.some(u => u.id === user.linear_user_id)) {
         integrations.push('linear')
       }
     }
