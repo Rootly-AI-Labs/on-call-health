@@ -1204,9 +1204,9 @@ function DashboardContent() {
                   <Alert className="border-amber-200 bg-amber-50 py-2 px-3">
                     <AlertCircle className="w-4 h-4 text-amber-600" />
                     <AlertDescription className="text-amber-800 text-sm">
-                      <strong>No team members synced</strong>
+                      <strong>No Org members synced</strong>
                       <span className="block mt-1">
-                        Visit the integrations page to sync your team members for analysis.
+                        Visit the integrations page to sync your Org members for analysis.
                       </span>
                       <button
                         onClick={() => {
@@ -1228,21 +1228,21 @@ function DashboardContent() {
                     <div className="flex items-center space-x-2">
                       <Users className="w-4 h-4 text-neutral-500" />
                       <span className="text-sm font-medium text-neutral-700">
-                        {syncedCount} team {syncedCount === 1 ? 'member' : 'members'} synced
+                        {syncedCount} Org {syncedCount === 1 ? 'member' : 'members'} synced
                       </span>
                     </div>
                     <button
                       onClick={() => {
                         setShowTimeRangeDialog(false)
-                        router.push('/integrations')
+                        router.push('/management')
                       }}
                       className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
                     >
-                      Manage team
+                      Manage Org
                     </button>
                   </div>
                   <p className="text-xs text-neutral-500 mt-1">
-                    Sync team members if there are changes to your organization
+                    Sync Org members if there are changes to your organization
                   </p>
                 </div>
               );
