@@ -288,14 +288,14 @@ async def accept_invitation_page(
             detail="This invitation is for a different email address"
         )
 
-    # Check if user is already in an organization
-    if current_user.organization_id and current_user.organization_id != invitation.organization_id:
+    # Check if user is already in the SAME organization
+    if current_user.organization_id and current_user.organization_id == invitation.organization_id:
         raise HTTPException(
             status_code=400,
-            detail="You are already a member of another organization"
+            detail="You are already a member of this organization"
         )
 
-    # Process acceptance
+    # Process acceptance (allows switching organizations)
     try:
         # Update user's organization
         current_user.organization_id = invitation.organization_id
@@ -370,14 +370,14 @@ async def accept_invitation_api(
             detail="This invitation is for a different email address"
         )
 
-    # Check if user is already in an organization
-    if current_user.organization_id and current_user.organization_id != invitation.organization_id:
+    # Check if user is already in the SAME organization
+    if current_user.organization_id and current_user.organization_id == invitation.organization_id:
         raise HTTPException(
             status_code=400,
-            detail="You are already a member of another organization"
+            detail="You are already a member of this organization"
         )
 
-    # Process acceptance
+    # Process acceptance (allows switching organizations)
     try:
         # Update user's organization
         current_user.organization_id = invitation.organization_id
