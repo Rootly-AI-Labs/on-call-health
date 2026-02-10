@@ -4864,10 +4864,12 @@ class UnifiedBurnoutAnalyzer:
                 # Calculate GitHub OCH contribution (0-100 scale)
                 github_och_contribution = 0.0
                 if has_github_username and (commits_count > 0 or commits_per_week > 0):
-                    github_och_contribution = self._calculate_github_burnout_score(
+                    # _calculate_github_burnout_score returns 0-10 scale, convert to 0-100
+                    github_burnout_0_10 = self._calculate_github_burnout_score(
                         commits_count, commits_per_week, after_hours_commits, weekend_commits
                     )
-                    # Ensure it's on 0-100 scale
+                    # Convert from 0-10 scale to 0-100 scale for OCH
+                    github_och_contribution = github_burnout_0_10 * 10.0
                     github_och_contribution = max(0.0, min(100.0, github_och_contribution))
 
                 # Only update if there's GitHub activity
