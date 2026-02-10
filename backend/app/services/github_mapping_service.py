@@ -187,16 +187,30 @@ class GitHubMappingService:
             
         logger.debug(f"🔄 Refreshing activity for {email} -> {username}")
 
+        # Get organization_id from analysis for proper UserCorrelation filtering
+        organization_id = None
+        try:
+            from ..models import Analysis
+            analysis = self.db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if analysis:
+                organization_id = analysis.organization_id
+        except Exception as e:
+            logger.debug(f"Could not retrieve organization_id from analysis: {e}")
+
         # Get timezone from UserCorrelation for accurate after-hours detection
         user_timezone = 'UTC'  # Default to UTC
         try:
             from ..models import UserCorrelation
             from sqlalchemy import desc
-            # Order by ID DESC to get most recent record, prefer records with github_username
-            user_correlation = self.db.query(UserCorrelation).filter(
+            # Filter by organization_id to avoid cross-org contamination
+            filters = [
                 UserCorrelation.email == email,
                 UserCorrelation.user_id.is_(None)  # Team roster only
-            ).order_by(
+            ]
+            if organization_id:
+                filters.append(UserCorrelation.organization_id == organization_id)
+
+            user_correlation = self.db.query(UserCorrelation).filter(*filters).order_by(
                 UserCorrelation.github_username.isnot(None).desc(),  # Prefer records with username
                 desc(UserCorrelation.id)  # Most recent first
             ).first()
@@ -248,7 +262,8 @@ class GitHubMappingService:
                 days=days,
                 github_token=github_token,
                 user_id=user_id,
-                email_to_name=email_to_name
+                email_to_name=email_to_name,
+                analysis_id=analysis_id
             )
             if result is None:
                 logger.warning("collect_team_github_data returned None - possible API or auth issue")

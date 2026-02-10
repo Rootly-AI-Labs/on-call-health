@@ -757,7 +757,7 @@ class GitHubCollector:
         self.last_request_time = time.time()
 
 
-async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None, timezone: str = 'UTC', email_to_name: Optional[Dict[str, str]] = None) -> Dict[str, Dict]:
+async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None, timezone: str = 'UTC', email_to_name: Optional[Dict[str, str]] = None, analysis_id: Optional[int] = None) -> Dict[str, Dict]:
     """
     Collect GitHub data for all team members.
 
@@ -768,12 +768,26 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
         user_id: User ID for checking manual mappings
         timezone: User's timezone for business hours calculation (default: 'UTC')
         email_to_name: Optional mapping of email -> full name for name-based matching
+        analysis_id: Analysis ID for organization context
 
     Returns:
         Dict mapping email -> github_activity_data
     """
     collector = GitHubCollector()
     github_data = {}
+
+    # Get organization_id from analysis for proper UserCorrelation filtering
+    organization_id = None
+    if analysis_id is not None:
+        try:
+            from ..models import SessionLocal, Analysis
+            db = SessionLocal()
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if analysis:
+                organization_id = analysis.organization_id
+            db.close()
+        except Exception as e:
+            logger.debug(f"Could not retrieve organization_id from analysis: {e}")
 
     for email in team_emails:
         try:
@@ -786,11 +800,15 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
                     from ..models import SessionLocal, UserCorrelation
                     from sqlalchemy import desc
                     db = SessionLocal()
-                    # Order by ID DESC to get most recent record, prefer records with github_username
-                    user_correlation = db.query(UserCorrelation).filter(
+                    # Filter by organization_id to avoid cross-org contamination
+                    filters = [
                         UserCorrelation.email == email,
                         UserCorrelation.user_id.is_(None)  # Team roster only
-                    ).order_by(
+                    ]
+                    if organization_id:
+                        filters.append(UserCorrelation.organization_id == organization_id)
+
+                    user_correlation = db.query(UserCorrelation).filter(*filters).order_by(
                         UserCorrelation.github_username.isnot(None).desc(),  # Prefer records with username
                         desc(UserCorrelation.id)  # Most recent first
                     ).first()
