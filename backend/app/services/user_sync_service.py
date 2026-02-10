@@ -1089,7 +1089,7 @@ class UserSyncService:
         try:
             from app.models import SlackWorkspaceMapping, SlackIntegration
             from app.api.endpoints.slack import decrypt_token
-            import requests
+            import httpx
 
             # Check for Slack workspace mapping
             logger.info(f"🔍 SLACK_MATCH: Checking Slack workspace for user {user.id}, email={user.email}, org_id={user.organization_id}")
@@ -1132,12 +1132,12 @@ class UserSyncService:
                 logger.error(f"❌ SLACK_MATCH: Failed to decrypt Slack token: {e}")
                 return None
 
-            # Fetch Slack workspace members (using sync requests to avoid event loop issues)
-            response = requests.get(
-                "https://slack.com/api/users.list",
-                headers={"Authorization": f"Bearer {access_token}"},
-                timeout=30
-            )
+            # Fetch Slack workspace members using async httpx
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    "https://slack.com/api/users.list",
+                    headers={"Authorization": f"Bearer {access_token}"}
+                )
 
             if response.status_code != 200:
                 logger.error(f"Slack API returned status {response.status_code}")

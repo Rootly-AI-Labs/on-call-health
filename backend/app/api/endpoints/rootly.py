@@ -2318,15 +2318,27 @@ async def update_user_correlation_slack_mapping(
             message = "Slack mapping cleared"
         else:
             # Before assigning the new Slack user, remove it from any other UserCorrelation records
+            # SECURITY: Scope conflict resolution to same organization to prevent cross-tenant data corruption
             removed_count = 0
 
             # Find all OTHER correlations with this Slack user (excluding current correlation)
-            conflicting_correlations = db.query(UserCorrelation).filter(
-                UserCorrelation.id != correlation_id,
-                UserCorrelation.slack_user_id == slack_user_id
-            ).all()
+            # Scoped to same organization/user isolation context
+            if current_user.organization_id:
+                # Org mode: only check within the same organization
+                conflicting_correlations = db.query(UserCorrelation).filter(
+                    UserCorrelation.id != correlation_id,
+                    UserCorrelation.organization_id == current_user.organization_id,
+                    UserCorrelation.slack_user_id == slack_user_id
+                ).all()
+            else:
+                # Beta mode: only check within current user's personal correlations
+                conflicting_correlations = db.query(UserCorrelation).filter(
+                    UserCorrelation.id != correlation_id,
+                    UserCorrelation.user_id == current_user.id,
+                    UserCorrelation.slack_user_id == slack_user_id
+                ).all()
 
-            logger.info(f"🔍 Found {len(conflicting_correlations)} other UserCorrelation records with Slack user '{slack_user_id}'")
+            logger.info(f"🔍 Found {len(conflicting_correlations)} other UserCorrelation records with Slack user '{slack_user_id}' in current org/user context")
 
             for other_correlation in conflicting_correlations:
                 logger.info(
