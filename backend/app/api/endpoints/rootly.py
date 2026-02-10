@@ -2256,3 +2256,129 @@ async def update_user_correlation_linear_mapping(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update Linear mapping: {str(e)}"
         )
+
+
+@router.patch("/user-correlation/{correlation_id}/slack-mapping")
+async def update_user_correlation_slack_mapping(
+    correlation_id: int,
+    slack_user_id: str = "",
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually update Slack user mapping for a UserCorrelation.
+    Enforces exclusive one-to-one mapping across all users in the organization.
+
+    Args:
+        slack_user_id: Slack user ID to assign. Empty string or whitespace clears the mapping.
+
+    Behavior:
+        - Empty/whitespace slack_user_id: Clears the Slack mapping (sets to None)
+        - Valid slack_user_id: Assigns to this user and removes from any other user
+
+    If ANY other user already has this Slack user_id, it will be removed from them first.
+    Used for dropdown selection in Team Members panel.
+    """
+    try:
+        from sqlalchemy import or_, and_
+
+        # Fetch the correlation - handle both personal and org-scoped correlations
+        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
+        correlation = db.query(UserCorrelation).filter(
+            UserCorrelation.id == correlation_id,
+            or_(
+                UserCorrelation.user_id == current_user.id,
+                and_(
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.organization_id.isnot(None),
+                    UserCorrelation.organization_id == current_user.organization_id
+                )
+            )
+        ).first()
+
+        if not correlation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User correlation not found or doesn't belong to your organization"
+            )
+
+        logger.info(f"SLACK MAPPING: Found correlation {correlation_id} for user {current_user.id}, email={correlation.email}, user_id={correlation.user_id}")
+
+        slack_user_id = (slack_user_id or "").strip()
+        old_slack_id = correlation.slack_user_id
+
+        if slack_user_id == "":
+            # Clear the mapping
+            correlation.slack_user_id = None
+            db.commit()
+            logger.info(
+                f"User {current_user.id} cleared Slack mapping for {correlation.email} "
+                f"(was: {old_slack_id})"
+            )
+            message = "Slack mapping cleared"
+        else:
+            # Before assigning the new Slack user, remove it from any other UserCorrelation records
+            # SECURITY: Scope conflict resolution to same organization to prevent cross-tenant data corruption
+            removed_count = 0
+
+            # Find all OTHER correlations with this Slack user (excluding current correlation)
+            # Scoped to same organization/user isolation context
+            if current_user.organization_id:
+                # Org mode: only check within the same organization
+                conflicting_correlations = db.query(UserCorrelation).filter(
+                    UserCorrelation.id != correlation_id,
+                    UserCorrelation.organization_id == current_user.organization_id,
+                    UserCorrelation.slack_user_id == slack_user_id
+                ).all()
+            else:
+                # Beta mode: only check within current user's personal correlations
+                conflicting_correlations = db.query(UserCorrelation).filter(
+                    UserCorrelation.id != correlation_id,
+                    UserCorrelation.user_id == current_user.id,
+                    UserCorrelation.slack_user_id == slack_user_id
+                ).all()
+
+            logger.info(f"🔍 Found {len(conflicting_correlations)} other UserCorrelation records with Slack user '{slack_user_id}' in current org/user context")
+
+            for other_correlation in conflicting_correlations:
+                logger.info(
+                    f"🗑️  Removing Slack '{slack_user_id}' from UserCorrelation {other_correlation.id}: "
+                    f"{other_correlation.name} ({other_correlation.email})"
+                )
+                other_correlation.slack_user_id = None
+                removed_count += 1
+
+            # Set the new mapping
+            correlation.slack_user_id = slack_user_id
+            db.commit()
+            logger.info(
+                f"✅ User {current_user.id} updated Slack mapping for {correlation.email}: "
+                f"{old_slack_id} → {slack_user_id} (removed from {removed_count} other records)"
+            )
+            message = "Slack mapping updated"
+            if removed_count > 0:
+                message += f" (removed from {removed_count} other user record(s))"
+
+        return {
+            "success": True,
+            "message": message,
+            "correlation": {
+                "id": correlation.id,
+                "email": correlation.email,
+                "name": correlation.name,
+                "slack_user_id": correlation.slack_user_id,
+                "github_username": correlation.github_username,
+                "jira_account_id": correlation.jira_account_id,
+                "linear_user_id": correlation.linear_user_id
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update Slack mapping: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update Slack mapping: {str(e)}"
+        )
