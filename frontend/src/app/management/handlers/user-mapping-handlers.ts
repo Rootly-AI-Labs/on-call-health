@@ -11,6 +11,7 @@ export async function updateUserCorrelation(
     jira_account_id?: string
     jira_email?: string
     linear_user_id?: string
+    slack_user_id?: string
   }
 ): Promise<boolean> {
   const authToken = localStorage.getItem("auth_token")
@@ -56,6 +57,18 @@ export async function updateUserCorrelation(
       promises.push(
         fetch(
           `${API_BASE}/rootly/user-correlation/${userId}/linear-mapping?linear_user_id=${encodeURIComponent(updates.linear_user_id)}`,
+          {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${authToken}` },
+          }
+        )
+      )
+    }
+
+    if (updates.slack_user_id !== undefined) {
+      promises.push(
+        fetch(
+          `${API_BASE}/rootly/user-correlation/${userId}/slack-mapping?slack_user_id=${encodeURIComponent(updates.slack_user_id)}`,
           {
             method: "PATCH",
             headers: { Authorization: `Bearer ${authToken}` },
@@ -208,6 +221,34 @@ export async function fetchLinearUsers(
     return []
   } catch (error) {
     console.error("Error fetching Linear users:", error)
+    return []
+  }
+}
+
+/**
+ * Fetch available Slack users from workspace
+ */
+export async function fetchSlackUsers(
+  integrationId: string
+): Promise<any[]> {
+  const authToken = localStorage.getItem("auth_token")
+  if (!authToken) return []
+
+  try {
+    const response = await fetch(
+      `${API_BASE}/integrations/slack/slack-users`,
+      {
+        headers: { Authorization: `Bearer ${authToken}` },
+      }
+    )
+
+    if (response.ok) {
+      const data = await response.json()
+      return data.users || []
+    }
+    return []
+  } catch (error) {
+    console.error("Error fetching Slack users:", error)
     return []
   }
 }
