@@ -830,6 +830,15 @@ function TeamPageContent() {
       return true
     })
     .sort((a, b) => {
+      // Always show logged-in user at the top
+      const currentUserEmail = localStorage.getItem('user_email')?.toLowerCase()
+      const aIsCurrentUser = a.email?.toLowerCase() === currentUserEmail
+      const bIsCurrentUser = b.email?.toLowerCase() === currentUserEmail
+
+      if (aIsCurrentUser && !bIsCurrentUser) return -1
+      if (!aIsCurrentUser && bIsCurrentUser) return 1
+
+      // Then apply regular sorting
       if (!sortBy) return 0
 
       let comparison = 0
