@@ -128,9 +128,23 @@ async def collect_team_github_data_with_mapping(
             # Get full name for this email if available
             full_name = email_to_name.get(email) if email_to_name else None
 
-            # Collect data with full name for better matching
+            # Get timezone from UserCorrelation for accurate after-hours detection
+            user_timezone = 'UTC'  # Default to UTC
+            if db:
+                try:
+                    from ..models import UserCorrelation
+                    user_correlation = db.query(UserCorrelation).filter(
+                        UserCorrelation.email == email,
+                        UserCorrelation.user_id.is_(None)  # Team roster only
+                    ).first()
+                    if user_correlation and user_correlation.timezone:
+                        user_timezone = user_correlation.timezone
+                except Exception as tz_error:
+                    logger.debug(f"Could not retrieve timezone for {email}: {tz_error}")
+
+            # Collect data with full name and timezone for accurate after-hours detection
             user_data = await collector.collect_github_data_for_user(
-                email, days, github_token, user_id, full_name=full_name
+                email, days, github_token, user_id, full_name=full_name, timezone=user_timezone
             )
             if user_data:
                 github_data[email] = user_data
