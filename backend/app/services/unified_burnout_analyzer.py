@@ -4891,7 +4891,8 @@ class UnifiedBurnoutAnalyzer:
                 commits_per_week = github_activity.get("commits_per_week", 0) or 0
                 after_hours_commits = github_activity.get("after_hours_commits", 0) or 0
                 weekend_commits = github_activity.get("weekend_commits", 0) or 0
-                has_github_username = github_activity.get("username")
+                # Get github_username from member, not from github_activity (it's not in activity_data)
+                has_github_username = member.get("github_username")
 
                 # FALLBACK: Calculate commits_per_week from commits_count if missing
                 if commits_per_week == 0 and commits_count > 0:
