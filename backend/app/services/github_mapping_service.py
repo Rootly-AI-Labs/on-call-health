@@ -186,11 +186,29 @@ class GitHubMappingService:
             return None
             
         logger.debug(f"🔄 Refreshing activity for {email} -> {username}")
-        
+
+        # Get timezone from UserCorrelation for accurate after-hours detection
+        user_timezone = 'UTC'  # Default to UTC
         try:
-            # Get fresh activity data using cached username
+            from ..models import UserCorrelation
+            from sqlalchemy import desc
+            # Order by ID DESC to get most recent record, prefer records with github_username
+            user_correlation = self.db.query(UserCorrelation).filter(
+                UserCorrelation.email == email,
+                UserCorrelation.user_id.is_(None)  # Team roster only
+            ).order_by(
+                UserCorrelation.github_username.isnot(None).desc(),  # Prefer records with username
+                desc(UserCorrelation.id)  # Most recent first
+            ).first()
+            if user_correlation and user_correlation.timezone:
+                user_timezone = user_correlation.timezone
+        except Exception as tz_error:
+            logger.debug(f"Could not retrieve timezone for {email}: {tz_error}")
+
+        try:
+            # Get fresh activity data using cached username and user's timezone
             user_data = await self.github_collector.collect_github_data_for_user(
-                email, days, github_token
+                email, days, github_token, timezone=user_timezone
             )
             
             if user_data and isinstance(user_data, dict):
