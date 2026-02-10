@@ -177,6 +177,26 @@ class UserSyncService:
                 stats['linear_skipped'] = 0
                 stats['linear_error'] = error_msg
 
+            # After syncing Rootly/PagerDuty users, try to match Slack user IDs
+            # Wrap in try-except to ensure Slack failures don't block other operations
+            try:
+                slack_stats = await self._match_slack_users(current_user)
+                if slack_stats:
+                    stats['slack_matched'] = slack_stats['matched']
+                    stats['slack_skipped'] = slack_stats['skipped']
+                    logger.info(
+                        f"Slack matching: {slack_stats['matched']} users matched, "
+                        f"{slack_stats['skipped']} skipped"
+                    )
+                # If None is returned (no Slack integration), don't set stats
+                # This prevents frontend from showing "Matched 0 users to Slack"
+            except Exception as e:
+                error_msg = f"Slack matching failed: {str(e)}"
+                logger.error(f"{error_msg} - continuing with other operations")
+                stats['slack_matched'] = 0
+                stats['slack_skipped'] = 0
+                stats['slack_error'] = error_msg
+
             return stats
 
         except Exception as e:
@@ -437,15 +457,11 @@ class UserSyncService:
         # This ensures manually set GitHub usernames persist across syncs
         self._restore_github_usernames_from_mappings(current_user)
 
-        # Auto-sync Slack IDs if Slack is connected
-        slack_sync_stats = self._auto_sync_slack_ids(current_user)
-
         return {
             "created": created,
             "updated": updated,
             "skipped": skipped,
-            "total": len(users),
-            "slack_synced": slack_sync_stats.get("updated", 0) if slack_sync_stats else 0
+            "total": len(users)
         }
 
     def _ensure_user_records_exist(self, current_user: User) -> int:
@@ -1046,26 +1062,26 @@ class UserSyncService:
             self.db.rollback()
             return 0
 
-    def _auto_sync_slack_ids(self, current_user: User) -> Optional[Dict[str, int]]:
+    async def _match_slack_users(self, user: User) -> Optional[Dict[str, int]]:
         """
-        Automatically sync Slack user IDs after user sync completes.
-        This ensures Slack IDs are populated in one operation.
+        Match all synced users to Slack accounts using email matching.
 
-        Returns statistics about Slack sync or None if Slack not connected.
+        This uses email exact matching to link user_correlations with Slack user IDs.
+
+        Returns statistics about matching results.
         """
         try:
-            # Check if user has Slack connected
-            from ..models import SlackWorkspaceMapping, SlackIntegration
-            from ..api.endpoints.slack import decrypt_token, mask_email
-            import httpx
+            from app.models import SlackWorkspaceMapping, SlackIntegration
+            from app.api.endpoints.slack import decrypt_token
+            import requests
 
             # Check for Slack workspace mapping
             workspace_mapping = self.db.query(SlackWorkspaceMapping).filter(
-                SlackWorkspaceMapping.organization_id == current_user.organization_id
+                SlackWorkspaceMapping.organization_id == user.organization_id
             ).first()
 
             if not workspace_mapping:
-                logger.debug("No Slack workspace connected - skipping auto-sync")
+                logger.info("Skipping Slack matching - no Slack workspace connected")
                 return None
 
             # Get Slack integration for token
@@ -1074,40 +1090,37 @@ class UserSyncService:
             ).first()
 
             if not slack_integration:
-                logger.debug("No Slack integration found - skipping auto-sync")
+                logger.info("Skipping Slack matching - no Slack integration found")
                 return None
 
-            logger.info(f"🔄 AUTO-SYNC: Starting automatic Slack ID sync for org {current_user.organization_id}")
+            logger.info(f"Starting Slack account matching for user {user.id}")
 
             # Decrypt token
             try:
                 access_token = decrypt_token(slack_integration.slack_token)
             except Exception as e:
-                logger.error(f"Failed to decrypt Slack token for auto-sync: {e}")
+                logger.error(f"Failed to decrypt Slack token: {e}")
                 return None
 
-            # Fetch Slack workspace members
-            import asyncio
-            async def fetch_slack_members():
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(
-                        "https://slack.com/api/users.list",
-                        headers={"Authorization": f"Bearer {access_token}"}
-                    )
-                    if response.status_code == 200:
-                        return response.json()
-                    return None
+            # Fetch Slack workspace members (using sync requests to avoid event loop issues)
+            response = requests.get(
+                "https://slack.com/api/users.list",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=30
+            )
 
-            # Run async operation
-            loop = asyncio.get_event_loop()
-            data = loop.run_until_complete(fetch_slack_members())
+            if response.status_code != 200:
+                logger.error(f"Slack API returned status {response.status_code}")
+                return None
+
+            data = response.json()
 
             if not data or not data.get("ok"):
-                logger.error(f"Slack API error during auto-sync: {data.get('error') if data else 'unknown'}")
+                logger.error(f"Slack API error: {data.get('error') if data else 'unknown'}")
                 return None
 
             members = data.get("members", [])
-            logger.info(f"🔄 AUTO-SYNC: Fetched {len(members)} Slack members")
+            logger.info(f"Fetched {len(members)} Slack members")
 
             # Build email -> slack_user_id mapping
             email_to_slack_id = {
@@ -1119,40 +1132,76 @@ class UserSyncService:
                 and member.get("id")
             }
 
-            logger.info(f"🔄 AUTO-SYNC: Built mapping for {len(email_to_slack_id)} Slack users")
+            if not email_to_slack_id:
+                logger.info("No Slack users found to match")
+                return {"matched": 0, "skipped": 0}
 
-            # Query user_correlations (team roster only)
-            correlations = self.db.query(UserCorrelation).filter(
-                UserCorrelation.organization_id == current_user.organization_id,
-                UserCorrelation.organization_id.isnot(None),
-                UserCorrelation.user_id.is_(None),  # Team roster only
-                UserCorrelation.email.in_(list(email_to_slack_id.keys()))
-            ).all()
-
-            logger.info(f"🔄 AUTO-SYNC: Found {len(correlations)} correlations to update")
-
-            # Update Slack IDs
-            updated = 0
-            for correlation in correlations:
-                slack_id = email_to_slack_id.get(correlation.email.lower())
-                if slack_id and correlation.slack_user_id != slack_id:
-                    correlation.slack_user_id = slack_id
-                    updated += 1
-
-            # Commit updates
-            if updated > 0:
-                self.db.commit()
-                logger.info(f"✅ AUTO-SYNC: Synced Slack IDs for {updated} users")
+            # Get all synced users without Slack IDs
+            # For org mode: match team roster (user_id IS NULL)
+            # For personal mode: match personal correlations (user_id == user.id)
+            if user.organization_id:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.slack_user_id.is_(None)
+                ).all()
             else:
-                logger.info(f"ℹ️  AUTO-SYNC: No Slack IDs needed updating")
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user.id,
+                    UserCorrelation.slack_user_id.is_(None)
+                ).all()
 
-            return {
-                "updated": updated,
-                "total": len(correlations)
-            }
+            if not correlations:
+                logger.info("No users need Slack matching")
+                return {"matched": 0, "skipped": 0}
+
+            logger.info(f"Found {len(correlations)} users to match with {len(email_to_slack_id)} Slack users")
+
+            matched = 0
+            skipped = 0
+
+            # Try to match each correlation to a Slack user
+            for correlation in correlations:
+                # Check if there's a manual mapping for this user's Slack account
+                # Manual mappings should take precedence over automatic matching
+                manual_mapping = self.db.query(UserMapping).filter(
+                    and_(
+                        UserMapping.user_id == user.id,
+                        UserMapping.source_identifier == correlation.email,
+                        UserMapping.target_platform == "slack",
+                        UserMapping.mapping_type == "manual"
+                    )
+                ).first()
+
+                if manual_mapping:
+                    # Manual mapping exists - respect it and don't overwrite
+                    logger.info(f"⚠️  Skipping {correlation.email} - manual Slack mapping exists: {manual_mapping.target_identifier}")
+                    skipped += 1
+                    continue
+
+                # Try exact email match
+                if correlation.email:
+                    slack_id = email_to_slack_id.get(correlation.email.lower())
+                    if slack_id:
+                        correlation.slack_user_id = slack_id
+                        matched += 1
+                        logger.info(f"✅ Matched {correlation.email} to Slack ID {slack_id}")
+                    else:
+                        logger.debug(f"No Slack match for {correlation.email}")
+                        skipped += 1
+                else:
+                    logger.debug(f"Skipping correlation without email")
+                    skipped += 1
+
+            # Commit changes
+            if matched > 0:
+                self.db.commit()
+                logger.info(f"Successfully matched {matched} users to Slack accounts")
+
+            return {"matched": matched, "skipped": skipped}
 
         except Exception as e:
-            logger.error(f"Error during Slack auto-sync: {e}")
+            logger.error(f"Error matching Slack users: {e}")
             self.db.rollback()
             return None
 
