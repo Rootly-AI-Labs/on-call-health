@@ -158,12 +158,13 @@ class GitHubCollector:
 
             db = SessionLocal()
             try:
-                # Query for synced member - match by email only (don't filter by user_id)
-                # This allows synced members to be shared across the organization
+                # Query for synced member from team roster only (user_id IS NULL)
+                # This avoids duplicate personal correlations with missing/incorrect data
                 user_correlation = db.query(UserCorrelation).filter(
                     UserCorrelation.email == email,
                     UserCorrelation.github_username.isnot(None),
-                    UserCorrelation.github_username != ''
+                    UserCorrelation.github_username != '',
+                    UserCorrelation.user_id.is_(None)  # Team roster only
                 ).first()
 
                 if user_correlation and user_correlation.github_username:
@@ -756,7 +757,7 @@ class GitHubCollector:
         self.last_request_time = time.time()
 
 
-async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None, timezone: str = 'UTC', email_to_name: Optional[Dict[str, str]] = None) -> Dict[str, Dict]:
+async def collect_team_github_data(team_emails: List[str], days: int = 30, github_token: str = None, user_id: Optional[int] = None, timezone: str = 'UTC', email_to_name: Optional[Dict[str, str]] = None, analysis_id: Optional[int] = None) -> Dict[str, Dict]:
     """
     Collect GitHub data for all team members.
 
@@ -767,6 +768,7 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
         user_id: User ID for checking manual mappings
         timezone: User's timezone for business hours calculation (default: 'UTC')
         email_to_name: Optional mapping of email -> full name for name-based matching
+        analysis_id: Analysis ID for organization context
 
     Returns:
         Dict mapping email -> github_activity_data
@@ -774,10 +776,49 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
     collector = GitHubCollector()
     github_data = {}
 
+    # Get organization_id from analysis for proper UserCorrelation filtering
+    organization_id = None
+    if analysis_id is not None:
+        try:
+            from ..models import SessionLocal, Analysis
+            db = SessionLocal()
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if analysis:
+                organization_id = analysis.organization_id
+            db.close()
+        except Exception as e:
+            logger.debug(f"Could not retrieve organization_id from analysis: {e}")
+
     for email in team_emails:
         try:
             full_name = email_to_name.get(email) if email_to_name else None
-            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, full_name=full_name, timezone=timezone)
+
+            # Get user-specific timezone from UserCorrelation if available
+            user_timezone = timezone  # Use parameter as fallback
+            if user_id is not None:
+                try:
+                    from ..models import SessionLocal, UserCorrelation
+                    from sqlalchemy import desc
+                    db = SessionLocal()
+                    # Filter by organization_id to avoid cross-org contamination
+                    filters = [
+                        UserCorrelation.email == email,
+                        UserCorrelation.user_id.is_(None)  # Team roster only
+                    ]
+                    if organization_id:
+                        filters.append(UserCorrelation.organization_id == organization_id)
+
+                    user_correlation = db.query(UserCorrelation).filter(*filters).order_by(
+                        UserCorrelation.github_username.isnot(None).desc(),  # Prefer records with username
+                        desc(UserCorrelation.id)  # Most recent first
+                    ).first()
+                    if user_correlation and user_correlation.timezone:
+                        user_timezone = user_correlation.timezone
+                    db.close()
+                except Exception as tz_error:
+                    logger.debug(f"Could not retrieve timezone for {email}: {tz_error}")
+
+            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, full_name=full_name, timezone=user_timezone)
             if user_data:
                 github_data[email] = user_data
         except Exception as e:

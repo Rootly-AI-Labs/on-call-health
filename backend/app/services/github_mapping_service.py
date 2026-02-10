@@ -186,11 +186,43 @@ class GitHubMappingService:
             return None
             
         logger.debug(f"🔄 Refreshing activity for {email} -> {username}")
-        
+
+        # Get organization_id from analysis for proper UserCorrelation filtering
+        organization_id = None
         try:
-            # Get fresh activity data using cached username
+            from ..models import Analysis
+            analysis = self.db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if analysis:
+                organization_id = analysis.organization_id
+        except Exception as e:
+            logger.debug(f"Could not retrieve organization_id from analysis: {e}")
+
+        # Get timezone from UserCorrelation for accurate after-hours detection
+        user_timezone = 'UTC'  # Default to UTC
+        try:
+            from ..models import UserCorrelation
+            from sqlalchemy import desc
+            # Filter by organization_id to avoid cross-org contamination
+            filters = [
+                UserCorrelation.email == email,
+                UserCorrelation.user_id.is_(None)  # Team roster only
+            ]
+            if organization_id:
+                filters.append(UserCorrelation.organization_id == organization_id)
+
+            user_correlation = self.db.query(UserCorrelation).filter(*filters).order_by(
+                UserCorrelation.github_username.isnot(None).desc(),  # Prefer records with username
+                desc(UserCorrelation.id)  # Most recent first
+            ).first()
+            if user_correlation and user_correlation.timezone:
+                user_timezone = user_correlation.timezone
+        except Exception as tz_error:
+            logger.debug(f"Could not retrieve timezone for {email}: {tz_error}")
+
+        try:
+            # Get fresh activity data using cached username and user's timezone
             user_data = await self.github_collector.collect_github_data_for_user(
-                email, days, github_token
+                email, days, github_token, timezone=user_timezone
             )
             
             if user_data and isinstance(user_data, dict):
@@ -230,7 +262,8 @@ class GitHubMappingService:
                 days=days,
                 github_token=github_token,
                 user_id=user_id,
-                email_to_name=email_to_name
+                email_to_name=email_to_name,
+                analysis_id=analysis_id
             )
             if result is None:
                 logger.warning("collect_team_github_data returned None - possible API or auth issue")

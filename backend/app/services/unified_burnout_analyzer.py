@@ -1657,13 +1657,13 @@ class UnifiedBurnoutAnalyzer:
             
             # Generate reasoning for zero-incident OCH scores
             och_reasoning = generate_och_score_reasoning(
-                personal_och, 
-                work_och, 
+                personal_och,
+                work_och,
                 composite_och,
                 zero_och_metrics
             )
-            
-            return {
+
+            result = {
                 "user_id": user_id,
                 "user_name": user_name,
                 "user_email": user_email,
@@ -1704,6 +1704,48 @@ class UnifiedBurnoutAnalyzer:
                     "severity_distribution": {}
                 }
             }
+
+            # Add GitHub activity if available (for zero-incident users)
+            if github_data and github_data.get("activity_data"):
+                result["github_activity"] = github_data["activity_data"]
+            else:
+                # Add placeholder GitHub activity
+                result["github_activity"] = {
+                    "commits_count": 0,
+                    "pull_requests_count": 0,
+                    "reviews_count": 0,
+                    "after_hours_commits": 0,
+                    "weekend_commits": 0,
+                    "avg_pr_size": 0,
+                    "burnout_indicators": {
+                        "excessive_commits": False,
+                        "late_night_activity": False,
+                        "weekend_work": False,
+                        "large_prs": False
+                    }
+                }
+
+            # Add Slack activity if available (for zero-incident users)
+            if slack_data and slack_data.get("activity_data"):
+                result["slack_activity"] = slack_data["activity_data"]
+            else:
+                # Add placeholder Slack activity
+                result["slack_activity"] = {
+                    "messages_sent": 0,
+                    "channels_active": 0,
+                    "after_hours_messages": 0,
+                    "weekend_messages": 0,
+                    "avg_response_time_minutes": 0,
+                    "sentiment_score": 0.0,
+                    "burnout_indicators": {
+                        "excessive_messaging": False,
+                        "poor_sentiment": False,
+                        "late_responses": False,
+                        "after_hours_activity": False
+                    }
+                }
+
+            return result
         
         # Calculate base metrics from incidents and GitHub data
         days_analyzed = metadata.get("days_analyzed") or 30
@@ -4653,24 +4695,25 @@ class UnifiedBurnoutAnalyzer:
             return []
     
     def _calculate_individual_daily_health_score(
-        self, 
-        daily_data: Dict[str, Any], 
-        date_obj: datetime, 
+        self,
+        daily_data: Dict[str, Any],
+        date_obj: datetime,
         user_email: str,
         team_analysis: List[Dict[str, Any]]
     ) -> int:
         """
         Calculate individual daily OCH burnout score (0-100 scale, higher = worse burnout).
-        
+
         Aligned with main OCH Risk Level Scale:
         - 0-24: Healthy (green)
-        - 25-49: Fair (yellow) 
+        - 25-49: Fair (yellow)
         - 50-74: Poor (orange)
         - 75-100: Critical (red)
-        
+
         Uses OCH scoring model. NO hardcoded values.
+        Includes GitHub commit contributions distributed across commit dates.
         """
-        
+
         try:
             # Extract metrics from daily data
             incident_count = daily_data.get("incident_count", 0)
@@ -4679,8 +4722,13 @@ class UnifiedBurnoutAnalyzer:
             weekend_count = daily_data.get("weekend_count", 0)
             high_severity_count = daily_data.get("high_severity_count", 0)
 
+            # Extract GitHub metrics (distributed across commit dates)
+            github_commits = daily_data.get("github_commits_count", 0)
+            github_after_hours = daily_data.get("github_after_hours_commits", 0)
+            github_weekend = daily_data.get("github_weekend_commits", 0)
+
             # If there's no activity at all, risk is 0
-            if incident_count == 0 and after_hours_count == 0 and weekend_count == 0:
+            if incident_count == 0 and after_hours_count == 0 and weekend_count == 0 and github_commits == 0:
                 return 0
 
             # Calculate baseline health from team incident load (no hardcoded values)
@@ -4714,7 +4762,30 @@ class UnifiedBurnoutAnalyzer:
             # 3. WORK-LIFE BALANCE HEALTH PENALTIES
             after_hours_penalty = after_hours_count * 8  # 8 point penalty per after-hours incident
             weekend_penalty = weekend_count * 12         # 12 point penalty per weekend incident (higher impact)
-            
+
+            # 3.5. GITHUB WORK PATTERN PENALTIES (distributed across commit dates)
+            github_penalty = 0
+            if github_commits > 0:
+                # Base penalty for commits (indicates workload)
+                # Scale: 1-3 commits = light (2 pts/commit), 4-10 = moderate (3 pts/commit), 10+ = heavy (4 pts/commit)
+                if github_commits <= 3:
+                    github_penalty = github_commits * 2
+                elif github_commits <= 10:
+                    github_penalty = 6 + (github_commits - 3) * 3
+                else:
+                    github_penalty = 27 + (github_commits - 10) * 4
+
+                # Additional penalties for unhealthy patterns
+                if github_after_hours > 0:
+                    # After-hours coding adds extra stress beyond normal workload
+                    github_after_hours_penalty = github_after_hours * 5  # 5 points per after-hours commit
+                    github_penalty += github_after_hours_penalty
+
+                if github_weekend > 0:
+                    # Weekend coding is especially concerning for burnout
+                    github_weekend_penalty = github_weekend * 8  # 8 points per weekend commit
+                    github_penalty += github_weekend_penalty
+
             # 4. CRITICAL INCIDENT MULTIPLIER
             # High severity incidents have compounding health effects
             critical_multiplier = 1.0
@@ -4756,7 +4827,7 @@ class UnifiedBurnoutAnalyzer:
             
             # CALCULATE FINAL HEALTH SCORE (no inversion needed)
             total_penalties = (
-                (incident_penalty + severity_penalty + after_hours_penalty + weekend_penalty) * critical_multiplier +
+                (incident_penalty + severity_penalty + after_hours_penalty + weekend_penalty + github_penalty) * critical_multiplier +
                 day_penalty + personal_load_penalty
             )
             
@@ -4820,7 +4891,8 @@ class UnifiedBurnoutAnalyzer:
                 commits_per_week = github_activity.get("commits_per_week", 0) or 0
                 after_hours_commits = github_activity.get("after_hours_commits", 0) or 0
                 weekend_commits = github_activity.get("weekend_commits", 0) or 0
-                has_github_username = github_activity.get("username")
+                # Get github_username from member, not from github_activity (it's not in activity_data)
+                has_github_username = member.get("github_username")
 
                 # FALLBACK: Calculate commits_per_week from commits_count if missing
                 if commits_per_week == 0 and commits_count > 0:
