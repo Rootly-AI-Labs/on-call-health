@@ -437,11 +437,15 @@ class UserSyncService:
         # This ensures manually set GitHub usernames persist across syncs
         self._restore_github_usernames_from_mappings(current_user)
 
+        # Auto-sync Slack IDs if Slack is connected
+        slack_sync_stats = self._auto_sync_slack_ids(current_user)
+
         return {
             "created": created,
             "updated": updated,
             "skipped": skipped,
-            "total": len(users)
+            "total": len(users),
+            "slack_synced": slack_sync_stats.get("updated", 0) if slack_sync_stats else 0
         }
 
     def _ensure_user_records_exist(self, current_user: User) -> int:
@@ -1041,6 +1045,116 @@ class UserSyncService:
             logger.error(f"Error restoring GitHub usernames: {e}")
             self.db.rollback()
             return 0
+
+    def _auto_sync_slack_ids(self, current_user: User) -> Optional[Dict[str, int]]:
+        """
+        Automatically sync Slack user IDs after user sync completes.
+        This ensures Slack IDs are populated in one operation.
+
+        Returns statistics about Slack sync or None if Slack not connected.
+        """
+        try:
+            # Check if user has Slack connected
+            from ..models import SlackWorkspaceMapping, SlackIntegration
+            from ..api.endpoints.slack import decrypt_token, mask_email
+            import httpx
+
+            # Check for Slack workspace mapping
+            workspace_mapping = self.db.query(SlackWorkspaceMapping).filter(
+                SlackWorkspaceMapping.organization_id == current_user.organization_id
+            ).first()
+
+            if not workspace_mapping:
+                logger.debug("No Slack workspace connected - skipping auto-sync")
+                return None
+
+            # Get Slack integration for token
+            slack_integration = self.db.query(SlackIntegration).filter(
+                SlackIntegration.workspace_id == workspace_mapping.workspace_id
+            ).first()
+
+            if not slack_integration:
+                logger.debug("No Slack integration found - skipping auto-sync")
+                return None
+
+            logger.info(f"🔄 AUTO-SYNC: Starting automatic Slack ID sync for org {current_user.organization_id}")
+
+            # Decrypt token
+            try:
+                access_token = decrypt_token(slack_integration.slack_token)
+            except Exception as e:
+                logger.error(f"Failed to decrypt Slack token for auto-sync: {e}")
+                return None
+
+            # Fetch Slack workspace members
+            import asyncio
+            async def fetch_slack_members():
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(
+                        "https://slack.com/api/users.list",
+                        headers={"Authorization": f"Bearer {access_token}"}
+                    )
+                    if response.status_code == 200:
+                        return response.json()
+                    return None
+
+            # Run async operation
+            loop = asyncio.get_event_loop()
+            data = loop.run_until_complete(fetch_slack_members())
+
+            if not data or not data.get("ok"):
+                logger.error(f"Slack API error during auto-sync: {data.get('error') if data else 'unknown'}")
+                return None
+
+            members = data.get("members", [])
+            logger.info(f"🔄 AUTO-SYNC: Fetched {len(members)} Slack members")
+
+            # Build email -> slack_user_id mapping
+            email_to_slack_id = {
+                member.get("profile", {}).get("email", "").lower(): member.get("id")
+                for member in members
+                if not member.get("deleted")
+                and not member.get("is_bot")
+                and member.get("profile", {}).get("email")
+                and member.get("id")
+            }
+
+            logger.info(f"🔄 AUTO-SYNC: Built mapping for {len(email_to_slack_id)} Slack users")
+
+            # Query user_correlations (team roster only)
+            correlations = self.db.query(UserCorrelation).filter(
+                UserCorrelation.organization_id == current_user.organization_id,
+                UserCorrelation.organization_id.isnot(None),
+                UserCorrelation.user_id.is_(None),  # Team roster only
+                UserCorrelation.email.in_(list(email_to_slack_id.keys()))
+            ).all()
+
+            logger.info(f"🔄 AUTO-SYNC: Found {len(correlations)} correlations to update")
+
+            # Update Slack IDs
+            updated = 0
+            for correlation in correlations:
+                slack_id = email_to_slack_id.get(correlation.email.lower())
+                if slack_id and correlation.slack_user_id != slack_id:
+                    correlation.slack_user_id = slack_id
+                    updated += 1
+
+            # Commit updates
+            if updated > 0:
+                self.db.commit()
+                logger.info(f"✅ AUTO-SYNC: Synced Slack IDs for {updated} users")
+            else:
+                logger.info(f"ℹ️  AUTO-SYNC: No Slack IDs needed updating")
+
+            return {
+                "updated": updated,
+                "total": len(correlations)
+            }
+
+        except Exception as e:
+            logger.error(f"Error during Slack auto-sync: {e}")
+            self.db.rollback()
+            return None
 
     async def _match_jira_users(self, user: User) -> Optional[Dict[str, int]]:
         """
