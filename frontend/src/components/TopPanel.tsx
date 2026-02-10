@@ -16,7 +16,22 @@ import { NotificationDrawer } from "@/components/notifications"
 import { AccountSettingsDialog } from "@/components/AccountSettingsDialog"
 import { TeamManagementDialog } from "@/components/TeamManagementDialog"
 import { useGettingStarted } from "@/contexts/GettingStartedContext"
-import { LogOut, BookOpen, HelpCircle, Settings, Users, FileText, MessageSquareMore, Key } from "lucide-react"
+import {
+  LogOut,
+  BookOpen,
+  HelpCircle,
+  Settings,
+  Users,
+  FileText,
+  MessageSquareMore,
+  Key,
+  Menu,
+} from "lucide-react"
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 
 interface UserInfo {
   name: string
@@ -33,6 +48,7 @@ export function TopPanel() {
   const [showAccountSettings, setShowAccountSettings] = useState(false)
   const [showTeamManagement, setShowTeamManagement] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false)
 
   useEffect(() => {
     const authToken = localStorage.getItem("auth_token")
@@ -65,35 +81,36 @@ export function TopPanel() {
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-neutral-300">
-      <div className="px-6 lg:px-8">
+      <div className="px-2 sm:px-4 md:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Left: brand + nav */}
-          <div className="flex items-center gap-10">
+          <div className="flex items-center gap-1 sm:gap-2 md:gap-6 lg:gap-10">
             {/* On-Call Health logo */}
             <Link href="/dashboard" className="flex flex-col items-start -space-y-0.5 hover:opacity-80 transition-opacity">
-              <div className="flex items-center gap-1.5">
-                <span className="text-lg font-normal text-black">On-Call Health</span>
+              <div className="flex items-center gap-1">
+                <span className="text-xs sm:text-sm md:text-base lg:text-lg font-normal text-black">On-Call Health</span>
                 <Image
                   src="/images/on-call-health-logo.svg"
                   alt="On-Call Health"
                   width={32}
                   height={32}
-                  className="w-6 h-6"
+                  className="w-4 sm:w-5 md:w-6"
                 />
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[9px] text-black/70 font-light">Powered by</span>
+              <div className="hidden sm:flex items-center gap-1">
+                <span className="text-[8px] sm:text-[9px] text-black/70 font-light">Powered by</span>
                 <Image
                   src="/images/rootly-ai-logo.png"
                   alt="Rootly"
                   width={321}
                   height={129}
-                  className="w-[60px]"
+                  className="w-[45px] sm:w-[60px]"
                   priority
                 />
               </div>
             </Link>
 
+            {/* Desktop navigation - hidden on mobile */}
             <nav className="hidden md:flex items-center gap-1">
               <Link
                 href="/dashboard"
@@ -126,19 +143,65 @@ export function TopPanel() {
                 Management
               </Link>
             </nav>
+
+            {/* Mobile navigation - hamburger menu */}
+            <Sheet open={isNavDrawerOpen} onOpenChange={setIsNavDrawerOpen}>
+              <SheetTrigger asChild>
+                <button className="md:hidden flex items-center justify-center p-2 rounded-lg hover:bg-purple-100 transition-colors">
+                  <Menu className="w-6 h-6 text-neutral-700" />
+                </button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64">
+                <nav className="flex flex-col gap-2 mt-8">
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setIsNavDrawerOpen(false)}
+                    className={`px-4 py-3 text-base font-semibold rounded-lg transition-all duration-200 ${
+                      isActive("/dashboard")
+                        ? "bg-purple-700 text-white shadow-sm"
+                        : "text-neutral-700 hover:text-white hover:bg-purple-800"
+                    }`}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/integrations"
+                    onClick={() => setIsNavDrawerOpen(false)}
+                    className={`px-4 py-3 text-base font-semibold rounded-lg transition-all duration-200 ${
+                      isActive("/integrations")
+                        ? "bg-purple-700 text-white shadow-sm"
+                        : "text-neutral-700 hover:text-white hover:bg-purple-800"
+                    }`}
+                  >
+                    Integrations
+                  </Link>
+                  <Link
+                    href="/management"
+                    onClick={() => setIsNavDrawerOpen(false)}
+                    className={`px-4 py-3 text-base font-semibold rounded-lg transition-all duration-200 ${
+                      isActive("/management")
+                        ? "bg-purple-700 text-white shadow-sm"
+                        : "text-neutral-700 hover:text-white hover:bg-purple-800"
+                    }`}
+                  >
+                    Management
+                  </Link>
+                </nav>
+              </SheetContent>
+            </Sheet>
           </div>
 
           {/* Right: feedback + notifications + user (only shown when authenticated) */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
             {userInfo && (
               <>
                 <a
                   href="https://github.com/Rootly-AI-Labs/On-Call-Health/issues/new"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+                  className="flex items-center gap-1 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
                 >
-                  <MessageSquareMore className="w-4 h-4" />
+                  <MessageSquareMore className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Feedback</span>
                 </a>
                 <NotificationDrawer />
@@ -150,10 +213,10 @@ export function TopPanel() {
                 }
               }}>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-3 px-2.5 py-1.5 rounded-full border border-neutral-200 bg-white hover:bg-purple-100 hover:border-neutral-300 transition-all duration-200 shadow-sm hover:shadow">
-                    <Avatar className="h-8 w-8 ring-2 ring-white">
+                  <button className="flex items-center gap-1.5 sm:gap-2.5 px-1 sm:px-2.5 py-1 sm:py-1.5 rounded-full border border-neutral-200 bg-white hover:bg-purple-100 hover:border-neutral-300 transition-all duration-200 shadow-sm hover:shadow">
+                    <Avatar className="h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9 ring-2 ring-white">
                       <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                      <AvatarFallback className="bg-purple-700 text-white text-sm font-semibold">
+                      <AvatarFallback className="bg-purple-700 text-white text-xs sm:text-sm font-semibold">
                         {userInfo.name
                           .split(" ")
                           .map((n) => n[0])
@@ -162,7 +225,7 @@ export function TopPanel() {
                           .toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="hidden sm:block text-sm font-semibold text-neutral-900 pr-1">
+                    <span className="hidden sm:block text-xs sm:text-sm font-semibold text-neutral-900 pr-0.5 sm:pr-1">
                       {userInfo.name.split(" ")[0]}
                     </span>
                   </button>
