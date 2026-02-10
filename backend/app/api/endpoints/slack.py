@@ -945,12 +945,17 @@ async def get_slack_users(
     Get list of Slack workspace members for user mapping interface.
     Returns user IDs, names, and emails.
     """
+    logger.info(f"🔍 SLACK_USERS_ENDPOINT: Request from user {current_user.id}, email={current_user.email}, org_id={current_user.organization_id}")
+
     workspace_mapping = get_active_workspace_mapping(db, current_user)
     if not workspace_mapping:
+        logger.warning(f"❌ SLACK_USERS_ENDPOINT: No workspace mapping found for user {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No active Slack workspace connection found"
         )
+
+    logger.info(f"✅ SLACK_USERS_ENDPOINT: Found workspace mapping, workspace_id={workspace_mapping.workspace_id}")
 
     # Get the bot token from SlackIntegration
     slack_integration = db.query(SlackIntegration).filter(
@@ -996,6 +1001,7 @@ async def get_slack_users(
                 )
 
             members = data.get("members", [])
+            logger.info(f"📥 SLACK_USERS_ENDPOINT: Fetched {len(members)} total members from Slack API")
 
             # Format users for frontend
             slack_users = []
@@ -1008,6 +1014,13 @@ async def get_slack_users(
                         "email": profile.get("email"),
                         "avatar": profile.get("image_72")
                     })
+
+            logger.info(f"✅ SLACK_USERS_ENDPOINT: Returning {len(slack_users)} active non-bot Slack users")
+
+            # Log sample for debugging
+            if slack_users:
+                sample = slack_users[:3]
+                logger.info(f"📋 SLACK_USERS_ENDPOINT: Sample users: {[(u['name'], u['email']) for u in sample]}")
 
             return {"users": slack_users}
 
