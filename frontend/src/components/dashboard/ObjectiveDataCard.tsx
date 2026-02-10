@@ -367,7 +367,7 @@ export function ObjectiveDataCard({
 
   return (
     <Card className="mb-6">
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-3">
             <CardTitle>Team Trends</CardTitle>
@@ -380,7 +380,7 @@ export function ObjectiveDataCard({
 
               return (
                 <div className="relative group">
-                  <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 cursor-help ${getTrendStatusClass(overallDirection.direction)}`}>
+                  <div className={`px-1.5 py-0 md:px-1.5 md:py-0.5 text-xs md:text-xs font-medium flex items-center gap-0.5 md:gap-1 cursor-help rounded-full ${getTrendStatusClass(overallDirection.direction)}`}>
                     {getTrendIcon(overallDirection.direction)}
                     {getTrendLabel(overallDirection.direction)}
                   </div>
@@ -400,12 +400,12 @@ export function ObjectiveDataCard({
           <CardDescription>{description}</CardDescription>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center flex-wrap gap-2 w-full md:w-auto md:space-x-2">
           {/* View Toggle */}
-          <div className="flex items-center bg-neutral-100 rounded-lg p-0.5">
+          <div className="flex items-center bg-neutral-100 rounded-lg p-0.5 flex-1 md:flex-none">
             <button
               onClick={() => setViewMode('weekly')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              className={`px-3 py-0.5 md:py-1.5 text-xs font-medium rounded-md transition-colors min-h-[32px] md:min-h-0 flex-1 ${
                 viewMode === 'weekly'
                   ? 'bg-white text-neutral-900 shadow-sm'
                   : 'text-neutral-500 hover:text-neutral-700'
@@ -415,7 +415,7 @@ export function ObjectiveDataCard({
             </button>
             <button
               onClick={() => setViewMode('daily')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              className={`px-3 py-0.5 md:py-1.5 text-xs font-medium rounded-md transition-colors min-h-[32px] md:min-h-0 flex-1 ${
                 viewMode === 'daily'
                   ? 'bg-white text-neutral-900 shadow-sm'
                   : 'text-neutral-500 hover:text-neutral-700'
@@ -436,7 +436,7 @@ export function ObjectiveDataCard({
 
           {/* Metric selector */}
           <Select value={selectedMetric} onValueChange={setSelectedMetric}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full md:w-[170px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -466,11 +466,11 @@ export function ObjectiveDataCard({
         ) : viewMode === 'weekly' ? (
           <>
             {/* Weekly Bar Chart */}
-            <div className="h-[280px]">
+            <div className="h-[280px] -mx-6 sm:-mx-4 md:mx-0">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={weeklyData}
-                  margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+                  margin={{ top: 20, right: 10, left: -20, bottom: 5 }}
                 >
                   <XAxis
                     dataKey="weekLabel"
@@ -616,7 +616,7 @@ export function ObjectiveDataCard({
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-center gap-6 mt-2 text-sm text-neutral-600">
+            <div className="flex items-center justify-center flex-wrap gap-3 md:gap-6 mt-2 text-sm text-neutral-600">
               {selectedMetric === 'incident_load' ? (
                 <>
                   <div className="flex items-center gap-2">
@@ -658,7 +658,7 @@ export function ObjectiveDataCard({
 
             {/* Week-over-Week Comparison */}
             {currentWeek && (
-              <div className="mt-4 flex items-center justify-center gap-6 text-sm">
+              <div className="mt-4 flex items-center justify-center flex-wrap gap-3 md:gap-6 text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-neutral-500">This week:</span>
                   <span className="font-semibold text-neutral-900">{currentWeek[config.weeklyDataKey]}</span>
@@ -685,7 +685,7 @@ export function ObjectiveDataCard({
         ) : (
           <>
             {/* Daily Area Chart */}
-            <div className="h-[300px]">
+            <div className="h-[300px] -mx-6 sm:-mx-4 md:mx-0">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={dailyChartData}
@@ -754,7 +754,7 @@ export function ObjectiveDataCard({
             </div>
 
             {/* Legend */}
-            <div className="mt-4 flex items-center justify-start space-x-6 text-sm text-neutral-700">
+            <div className="mt-4 flex items-center justify-start flex-wrap gap-3 md:gap-6 text-sm text-neutral-700">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 rounded" style={{ backgroundColor: config.color }}></div>
                 <span>{config.label}</span>
