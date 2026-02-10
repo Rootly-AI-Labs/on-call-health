@@ -326,20 +326,19 @@ class UserSyncService:
             # This prevents one user from overwriting another user's correlations
 
             # Determine user_id assignment FIRST (before querying)
-            if email.lower() == current_user.email.lower():
-                # Current user's own email always gets user_id=current_user.id
-                assigned_user_id = current_user.id
-                logger.debug(f"Assigning correlation for {email} to current user {current_user.id}")
-            else:
-                # Team members:
-                # - In multi-tenant mode: user_id=NULL (org-scoped roster data)
-                # - In beta mode: user_id=current_user.id (personal isolation)
-                if organization_id:
-                    assigned_user_id = None  # Org-scoped
-                    logger.debug(f"Creating org-scoped correlation for team member {email}")
+            # CHANGED: In org mode, ALL users (including current user) use team roster (user_id=NULL)
+            # This prevents duplicate-looking entries where same email has both personal + roster records
+            if organization_id:
+                # Multi-tenant mode: Everyone is team roster (user_id=NULL)
+                assigned_user_id = None
+                if email.lower() == current_user.email.lower():
+                    logger.debug(f"Creating org-scoped correlation for current user {email} (team roster)")
                 else:
-                    assigned_user_id = current_user.id  # Beta mode: isolate by user_id
-                    logger.debug(f"Creating personal correlation for team member {email} (beta mode)")
+                    logger.debug(f"Creating org-scoped correlation for team member {email}")
+            else:
+                # Beta mode: Personal correlations only (user_id=current_user.id)
+                assigned_user_id = current_user.id
+                logger.debug(f"Creating personal correlation for {email} (beta mode)")
 
             # Query with correct uniqueness key based on assigned_user_id
             if assigned_user_id is not None:
@@ -417,6 +416,11 @@ class UserSyncService:
         for attempt in range(max_retries):
             try:
                 self.db.commit()
+                # MONITORING: Log successful sync stats
+                logger.info(
+                    f"✅ SYNC_SUCCESS: org_id={organization_id}, "
+                    f"created={created}, updated={updated}, skipped={skipped}"
+                )
                 break
             except IntegrityError as e:
                 self.db.rollback()
@@ -428,14 +432,21 @@ class UserSyncService:
                 ])
 
                 if is_duplicate_key:
+                    # MONITORING: Log duplicate attempts with context for alerting
+                    logger.warning(
+                        f"🚨 DUPLICATE_ATTEMPT: org_id={organization_id}, "
+                        f"user_id={user_id}, attempt={attempt+1}/{max_retries}, "
+                        f"created={created}, updated={updated}, error={error_str}"
+                    )
                     if attempt < max_retries - 1:
-                        logger.warning(
-                            f"Duplicate key violation on commit (attempt {attempt+1}/{max_retries}). "
-                            f"Retrying after concurrent insert... Error: {error_str}"
-                        )
+                        logger.warning(f"Retrying after concurrent insert...")
                         continue
                     else:
-                        logger.error(f"Failed to commit after {max_retries} attempts: {e}")
+                        # ALERT: This should rarely happen with proper constraints
+                        logger.error(
+                            f"❌ DUPLICATE_FAILURE: Failed to commit after {max_retries} attempts. "
+                            f"org_id={organization_id}, created={created}, updated={updated}"
+                        )
                         raise
                 else:
                     # Different IntegrityError, don't retry
