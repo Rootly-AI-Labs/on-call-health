@@ -1106,8 +1106,19 @@ class UserSyncService:
             # Decrypt token
             try:
                 access_token = decrypt_token(slack_integration.slack_token)
+
+                # Validate decrypted token format
+                if not access_token or not isinstance(access_token, str):
+                    logger.error("❌ SLACK_MATCH: Decrypted token is empty or invalid type")
+                    return None
+
+                if not access_token.startswith(("xoxb-", "xoxp-")):
+                    logger.error("❌ SLACK_MATCH: Decrypted token has invalid format (expected xoxb- or xoxp- prefix)")
+                    return None
+
+                logger.info("✅ SLACK_MATCH: Token decrypted and validated successfully")
             except Exception as e:
-                logger.error(f"Failed to decrypt Slack token: {e}")
+                logger.error(f"❌ SLACK_MATCH: Failed to decrypt Slack token: {e}")
                 return None
 
             # Fetch Slack workspace members (using sync requests to avoid event loop issues)

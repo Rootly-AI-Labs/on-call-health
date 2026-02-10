@@ -2269,6 +2269,13 @@ async def update_user_correlation_slack_mapping(
     Manually update Slack user mapping for a UserCorrelation.
     Enforces exclusive one-to-one mapping across all users in the organization.
 
+    Args:
+        slack_user_id: Slack user ID to assign. Empty string or whitespace clears the mapping.
+
+    Behavior:
+        - Empty/whitespace slack_user_id: Clears the Slack mapping (sets to None)
+        - Valid slack_user_id: Assigns to this user and removes from any other user
+
     If ANY other user already has this Slack user_id, it will be removed from them first.
     Used for dropdown selection in Team Members panel.
     """
