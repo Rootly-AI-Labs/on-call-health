@@ -31,6 +31,7 @@ import {
   Sheet,
   SheetContent,
   SheetTrigger,
+  SheetTitle,
 } from "@/components/ui/sheet"
 
 interface UserInfo {
@@ -97,8 +98,8 @@ export function TopPanel() {
                   className="w-4 sm:w-5 md:w-6"
                 />
               </div>
-              <div className="hidden sm:flex items-center gap-1">
-                <span className="text-[8px] sm:text-[9px] text-black/70 font-light">Powered by</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[8px] text-black/70 font-light">Powered by</span>
                 <Image
                   src="/images/rootly-ai-logo.png"
                   alt="Rootly"
@@ -152,6 +153,7 @@ export function TopPanel() {
                 </button>
               </SheetTrigger>
               <SheetContent side="left" className="w-64">
+                <SheetTitle className="hidden">Navigation Menu</SheetTitle>
                 <nav className="flex flex-col gap-2 mt-8">
                   <Link
                     href="/dashboard"
@@ -201,7 +203,7 @@ export function TopPanel() {
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
                 >
-                  <MessageSquareMore className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <MessageSquareMore className="w-5 h-5 sm:w-5 sm:h-5" />
                   <span className="hidden sm:inline">Feedback</span>
                 </a>
                 <NotificationDrawer />
