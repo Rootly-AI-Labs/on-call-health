@@ -158,12 +158,13 @@ class GitHubCollector:
 
             db = SessionLocal()
             try:
-                # Query for synced member - match by email only (don't filter by user_id)
-                # This allows synced members to be shared across the organization
+                # Query for synced member from team roster only (user_id IS NULL)
+                # This avoids duplicate personal correlations with missing/incorrect data
                 user_correlation = db.query(UserCorrelation).filter(
                     UserCorrelation.email == email,
                     UserCorrelation.github_username.isnot(None),
-                    UserCorrelation.github_username != ''
+                    UserCorrelation.github_username != '',
+                    UserCorrelation.user_id.is_(None)  # Team roster only
                 ).first()
 
                 if user_correlation and user_correlation.github_username:
