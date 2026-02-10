@@ -151,7 +151,7 @@ function TeamPageContent() {
       github_matched?: number
       jira_matched?: number
       linear_matched?: number
-      slack_synced?: number
+      slack_matched?: number
       slack_skipped?: number
     }
   } | null>(null)
@@ -1748,7 +1748,8 @@ function TeamPageContent() {
                         {/* Newly Mapped Integrations */}
                         {(syncProgress.results.github_matched !== undefined ||
                           syncProgress.results.jira_matched !== undefined ||
-                          syncProgress.results.linear_matched !== undefined) && (
+                          syncProgress.results.linear_matched !== undefined ||
+                          syncProgress.results.slack_matched !== undefined) && (
                           <div className="border rounded-lg p-4">
                             <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
                               Newly Mapped Integrations
