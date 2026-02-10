@@ -1657,13 +1657,13 @@ class UnifiedBurnoutAnalyzer:
             
             # Generate reasoning for zero-incident OCH scores
             och_reasoning = generate_och_score_reasoning(
-                personal_och, 
-                work_och, 
+                personal_och,
+                work_och,
                 composite_och,
                 zero_och_metrics
             )
-            
-            return {
+
+            result = {
                 "user_id": user_id,
                 "user_name": user_name,
                 "user_email": user_email,
@@ -1704,6 +1704,48 @@ class UnifiedBurnoutAnalyzer:
                     "severity_distribution": {}
                 }
             }
+
+            # Add GitHub activity if available (for zero-incident users)
+            if github_data and github_data.get("activity_data"):
+                result["github_activity"] = github_data["activity_data"]
+            else:
+                # Add placeholder GitHub activity
+                result["github_activity"] = {
+                    "commits_count": 0,
+                    "pull_requests_count": 0,
+                    "reviews_count": 0,
+                    "after_hours_commits": 0,
+                    "weekend_commits": 0,
+                    "avg_pr_size": 0,
+                    "burnout_indicators": {
+                        "excessive_commits": False,
+                        "late_night_activity": False,
+                        "weekend_work": False,
+                        "large_prs": False
+                    }
+                }
+
+            # Add Slack activity if available (for zero-incident users)
+            if slack_data and slack_data.get("activity_data"):
+                result["slack_activity"] = slack_data["activity_data"]
+            else:
+                # Add placeholder Slack activity
+                result["slack_activity"] = {
+                    "messages_sent": 0,
+                    "channels_active": 0,
+                    "after_hours_messages": 0,
+                    "weekend_messages": 0,
+                    "avg_response_time_minutes": 0,
+                    "sentiment_score": 0.0,
+                    "burnout_indicators": {
+                        "excessive_messaging": False,
+                        "poor_sentiment": False,
+                        "late_responses": False,
+                        "after_hours_activity": False
+                    }
+                }
+
+            return result
         
         # Calculate base metrics from incidents and GitHub data
         days_analyzed = metadata.get("days_analyzed") or 30
