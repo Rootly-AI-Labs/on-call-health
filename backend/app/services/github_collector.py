@@ -784,10 +784,15 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
             if user_id is not None:
                 try:
                     from ..models import SessionLocal, UserCorrelation
+                    from sqlalchemy import desc
                     db = SessionLocal()
+                    # Order by ID DESC to get most recent record, prefer records with github_username
                     user_correlation = db.query(UserCorrelation).filter(
                         UserCorrelation.email == email,
                         UserCorrelation.user_id.is_(None)  # Team roster only
+                    ).order_by(
+                        UserCorrelation.github_username.isnot(None).desc(),  # Prefer records with username
+                        desc(UserCorrelation.id)  # Most recent first
                     ).first()
                     if user_correlation and user_correlation.timezone:
                         user_timezone = user_correlation.timezone

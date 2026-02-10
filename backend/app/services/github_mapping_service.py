@@ -191,9 +191,14 @@ class GitHubMappingService:
         user_timezone = 'UTC'  # Default to UTC
         try:
             from ..models import UserCorrelation
+            from sqlalchemy import desc
+            # Order by ID DESC to get most recent record, prefer records with github_username
             user_correlation = self.db.query(UserCorrelation).filter(
                 UserCorrelation.email == email,
                 UserCorrelation.user_id.is_(None)  # Team roster only
+            ).order_by(
+                UserCorrelation.github_username.isnot(None).desc(),  # Prefer records with username
+                desc(UserCorrelation.id)  # Most recent first
             ).first()
             if user_correlation and user_correlation.timezone:
                 user_timezone = user_correlation.timezone
