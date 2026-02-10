@@ -352,18 +352,28 @@ function DashboardContent() {
           )}
         {/* Navigation */}
         <div className={`flex-1 flex flex-col min-h-0 ${sidebarCollapsed ? 'p-1 sm:p-1.5 md:p-2' : 'p-4'} space-y-2 relative z-0`}>
-          {!sidebarCollapsed ? (
-            <div className="flex-1 space-y-2 min-h-0 flex flex-col">
-              <Button
-                onClick={startAnalysis}
-                disabled={analysisRunning}
-                className="w-full justify-start bg-purple-700 hover:bg-purple-800 text-white text-base mt-2"
-              >
-                <Play className="w-5 h-5 mr-2" />
-                New Analysis
-              </Button>
+          {/* New Analysis Button - show when expanded, or on desktop when collapsed */}
+          {sidebarCollapsed ? (
+            <Button
+              onClick={startAnalysis}
+              disabled={analysisRunning}
+              className="w-full h-10 bg-purple-700 hover:bg-purple-800 text-white hidden md:flex items-center justify-center"
+            >
+              <Play className="w-5 h-5" />
+            </Button>
+          ) : (
+            <Button
+              onClick={startAnalysis}
+              disabled={analysisRunning}
+              className="w-full justify-start bg-purple-700 hover:bg-purple-800 text-white text-base mt-2"
+            >
+              <Play className="w-5 h-5 mr-2" />
+              New Analysis
+            </Button>
+          )}
 
-            <div className="space-y-1 flex-1 flex flex-col min-h-0">
+          {!sidebarCollapsed ? (
+            <div className="flex-1 space-y-1 min-h-0 flex flex-col">
               {!sidebarCollapsed && previousAnalyses.length > 0 && (
                 <p className="text-sm text-neutral-500 uppercase tracking-wide px-2 py-1 mt-4">Recent</p>
               )}
@@ -540,10 +550,9 @@ function DashboardContent() {
                 )}
               </div>
             </div>
-            </div>
           ) : (
-            <div className="flex items-center justify-center pt-2">
-              {/* Collapsed state - show chevron arrow at top (click sidebar to expand) */}
+            <div className="flex items-center justify-center pt-2 md:hidden">
+              {/* Collapsed state - show chevron arrow at top (click sidebar to expand) - mobile only */}
               <ChevronRight className="w-6 h-6 text-white" />
             </div>
           )}
