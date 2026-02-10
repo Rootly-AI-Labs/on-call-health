@@ -4827,93 +4827,104 @@ class UnifiedBurnoutAnalyzer:
     
     def _recalculate_burnout_with_github(self, members: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Recalculate burnout scores incorporating GitHub activity data.
-        This handles users with 0 incidents but significant GitHub activity.
+        Recalculate OCH scores incorporating GitHub activity data.
+        Uses headroom model like Jira/Linear to add GitHub burnout to existing OCH scores.
         """
         try:
             updated_members = []
             github_adjustments_made = 0
-            
+
             for member in members:
                 if not isinstance(member, dict):
                     updated_members.append(member)
                     continue
-                
-                # Get current burnout info
-                current_score = member.get("health_score", 0)
-                incident_count = member.get("incident_count", 0)
-                github_activity = member.get("github_activity", {})
-                
-                # Extract GitHub metrics (even if no activity to properly set score_source)
-                commits_count = github_activity.get("commits_count", 0) if github_activity else 0
-                commits_per_week = github_activity.get("commits_per_week", 0) if github_activity else 0
-                after_hours_commits = github_activity.get("after_hours_commits", 0) if github_activity else 0
-                weekend_commits = github_activity.get("weekend_commits", 0) if github_activity else 0
 
-                # Ensure None values are converted to 0 to prevent NoneType errors
-                commits_count = commits_count if commits_count is not None else 0
-                commits_per_week = commits_per_week if commits_per_week is not None else 0
-                after_hours_commits = after_hours_commits if after_hours_commits is not None else 0
-                weekend_commits = weekend_commits if weekend_commits is not None else 0
-                has_github_username = github_activity.get("username") if github_activity else None
+                updated_member = member.copy()
+                github_activity = member.get("github_activity", {})
+                member_name = member.get("user_name") or member.get("name") or "Unknown"
+
+                # Only process if user has GitHub activity
+                if not github_activity:
+                    updated_members.append(updated_member)
+                    continue
+
+                # Extract GitHub metrics
+                commits_count = github_activity.get("commits_count", 0) or 0
+                commits_per_week = github_activity.get("commits_per_week", 0) or 0
+                after_hours_commits = github_activity.get("after_hours_commits", 0) or 0
+                weekend_commits = github_activity.get("weekend_commits", 0) or 0
+                has_github_username = github_activity.get("username")
 
                 # FALLBACK: Calculate commits_per_week from commits_count if missing
-                # This handles older analyses where commits_per_week wasn't stored
                 if commits_per_week == 0 and commits_count > 0:
-                    # Assume standard 30-day analysis period
                     days_analyzed = metadata.get("days_analyzed", 30)
                     weeks = days_analyzed / 7.0
                     commits_per_week = round(commits_count / weeks, 2) if weeks > 0 else 0
-                    logger.info(f"Calculated commits_per_week for {member.get('user_email')}: {commits_per_week} ({commits_count} commits / {weeks:.1f} weeks)")
-                
-                # Calculate GitHub-based burnout score (even if 0 to determine score_source properly)
-                github_burnout_score = 0.0
+
+                # Calculate GitHub OCH contribution (0-100 scale)
+                github_och_contribution = 0.0
                 if has_github_username and (commits_count > 0 or commits_per_week > 0):
-                    github_burnout_score = self._calculate_github_burnout_score(
+                    github_och_contribution = self._calculate_github_burnout_score(
                         commits_count, commits_per_week, after_hours_commits, weekend_commits
                     )
-                
-                # Determine final burnout score based on available data
-                final_score = current_score  # Default to current score
-                score_source = "incident_based"  # Default score source
-                
-                if incident_count == 0 and github_burnout_score > 0:
-                    # User has no incidents but GitHub activity - use GitHub score
-                    final_score = github_burnout_score
-                    score_source = "github_based"
-                    github_adjustments_made += 1
-                elif incident_count > 0 and github_burnout_score > 0:
-                    # User has both incidents and GitHub activity - combine scores
-                    # Weight: 70% incident-based, 30% GitHub-based for users with incidents
-                    final_score = (current_score * 0.7) + (github_burnout_score * 0.3)
-                    score_source = "hybrid"
-                    github_adjustments_made += 1
-                elif incident_count == 0 and github_burnout_score == 0:
-                    # User has no incidents and no GitHub activity
-                    score_source = "incident_based"  # Keep as incident_based since that's the baseline
-                
-                # Update member with new score
-                updated_member = member.copy()
-                updated_member["health_score"] = round(final_score, 2)
-                updated_member["risk_level"] = self._determine_risk_level(final_score)
-                
-                # Add GitHub burnout breakdown for transparency
-                updated_member["github_burnout_breakdown"] = {
-                    "github_score": round(github_burnout_score, 2),
-                    "original_score": round(current_score, 2),
-                    "final_score": round(final_score, 2),
-                    "score_source": score_source,
-                    "github_indicators": {
-                        "high_commit_volume": commits_per_week > 25,
-                        "excessive_commits": commits_per_week > 50,
-                        "after_hours_work": (after_hours_commits / max(commits_count, 1)) > 0.15 if commits_count and commits_count > 0 and after_hours_commits is not None else False,
-                        "weekend_work": (weekend_commits / max(commits_count, 1)) > 0.10 if commits_count and commits_count > 0 and weekend_commits is not None else False
+                    # Ensure it's on 0-100 scale
+                    github_och_contribution = max(0.0, min(100.0, github_och_contribution))
+
+                # Only update if there's GitHub activity
+                if github_och_contribution > 0:
+                    original_och = float(member.get("och_score") or 0.0)
+                    original_och = max(0.0, min(100.0, original_och))
+
+                    # Use headroom model (same as Jira/Linear)
+                    # final = original + (100 - original) * (github / 100)
+                    final_och = original_och + (100.0 - original_och) * (github_och_contribution / 100.0)
+                    final_och = max(original_och, min(100.0, final_och))
+
+                    github_added_risk = final_och - original_och
+                    updated_member["och_score"] = round(final_och, 2)
+
+                    # Update risk level based on new OCH score
+                    # OCH scale: 0-30=low, 30-50=medium, 50-70=high, 70+=critical
+                    if final_och >= 70:
+                        updated_member["risk_level"] = "critical"
+                    elif final_och >= 50:
+                        updated_member["risk_level"] = "high"
+                    elif final_och >= 30:
+                        updated_member["risk_level"] = "medium"
+                    else:
+                        updated_member["risk_level"] = "low"
+
+                    # Add GitHub burnout breakdown for transparency
+                    updated_member["github_burnout_breakdown"] = {
+                        "github_och_score": round(github_och_contribution, 2),
+                        "original_och": round(original_och, 2),
+                        "final_och": round(final_och, 2),
+                        "github_added_risk": round(github_added_risk, 2),
+                        "github_indicators": {
+                            "commits_count": commits_count,
+                            "commits_per_week": round(commits_per_week, 2),
+                            "high_commit_volume": commits_per_week > 25,
+                            "excessive_commits": commits_per_week > 50,
+                            "after_hours_work": (after_hours_commits / max(commits_count, 1)) > 0.15 if commits_count > 0 else False,
+                            "weekend_work": (weekend_commits / max(commits_count, 1)) > 0.10 if commits_count > 0 else False
+                        }
                     }
-                }
-                
+
+                    github_adjustments_made += 1
+
+                    logger.info(
+                        f"🔍 GITHUB OCH {member_name}: "
+                        f"commits={commits_count}, "
+                        f"commits_per_week={commits_per_week:.1f}, "
+                        f"original_och={original_och:.2f}, "
+                        f"github_och={github_och_contribution:.2f}, "
+                        f"github_added_risk={github_added_risk:.2f}, "
+                        f"final_och={final_och:.2f}"
+                    )
+
                 updated_members.append(updated_member)
-            
-            logger.info(f"GITHUB BURNOUT: Adjusted scores for {github_adjustments_made}/{len(members)} members using GitHub activity")
+
+            logger.info(f"GITHUB OCH: Updated OCH scores for {github_adjustments_made}/{len(members)} members with GitHub activity")
 
             return updated_members
 
