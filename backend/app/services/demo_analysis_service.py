@@ -208,10 +208,11 @@ def _load_health_checkins_for_user(db: Session, user_id: int, organization_id: i
                 continue
 
             try:
-                # Check if UserCorrelation already exists
+                # Check if UserCorrelation already exists (team roster only)
                 existing = db.query(UserCorrelation).filter(
                     UserCorrelation.organization_id == organization_id,
-                    UserCorrelation.email == email
+                    UserCorrelation.email == email,
+                    UserCorrelation.user_id.is_(None)  # Team roster only
                 ).first()
 
                 if not existing:

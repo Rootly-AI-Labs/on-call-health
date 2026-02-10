@@ -3000,9 +3000,10 @@ async def run_analysis_task(
                 integration_id_str = str(integration_id)
                 logger.info(f"BACKGROUND_TASK: Querying UserCorrelation for organization_id={user.organization_id}, integration_id={integration_id_str}")
 
-                # Query all correlations for this organization
+                # Query all correlations for this organization (team roster only)
                 correlations = db.query(UserCorrelation).filter(
-                    UserCorrelation.organization_id == user.organization_id
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None)  # Team roster only
                 ).all()
 
                 jira_mapped = [c for c in correlations if c.jira_account_id]
