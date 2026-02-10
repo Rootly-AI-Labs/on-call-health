@@ -55,10 +55,11 @@ async def collect_team_github_data_with_mapping(
             github_data = {}
 
             # Query UserCorrelation for synced GitHub usernames
-            # Don't filter by user_id - allow lookups across the organization
+            # Filter for team roster only (user_id IS NULL) to avoid duplicate personal correlations
             user_correlations = session_to_use.query(UserCorrelation).filter(
                 UserCorrelation.email.in_(team_emails),
-                UserCorrelation.github_username.isnot(None)
+                UserCorrelation.github_username.isnot(None),
+                UserCorrelation.user_id.is_(None)  # Team roster only
             ).all()
 
             # Create a lookup dict: email -> github_username (skip null emails)
