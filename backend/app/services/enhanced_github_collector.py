@@ -123,6 +123,17 @@ async def collect_team_github_data_with_mapping(
     correlation_failures = 0
     api_failures = 0
 
+    # Get organization_id from analysis for proper UserCorrelation filtering
+    organization_id = None
+    if db and analysis_id:
+        try:
+            from ..models import Analysis
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if analysis:
+                organization_id = analysis.organization_id
+        except Exception as e:
+            logger.debug(f"Could not retrieve organization_id from analysis: {e}")
+
     for email in team_emails:
         try:
             # Get full name for this email if available
@@ -134,11 +145,15 @@ async def collect_team_github_data_with_mapping(
                 try:
                     from ..models import UserCorrelation
                     from sqlalchemy import desc
-                    # Order by ID DESC to get most recent record, prefer records with github_username
-                    user_correlation = db.query(UserCorrelation).filter(
+                    # Filter by organization_id to avoid cross-org contamination
+                    filters = [
                         UserCorrelation.email == email,
                         UserCorrelation.user_id.is_(None)  # Team roster only
-                    ).order_by(
+                    ]
+                    if organization_id:
+                        filters.append(UserCorrelation.organization_id == organization_id)
+
+                    user_correlation = db.query(UserCorrelation).filter(*filters).order_by(
                         UserCorrelation.github_username.isnot(None).desc(),  # Prefer records with username
                         desc(UserCorrelation.id)  # Most recent first
                     ).first()
