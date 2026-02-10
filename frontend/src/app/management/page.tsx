@@ -879,12 +879,11 @@ function TeamPageContent() {
       }
     }
 
-    // Only show Slack if user is mapped AND exists in current integration data
+    // Show Slack if user is mapped and Slack is connected
+    // Unlike other integrations, we don't validate against slackUsers
+    // because the slack_user_id is already saved and we trust it
     if (user.slack_user_id && connectedIntegrations.has('slack')) {
-      // Only show logo if data is loaded AND user exists in the current integration
-      if (slackUsers.length > 0 && slackUsers.some(u => u.id === user.slack_user_id)) {
-        integrations.push('slack')
-      }
+      integrations.push('slack')
     }
 
     return integrations
