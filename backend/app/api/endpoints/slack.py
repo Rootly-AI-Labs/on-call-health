@@ -587,6 +587,7 @@ async def get_slack_status(
     synced_users_count = db.query(UserCorrelation).filter(
         UserCorrelation.organization_id == current_user.organization_id,
         UserCorrelation.organization_id.isnot(None),
+        UserCorrelation.user_id.is_(None),  # Team roster only
         UserCorrelation.slack_user_id.isnot(None)
     ).count()
 

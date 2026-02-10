@@ -192,9 +192,10 @@ class JiraUserSyncService:
         organization_id = current_user.organization_id
         user_id = current_user.id
 
-        # Get all existing UserCorrelation records for this org
+        # Get all existing UserCorrelation records for this org (team roster only)
         existing_correlations = self.db.query(UserCorrelation).filter(
-            UserCorrelation.organization_id == organization_id
+            UserCorrelation.organization_id == organization_id,
+            UserCorrelation.user_id.is_(None)  # Team roster only
         ).all() if organization_id else []
 
         # Also query by user_id for beta mode (no org)
