@@ -783,7 +783,7 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
             user_timezone = timezone  # Use parameter as fallback
             if user_id is not None:
                 try:
-                    from .models import SessionLocal, UserCorrelation
+                    from ..models import SessionLocal, UserCorrelation
                     db = SessionLocal()
                     user_correlation = db.query(UserCorrelation).filter(
                         UserCorrelation.email == email,
