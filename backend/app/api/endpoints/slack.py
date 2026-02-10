@@ -27,6 +27,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/slack", tags=["slack-integration"])
 
+# Cache for Slack users to avoid rate limiting
+# Key: workspace_id, Value: (timestamp, users_list)
+_slack_users_cache: Dict[str, tuple[datetime, list]] = {}
+CACHE_TTL_SECONDS = 300  # 5 minutes
+
 # Helper function to get the user isolation key (organization_id or user_id for beta)
 def get_user_isolation_key(user: User) -> tuple:
     """
@@ -978,6 +983,22 @@ async def get_slack_users(
             detail="Failed to decrypt Slack token"
         )
 
+    # Check cache first to avoid rate limiting
+    cache_key = workspace_mapping.workspace_id
+    now = datetime.now(timezone.utc)
+
+    if cache_key in _slack_users_cache:
+        cached_time, cached_users = _slack_users_cache[cache_key]
+        age_seconds = (now - cached_time).total_seconds()
+
+        if age_seconds < CACHE_TTL_SECONDS:
+            logger.info(f"🎯 SLACK_USERS_CACHE_HIT: Returning cached data (age: {int(age_seconds)}s)")
+            return {"users": cached_users}
+        else:
+            logger.info(f"⏰ SLACK_USERS_CACHE_EXPIRED: Cache expired (age: {int(age_seconds)}s), fetching fresh data")
+    else:
+        logger.info(f"🔄 SLACK_USERS_CACHE_MISS: No cache found, fetching from Slack API")
+
     # Fetch Slack workspace members
     try:
         import httpx
@@ -1022,6 +1043,10 @@ async def get_slack_users(
             if slack_users:
                 sample = slack_users[:3]
                 logger.info(f"📋 SLACK_USERS_ENDPOINT: Sample users: {[(u['name'], u['email']) for u in sample]}")
+
+            # Store in cache to avoid rate limiting
+            _slack_users_cache[cache_key] = (now, slack_users)
+            logger.info(f"💾 SLACK_USERS_CACHE_STORED: Cached {len(slack_users)} users for workspace {cache_key}")
 
             return {"users": slack_users}
 
