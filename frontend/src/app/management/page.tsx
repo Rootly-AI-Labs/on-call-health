@@ -1179,6 +1179,8 @@ function TeamPageContent() {
                         {paginatedUsers.map((user, index) => {
                           const integrations = getUserIntegrations(user)
                           const displayName = user.email?.split('@')[0] || 'Unknown'
+                          const currentUserEmail = localStorage.getItem('user_email')?.toLowerCase()
+                          const isCurrentUser = user.email?.toLowerCase() === currentUserEmail
 
                           return (
                             <tr key={user.id} className={`border-b border-neutral-100 hover:bg-neutral-50 ${index === paginatedUsers.length - 1 ? 'border-b-0' : ''}`}>
@@ -1195,9 +1197,16 @@ function TeamPageContent() {
                                         .substring(0, 2)}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <span className="text-sm font-medium text-neutral-900 capitalize">
-                                    {displayName.replace(/[._]/g, ' ')}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-neutral-900 capitalize">
+                                      {displayName.replace(/[._]/g, ' ')}
+                                    </span>
+                                    {isCurrentUser && (
+                                      <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 text-xs px-2 py-0.5">
+                                        You
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                               <td className="py-3 px-6">
