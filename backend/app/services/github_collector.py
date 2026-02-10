@@ -778,7 +778,24 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
     for email in team_emails:
         try:
             full_name = email_to_name.get(email) if email_to_name else None
-            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, full_name=full_name, timezone=timezone)
+
+            # Get user-specific timezone from UserCorrelation if available
+            user_timezone = timezone  # Use parameter as fallback
+            if user_id is not None:
+                try:
+                    from .models import SessionLocal, UserCorrelation
+                    db = SessionLocal()
+                    user_correlation = db.query(UserCorrelation).filter(
+                        UserCorrelation.email == email,
+                        UserCorrelation.user_id.is_(None)  # Team roster only
+                    ).first()
+                    if user_correlation and user_correlation.timezone:
+                        user_timezone = user_correlation.timezone
+                    db.close()
+                except Exception as tz_error:
+                    logger.debug(f"Could not retrieve timezone for {email}: {tz_error}")
+
+            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, full_name=full_name, timezone=user_timezone)
             if user_data:
                 github_data[email] = user_data
         except Exception as e:
