@@ -2220,7 +2220,15 @@ export default function IntegrationsPage() {
         )}
 
         {/* Platform Selection Cards */}
-        <div className="grid md:grid-cols-2 gap-4 mb-6 max-w-4xl mx-auto">
+        <div
+          className="grid md:grid-cols-2 gap-4 mb-6 max-w-4xl mx-auto"
+          onClick={(e) => {
+            // Deselect on click if target is the grid itself or empty space
+            if (e.target === e.currentTarget) {
+              setActiveTab(null)
+            }
+          }}
+        >
           {/* Rootly Card */}
           {loadingRootly ? (
             <Card className="border-2 border-neutral-200 p-4 flex items-center justify-center relative h-20 animate-pulse">
@@ -2627,7 +2635,7 @@ export default function IntegrationsPage() {
                             </Button>
                           </div>
                         ) : (
-                          <h3 className="font-semibold text-base truncate flex-1 min-w-0 mr-3">{integration.name}</h3>
+                          <h3 className="font-semibold text-base truncate flex-1 min-w-0 mr-3 hidden md:block">{integration.name}</h3>
                         )}
 
                         {/* Stats in collapsed view - fixed widths for alignment */}
@@ -2637,7 +2645,7 @@ export default function IntegrationsPage() {
                               <Users className="w-3 h-3" />
                               <span>{integration.total_users}</span>
                             </div>
-                            <div className="text-sm text-neutral-500 w-28 flex-shrink-0">•••{integration.token_suffix}</div>
+                            <div className="text-sm text-neutral-500 w-28 flex-shrink-0 hidden md:block">•••{integration.token_suffix}</div>
                           </>
                         )}
 
@@ -2720,43 +2728,45 @@ export default function IntegrationsPage() {
                           {/* Permissions for Rootly and PagerDuty */}
                           {integration.permissions && (
                             <>
-                              <div className="mt-3 flex items-center justify-between text-sm">
-                                <div className="flex items-center space-x-4">
+                              <div className="mt-3 text-sm flex items-start justify-between gap-2">
+                                <div className="flex items-start gap-2">
                                   <span className="text-neutral-500">Read permissions:</span>
-                                  {/* Show loader when permissions are being checked */}
-                                  {(integration.permissions?.users?.access === null && integration.permissions?.incidents?.access === null) || refreshingPermissions === integration.id ? (
-                                    <div className="flex items-center space-x-2">
-                                      <Loader2 className="w-4 h-4 animate-spin text-neutral-500" />
-                                      <span className="text-neutral-500">Checking permissions...</span>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-center space-x-1">
-                                        {integration.permissions?.users?.access ? (
-                                          <Tooltip content="✓ User read permissions: Required to run an analysis and identify team members">
-                                            <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
-                                          </Tooltip>
-                                        ) : (
-                                          <Tooltip content={`✗ User read permissions required: ${integration.permissions?.users?.error || "Permission denied"}. Both User and Incident read permissions are required to run an analysis.`}>
-                                            <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
-                                          </Tooltip>
-                                        )}
-                                        <span>Users</span>
+                                  <div className="flex flex-col space-y-1">
+                                    {/* Show loader when permissions are being checked */}
+                                    {(integration.permissions?.users?.access === null && integration.permissions?.incidents?.access === null) || refreshingPermissions === integration.id ? (
+                                      <div className="flex items-center space-x-2">
+                                        <Loader2 className="w-4 h-4 animate-spin text-neutral-500" />
+                                        <span className="text-neutral-500">Checking permissions...</span>
                                       </div>
-                                      <div className="flex items-center space-x-1">
-                                        {integration.permissions?.incidents?.access ? (
-                                          <Tooltip content="✓ Incident read permissions: Required to run an analysis and analyze incident response patterns">
-                                            <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
-                                          </Tooltip>
-                                        ) : (
-                                          <Tooltip content={`✗ Incident read permissions required: ${integration.permissions?.incidents?.error || "Permission denied"}. Both User and Incident read permissions are required to run an analysis.`}>
-                                            <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
-                                          </Tooltip>
-                                        )}
-                                        <span>Incidents</span>
-                                      </div>
-                                    </>
-                                  )}
+                                    ) : (
+                                      <>
+                                        <div className="flex items-center space-x-1">
+                                          {integration.permissions?.users?.access ? (
+                                            <Tooltip content="✓ User read permissions: Required to run an analysis and identify team members">
+                                              <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                            </Tooltip>
+                                          ) : (
+                                            <Tooltip content={`✗ User read permissions required: ${integration.permissions?.users?.error || "Permission denied"}. Both User and Incident read permissions are required to run an analysis.`}>
+                                              <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                            </Tooltip>
+                                          )}
+                                          <span>Users</span>
+                                        </div>
+                                        <div className="flex items-center space-x-1">
+                                          {integration.permissions?.incidents?.access ? (
+                                            <Tooltip content="✓ Incident read permissions: Required to run an analysis and analyze incident response patterns">
+                                              <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                            </Tooltip>
+                                          ) : (
+                                            <Tooltip content={`✗ Incident read permissions required: ${integration.permissions?.incidents?.error || "Permission denied"}. Both User and Incident read permissions are required to run an analysis.`}>
+                                              <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                            </Tooltip>
+                                          )}
+                                          <span>Incidents</span>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                                 {/* Refresh button */}
                                 <Button
@@ -2764,7 +2774,7 @@ export default function IntegrationsPage() {
                                   variant="ghost"
                                   onClick={() => refreshIntegrationPermissions(integration.id)}
                                   disabled={refreshingPermissions === integration.id}
-                                  className="h-7 px-2 text-neutral-500 hover:text-neutral-700"
+                                  className="h-7 px-2 text-neutral-500 hover:text-neutral-700 flex-shrink-0"
                                 >
                                   <RefreshCw className={`w-3 h-3 ${refreshingPermissions === integration.id ? 'animate-spin' : ''}`} />
                                 </Button>
@@ -3055,7 +3065,15 @@ export default function IntegrationsPage() {
           </div>
 
           {/* Integration Forms */}
-          <div className="space-y-6">
+          <div
+            className="space-y-6"
+            onClick={(e) => {
+              // Deselect on click if target is the div itself (empty space)
+              if (e.target === e.currentTarget) {
+                setActiveEnhancementTab(null)
+              }
+            }}
+          >
             {/* GitHub Token Form */}
             {activeEnhancementTab === 'github' && !githubIntegration && (
               <GitHubIntegrationCard
