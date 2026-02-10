@@ -675,6 +675,8 @@ function TeamPageContent() {
           github_matched: syncResults.stats?.github_matched,
           jira_matched: syncResults.stats?.jira_matched,
           linear_matched: syncResults.stats?.linear_matched,
+          slack_matched: syncResults.stats?.slack_matched,
+          slack_skipped: syncResults.stats?.slack_skipped,
         }
       })
 
