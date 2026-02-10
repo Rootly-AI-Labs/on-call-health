@@ -94,7 +94,6 @@
   }
   html {
     scrollbar-gutter: stable;
-    overflow-y: scroll;
   }
   body {
     @apply bg-background text-foreground;
