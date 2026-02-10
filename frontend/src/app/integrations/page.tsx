@@ -2191,11 +2191,12 @@ export default function IntegrationsPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-neutral-100">
+    <div className="flex flex-col h-screen bg-neutral-100">
       <TopPanel />
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="flex-1 overflow-hidden">
+        <div className="container mx-auto px-4 py-8 h-full overflow-y-auto">
         {/* Incident Management Platform Card */}
         <Card className="mb-8 max-w-3xl mx-auto" data-incident-section>
           <CardContent className="p-8">
@@ -2397,8 +2398,8 @@ export default function IntegrationsPage() {
               <Card className="max-w-4xl mx-auto">
                 <CardContent className="p-6">
                   {/* Active Organization Selector */}
-                  <div className="flex items-center gap-3 pb-4 border-b border-neutral-200 mb-4">
-                    <span className="font-semibold text-base text-neutral-700 whitespace-nowrap">Active Organization:</span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 pb-4 border-b border-neutral-200 mb-4">
+                    <span className="font-semibold text-sm sm:text-base text-neutral-700">Active Organization:</span>
                     <Select
                       value={selectedOrganization}
                       onValueChange={async (value) => {
@@ -2463,20 +2464,20 @@ export default function IntegrationsPage() {
                         }
                       }}
                     >
-                      <SelectTrigger className="flex-1 h-10 border-neutral-300 hover:border-neutral-400 transition-colors">
+                      <SelectTrigger className="w-full sm:flex-1 h-10 border-neutral-300 hover:border-neutral-400 transition-colors">
                         <SelectValue placeholder="Select organization">
                           {selectedOrganization && (() => {
                             const selected = integrations.find(i => i.id.toString() === selectedOrganization)
                             if (selected) {
                               return (
                                 <div className="flex items-center justify-between w-full">
-                                  <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
                                       selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
                                     }`}></div>
-                                    <span className="font-medium text-base">{selected.name}</span>
+                                    <span className="font-medium text-sm sm:text-base truncate">{selected.name}</span>
                                   </div>
-                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-4" />
+                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2 sm:ml-4" />
                                 </div>
                               )
                             }
@@ -2484,7 +2485,7 @@ export default function IntegrationsPage() {
                           })()}
                         </SelectValue>
                       </SelectTrigger>
-                      <SelectContent className="max-w-md">
+                      <SelectContent className="overflow-x-hidden" style={{ maxWidth: 'var(--radix-select-trigger-width)' }}>
                         {/* Group integrations by platform */}
                         {(() => {
                           const rootlyIntegrations = integrations.filter(i => i.platform === 'rootly')
@@ -2503,20 +2504,18 @@ export default function IntegrationsPage() {
                                   <SelectItem
                                     key={integration.id}
                                     value={integration.id.toString()}
-                                    className="cursor-pointer"
+                                    className="cursor-pointer overflow-hidden"
                                   >
-                                    <div className="flex items-center justify-between w-full gap-2">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                                        <span className="font-medium text-base">{integration.name}</span>
-                                        {hasPermissionIssues && (
-                                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
-                                            Missing Permissions
-                                          </span>
-                                        )}
-                                      </div>
+                                    <div className="flex items-center gap-1 overflow-hidden">
+                                      <div className="w-3 h-3 bg-purple-500 rounded-full flex-shrink-0"></div>
+                                      <span className="font-medium text-sm sm:text-base truncate">{integration.name}</span>
+                                      {hasPermissionIssues && (
+                                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700 flex-shrink-0 hidden">
+                                          Missing Permissions
+                                        </span>
+                                      )}
                                       {selectedOrganization === integration.id.toString() && (
-                                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
+                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-auto" />
                                       )}
                                     </div>
                                   </SelectItem>
@@ -2539,20 +2538,18 @@ export default function IntegrationsPage() {
                                   <SelectItem
                                     key={integration.id}
                                     value={integration.id.toString()}
-                                    className="cursor-pointer"
+                                    className="cursor-pointer overflow-hidden"
                                   >
-                                    <div className="flex items-center justify-between w-full gap-2">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                                        <span className="font-medium text-base">{integration.name}</span>
-                                        {hasPermissionIssues && (
-                                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
-                                            Missing Permissions
-                                          </span>
-                                        )}
-                                      </div>
+                                    <div className="flex items-center gap-1 overflow-hidden">
+                                      <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
+                                      <span className="font-medium text-sm sm:text-base truncate">{integration.name}</span>
+                                      {hasPermissionIssues && (
+                                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700 flex-shrink-0 hidden">
+                                          Missing Permissions
+                                        </span>
+                                      )}
                                       {selectedOrganization === integration.id.toString() && (
-                                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
+                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-auto" />
                                       )}
                                     </div>
                                   </SelectItem>
@@ -3339,6 +3336,25 @@ export default function IntegrationsPage() {
           </CardContent>
         </Card>
 
+        {/* Powered by Rootly AI Footer */}
+        <div className="mt-12 pt-8 border-t border-neutral-200 text-center">
+          <a
+            href="https://rootly.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex flex-col items-center space-y-1 hover:opacity-80 transition-opacity"
+          >
+            <span className="text-lg text-neutral-700">powered by</span>
+            <Image
+              src="/images/rootly-ai-logo.png"
+              alt="Rootly AI"
+              width={200}
+              height={80}
+              className="h-12 w-auto"
+            />
+          </a>
+        </div>
+        </div>
       </main>
 
       {/* Data Mapping Drawer */}
@@ -4270,25 +4286,6 @@ export default function IntegrationsPage() {
           setIntegrationToDelete(null)
         }}
       />
-
-      {/* Powered by Rootly AI Footer */}
-      <div className="mt-12 pt-8 border-t border-neutral-200 text-center">
-        <a
-          href="https://rootly.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex flex-col items-center space-y-1 hover:opacity-80 transition-opacity"
-        >
-          <span className="text-lg text-neutral-700">powered by</span>
-          <Image
-            src="/images/rootly-ai-logo.png"
-            alt="Rootly AI"
-            width={200}
-            height={80}
-            className="h-12 w-auto"
-          />
-        </a>
-      </div>
 
       {/* Manual Survey Delivery Modal */}
       <ManualSurveyDeliveryModal

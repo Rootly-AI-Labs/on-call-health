@@ -956,10 +956,11 @@ function TeamPageContent() {
   }
 
   return (
-    <>
+    <div className="flex flex-col h-screen bg-neutral-50">
       <TopPanel />
-      <main className="min-h-screen bg-neutral-50 p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
+      <main className="flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">
           {/* Header with Title and View Mode Toggle */}
           <div className="mb-6 flex items-start justify-between pl-4">
             <div>
@@ -1651,6 +1652,7 @@ function TeamPageContent() {
               <p className="text-neutral-600">Please select an organization to view users</p>
             </div>
           )}
+          </div>
         </div>
       </main>
 
@@ -1842,7 +1844,7 @@ function TeamPageContent() {
         onMappingUpdated={handleMappingUpdated}
         connectedIntegrations={connectedIntegrations}
       />
-    </>
+    </div>
   )
 }
 

@@ -92,8 +92,15 @@
   * {
     @apply border-border;
   }
+  html {
+    scrollbar-gutter: stable;
+    overflow-y: scroll;
+  }
   body {
     @apply bg-background text-foreground;
+    overflow: auto !important;
+    padding-right: 0 !important;
+    margin-right: 0 !important;
   }
 }
 
