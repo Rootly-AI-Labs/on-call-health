@@ -842,6 +842,13 @@ async def sync_slack_user_ids(
 
             logger.debug(f"Built mapping for {len(email_to_slack_id)} Slack users with emails")
 
+            # DEBUG: Log current user and org info
+            logger.info(f"🔍 SLACK_SYNC_DEBUG: Current user: {current_user.email}, org_id: {current_user.organization_id}")
+
+            # DEBUG: Log sample of Slack emails
+            slack_emails = list(email_to_slack_id.keys())[:5]
+            logger.info(f"🔍 SLACK_SYNC_DEBUG: Sample Slack emails: {slack_emails}")
+
             # Update correlations for team members only (user_id=NULL)
             # Match by organization + email to support team roster
             # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
@@ -853,13 +860,33 @@ async def sync_slack_user_ids(
                 UserCorrelation.email.in_(list(email_to_slack_id.keys()))
             ).all()
 
+            # DEBUG: Log found correlations
+            logger.info(f"🔍 SLACK_SYNC_DEBUG: Found {len(correlations)} user_correlations to match")
+            if len(correlations) > 0:
+                sample_emails = [c.email for c in correlations[:5]]
+                logger.info(f"🔍 SLACK_SYNC_DEBUG: Sample correlation emails: {sample_emails}")
+
+            # DEBUG: Check if current user is in correlations
+            current_user_correlation = next((c for c in correlations if c.email.lower() == current_user.email.lower()), None)
+            if current_user_correlation:
+                logger.info(f"✅ SLACK_SYNC_DEBUG: Current user {current_user.email} found in correlations")
+            else:
+                logger.warning(f"⚠️ SLACK_SYNC_DEBUG: Current user {current_user.email} NOT in correlations")
+                # Check if current user is in Slack
+                if current_user.email.lower() in email_to_slack_id:
+                    logger.warning(f"⚠️ SLACK_SYNC_DEBUG: But current user IS in Slack with ID: {email_to_slack_id[current_user.email.lower()]}")
+                else:
+                    logger.warning(f"⚠️ SLACK_SYNC_DEBUG: Current user NOT in Slack either")
+
             updated_count = 0
             for correlation in correlations:
                 slack_id = email_to_slack_id.get(correlation.email.lower())
                 if slack_id:
                     correlation.slack_user_id = slack_id
                     updated_count += 1
-                    logger.debug(f"Matched {mask_email(correlation.email)} -> {slack_id}")
+                    logger.info(f"✅ SLACK_SYNC_MATCH: {mask_email(correlation.email)} -> {slack_id}")
+                else:
+                    logger.warning(f"⚠️ SLACK_SYNC_NOMATCH: {mask_email(correlation.email)} not found in Slack")
 
             db.commit()
 
