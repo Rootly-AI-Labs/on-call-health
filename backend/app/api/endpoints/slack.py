@@ -936,6 +936,91 @@ class SlackModalPayload(BaseModel):
     user_email: str = ""
 
 
+@router.get("/slack-users")
+async def get_slack_users(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of Slack workspace members for user mapping interface.
+    Returns user IDs, names, and emails.
+    """
+    workspace_mapping = get_active_workspace_mapping(db, current_user)
+    if not workspace_mapping:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active Slack workspace connection found"
+        )
+
+    # Get the bot token from SlackIntegration
+    slack_integration = db.query(SlackIntegration).filter(
+        SlackIntegration.workspace_id == workspace_mapping.workspace_id
+    ).first()
+
+    if not slack_integration:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Slack bot token not found"
+        )
+
+    try:
+        access_token = decrypt_token(slack_integration.slack_token)
+    except Exception as e:
+        logger.error(f"Failed to decrypt Slack token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to decrypt Slack token"
+        )
+
+    # Fetch Slack workspace members
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://slack.com/api/users.list",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Slack API returned status {response.status_code}"
+                )
+
+            data = response.json()
+            if not data.get("ok"):
+                error = data.get("error", "unknown")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Slack API error: {error}"
+                )
+
+            members = data.get("members", [])
+
+            # Format users for frontend
+            slack_users = []
+            for member in members:
+                if not member.get("deleted") and not member.get("is_bot"):
+                    profile = member.get("profile", {})
+                    slack_users.append({
+                        "id": member.get("id"),
+                        "name": profile.get("real_name") or profile.get("display_name") or member.get("name"),
+                        "email": profile.get("email"),
+                        "avatar": profile.get("image_72")
+                    })
+
+            return {"users": slack_users}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching Slack users: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch Slack users"
+        )
+
+
 @router.get("/debug/correlation")
 async def debug_user_correlation(
     email: str = None,
