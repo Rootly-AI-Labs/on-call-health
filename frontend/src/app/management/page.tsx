@@ -276,11 +276,12 @@ function TeamPageContent() {
     }
   }, [selectedOrganization])
 
-  // Clear integration users data when organization changes to force fresh data load
+  // Clear integration users data and reset pagination when organization changes
   useEffect(() => {
     setGithubUsers([])
     setJiraUsers([])
     setLinearUsers([])
+    setCurrentPage(1)  // Reset to page 1 when switching orgs
   }, [selectedOrganization])
 
   // Cleanup timeout on unmount and mark component as unmounted
@@ -324,8 +325,9 @@ function TeamPageContent() {
     }
   }, [])
 
-  // Load organization data when Company tab is selected
+  // Load organization data and reset pagination when switching view modes
   useEffect(() => {
+    setCurrentPage(1)  // Reset to page 1 when switching views
     if (viewMode === 'company') {
       loadOrganizationData()
     }
