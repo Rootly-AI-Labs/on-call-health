@@ -1654,12 +1654,6 @@ function TeamPageContent() {
               )}
             </div>
           )}
-
-          {!selectedOrganization && !loadingIntegrations && (
-            <div className="flex items-center justify-center h-96">
-              <p className="text-neutral-600">Please select an organization to view users</p>
-            </div>
-          )}
         </div>
       </main>
 
