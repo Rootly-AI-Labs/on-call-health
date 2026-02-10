@@ -359,9 +359,9 @@ export function UserObjectiveDataCard({
 
   return (
     <Card className="mb-6">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-3">
+      <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1.5 min-w-0 md:flex-1">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <CardTitle>User Trends</CardTitle>
             {viewMode === 'weekly' && hasData && weeklyData.length >= 2 && (() => {
               // Compare first week(s) to last week(s) for true overall direction
@@ -371,8 +371,8 @@ export function UserObjectiveDataCard({
               const overallDirection = calculateTrend(lastWeeksAvg, firstWeeksAvg)
 
               return (
-                <div className="relative group">
-                  <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 cursor-help ${getTrendStatusClass(overallDirection.direction)}`}>
+                <div className="relative group flex-shrink-0 w-fit">
+                  <div className={`px-1 sm:px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-0.5 cursor-help whitespace-nowrap ${getTrendStatusClass(overallDirection.direction)}`}>
                     {getTrendIcon(overallDirection.direction)}
                     {getTrendLabel(overallDirection.direction)}
                   </div>
@@ -392,9 +392,9 @@ export function UserObjectiveDataCard({
           <CardDescription>{description}</CardDescription>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-row gap-2 items-center">
           {/* View Toggle */}
-          <div className="flex items-center bg-neutral-100 rounded-lg p-0.5">
+          <div className="flex items-center bg-neutral-100 rounded-lg p-0.5 w-auto">
             <button
               onClick={() => setViewMode('weekly')}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
@@ -417,10 +417,10 @@ export function UserObjectiveDataCard({
             </button>
           </div>
 
-          {/* Info tooltip */}
+          {/* Info icon */}
           <div className="relative group">
-            <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors" />
-            <div className="absolute top-full right-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+            <Info className="w-4 h-4 text-neutral-500 cursor-help hover:text-neutral-700 transition-colors flex-shrink-0" />
+            <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-neutral-900/95 text-white text-xs rounded-lg w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <div className="font-semibold mb-1">{METRIC_DESCRIPTIONS[selectedMetric].title}</div>
               <div>{METRIC_DESCRIPTIONS[selectedMetric].description}</div>
             </div>
@@ -428,21 +428,21 @@ export function UserObjectiveDataCard({
 
           {/* Metric selector */}
           <Select value={selectedMetric} onValueChange={setSelectedMetric}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(METRIC_CONFIG).map(([key, value]: [string, any]) => (
-                <SelectItem key={key} value={key}>
-                  {value.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <SelectTrigger className="w-full sm:w-[160px] ml-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(METRIC_CONFIG).map(([key, value]: [string, any]) => (
+              <SelectItem key={key} value={key}>
+                {value.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         </div>
       </CardHeader>
 
-      <CardContent className="pb-6">
+      <CardContent className="px-3 sm:px-4 md:px-6 pb-6">
         {!hasData ? (
           <div className="flex items-center justify-center h-[300px]">
             <div className="text-center">
@@ -458,7 +458,7 @@ export function UserObjectiveDataCard({
         ) : viewMode === 'weekly' ? (
           <>
             {/* Weekly Bar Chart */}
-            <div className="h-[280px]">
+            <div className="h-[280px] -mx-3 sm:-mx-4 md:mx-0">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={weeklyData}
