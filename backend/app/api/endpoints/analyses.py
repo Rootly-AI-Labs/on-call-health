@@ -94,10 +94,10 @@ class RunAnalysisRequest(BaseModel):
     integration_id: Union[int, str]  # Allow both int (regular) and str (beta) IDs
     time_range: int = 30  # days
     include_weekends: bool = True
-    include_github: bool = False
-    include_slack: bool = False
-    include_jira: bool = False
-    include_linear: bool = False
+    include_github: bool = True  # Auto-include when integration is enabled
+    include_slack: bool = True   # Auto-include when integration is enabled
+    include_jira: bool = True    # Auto-include when integration is enabled
+    include_linear: bool = True  # Auto-include when integration is enabled
     enable_ai: bool = False
 
 
