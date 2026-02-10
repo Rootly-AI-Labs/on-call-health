@@ -29,8 +29,10 @@ router = APIRouter(prefix="/slack", tags=["slack-integration"])
 
 # Cache for Slack users to avoid rate limiting
 # Key: workspace_id, Value: (timestamp, users_list)
+# TTL is set to 5 minutes to balance freshness with Slack API rate limits (Tier 3: 50+ calls/min)
+# User lists change infrequently, so 5 minutes provides good UX without hitting rate limits
 _slack_users_cache: Dict[str, tuple[datetime, list]] = {}
-CACHE_TTL_SECONDS = 300  # 5 minutes
+CACHE_TTL_SECONDS = 300  # 5 minutes - configurable via environment if needed
 
 # Helper function to get the user isolation key (organization_id or user_id for beta)
 def get_user_isolation_key(user: User) -> tuple:
@@ -976,6 +978,25 @@ async def get_slack_users(
 
     try:
         access_token = decrypt_token(slack_integration.slack_token)
+
+        # Validate decrypted token format
+        if not access_token or not isinstance(access_token, str):
+            logger.error("Decrypted token is empty or invalid type")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid Slack token format"
+            )
+
+        if not access_token.startswith(("xoxb-", "xoxp-")):
+            logger.error("Decrypted token has invalid format (expected xoxb- or xoxp- prefix)")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid Slack token format"
+            )
+
+        logger.info("✅ SLACK_USERS_ENDPOINT: Token decrypted and validated successfully")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to decrypt Slack token: {e}")
         raise HTTPException(
@@ -984,7 +1005,15 @@ async def get_slack_users(
         )
 
     # Check cache first to avoid rate limiting
+    # Validate workspace_id for cache key (should be alphanumeric from Slack)
     cache_key = workspace_mapping.workspace_id
+    if not cache_key or not isinstance(cache_key, str) or len(cache_key) > 100:
+        logger.error(f"Invalid workspace_id for cache key: {cache_key}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid workspace configuration"
+        )
+
     now = datetime.now(timezone.utc)
 
     if cache_key in _slack_users_cache:
