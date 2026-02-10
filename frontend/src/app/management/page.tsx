@@ -46,6 +46,7 @@ import {
   fetchGithubUsers,
   fetchJiraUsers,
   fetchLinearUsers,
+  fetchSlackUsers,
   updateUserCorrelation,
 } from "./handlers/user-mapping-handlers"
 
@@ -62,6 +63,7 @@ interface SyncedUser {
   jira_email?: string
   linear_user_id?: string
   linear_email?: string
+  slack_user_id?: string
   on_call_status?: string
   is_oncall?: boolean
   role?: string
@@ -132,6 +134,7 @@ function TeamPageContent() {
   const [githubUsers, setGithubUsers] = useState<string[]>([])
   const [jiraUsers, setJiraUsers] = useState<any[]>([])
   const [linearUsers, setLinearUsers] = useState<any[]>([])
+  const [slackUsers, setSlackUsers] = useState<any[]>([])
   const [loadingIntegrationUsers, setLoadingIntegrationUsers] = useState(false)
   const [integrationSearchQuery, setIntegrationSearchQuery] = useState("")
 
@@ -281,6 +284,7 @@ function TeamPageContent() {
     setGithubUsers([])
     setJiraUsers([])
     setLinearUsers([])
+    setSlackUsers([])
     setCurrentPage(1)  // Reset to page 1 when switching orgs
   }, [selectedOrganization])
 
@@ -399,6 +403,9 @@ function TeamPageContent() {
       if (connectedIntegrations.has('linear') && (orgChanged || linearUsers.length === 0)) {
         promises.push(loadLinearUsersForMapping())
       }
+      if (connectedIntegrations.has('slack') && (orgChanged || slackUsers.length === 0)) {
+        promises.push(loadSlackUsersForMapping())
+      }
 
       if (promises.length > 0) {
         await Promise.all(promises)
@@ -424,6 +431,9 @@ function TeamPageContent() {
       }
       if (connectedIntegrations.has('linear') && linearUsers.length === 0) {
         promises.push(loadLinearUsersForMapping())
+      }
+      if (connectedIntegrations.has('slack') && slackUsers.length === 0) {
+        promises.push(loadSlackUsersForMapping())
       }
 
       if (promises.length > 0) {
@@ -477,6 +487,21 @@ function TeamPageContent() {
     }
   }
 
+  const loadSlackUsersForMapping = async () => {
+    if (!selectedOrganization) return
+    setLoadingIntegrationUsers(true)
+    try {
+      const users = await fetchSlackUsers(selectedOrganization)
+      setSlackUsers(users || [])
+    } catch (error) {
+      console.error('Error loading Slack users:', error)
+      toast.error("Failed to load Slack users")
+      setSlackUsers([])
+    } finally {
+      setLoadingIntegrationUsers(false)
+    }
+  }
+
   const handleUserMapping = async (userId: number, integrationType: string, integrationUserId: string) => {
     try {
       // Build the updates object based on integration type
@@ -487,6 +512,8 @@ function TeamPageContent() {
         updates.jira_account_id = integrationUserId
       } else if (integrationType === 'linear') {
         updates.linear_user_id = integrationUserId
+      } else if (integrationType === 'slack') {
+        updates.slack_user_id = integrationUserId
       }
 
       await updateUserCorrelation(userId, updates)
@@ -852,6 +879,14 @@ function TeamPageContent() {
       }
     }
 
+    // Only show Slack if user is mapped AND exists in current integration data
+    if (user.slack_user_id && connectedIntegrations.has('slack')) {
+      // Only show logo if data is loaded AND user exists in the current integration
+      if (slackUsers.length > 0 && slackUsers.some(u => u.id === user.slack_user_id)) {
+        integrations.push('slack')
+      }
+    }
+
     return integrations
   }
 
@@ -881,6 +916,20 @@ function TeamPageContent() {
     const linearUser = linearUsers.find(u => u.id === userId)
     // Never show raw ID - show "Unmapped" instead for privacy
     return linearUser?.name || linearUser?.email || 'Unmapped'
+  }
+
+  // Get display name for Slack user from user ID
+  const getSlackDisplayName = (userId: string | null | undefined) => {
+    if (!userId) return 'Not mapped'
+
+    // Show loading indicator until data is actually loaded (prevents ID flash)
+    if (slackUsers.length === 0) {
+      return 'Loading...'
+    }
+
+    const slackUser = slackUsers.find(u => u.id === userId)
+    // Never show raw ID - show "Unmapped" instead for privacy
+    return slackUser?.name || slackUser?.email || 'Unmapped'
   }
 
   // Handle column header click for sorting
@@ -1179,6 +1228,11 @@ function TeamPageContent() {
                                         {integration === 'linear' && (
                                           <Image src="/images/linear-logo.png" alt="Linear" width={20} height={20} />
                                         )}
+                                        {integration === 'slack' && (
+                                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#E01E5A"/>
+                                          </svg>
+                                        )}
                                       </div>
                                     ))
                                   ) : (
@@ -1457,6 +1511,73 @@ function TeamPageContent() {
                                             )}
                                           </div>
                                         )}
+
+                                        {/* Slack */}
+                                        {connectedIntegrations.has('slack') && (
+                                          <div className="border border-neutral-200 rounded">
+                                            <button
+                                              onClick={() => setExpandedIntegration(expandedIntegration === 'slack' ? null : 'slack')}
+                                              className="w-full flex items-center justify-between p-2 hover:bg-neutral-50"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                                  <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#E01E5A"/>
+                                                </svg>
+                                                <div className="text-left">
+                                                  <div className="text-sm font-medium">Slack</div>
+                                                  <div className={`text-xs ${user.slack_user_id ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {user.slack_user_id ? getSlackDisplayName(user.slack_user_id) : 'Not mapped'}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'slack' ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {expandedIntegration === 'slack' && (
+                                              <div className="p-2 border-t border-neutral-200">
+                                                <input
+                                                  type="text"
+                                                  placeholder="Search Slack users..."
+                                                  value={integrationSearchQuery}
+                                                  onChange={(e) => setIntegrationSearchQuery(e.target.value)}
+                                                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
+                                                />
+                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                  {loadingIntegrationUsers ? (
+                                                    <div className="text-center py-2">
+                                                      <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      {user.slack_user_id && (
+                                                        <button
+                                                          onClick={() => handleUserMapping(user.id, 'slack', '')}
+                                                          className="w-full text-left px-2 py-1 text-sm hover:bg-red-50 text-red-600 rounded border-b border-neutral-200 mb-1"
+                                                        >
+                                                          Clear mapping
+                                                        </button>
+                                                      )}
+                                                      {slackUsers.filter(u => (u.name || u.email || '').toLowerCase().includes(integrationSearchQuery.toLowerCase())).length > 0 ? (
+                                                        slackUsers
+                                                          .filter(u => (u.name || u.email || '').toLowerCase().includes(integrationSearchQuery.toLowerCase()))
+                                                          .map((slackUser) => (
+                                                            <button
+                                                              key={slackUser.id}
+                                                              onClick={() => handleUserMapping(user.id, 'slack', slackUser.id)}
+                                                              className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded"
+                                                            >
+                                                              {slackUser.name || slackUser.email}
+                                                            </button>
+                                                          ))
+                                                      ) : (
+                                                        <p className="text-xs text-neutral-500 text-center py-2">No users found</p>
+                                                      )}
+                                                    </>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                           ) : (
                             <p className="text-xs text-neutral-500 text-center py-2">No integrations connected</p>
@@ -1544,7 +1665,7 @@ function TeamPageContent() {
               <DialogHeader>
                 <DialogTitle>Sync Organization Users</DialogTitle>
                 <DialogDescription>
-                  This will sync all users from your connected integrations and match them with GitHub, Jira, and Linear accounts
+                  This will sync all users from your connected integrations and match them with GitHub, Jira, Linear, and Slack accounts
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -1672,6 +1793,21 @@ function TeamPageContent() {
                                   </div>
                                   <span className="text-sm font-semibold text-neutral-900">
                                     {syncProgress.results.linear_matched}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Slack */}
+                              {syncProgress.results.slack_matched !== undefined && (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#E01E5A"/>
+                                    </svg>
+                                    <span className="text-sm font-medium text-neutral-700">Slack</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900">
+                                    {syncProgress.results.slack_matched}
                                   </span>
                                 </div>
                               )}
