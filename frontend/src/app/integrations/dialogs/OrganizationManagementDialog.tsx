@@ -685,21 +685,19 @@ export function OrganizationManagementDialog({
                   <AlertCircle className="w-5 h-5 text-orange-600" />
                   <span>Leave Current Organization?</span>
                 </DialogTitle>
-                <DialogDescription className="text-left pt-4">
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium text-neutral-900">
-                      You are about to leave your current organization and join <span className="font-semibold text-orange-600">{confirmingInvitation.organization_name}</span>.
-                    </p>
-                    <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
-                      <p className="text-xs text-orange-900">
-                        <span className="font-semibold">⚠️ Warning:</span> This action will remove you from your current organization. You will lose access to all data and resources associated with it.
-                      </p>
-                    </div>
-                    <p className="text-sm text-neutral-600">
-                      Are you sure you want to continue?
-                    </p>
+                <div className="text-left pt-4 space-y-3">
+                  <div className="text-sm font-medium text-neutral-900">
+                    You are about to leave your current organization and join <span className="font-semibold text-orange-600">{confirmingInvitation.organization_name}</span>.
                   </div>
-                </DialogDescription>
+                  <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                    <div className="text-xs text-orange-900">
+                      <span className="font-semibold">⚠️ Warning:</span> This action will remove you from your current organization. You will lose access to all data and resources associated with it.
+                    </div>
+                  </div>
+                  <div className="text-sm text-neutral-600">
+                    Are you sure you want to continue?
+                  </div>
+                </div>
               </DialogHeader>
               <DialogFooter className="gap-2">
                 <Button
