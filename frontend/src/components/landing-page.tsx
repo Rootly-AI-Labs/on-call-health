@@ -291,9 +291,9 @@ export default function LandingPage() {
       <section className="pt-0 pb-0 bg-white lg:pt-8 lg:pb-12">
         <div className="container mx-auto px-4">
           <div className="text-center mb-4">
-            <h2 className="text-4xl md:text-5xl font-semibold text-slate-900 mb-4">Sustainable work backed by data.</h2>
+            <h2 className="text-4xl md:text-5xl font-semibold text-slate-900 mb-4">Spot overload before it spirals.</h2>
             <p className="text-lg text-slate-600 max-w-3xl mx-auto">
-              Proof you can act on to justify change.
+              Objective signals that make the case for change.
             </p>
             <Image
               src="/images/landing/integration-dashboard.png"
