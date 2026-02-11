@@ -516,7 +516,12 @@ function TeamPageContent() {
         updates.slack_user_id = integrationUserId
       }
 
-      await updateUserCorrelation(userId, updates)
+      const success = await updateUserCorrelation(userId, updates)
+      if (!success) {
+        // updateUserCorrelation already showed an error toast
+        return
+      }
+
       toast.success("User mapping updated successfully")
       await fetchSyncedUsers(false, false, true) // Refresh the users list
       setOpenMappingUserId(null)

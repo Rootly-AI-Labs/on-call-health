@@ -1897,13 +1897,19 @@ async def update_user_correlation_github_username(
     If the same GitHub username is already assigned to another user, it will be removed from them.
     """
     try:
-        from sqlalchemy import func, cast, String
-        # Fetch the correlation - ensure it belongs to current user's organization
+        from sqlalchemy import func, cast, String, or_, and_
+        # Fetch the correlation - handle both personal and org-scoped correlations
         # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
         correlation = db.query(UserCorrelation).filter(
             UserCorrelation.id == correlation_id,
-            UserCorrelation.organization_id.isnot(None),
-            UserCorrelation.organization_id == current_user.organization_id
+            or_(
+                UserCorrelation.user_id == current_user.id,
+                and_(
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.organization_id.isnot(None),
+                    UserCorrelation.organization_id == current_user.organization_id
+                )
+            )
         ).first()
 
         if not correlation:
