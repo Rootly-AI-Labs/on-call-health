@@ -301,17 +301,24 @@ async def accept_invitation_page(
     # Process acceptance
     try:
         # Delete user's personal Slack integration if they have one
-        # (organizations should have a single shared Slack workspace)
+        # Rationale: Organizations use a single shared Slack workspace for all members.
+        # Personal Slack integrations (organization_id=NULL) are incompatible with org mode.
+        # The organization should configure its own Slack integration for all members to use.
+        #
         # NOTE: This deletion is part of the atomic transaction and will be rolled back
-        # if any subsequent operation fails, ensuring data consistency
+        # if any subsequent operation fails, ensuring data consistency.
         from ...models.slack_integration import SlackIntegration
         personal_slack = db.query(SlackIntegration).filter(
             SlackIntegration.user_id == current_user.id,
             SlackIntegration.organization_id.is_(None)
         ).first()
         if personal_slack:
+            logger.warning(
+                f"🔄 ORG_JOIN: Removing personal Slack integration for user {current_user.email}. "
+                f"User will now use organization {invitation.organization_id}'s shared Slack workspace. "
+                f"Workspace ID: {personal_slack.workspace_id}"
+            )
             db.delete(personal_slack)
-            logger.info(f"Deleted personal Slack integration for user {current_user.email} joining org {invitation.organization_id}")
 
         # Update user's organization
         current_user.organization_id = invitation.organization_id
@@ -396,17 +403,24 @@ async def accept_invitation_api(
     # Process acceptance
     try:
         # Delete user's personal Slack integration if they have one
-        # (organizations should have a single shared Slack workspace)
+        # Rationale: Organizations use a single shared Slack workspace for all members.
+        # Personal Slack integrations (organization_id=NULL) are incompatible with org mode.
+        # The organization should configure its own Slack integration for all members to use.
+        #
         # NOTE: This deletion is part of the atomic transaction and will be rolled back
-        # if any subsequent operation fails, ensuring data consistency
+        # if any subsequent operation fails, ensuring data consistency.
         from ...models.slack_integration import SlackIntegration
         personal_slack = db.query(SlackIntegration).filter(
             SlackIntegration.user_id == current_user.id,
             SlackIntegration.organization_id.is_(None)
         ).first()
         if personal_slack:
+            logger.warning(
+                f"🔄 ORG_JOIN: Removing personal Slack integration for user {current_user.email}. "
+                f"User will now use organization {invitation.organization_id}'s shared Slack workspace. "
+                f"Workspace ID: {personal_slack.workspace_id}"
+            )
             db.delete(personal_slack)
-            logger.info(f"Deleted personal Slack integration for user {current_user.email} joining org {invitation.organization_id}")
 
         # Update user's organization
         current_user.organization_id = invitation.organization_id
