@@ -323,11 +323,14 @@ class GitHubCollector:
             from .github_api_manager import github_api_manager, GitHubPermissionError
 
             # Use search API to get counts only (1 call instead of paginating)
-            # Get commits across all repos
-            commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}&per_page=1"
+            # Build org filters to search within configured organizations
+            org_filters = "+".join([f"org:{org}" for org in self.organizations])
+
+            # Get commits across all repos in configured orgs
+            commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}+{org_filters}&per_page=1"
 
             # Get pull requests count
-            prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}&per_page=1"
+            prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}+{org_filters}&per_page=1"
 
             logger.debug(f"🔍 [GITHUB_API_URL] Commits query: {commits_url}")
             logger.debug(f"🔍 [GITHUB_API_URL] PRs query: {prs_url}")
@@ -544,7 +547,9 @@ class GitHubCollector:
                 
                 # Fetch commits using search API
                 search_url = f"https://api.github.com/search/commits"
-                query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
+                # Build org filters to search within configured organizations
+                org_filters = "+".join([f"org:{org}" for org in self.organizations])
+                query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')} {org_filters}"
                 
                 page = 1
                 per_page = 100
