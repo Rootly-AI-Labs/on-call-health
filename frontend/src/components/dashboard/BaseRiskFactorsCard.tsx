@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip } from "recharts"
 import { Info, AlertTriangle, Loader2 } from "lucide-react"
@@ -26,6 +27,53 @@ export interface BaseRiskFactorsCardProps {
   className?: string
 }
 
+// Custom tick component for mobile-friendly labels with line breaks
+function CustomPolarAngleTick(props: any) {
+  const { x, y, payload, isMobile, cx = 0, cy = 0 } = props
+
+  // Map of factor names to mobile-friendly versions with line breaks
+  const mobileBreaks: Record<string, string[]> = {
+    'After-hours activity': isMobile ? ['After', 'hours activity'] : ['After-hours activity'],
+    'Consecutive incident days': isMobile ? ['Consecutive', 'incident days'] : ['Consecutive incident days'],
+    'Task load': isMobile ? ['Task', 'load'] : ['Task load'],
+    'High-severity incidents': isMobile ? ['High severity', 'incidents'] : ['High-severity incidents'],
+    'After Hours Activity': isMobile ? ['After', 'hours activity'] : ['After Hours Activity'],
+    'Workload Intensity': isMobile ? ['Workload', 'Intensity'] : ['Workload Intensity'],
+    'On-call load': isMobile ? ['On-call', 'load'] : ['On-call load'],
+    'Weekend Work': isMobile ? ['Weekend', 'Work'] : ['Weekend Work'],
+    'Response Time': isMobile ? ['Response', 'Time'] : ['Response Time'],
+  }
+
+  const lines = mobileBreaks[payload.value] || [payload.value]
+
+  // Calculate offset from center to push labels further away
+  const dx = x - (cx || 0)
+  const dy = y - (cy || 0)
+  const distance = Math.sqrt(dx * dx + dy * dy)
+  const offsetFactor = isMobile ? 1.15 : 1.1 // Push labels 10% further on desktop, 15% on mobile
+  const offsetX = (dx / distance) * (distance * offsetFactor)
+  const offsetY = (dy / distance) * (distance * offsetFactor)
+  const finalX = (cx || 0) + offsetX
+  const finalY = (cy || 0) + offsetY
+
+  return (
+    <text
+      x={finalX}
+      y={finalY}
+      textAnchor="middle"
+      dominantBaseline="middle"
+      className="text-xs font-medium fill-neutral-700"
+      style={{ fontSize: isMobile ? '11px' : '13px' }}
+    >
+      {lines.map((line, index) => (
+        <tspan key={index} x={finalX} dy={index === 0 ? 0 : '1em'}>
+          {line}
+        </tspan>
+      ))}
+    </text>
+  )
+}
+
 export function BaseRiskFactorsCard({
   title,
   description,
@@ -40,6 +88,15 @@ export function BaseRiskFactorsCard({
   loading = false,
   className = ""
 }: BaseRiskFactorsCardProps): React.ReactElement {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   // Use fixed 0-100 scale for consistent axis representation
   const effectiveDomain: [number, number] = [0, 100]
   const ringCount = 5
@@ -122,11 +179,12 @@ export function BaseRiskFactorsCard({
       <CardContent className="flex-1 flex flex-col min-h-0 pb-2">
         <div className="flex-1 min-h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={factorsData} cx="50%" cy="52%" outerRadius="68%">
+            <RadarChart data={factorsData} cx="50%" cy="52%" outerRadius={isMobile ? "62%" : "75%"}>
               <PolarGrid gridType="polygon" />
               <PolarAngleAxis
                 dataKey="factor"
-                tick={{ fontSize: 13, fill: '#374151', fontWeight: 500 }}
+                tick={(props) => <CustomPolarAngleTick {...props} isMobile={isMobile} />}
+                radius={isMobile ? 75 : 160}
               />
               <PolarRadiusAxis
                 domain={effectiveDomain}
