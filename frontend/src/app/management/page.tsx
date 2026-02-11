@@ -965,13 +965,15 @@ function TeamPageContent() {
   }
 
   return (
-    <>
+    <div className="flex flex-col h-screen w-full bg-neutral-50">
       <TopPanel />
-      <main className="min-h-screen bg-neutral-50 p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Header with Title and View Mode Toggle */}
-          <div className="mb-6 flex items-start justify-between pl-4">
-            <div>
+      <main className="flex-1 overflow-hidden w-full bg-neutral-50">
+        <div className="h-full w-full overflow-y-auto">
+          <div className="p-6 lg:p-8">
+            <div className="max-w-4xl mx-auto">
+            {/* Header with Title and View Mode Toggle */}
+          <div className="mb-6 flex flex-col-reverse md:flex-row md:items-start md:justify-between md:pl-4 gap-4 md:gap-0">
+            <div className="flex-1 min-w-0">
               <h1 className="text-2xl font-semibold text-neutral-900">
                 {viewMode === 'organization' ? 'Organization Management' : 'Team Management'}
               </h1>
@@ -982,10 +984,10 @@ function TeamPageContent() {
               </p>
             </div>
             {/* View Mode Toggle */}
-            <div className="relative flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
+            <div className="relative grid grid-cols-2 bg-white border border-neutral-200 rounded-lg p-1 md:flex-shrink-0">
               <button
                 onClick={() => setViewMode('organization')}
-                className={`relative z-10 px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
+                className={`relative z-10 flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'organization'
                     ? 'text-purple-700'
                     : 'text-neutral-600 hover:text-neutral-900'
@@ -995,7 +997,7 @@ function TeamPageContent() {
               </button>
               <button
                 onClick={() => setViewMode('company')}
-                className={`relative z-10 px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
+                className={`relative z-10 flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'company'
                     ? 'text-purple-700'
                     : 'text-neutral-600 hover:text-neutral-900'
@@ -1004,8 +1006,8 @@ function TeamPageContent() {
                 Team Roles
               </button>
               <div
-                className={`absolute top-1 bottom-1 bg-purple-100 rounded transition-all duration-300 ease-in-out ${
-                  viewMode === 'organization' ? 'left-1 w-[calc(50%-0.25rem)]' : 'left-[calc(50%+0.125rem)] w-[calc(50%-0.375rem)]'
+                className={`absolute top-1 bottom-1 bg-purple-100 rounded transition-all duration-300 ease-in-out w-[calc(50%-0.25rem)] ${
+                  viewMode === 'organization' ? 'left-1' : 'left-[calc(50%+0.125rem)]'
                 }`}
               />
             </div>
@@ -1013,7 +1015,7 @@ function TeamPageContent() {
 
           {/* Organization Management Section */}
           {(selectedOrganization || !hasPrimaryIntegration) && !loadingIntegrations && (
-            <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
+              <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
               {viewMode === 'organization' ? (
                 <>
                   {/* Organization View */}
@@ -1023,8 +1025,30 @@ function TeamPageContent() {
                     {/* Organization Selector and Members Section - Only show when primary integration exists */}
                     {hasPrimaryIntegration && (
                       <div className="space-y-4">
+                        {/* Sync Button - Mobile Only (Above Select Organization) */}
+                        <div className="md:hidden flex flex-col gap-2">
+                          <Button
+                            onClick={() => {
+                              setSyncProgress(null) // Reset sync progress when opening modal
+                              setShowSyncConfirmModal(true)
+                            }}
+                            disabled={loadingSyncedUsers || !hasPrimaryIntegration}
+                            className="bg-purple-700 hover:bg-purple-800 text-white w-full"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Sync Now
+                          </Button>
+                          {lastSyncInfo && (
+                            <p className="text-xs text-neutral-500 text-center">
+                              Last synced {new Date(lastSyncInfo.synced_at).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+
                         {/* Top row: Organization Selector and Sync Button */}
-                        <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-3 border-b border-neutral-200 gap-4 md:gap-0">
                           <div className="flex-shrink-0">
                             <label className="text-sm font-medium text-neutral-900 mb-2 block">Select Organization</label>
                             <Select
@@ -1044,7 +1068,7 @@ function TeamPageContent() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="flex flex-col items-end gap-2">
+                          <div className="hidden md:flex flex-col items-end gap-2">
                             <Button
                               onClick={() => {
                                 setSyncProgress(null) // Reset sync progress when opening modal
@@ -1067,7 +1091,7 @@ function TeamPageContent() {
                         </div>
 
                         {/* Bottom row: Organization Members and Search Bar */}
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                           <div className="flex items-center gap-2">
                             <h3 className="text-sm font-semibold text-neutral-900">Organization Members</h3>
                             {loadingSyncedUsers ? (
@@ -1076,7 +1100,7 @@ function TeamPageContent() {
                               <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 text-xs font-medium text-neutral-700">{syncedUsers.length}</span>
                             )}
                           </div>
-                          <div className="w-80">
+                          <div className="w-full sm:w-64 md:w-80">
                             <div className="relative">
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                               <Input
@@ -1661,9 +1685,17 @@ function TeamPageContent() {
                   />
                 </>
               )}
+              </div>
+          )}
+
+          {!selectedOrganization && !loadingIntegrations && (
+            <div className="flex items-center justify-center h-96">
+              <p className="text-neutral-600">Please select an organization to view users</p>
             </div>
           )}
-        </div>
+            </div>  {/* Close max-w-4xl mx-auto */}
+          </div>  {/* Close p-6 lg:p-8 */}
+        </div>  {/* Close h-full overflow-y-auto */}
       </main>
 
       {/* Sync Confirmation Modal */}
@@ -1854,7 +1886,7 @@ function TeamPageContent() {
         onMappingUpdated={handleMappingUpdated}
         connectedIntegrations={connectedIntegrations}
       />
-    </>
+    </div>
   )
 }
 

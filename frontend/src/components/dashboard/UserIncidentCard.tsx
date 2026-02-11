@@ -237,7 +237,7 @@ export function UserIncidentCard({
 
         {/* Severity breakdown */}
         {hasSeverityData && incidentCount > 0 && isPagerDuty && (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="bg-red-50 rounded-lg p-3 text-center">
               <div className="text-xs font-semibold text-red-700 mb-1">High Urgency</div>
               <div className="text-xl font-bold text-red-600">{pagerDutyCounts.high}</div>
@@ -250,7 +250,7 @@ export function UserIncidentCard({
         )}
 
         {hasSeverityData && incidentCount > 0 && !isPagerDuty && (
-          <div className={`grid ${rootlyCounts.sev0 > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
+          <div className={`grid ${rootlyCounts.sev0 > 0 ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'} gap-2`}>
             {rootlyCounts.sev0 > 0 && (
               <div className="bg-red-100 rounded-lg p-2 text-center">
                 <div className="text-xs font-semibold text-red-800">SEV0</div>
@@ -338,7 +338,7 @@ export function UserIncidentCard({
                         {severity}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-neutral-800 truncate">{title}</p>
+                        <p className="text-sm text-neutral-800 break-words">{title}</p>
                         <p className="text-xs text-neutral-500">
                           {createdAt}
                           {duration && (

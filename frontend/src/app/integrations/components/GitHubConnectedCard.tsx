@@ -77,63 +77,52 @@ export function GitHubConnectedCard({
   return (
     <Card className={`border-2 ${hasTokenError ? 'border-red-200 bg-red-50/50' : 'border-green-200 bg-green-50/50'} max-w-2xl mx-auto`}>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-                <Image
-                  src="/images/github-logo.png"
-                  alt="GitHub"
-                  width={40}
-                  height={40}
-                  className="h-10 w-10 object-contain"
-                  quality={100}
-                />
-            </div>
-            <div>
-              <CardTitle className="text-lg flex items-center space-x-2">
-                <span>GitHub</span>
-                {hasTokenError ? (
-                  <Badge variant="secondary" className="bg-red-100 text-red-700">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    Token Invalid
-                  </Badge>
-                ) : (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Badge
-                        variant="secondary"
-                        className="bg-green-100 text-green-700 cursor-pointer hover:bg-green-200 transition-colors"
-                      >
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Connected
-                        <ChevronDown className="w-3 h-3 ml-1" />
-                      </Badge>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuItem onClick={onTest} disabled={isLoading}>
-                        {isLoading ? (
-                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                        ) : (
-                          <Zap className="w-3 h-3 mr-2" />
-                        )}
-                        Test Connection
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </CardTitle>
-              <p className="text-sm text-slate-600">Repository collaboration and code management</p>
-            </div>
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+              <Image
+                src="/images/github-logo.png"
+                alt="GitHub"
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain"
+                quality={100}
+              />
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onDisconnect}
-            disabled={isLoading}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-          >
-            <Trash2 className="w-5 h-5" />
-          </Button>
+          <div>
+            <CardTitle className="text-lg flex items-center space-x-2">
+              <span>GitHub</span>
+              {hasTokenError ? (
+                <Badge variant="secondary" className="bg-red-100 text-red-700">
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  Token Invalid
+                </Badge>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Badge
+                      variant="secondary"
+                      className="bg-green-100 text-green-700 cursor-pointer hover:bg-green-200 transition-colors"
+                    >
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Connected
+                      <ChevronDown className="w-3 h-3 ml-1" />
+                    </Badge>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={onTest} disabled={isLoading}>
+                      {isLoading ? (
+                        <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                      ) : (
+                        <Zap className="w-3 h-3 mr-2" />
+                      )}
+                      Test Connection
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </CardTitle>
+            <p className="text-sm text-slate-600">Repository collaboration<br />and code management</p>
+          </div>
         </div>
       </CardHeader>
 
@@ -247,6 +236,20 @@ export function GitHubConnectedCard({
           <div>
             We collect repository information, commit history, and collaboration metrics to analyze development patterns and identify risk of overwork.
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end pt-4 border-t">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDisconnect}
+            disabled={isLoading}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Disconnect
+          </Button>
         </div>
       </CardContent>
     </Card>
