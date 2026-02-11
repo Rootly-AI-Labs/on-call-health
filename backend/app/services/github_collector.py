@@ -316,16 +316,31 @@ class GitHubCollector:
             # Make resilient API calls with rate limiting and circuit breaker
             async def fetch_commits():
                 import aiohttp
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(commits_url, headers=headers) as resp:
-                        if resp.status == 200:
-                            return await resp.json()
-                        elif resp.status == 401:
-                            raise aiohttp.ClientError(f"GitHub API authentication failed (401) - token may be expired or invalid")
-                        elif resp.status == 403:
-                            raise GitHubPermissionError(f"GitHub API forbidden (403) - token needs 'repo' permission for private repos")
-                        else:
-                            raise aiohttp.ClientError(f"GitHub API error for commits: {resp.status}")
+                logger.info(f"🚀 [GITHUB_API_DEBUG] Starting fetch_commits for {username}")
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        logger.info(f"🔗 [GITHUB_API_DEBUG] Making request to: {commits_url}")
+                        async with session.get(commits_url, headers=headers) as resp:
+                            logger.info(f"📡 [GITHUB_API_DEBUG] Response status: {resp.status}, headers: {dict(resp.headers)}")
+                            if resp.status == 200:
+                                json_data = await resp.json()
+                                logger.info(f"✅ [GITHUB_API_DEBUG] Successfully parsed JSON, has total_count: {'total_count' in json_data if json_data else False}")
+                                return json_data
+                            elif resp.status == 401:
+                                error_text = await resp.text()
+                                logger.error(f"🔐 [GITHUB_API_ERROR] 401 Unauthorized: {error_text[:200]}")
+                                raise aiohttp.ClientError(f"GitHub API authentication failed (401) - token may be expired or invalid")
+                            elif resp.status == 403:
+                                error_text = await resp.text()
+                                logger.error(f"🚫 [GITHUB_API_ERROR] 403 Forbidden: {error_text[:200]}")
+                                raise GitHubPermissionError(f"GitHub API forbidden (403) - token needs 'repo' permission for private repos")
+                            else:
+                                error_text = await resp.text()
+                                logger.error(f"❌ [GITHUB_API_ERROR] Status {resp.status}: {error_text[:200]}")
+                                raise aiohttp.ClientError(f"GitHub API error for commits: {resp.status}")
+                except Exception as e:
+                    logger.error(f"💥 [GITHUB_API_EXCEPTION] Error in fetch_commits: {type(e).__name__}: {e}")
+                    raise
 
             async def fetch_prs():
                 import aiohttp

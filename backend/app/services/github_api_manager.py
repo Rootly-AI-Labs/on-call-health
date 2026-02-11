@@ -90,17 +90,19 @@ class GitHubAPIManager:
         """
         request_start = time.time()
         self.metrics["total_requests"] += 1
-        
+
+        logger.info(f"🎯 [API_MANAGER] Starting API call (total requests: {self.metrics['total_requests']})")
+
         # Check circuit breaker state
         if not self._check_circuit_breaker():
             self.metrics["circuit_breaker_blocks"] += 1
-            logger.warning("🚫 Circuit breaker OPEN - blocking API request")
+            logger.error(f"🚫 [API_MANAGER] Circuit breaker OPEN - blocking API request (state: {self.circuit_state.value}, failures: {self.failure_count})")
             return None
-        
+
         # Check rate limits
         if not await self._check_rate_limit():
             self.metrics["rate_limited_requests"] += 1
-            logger.warning("⏳ Rate limit exceeded - throttling request")
+            logger.error(f"⏳ [API_MANAGER] Rate limit exceeded - throttling request (requests in window: {len(self.request_history)})")
             return None
         
         # Execute with exponential backoff retry
@@ -127,14 +129,17 @@ class GitHubAPIManager:
                 return None
 
             except aiohttp.ClientError as e:
-                logger.warning(f"API call attempt {attempt + 1} failed: {e}")
+                logger.error(f"🔴 [API_MANAGER] API call attempt {attempt + 1}/{max_retries + 1} failed with ClientError: {type(e).__name__}: {e}")
                 if attempt == max_retries:
                     # Final failure: update circuit breaker
+                    logger.error(f"🚨 [API_MANAGER] All retry attempts exhausted for API call - returning None")
                     self._record_failure()
                     return None
 
             except Exception as e:
-                logger.error(f"Unexpected error in API call: {e}")
+                logger.error(f"💥 [API_MANAGER] Unexpected error in API call (attempt {attempt + 1}): {type(e).__name__}: {e}")
+                import traceback
+                logger.error(f"📚 [API_MANAGER] Traceback: {traceback.format_exc()}")
                 self._record_failure()
                 return None
 
