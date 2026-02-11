@@ -1241,6 +1241,11 @@ class MigrationRunner:
                 "description": "Add organization_id column to slack_integrations for org-level Slack management",
                 "sql_file": "2026_02_06_add_organization_id_to_slack_integrations.sql"
             },
+            {
+                "name": "046_add_organization_id_to_user_mappings",
+                "description": "Add organization_id to user_mappings for multi-tenancy isolation (SECURITY FIX)",
+                "sql_file": "2026_02_11_add_organization_id_to_user_mappings.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 

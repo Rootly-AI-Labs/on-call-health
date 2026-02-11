@@ -156,17 +156,17 @@ class GitHubCorrelationService:
                 else:
                     self.logger.warning(f"⚠️ No analysis_id provided - fetching ALL GitHub mappings!")
 
-                # Filter by organization_id for cross-org data isolation
-                if self.organization_id:
-                    query = query.filter(
-                        or_(
-                            IntegrationMapping.organization_id == self.organization_id,
-                            IntegrationMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
-                        )
+                # SECURITY: Require organization_id for cross-org data isolation
+                if not self.organization_id:
+                    raise ValueError("organization_id is required for GitHub correlation to prevent cross-organization data exposure")
+
+                query = query.filter(
+                    or_(
+                        IntegrationMapping.organization_id == self.organization_id,
+                        IntegrationMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
                     )
-                    self.logger.info(f"Filtering IntegrationMappings by organization_id={self.organization_id}")
-                else:
-                    self.logger.warning("⚠️ No organization_id provided - using unfiltered query (may include cross-org data)")
+                )
+                self.logger.info(f"Filtering IntegrationMappings by organization_id={self.organization_id}")
 
                 auto_mappings = query.order_by(IntegrationMapping.created_at.desc()).all()
             
@@ -196,24 +196,21 @@ class GitHubCorrelationService:
                     UserCorrelation.github_username != ''
                 )
 
-                # Filter by organization_id (team roster) or user_id (personal mappings) for multi-tenancy
-                if self.organization_id:
-                    user_correlation_query = user_correlation_query.filter(
-                        or_(
-                            and_(
-                                UserCorrelation.user_id.is_(None),
-                                UserCorrelation.organization_id == self.organization_id
-                            ),  # Team roster mappings (org-scoped)
-                            UserCorrelation.user_id == self.current_user_id  # Personal mappings
-                        )
+                # SECURITY: Require organization_id for multi-tenancy isolation
+                if not self.organization_id:
+                    raise ValueError("organization_id is required for GitHub correlation to prevent cross-organization data exposure")
+
+                # Filter by organization_id (team roster) or user_id (personal mappings)
+                user_correlation_query = user_correlation_query.filter(
+                    or_(
+                        and_(
+                            UserCorrelation.user_id.is_(None),
+                            UserCorrelation.organization_id == self.organization_id
+                        ),  # Team roster mappings (org-scoped)
+                        UserCorrelation.user_id == self.current_user_id  # Personal mappings
                     )
-                    self.logger.info(f"Filtering UserCorrelations by organization_id={self.organization_id} (team roster) or user_id={self.current_user_id} (personal)")
-                elif self.current_user_id:
-                    # Fallback: if no organization_id but have user_id, only show personal mappings
-                    user_correlation_query = user_correlation_query.filter(UserCorrelation.user_id == self.current_user_id)
-                    self.logger.warning(f"No organization_id provided - only showing personal mappings for user_id={self.current_user_id}")
-                else:
-                    self.logger.warning("⚠️ No organization_id or user_id provided - using unfiltered query (may include cross-org data)")
+                )
+                self.logger.info(f"Filtering UserCorrelations by organization_id={self.organization_id} (team roster) or user_id={self.current_user_id} (personal)")
 
                 user_correlations = user_correlation_query.order_by(UserCorrelation.created_at.desc()).all()
 

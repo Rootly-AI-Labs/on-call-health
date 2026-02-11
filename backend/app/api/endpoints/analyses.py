@@ -270,7 +270,15 @@ async def run_burnout_analysis(
         logger.info(f"Analysis request: integration={request.integration_id}, github={request.include_github}, slack={request.include_slack}")
         logger.info(f"ENDPOINT_DEBUG: Entered run_burnout_analysis for integration {request.integration_id}")
         logger.info(f"ENDPOINT_DEBUG: Request params - include_github: {request.include_github}, include_slack: {request.include_slack}")
-        
+
+        # SECURITY: Validate organization_id to prevent cross-org data exposure
+        if not current_user.organization_id:
+            logger.error(f"Analysis rejected: User {current_user.id} has no organization_id")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be part of an organization to run analyses"
+            )
+
         # Get the integration from database
         integration = db.query(RootlyIntegration).filter(
             RootlyIntegration.id == request.integration_id,
