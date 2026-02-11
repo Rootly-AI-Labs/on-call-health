@@ -793,7 +793,7 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
         days: Number of days to analyze
         github_token: GitHub API token for real data collection
         user_id: User ID for checking manual mappings
-        timezone: User's timezone for business hours calculation (default: 'UTC')
+        timezone: Fallback timezone if per-user timezone not found (default: 'UTC')
         email_to_name: Optional mapping of email -> full name for name-based matching
 
     Returns:
@@ -802,14 +802,68 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
     collector = GitHubCollector()
     github_data = {}
 
-    for email in team_emails:
+    # Get organization_id for filtering user_correlations
+    organization_id = None
+    if user_id is not None:
         try:
-            full_name = email_to_name.get(email) if email_to_name else None
-            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, full_name=full_name, timezone=timezone)
-            if user_data:
-                github_data[email] = user_data
+            from ..models import SessionLocal, User
+            db = SessionLocal()
+            try:
+                user = db.query(User).filter(User.id == user_id).first()
+                if user:
+                    organization_id = user.organization_id
+                    logger.debug(f"User {user_id} belongs to organization {organization_id}")
+            finally:
+                db.close()
         except Exception as e:
-            logger.error(f"Failed to collect GitHub data for {email}: {e}")
-    
+            logger.warning(f"Could not retrieve organization_id: {e}")
+
+    # Open single database connection for all timezone lookups (performance optimization)
+    db_session = None
+    if user_id is not None:
+        try:
+            from ..models import SessionLocal, UserCorrelation
+            from sqlalchemy import desc
+            db_session = SessionLocal()
+        except Exception as e:
+            logger.warning(f"⚠️ Could not create database session for timezone lookups: {e}")
+
+    try:
+        for email in team_emails:
+            try:
+                full_name = email_to_name.get(email) if email_to_name else None
+
+                # Get user-specific timezone from UserCorrelation if available
+                user_timezone = timezone  # Use parameter as fallback
+                if db_session is not None:
+                    try:
+                        # Filter by organization_id to avoid cross-org contamination
+                        filters = [
+                            UserCorrelation.email == email,
+                            UserCorrelation.user_id.is_(None)  # Team roster only
+                        ]
+                        if organization_id:
+                            filters.append(UserCorrelation.organization_id == organization_id)
+
+                        user_correlation = db_session.query(UserCorrelation).filter(*filters).order_by(
+                            UserCorrelation.github_username.isnot(None).desc(),  # Prefer records with username
+                            desc(UserCorrelation.id)  # Most recent first
+                        ).first()
+                        if user_correlation and user_correlation.timezone:
+                            user_timezone = user_correlation.timezone
+                            logger.debug(f"Using timezone {user_timezone} for {email}")
+                    except Exception as tz_error:
+                        logger.warning(f"⚠️ Timezone retrieval failed for {email}, defaulting to {timezone}: {tz_error}")
+
+                user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, full_name=full_name, timezone=user_timezone)
+                if user_data:
+                    github_data[email] = user_data
+            except Exception as e:
+                logger.error(f"Failed to collect GitHub data for {email}: {e}")
+    finally:
+        # Close database connection after all timezone lookups complete
+        if db_session is not None:
+            db_session.close()
+
     logger.info(f"Collected GitHub data for {len(github_data)} users out of {len(team_emails)}")
     return github_data
