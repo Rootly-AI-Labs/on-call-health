@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Key, Calendar, Building, Clock, Users, Zap, Trash2, Loader2, CheckCircle, AlertTriangle, ChevronDown } from "lucide-react"
-import { Tooltip } from "@/components/ui/tooltip"
 import { GitHubIntegration, API_BASE } from "../types"
 
 interface GitHubConnectedCardProps {
@@ -160,18 +159,9 @@ export function GitHubConnectedCard({
             <div>
               <div className="font-medium">Organizations</div>
               <div className="text-slate-600">
-                {integration.organizations && integration.organizations.length > 0 ? (
-                  <Tooltip
-                    content={integration.organizations.join(', ')}
-                    side="bottom"
-                  >
-                    <span className="cursor-help border-b border-dotted border-slate-400">
-                      {`${integration.organizations.length} organization${integration.organizations.length > 1 ? 's' : ''}`}
-                    </span>
-                  </Tooltip>
-                ) : (
-                  'None'
-                )}
+                {integration.organizations && integration.organizations.length > 0
+                  ? `${integration.organizations.length} organization${integration.organizations.length > 1 ? 's' : ''}`
+                  : 'None'}
               </div>
             </div>
           </div>
