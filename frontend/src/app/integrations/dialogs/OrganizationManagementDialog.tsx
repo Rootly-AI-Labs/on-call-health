@@ -352,7 +352,7 @@ export function OrganizationManagementDialog({
             <div className={asInlineView ? "mx-6 mt-6 pb-6 border-b border-neutral-200" : "pb-6 border-b border-neutral-200"}>
               <div className="space-y-3">
                 <h3 className="text-sm font-medium text-neutral-900">Invite a team member</h3>
-                <div className="flex gap-3 items-end">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end">
                   <div className="flex flex-col">
                     <label htmlFor="invite-email" className="text-xs font-medium text-neutral-600 mb-1">Email</label>
                     <Input
@@ -361,7 +361,7 @@ export function OrganizationManagementDialog({
                       placeholder="colleague@company.com"
                       value={inviteEmail}
                       onChange={(e) => onInviteEmailChange(e.target.value)}
-                      className="w-72"
+                      className="w-full md:w-72"
                     />
                   </div>
                   <div className="flex flex-col">
@@ -414,7 +414,7 @@ export function OrganizationManagementDialog({
                     {showPendingInvitations && (
                       <div className="mt-3 space-y-2">
                         {pendingInvitations.map((invitation) => (
-                          <div key={invitation.id} className="flex items-center justify-between gap-3 p-3 bg-blue-50 rounded-md border border-blue-200 text-xs">
+                          <div key={invitation.id} className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3 p-3 bg-blue-50 rounded-md border border-blue-200 text-xs">
                             <span className="font-medium text-neutral-900 flex-shrink-0">{invitation.email}</span>
                             <span className={`px-2 py-0.5 rounded-full capitalize flex-shrink-0 ${
                               invitation.role === 'admin'
@@ -460,12 +460,12 @@ export function OrganizationManagementDialog({
             <div className="space-y-6">
               {/* Team Members Header and Search Bar */}
               {orgMembers.length > 0 && (
-                <div className={asInlineView ? "px-6 mt-4 flex items-center justify-between" : "mt-4 flex items-center justify-between"}>
+                <div className={`${asInlineView ? "px-6 mt-4" : "mt-4"} flex flex-col gap-4 md:flex-row md:items-center md:justify-between`}>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-neutral-900">Team Members</h3>
                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 text-xs font-medium text-neutral-700">{orgMembers.length}</span>
                   </div>
-                  <div className="w-80">
+                  <div className="w-full sm:w-64 md:w-80">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                       <Input

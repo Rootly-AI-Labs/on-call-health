@@ -68,7 +68,7 @@ export function NotificationDrawer() {
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
+              className="absolute -top-2 -right-2 h-6 w-6 sm:h-6 sm:w-6 rounded-full p-0.5 sm:p-1 text-[10px] sm:text-xs flex items-center justify-center"
             >
               {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
@@ -76,7 +76,7 @@ export function NotificationDrawer() {
         </Button>
       </SheetTrigger>
 
-      <SheetContent side="right" className="w-[400px] sm:w-[600px] p-0 flex flex-col h-full">
+      <SheetContent side="right" className="w-full sm:w-[600px] max-w-[600px] p-0 flex flex-col h-full">
         <SheetHeader className="border-b border-neutral-200 px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -90,13 +90,13 @@ export function NotificationDrawer() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2 mr-8">
+            <div className="flex flex-col sm:flex-row gap-2 mr-8 mt-2">
               {unreadCount > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={markAllAsRead}
-                  className="text-sm text-neutral-500 hover:text-neutral-700"
+                  className="text-sm text-neutral-500 hover:text-neutral-700 whitespace-nowrap"
                 >
                   Mark all read
                 </Button>
@@ -106,7 +106,7 @@ export function NotificationDrawer() {
                   variant="ghost"
                   size="sm"
                   onClick={clearAll}
-                  className="text-sm text-red-500 hover:text-red-700"
+                  className="text-sm text-red-500 hover:text-red-700 whitespace-nowrap"
                 >
                   Clear all
                 </Button>
@@ -135,9 +135,9 @@ export function NotificationDrawer() {
               </div>
             ) : (
               <>
-                {notifications.map((notification) => (
+                {notifications.map((notification, index) => (
                   <NotificationItem
-                    key={notification.id}
+                    key={`${notification.id}-${index}`}
                     notification={notification}
                     onRead={markAsRead}
                     onDismiss={dismiss}

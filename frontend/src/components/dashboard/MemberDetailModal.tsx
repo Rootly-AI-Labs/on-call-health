@@ -342,7 +342,7 @@ export function MemberDetailModal({
     <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
       <DialogContent
         ref={dialogContentRef}
-        className="max-w-6xl max-h-[80vh] overflow-y-auto"
+        className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-3rem)] md:w-auto md:max-w-6xl max-h-[80vh] overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6"
         aria-describedby="member-detail-description"
       >
         {selectedMember && (() => {
@@ -362,11 +362,11 @@ export function MemberDetailModal({
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-xl font-semibold">{selectedMember?.name}</h2>
-                        <p className="text-neutral-700">{selectedMember?.role || selectedMember?.email}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h2 className="text-xl font-semibold break-words">{selectedMember?.name}</h2>
+                        <p className="text-neutral-700 break-words text-sm">{selectedMember?.role || selectedMember?.email}</p>
                       </div>
                     </div>
                   </div>

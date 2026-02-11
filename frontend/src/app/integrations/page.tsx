@@ -2191,22 +2191,25 @@ export default function IntegrationsPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-neutral-100">
+    <div className="flex flex-col h-screen w-full bg-neutral-100">
       <TopPanel />
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {/* Incident Management Platform Card */}
-        <Card className="mb-8 max-w-3xl mx-auto" data-incident-section>
+      <main className="flex-1 overflow-hidden w-full bg-neutral-100">
+        <div className="h-full w-full overflow-y-auto">
+          <div className="px-4 py-8">
+            <div className="max-w-3xl mx-auto">
+              {/* Incident Management Platform Card */}
+        <Card className="mb-8" data-incident-section>
           <CardContent className="p-8">
         {/* Introduction Text */}
-        <div className="text-center mb-2 max-w-2xl mx-auto">
+        <div className="text-center mb-2">
           <h2 className="text-4xl font-bold text-black">Connect Your Incident Management Platform</h2>
         </div>
 
         {/* Integration Status Message */}
         {!loadingRootly && !loadingPagerDuty && (
-          <div className="text-center mb-6 max-w-2xl mx-auto">
+          <div className="text-center mb-6">
             {integrations.length === 0 ? (
               <p className="text-lg font-medium text-neutral-700">Add a Rootly or PagerDuty integration to get started!</p>
             ) : (
@@ -2219,7 +2222,15 @@ export default function IntegrationsPage() {
         )}
 
         {/* Platform Selection Cards */}
-        <div className="grid md:grid-cols-2 gap-4 mb-6 max-w-4xl mx-auto">
+        <div
+          className="grid md:grid-cols-2 gap-4 mb-6 max-w-2xl mx-auto"
+          onClick={(e) => {
+            // Deselect on click if target is the grid itself or empty space
+            if (e.target === e.currentTarget) {
+              setActiveTab(null)
+            }
+          }}
+        >
           {/* Rootly Card */}
           {loadingRootly ? (
             <Card className="border-2 border-neutral-200 p-4 flex items-center justify-center relative h-20 animate-pulse">
@@ -2357,7 +2368,7 @@ export default function IntegrationsPage() {
 
             {/* Existing Integrations */}
             {(loadingRootly || loadingPagerDuty) ? (
-              <Card className="max-w-2xl mx-auto">
+              <Card>
                 <CardContent className="p-6 space-y-4">
                 {/* Skeleton loading cards */}
                 {[1, 2].map((i) => (
@@ -2394,11 +2405,11 @@ export default function IntegrationsPage() {
                 </CardContent>
               </Card>
             ) : integrations.length > 0 && filteredIntegrations.length > 0 ? (
-              <Card className="max-w-4xl mx-auto">
+              <Card>
                 <CardContent className="p-6">
                   {/* Active Organization Selector */}
-                  <div className="flex items-center gap-3 pb-4 border-b border-neutral-200 mb-4">
-                    <span className="font-semibold text-base text-neutral-700 whitespace-nowrap">Active Organization:</span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 pb-4 border-b border-neutral-200 mb-4">
+                    <span className="font-semibold text-sm sm:text-base text-neutral-700">Active Organization:</span>
                     <Select
                       value={selectedOrganization}
                       onValueChange={async (value) => {
@@ -2463,20 +2474,20 @@ export default function IntegrationsPage() {
                         }
                       }}
                     >
-                      <SelectTrigger className="flex-1 h-10 border-neutral-300 hover:border-neutral-400 transition-colors">
+                      <SelectTrigger className="w-full sm:flex-1 h-10 border-neutral-300 hover:border-neutral-400 transition-colors">
                         <SelectValue placeholder="Select organization">
                           {selectedOrganization && (() => {
                             const selected = integrations.find(i => i.id.toString() === selectedOrganization)
                             if (selected) {
                               return (
                                 <div className="flex items-center justify-between w-full">
-                                  <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
                                       selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
                                     }`}></div>
-                                    <span className="font-medium text-base">{selected.name}</span>
+                                    <span className="font-medium text-sm sm:text-base truncate">{selected.name}</span>
                                   </div>
-                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-4" />
+                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2 sm:ml-4" />
                                 </div>
                               )
                             }
@@ -2484,7 +2495,7 @@ export default function IntegrationsPage() {
                           })()}
                         </SelectValue>
                       </SelectTrigger>
-                      <SelectContent className="max-w-md">
+                      <SelectContent className="overflow-x-hidden" style={{ maxWidth: 'var(--radix-select-trigger-width)' }}>
                         {/* Group integrations by platform */}
                         {(() => {
                           const rootlyIntegrations = integrations.filter(i => i.platform === 'rootly')
@@ -2503,20 +2514,18 @@ export default function IntegrationsPage() {
                                   <SelectItem
                                     key={integration.id}
                                     value={integration.id.toString()}
-                                    className="cursor-pointer"
+                                    className="cursor-pointer overflow-hidden"
                                   >
-                                    <div className="flex items-center justify-between w-full gap-2">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                                        <span className="font-medium text-base">{integration.name}</span>
-                                        {hasPermissionIssues && (
-                                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
-                                            Missing Permissions
-                                          </span>
-                                        )}
-                                      </div>
+                                    <div className="flex items-center gap-1 overflow-hidden">
+                                      <div className="w-3 h-3 bg-purple-500 rounded-full flex-shrink-0"></div>
+                                      <span className="font-medium text-sm sm:text-base truncate">{integration.name}</span>
+                                      {hasPermissionIssues && (
+                                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700 flex-shrink-0 hidden">
+                                          Missing Permissions
+                                        </span>
+                                      )}
                                       {selectedOrganization === integration.id.toString() && (
-                                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
+                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-auto" />
                                       )}
                                     </div>
                                   </SelectItem>
@@ -2539,20 +2548,18 @@ export default function IntegrationsPage() {
                                   <SelectItem
                                     key={integration.id}
                                     value={integration.id.toString()}
-                                    className="cursor-pointer"
+                                    className="cursor-pointer overflow-hidden"
                                   >
-                                    <div className="flex items-center justify-between w-full gap-2">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                                        <span className="font-medium text-base">{integration.name}</span>
-                                        {hasPermissionIssues && (
-                                          <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
-                                            Missing Permissions
-                                          </span>
-                                        )}
-                                      </div>
+                                    <div className="flex items-center gap-1 overflow-hidden">
+                                      <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
+                                      <span className="font-medium text-sm sm:text-base truncate">{integration.name}</span>
+                                      {hasPermissionIssues && (
+                                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700 flex-shrink-0 hidden">
+                                          Missing Permissions
+                                        </span>
+                                      )}
                                       {selectedOrganization === integration.id.toString() && (
-                                        <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2" />
+                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-auto" />
                                       )}
                                     </div>
                                   </SelectItem>
@@ -2630,7 +2637,7 @@ export default function IntegrationsPage() {
                             </Button>
                           </div>
                         ) : (
-                          <h3 className="font-semibold text-base truncate flex-1 min-w-0 mr-3">{integration.name}</h3>
+                          <h3 className="font-semibold text-base truncate flex-1 min-w-0 mr-3 hidden md:block">{integration.name}</h3>
                         )}
 
                         {/* Stats in collapsed view - fixed widths for alignment */}
@@ -2640,7 +2647,7 @@ export default function IntegrationsPage() {
                               <Users className="w-3 h-3" />
                               <span>{integration.total_users}</span>
                             </div>
-                            <div className="text-sm text-neutral-500 w-28 flex-shrink-0">•••{integration.token_suffix}</div>
+                            <div className="text-sm text-neutral-500 w-28 flex-shrink-0 hidden md:block">•••{integration.token_suffix}</div>
                           </>
                         )}
 
@@ -2723,43 +2730,45 @@ export default function IntegrationsPage() {
                           {/* Permissions for Rootly and PagerDuty */}
                           {integration.permissions && (
                             <>
-                              <div className="mt-3 flex items-center justify-between text-sm">
-                                <div className="flex items-center space-x-4">
+                              <div className="mt-3 text-sm flex items-start justify-between gap-2">
+                                <div className="flex items-start gap-2">
                                   <span className="text-neutral-500">Read permissions:</span>
-                                  {/* Show loader when permissions are being checked */}
-                                  {(integration.permissions?.users?.access === null && integration.permissions?.incidents?.access === null) || refreshingPermissions === integration.id ? (
-                                    <div className="flex items-center space-x-2">
-                                      <Loader2 className="w-4 h-4 animate-spin text-neutral-500" />
-                                      <span className="text-neutral-500">Checking permissions...</span>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-center space-x-1">
-                                        {integration.permissions?.users?.access ? (
-                                          <Tooltip content="✓ User read permissions: Required to run an analysis and identify team members">
-                                            <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
-                                          </Tooltip>
-                                        ) : (
-                                          <Tooltip content={`✗ User read permissions required: ${integration.permissions?.users?.error || "Permission denied"}. Both User and Incident read permissions are required to run an analysis.`}>
-                                            <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
-                                          </Tooltip>
-                                        )}
-                                        <span>Users</span>
+                                  <div className="flex flex-col space-y-1">
+                                    {/* Show loader when permissions are being checked */}
+                                    {(integration.permissions?.users?.access === null && integration.permissions?.incidents?.access === null) || refreshingPermissions === integration.id ? (
+                                      <div className="flex items-center space-x-2">
+                                        <Loader2 className="w-4 h-4 animate-spin text-neutral-500" />
+                                        <span className="text-neutral-500">Checking permissions...</span>
                                       </div>
-                                      <div className="flex items-center space-x-1">
-                                        {integration.permissions?.incidents?.access ? (
-                                          <Tooltip content="✓ Incident read permissions: Required to run an analysis and analyze incident response patterns">
-                                            <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
-                                          </Tooltip>
-                                        ) : (
-                                          <Tooltip content={`✗ Incident read permissions required: ${integration.permissions?.incidents?.error || "Permission denied"}. Both User and Incident read permissions are required to run an analysis.`}>
-                                            <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
-                                          </Tooltip>
-                                        )}
-                                        <span>Incidents</span>
-                                      </div>
-                                    </>
-                                  )}
+                                    ) : (
+                                      <>
+                                        <div className="flex items-center space-x-1">
+                                          {integration.permissions?.users?.access ? (
+                                            <Tooltip content="✓ User read permissions: Required to run an analysis and identify team members">
+                                              <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                            </Tooltip>
+                                          ) : (
+                                            <Tooltip content={`✗ User read permissions required: ${integration.permissions?.users?.error || "Permission denied"}. Both User and Incident read permissions are required to run an analysis.`}>
+                                              <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                            </Tooltip>
+                                          )}
+                                          <span>Users</span>
+                                        </div>
+                                        <div className="flex items-center space-x-1">
+                                          {integration.permissions?.incidents?.access ? (
+                                            <Tooltip content="✓ Incident read permissions: Required to run an analysis and analyze incident response patterns">
+                                              <CheckCircle className="w-4 h-4 text-green-500 cursor-help" />
+                                            </Tooltip>
+                                          ) : (
+                                            <Tooltip content={`✗ Incident read permissions required: ${integration.permissions?.incidents?.error || "Permission denied"}. Both User and Incident read permissions are required to run an analysis.`}>
+                                              <AlertCircle className="w-4 h-4 text-red-500 cursor-help" />
+                                            </Tooltip>
+                                          )}
+                                          <span>Incidents</span>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                                 {/* Refresh button */}
                                 <Button
@@ -2767,7 +2776,7 @@ export default function IntegrationsPage() {
                                   variant="ghost"
                                   onClick={() => refreshIntegrationPermissions(integration.id)}
                                   disabled={refreshingPermissions === integration.id}
-                                  className="h-7 px-2 text-neutral-500 hover:text-neutral-700"
+                                  className="h-7 px-2 text-neutral-500 hover:text-neutral-700 flex-shrink-0"
                                 >
                                   <RefreshCw className={`w-3 h-3 ${refreshingPermissions === integration.id ? 'animate-spin' : ''}`} />
                                 </Button>
@@ -2860,7 +2869,7 @@ export default function IntegrationsPage() {
         </Card>
 
         {/* Enhanced Integrations Card */}
-        <Card className="mb-8 max-w-3xl mx-auto" data-enhancement-section>
+        <Card className="mb-8" data-enhancement-section>
           <CardContent className="p-8">
         {/* Enhanced Integrations Section */}
         <div className="space-y-8">
@@ -3058,7 +3067,15 @@ export default function IntegrationsPage() {
           </div>
 
           {/* Integration Forms */}
-          <div className="space-y-6">
+          <div
+            className="space-y-6"
+            onClick={(e) => {
+              // Deselect on click if target is the div itself (empty space)
+              if (e.target === e.currentTarget) {
+                setActiveEnhancementTab(null)
+              }
+            }}
+          >
             {/* GitHub Token Form */}
             {activeEnhancementTab === 'github' && !githubIntegration && (
               <GitHubIntegrationCard
@@ -3339,6 +3356,27 @@ export default function IntegrationsPage() {
           </CardContent>
         </Card>
 
+        {/* Powered by Rootly AI Footer */}
+        <div className="mt-12 pt-8 border-t border-neutral-200 text-center">
+          <a
+            href="https://rootly.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex flex-col items-center space-y-1 hover:opacity-80 transition-opacity"
+          >
+            <span className="text-lg text-neutral-700">powered by</span>
+            <Image
+              src="/images/rootly-ai-logo.png"
+              alt="Rootly AI"
+              width={200}
+              height={80}
+              className="h-12 w-auto"
+            />
+          </a>
+        </div>
+            </div>  {/* Close max-w-3xl mx-auto */}
+          </div>  {/* Close px-4 py-8 */}
+        </div>  {/* Close scroll container */}
       </main>
 
       {/* Data Mapping Drawer */}
@@ -4270,25 +4308,6 @@ export default function IntegrationsPage() {
           setIntegrationToDelete(null)
         }}
       />
-
-      {/* Powered by Rootly AI Footer */}
-      <div className="mt-12 pt-8 border-t border-neutral-200 text-center">
-        <a
-          href="https://rootly.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex flex-col items-center space-y-1 hover:opacity-80 transition-opacity"
-        >
-          <span className="text-lg text-neutral-700">powered by</span>
-          <Image
-            src="/images/rootly-ai-logo.png"
-            alt="Rootly AI"
-            width={200}
-            height={80}
-            className="h-12 w-auto"
-          />
-        </a>
-      </div>
 
       {/* Manual Survey Delivery Modal */}
       <ManualSurveyDeliveryModal

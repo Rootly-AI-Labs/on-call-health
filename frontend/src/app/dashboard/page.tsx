@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState, useMemo, useEffect, type JSX } from "react"
+import { Suspense, useState, useMemo, useEffect, useRef, type JSX } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { MappingDrawer } from "@/components/mapping-drawer"
@@ -45,6 +45,8 @@ import {
   ArrowRight,
   RefreshCw,
   Loader2,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react"
 
 // Helper function for platform-based colors
@@ -227,15 +229,67 @@ function DashboardContent() {
   setRedirectingToSuggested
   } = useDashboard()
 
+  // Helper function to safely sanitize untrusted strings to prevent XSS
+  const sanitizeString = (str: any): string => {
+    if (typeof str !== 'string') {
+      return String(str || '')
+    }
+    // Create a temporary element to use browser's HTML parsing for safe text extraction
+    const temp = document.createElement('div')
+    temp.textContent = str
+    return temp.innerHTML
+  }
+
+  // Helper function to check if run analysis button should be disabled
+  const isRunAnalysisDisabled = (): boolean => {
+    if (!dialogSelectedIntegration) return true
+    if (isCustomRange && !validateCustomDate(customStartDate).valid) return true
+
+    const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration)
+    if (!selectedIntegration) return true
+
+    // Check if no team members synced
+    if ((selectedIntegration.total_users || 0) === 0) return true
+
+    // Only check permissions for Rootly integrations, not PagerDuty
+    if (selectedIntegration.platform === 'rootly') {
+      const hasUserPermission = selectedIntegration.permissions?.users?.access
+      const hasIncidentPermission = selectedIntegration.permissions?.incidents?.access
+      return !hasUserPermission || !hasIncidentPermission
+    }
+
+    // For PagerDuty or other platforms, don't block based on permissions
+    return false
+  }
+
   // Get userId from localStorage for user-specific onboarding tracking
   const userId = typeof window !== 'undefined' ? localStorage.getItem("user_id") : null
   const onboarding = useOnboarding(userId)
 
   // Track if component has mounted on client to prevent hydration mismatch
   const [mounted, setMounted] = useState(false)
+  const sidebarRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Click outside sidebar detection for mobile collapse
+  useEffect(() => {
+    // Only handle click-outside on mobile
+    if (typeof window === 'undefined') return
+    if (window.innerWidth >= 768) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!sidebarCollapsed &&
+          sidebarRef.current &&
+          !sidebarRef.current.contains(event.target as Node)) {
+        setSidebarCollapsed(true)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [sidebarCollapsed, setSidebarCollapsed])
 
   // Auto-open analysis dialog when redirected from integrations page with ?run=true
   useEffect(() => {
@@ -277,7 +331,7 @@ function DashboardContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-100">
+    <div className="flex flex-col h-screen w-full bg-neutral-100">
       <TopPanel />
       {!onboarding.hasSeenOnboarding && (
         <IntroGuide
@@ -289,26 +343,71 @@ function DashboardContent() {
         />
       )}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Unified Sidebar - Works on all screen sizes */}
         <div
-          onMouseEnter={() => setSidebarCollapsed(false)}
-          onMouseLeave={() => setSidebarCollapsed(true)}
-          className={`${sidebarCollapsed ? "w-16" : "w-60"} bg-neutral-900 text-white transition-all duration-300 flex flex-col overflow-hidden`}
+          ref={sidebarRef}
+          onMouseEnter={() => {
+            // Only expand on hover on desktop
+            if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+              setSidebarCollapsed(false)
+            }
+          }}
+          onMouseLeave={() => {
+            // Only collapse on mouse leave on desktop
+            if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+              setSidebarCollapsed(true)
+            }
+          }}
+          className={`flex ${sidebarCollapsed ? "w-10 sm:w-12 md:w-16" : "w-60"} bg-neutral-900 text-white transition-all duration-300 flex-col overflow-hidden cursor-pointer md:cursor-default relative group md:relative`}
+          style={
+            mounted && !sidebarCollapsed && typeof window !== 'undefined' && window.innerWidth < 768
+              ? { position: 'fixed', left: 0, top: 0, height: '100vh', zIndex: 50 }
+              : {}
+          }
         >
+          {/* Clickable overlay for mobile */}
+          {sidebarCollapsed && (
+            <div
+              onClick={(e) => {
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  e.stopPropagation()
+                  setSidebarCollapsed(false)
+                }
+              }}
+              onTouchEnd={(e) => {
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  e.stopPropagation()
+                  setSidebarCollapsed(false)
+                }
+              }}
+              className="absolute inset-0 z-10 md:hidden"
+              style={{ pointerEvents: 'auto' }}
+            />
+          )}
         {/* Navigation */}
-        <div className={`flex-1 flex flex-col min-h-0 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`}>
-          {!sidebarCollapsed ? (
-            <div className="flex-1 space-y-2 min-h-0 flex flex-col">
-              <Button
-                onClick={startAnalysis}
-                disabled={analysisRunning}
-                className="w-full justify-start bg-purple-700 hover:bg-purple-800 text-white text-base mt-2"
-              >
-                <Play className="w-5 h-5 mr-2" />
-                New Analysis
-              </Button>
+        <div className={`flex-1 flex flex-col min-h-0 ${sidebarCollapsed ? 'p-1 sm:p-1.5 md:p-2' : 'p-4'} space-y-2 relative z-0`}>
+          {/* New Analysis Button - show when expanded, or on desktop when collapsed */}
+          {sidebarCollapsed ? (
+            <Button
+              onClick={startAnalysis}
+              disabled={analysisRunning}
+              className="w-full h-10 bg-purple-700 hover:bg-purple-800 text-white hidden md:flex items-center justify-center"
+            >
+              <Play className="w-5 h-5" />
+            </Button>
+          ) : (
+            <Button
+              onClick={startAnalysis}
+              disabled={analysisRunning}
+              className="w-full justify-start bg-purple-700 hover:bg-purple-800 text-white text-base mt-2"
+            >
+              <Play className="w-5 h-5 mr-2" />
+              New Analysis
+            </Button>
+          )}
 
-            <div className="space-y-1 flex-1 flex flex-col min-h-0">
+          {!sidebarCollapsed ? (
+            <div className="flex-1 space-y-1 min-h-0 flex flex-col">
               {!sidebarCollapsed && previousAnalyses.length > 0 && (
                 <p className="text-sm text-neutral-500 uppercase tracking-wide px-2 py-1 mt-4">Recent</p>
               )}
@@ -348,7 +447,9 @@ function DashboardContent() {
                 })
                 
                 // SIMPLE: Use integration name and platform stored directly with analysis
-                const organizationName = (analysis as any).integration_name || 'Unknown Integration'
+                // Sanitize organization name to prevent XSS
+                const rawName = (analysis as any).integration_name || 'Unknown Integration'
+                const organizationName = sanitizeString(rawName)
                 const analysisPlatform = (analysis as any).platform
                 const isSelected = currentAnalysis?.id === analysis.id
                 
@@ -374,7 +475,11 @@ function DashboardContent() {
                         const cachedTeamAnalysis = cachedAnalysis?.analysis_data?.team_analysis
                         const cachedMembers = Array.isArray(cachedTeamAnalysis) ? cachedTeamAnalysis : (cachedTeamAnalysis as any)?.members
 
-                        if (cachedAnalysis && cachedAnalysis.analysis_data && cachedMembers && Array.isArray(cachedMembers) && cachedMembers.length > 0) {
+                        // Check if we have valid cached data with analysis and members
+                        const hasCachedAnalysisData = cachedAnalysis?.analysis_data
+                        const hasCachedMembers = Array.isArray(cachedMembers) && cachedMembers.length > 0
+
+                        if (hasCachedAnalysisData && hasCachedMembers) {
                           // Use cached full analysis data
                           setCurrentAnalysis(cachedAnalysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
@@ -485,21 +590,29 @@ function DashboardContent() {
                 )}
               </div>
             </div>
-            </div>
           ) : (
-            <div className="flex-1">
-              {/* Collapsed state - just show new analysis button */}
-              <Button
-                onClick={startAnalysis}
-                disabled={analysisRunning}
-                className="w-full bg-purple-700 hover:bg-purple-800 text-white p-2"
-                title="New Analysis"
-              >
-                <Play className="w-5 h-5" />
-              </Button>
+            <div className="flex items-center justify-center pt-2 md:hidden">
+              {/* Collapsed state - show chevron arrow at top (click sidebar to expand) - mobile only */}
+              <ChevronRight className="w-6 h-6 text-white" />
             </div>
           )}
         </div>
+
+        {/* Close button for expanded mobile sidebar */}
+        {!sidebarCollapsed && (
+          <div className="md:hidden flex items-center justify-end p-2 bg-neutral-900">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setSidebarCollapsed(true)
+              }}
+              className="text-white hover:text-neutral-300 transition-colors p-1"
+              title="Close sidebar"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Content */}
@@ -1610,28 +1723,7 @@ function DashboardContent() {
               <Button
                 onClick={runAnalysisWithTimeRange}
                 className="bg-purple-700 hover:bg-purple-800"
-                disabled={
-                  !dialogSelectedIntegration ||
-                  (isCustomRange && !validateCustomDate(customStartDate).valid) ||
-                  (() => {
-                    const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
-
-                    // Check if no team members synced
-                    if ((selectedIntegration?.total_users || 0) === 0) {
-                      return true;
-                    }
-
-                    // Only check permissions for Rootly integrations, not PagerDuty
-                    if (selectedIntegration?.platform === 'rootly') {
-                      const hasUserPermission = selectedIntegration?.permissions?.users?.access;
-                      const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
-                      return !hasUserPermission || !hasIncidentPermission;
-                    }
-
-                    // For PagerDuty or other platforms, don't block based on permissions
-                    return false;
-                  })()
-                }
+                disabled={isRunAnalysisDisabled()}
               >
                 <>
                   <Play className="w-4 h-4 mr-2" />
