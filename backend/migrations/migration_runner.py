@@ -1236,6 +1236,11 @@ class MigrationRunner:
                 "description": "Add composite indexes to optimize get_platform_mappings endpoint",
                 "sql_file": "2026_02_06_optimize_get_platform_mappings.sql"
             },
+            {
+                "name": "045_add_organization_id_to_slack_integrations",
+                "description": "Add organization_id column to slack_integrations for org-level Slack management",
+                "sql_file": "2026_02_06_add_organization_id_to_slack_integrations.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 
