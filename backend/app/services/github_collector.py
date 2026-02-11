@@ -95,7 +95,7 @@ class GitHubCollector:
                 logger.warning(f"⚠️ [SYNCED_CHECK] Invalid user_id type: {type(user_id).__name__}: {user_id}")
                 return None
 
-            logger.debug(f"🔍 [SYNCED_CHECK] Querying user_correlations for email: {email}")
+            logger.info(f"🔍 [SYNCED_CHECK] Querying user_correlations for email: {email}")
 
             # Use SessionLocal instead of creating new engine/connection for each query
             # This prevents "too many clients" error when processing large teams
@@ -112,13 +112,18 @@ class GitHubCollector:
                 ).first()
 
                 if user_correlation and user_correlation.github_username:
+                    logger.info(f"✅ [SYNCED_CHECK_SUCCESS] Found GitHub username for {email}: {user_correlation.github_username}")
                     return user_correlation.github_username
-                return None
+                else:
+                    logger.info(f"❌ [SYNCED_CHECK_NOT_FOUND] No GitHub username found for {email} in user_correlations")
+                    return None
             finally:
                 db.close()
 
         except Exception as e:
             logger.error(f"❌ [SYNCED_CHECK_ERROR] Error checking synced members for {email}: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(f"❌ [SYNCED_CHECK_ERROR] Traceback: {traceback.format_exc()}")
             return None
 
     async def _build_email_mapping(self, token: str) -> Dict[str, str]:
