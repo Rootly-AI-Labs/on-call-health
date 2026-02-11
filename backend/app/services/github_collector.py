@@ -36,12 +36,15 @@ class GitHubCollector:
         
     async def _correlate_email_to_github(self, email: str, token: str, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[str]:
         """
-        Correlate an email address to a GitHub username using multiple strategies.
+        Correlate an email address to a GitHub username using ONLY manual mappings.
 
-        This checks in order:
-        1. Manual mappings from user_mappings table (highest priority)
-        2. Enhanced matching algorithm with multiple strategies
-        3. Legacy discovered email mappings from organization members
+        Management page is the single source of truth. This checks in order:
+        1. Synced members from user_correlations (GitHub username already set)
+        2. Manual mappings from user_mappings table (set via management page)
+        3. NO AUTO-DETECTION - users must be manually mapped on management page
+
+        Auto-detection is DISABLED to prevent conflicts with manual mappings.
+        If no mapping exists, returns None (user won't have GitHub data in analysis).
         """
         if not token:
             logger.debug("No GitHub token provided for correlation")
@@ -52,6 +55,7 @@ class GitHubCollector:
             logger.debug(f"🔍 [CORRELATION] Checking user_correlations for {email}")
             synced_username = await self._check_synced_members(email, user_id)
             if synced_username:
+                logger.info(f"✅ [SYNCED] Found synced GitHub username: {email} -> {synced_username}")
                 return synced_username
 
             # SECOND: Check manual mappings from user_mappings table (mapping drawer)
@@ -59,21 +63,13 @@ class GitHubCollector:
                 logger.debug(f"🔍 [CORRELATION] Checking user_mappings for {email}")
                 manual_username = await self._check_manual_mappings(email, user_id)
                 if manual_username:
+                    logger.info(f"✅ [MANUAL] Found manual GitHub mapping: {email} -> {manual_username}")
                     return manual_username
 
-            # FALLBACK: Try name-based matching against org members
-            if full_name and token:
-                try:
-                    from .enhanced_github_matcher import EnhancedGitHubMatcher
-                    matcher = EnhancedGitHubMatcher(token, self.organizations)
-                    name_match = await matcher.match_name_to_github(full_name, fallback_email=email)
-                    if name_match:
-                        logger.info(f"✅ [NAME_FALLBACK] Matched {email} -> {name_match} via name '{full_name}'")
-                        return name_match
-                    else:
-                        logger.debug(f"[NAME_FALLBACK] No match found for name '{full_name}' ({email})")
-                except Exception as e:
-                    logger.warning(f"⚠️ [NAME_FALLBACK] Error during name matching for '{full_name}': {e}")
+            # NO AUTO-DETECTION: Management page is the source of truth
+            # If user wants GitHub data, they must manually map on management page
+            logger.info(f"ℹ️ [NO_MAPPING] No manual mapping found for {email} - skipping GitHub data collection. "
+                       f"Map this user on the management page to include their GitHub activity.")
 
             return None
 
