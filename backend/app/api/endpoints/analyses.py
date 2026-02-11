@@ -383,7 +383,8 @@ async def run_burnout_analysis(
                 include_jira=request.include_jira,
                 include_linear=request.include_linear,
                 user_id=current_user.id,
-                enable_ai=request.enable_ai
+                enable_ai=request.enable_ai,
+                organization_id=current_user.organization_id
             )
             logger.info(f"ENDPOINT: Successfully added background task for analysis {analysis.id}")
         except Exception as e:
@@ -2807,7 +2808,8 @@ async def run_analysis_task(
     include_jira: bool = False,
     include_linear: bool = False,
     user_id: int = None,
-    enable_ai: bool = False
+    enable_ai: bool = False,
+    organization_id: int = None
 ):
     """Background task to run the actual burnout analysis."""
     import asyncio
@@ -3174,9 +3176,10 @@ async def run_analysis_task(
             organization_name=organization_name,
             synced_users=synced_users,  # Pass synced users from Team Sync
             current_user_id=user_id,  # Pass the current user ID for Jira integration lookup
-            db=db  # Reuse DB session to prevent connection pool exhaustion
+            db=db,  # Reuse DB session to prevent connection pool exhaustion
+            organization_id=organization_id  # Pass organization_id for cross-org data isolation
         )
-        logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}, current_user_id={user_id}")
+        logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}, current_user_id={user_id}, organization_id={organization_id}")
         
         # Run the analysis with timeout (15 minutes max)
         logger.info(f"BACKGROUND_TASK: Starting burnout analysis with 15-minute timeout for analysis {analysis_ref}")

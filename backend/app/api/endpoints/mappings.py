@@ -237,10 +237,24 @@ async def get_platform_mappings(
                 logger.warning(f"Could not extract user names from analysis: {e}")
 
         # Get most recent integration mappings, limited to prevent UI overload
-        integration_mappings = db.query(IntegrationMapping).filter(
+        from sqlalchemy import or_
+
+        query = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id,
             IntegrationMapping.target_platform == platform
-        ).order_by(IntegrationMapping.created_at.desc()).limit(limit).all()
+        )
+
+        # Filter by organization_id for cross-org data isolation
+        if current_user.organization_id:
+            query = query.filter(
+                or_(
+                    IntegrationMapping.organization_id == current_user.organization_id,
+                    IntegrationMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
+                )
+            )
+            logger.info(f"Filtering platform mappings by organization_id={current_user.organization_id}")
+
+        integration_mappings = query.order_by(IntegrationMapping.created_at.desc()).limit(limit).all()
         
         # Get manual mappings for this platform
         manual_mappings = db.query(UserMapping).filter(
@@ -323,14 +337,26 @@ async def get_success_rates(
             github_was_enabled = bool(row[0])
         
         # Get integration mappings for this user, optionally filtered by platform
+        from sqlalchemy import or_
+
         query = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id
         )
-        
+
         if platform:
             query = query.filter(IntegrationMapping.target_platform == platform)
             logger.info(f"🔍 DEBUG: Filtering by platform: {platform}")
-            
+
+        # Filter by organization_id for cross-org data isolation
+        if current_user.organization_id:
+            query = query.filter(
+                or_(
+                    IntegrationMapping.organization_id == current_user.organization_id,
+                    IntegrationMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
+                )
+            )
+            logger.info(f"Filtering success rates by organization_id={current_user.organization_id}")
+
         # Apply same ordering and limit as platform endpoint to ensure consistency
         integration_mappings = query.order_by(IntegrationMapping.created_at.desc()).limit(50).all()
         
