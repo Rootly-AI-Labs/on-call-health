@@ -374,11 +374,16 @@ class IntegrationValidator:
             "jira": {"valid": True/False, "error": "..."}
         }
         """
+        import time
+
         # Check cache first if enabled
         if use_cache:
             cached_results = get_cached_validation(user_id)
             if cached_results is not None:
+                logger.info(f"[VALIDATION] user_id={user_id} cache_hit=true")
                 return cached_results
+
+        logger.info(f"[VALIDATION] user_id={user_id} cache_hit=false starting_validation")
 
         validators = [
             ("github", self._validate_github),
@@ -387,10 +392,20 @@ class IntegrationValidator:
         ]
 
         results = {}
+        total_start = time.time()
+
         for name, validator_func in validators:
+            start = time.time()
             result = await validator_func(user_id)
+            duration = time.time() - start
+
+            logger.info(f"[VALIDATION] user_id={user_id} integration={name} duration={duration:.3f}s valid={result.get('valid') if result else None}")
+
             if result:
                 results[name] = result
+
+        total_duration = time.time() - total_start
+        logger.info(f"[VALIDATION] user_id={user_id} total_duration={total_duration:.3f}s integrations_validated={len(results)}")
 
         # Cache the results
         set_cached_validation(user_id, results)
