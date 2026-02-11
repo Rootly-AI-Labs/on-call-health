@@ -297,7 +297,7 @@ function DashboardContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-100">
+    <div className="flex flex-col h-screen w-full bg-neutral-100">
       <TopPanel />
       {!onboarding.hasSeenOnboarding && (
         <IntroGuide

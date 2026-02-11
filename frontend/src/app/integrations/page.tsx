@@ -2191,23 +2191,25 @@ export default function IntegrationsPage() {
   }, [])
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-100">
+    <div className="flex flex-col h-screen w-full bg-neutral-100">
       <TopPanel />
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden">
-        <div className="container mx-auto px-4 py-8 h-full overflow-y-auto">
-        {/* Incident Management Platform Card */}
-        <Card className="mb-8 max-w-3xl mx-auto" data-incident-section>
+      <main className="flex-1 overflow-hidden w-full bg-neutral-100">
+        <div className="h-full w-full overflow-y-auto">
+          <div className="px-4 py-8">
+            <div className="max-w-3xl mx-auto">
+              {/* Incident Management Platform Card */}
+        <Card className="mb-8" data-incident-section>
           <CardContent className="p-8">
         {/* Introduction Text */}
-        <div className="text-center mb-2 max-w-2xl mx-auto">
+        <div className="text-center mb-2">
           <h2 className="text-4xl font-bold text-black">Connect Your Incident Management Platform</h2>
         </div>
 
         {/* Integration Status Message */}
         {!loadingRootly && !loadingPagerDuty && (
-          <div className="text-center mb-6 max-w-2xl mx-auto">
+          <div className="text-center mb-6">
             {integrations.length === 0 ? (
               <p className="text-lg font-medium text-neutral-700">Add a Rootly or PagerDuty integration to get started!</p>
             ) : (
@@ -2221,7 +2223,7 @@ export default function IntegrationsPage() {
 
         {/* Platform Selection Cards */}
         <div
-          className="grid md:grid-cols-2 gap-4 mb-6 max-w-4xl mx-auto"
+          className="grid md:grid-cols-2 gap-4 mb-6 max-w-2xl mx-auto"
           onClick={(e) => {
             // Deselect on click if target is the grid itself or empty space
             if (e.target === e.currentTarget) {
@@ -2366,7 +2368,7 @@ export default function IntegrationsPage() {
 
             {/* Existing Integrations */}
             {(loadingRootly || loadingPagerDuty) ? (
-              <Card className="max-w-2xl mx-auto">
+              <Card>
                 <CardContent className="p-6 space-y-4">
                 {/* Skeleton loading cards */}
                 {[1, 2].map((i) => (
@@ -2403,7 +2405,7 @@ export default function IntegrationsPage() {
                 </CardContent>
               </Card>
             ) : integrations.length > 0 && filteredIntegrations.length > 0 ? (
-              <Card className="max-w-4xl mx-auto">
+              <Card>
                 <CardContent className="p-6">
                   {/* Active Organization Selector */}
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 pb-4 border-b border-neutral-200 mb-4">
@@ -2867,7 +2869,7 @@ export default function IntegrationsPage() {
         </Card>
 
         {/* Enhanced Integrations Card */}
-        <Card className="mb-8 max-w-3xl mx-auto" data-enhancement-section>
+        <Card className="mb-8" data-enhancement-section>
           <CardContent className="p-8">
         {/* Enhanced Integrations Section */}
         <div className="space-y-8">
@@ -3372,7 +3374,9 @@ export default function IntegrationsPage() {
             />
           </a>
         </div>
-        </div>
+            </div>  {/* Close max-w-3xl mx-auto */}
+          </div>  {/* Close px-4 py-8 */}
+        </div>  {/* Close scroll container */}
       </main>
 
       {/* Data Mapping Drawer */}

@@ -956,12 +956,13 @@ function TeamPageContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-50">
+    <div className="flex flex-col h-screen w-full bg-neutral-50">
       <TopPanel />
-      <main className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
-          {/* Header with Title and View Mode Toggle */}
+      <main className="flex-1 overflow-hidden w-full bg-neutral-50">
+        <div className="h-full w-full overflow-y-auto">
+          <div className="p-6 lg:p-8">
+            <div className="max-w-4xl mx-auto">
+            {/* Header with Title and View Mode Toggle */}
           <div className="mb-6 flex flex-col-reverse md:flex-row md:items-start md:justify-between md:pl-4 gap-4 md:gap-0">
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl font-semibold text-neutral-900">
@@ -1005,7 +1006,7 @@ function TeamPageContent() {
 
           {/* Organization Management Section */}
           {(selectedOrganization || !hasPrimaryIntegration) && !loadingIntegrations && (
-            <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
+              <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
               {viewMode === 'organization' ? (
                 <>
                   {/* Organization View */}
@@ -1666,7 +1667,7 @@ function TeamPageContent() {
                   />
                 </>
               )}
-            </div>
+              </div>
           )}
 
           {!selectedOrganization && !loadingIntegrations && (
@@ -1674,8 +1675,9 @@ function TeamPageContent() {
               <p className="text-neutral-600">Please select an organization to view users</p>
             </div>
           )}
-          </div>
-        </div>
+            </div>  {/* Close max-w-4xl mx-auto */}
+          </div>  {/* Close p-6 lg:p-8 */}
+        </div>  {/* Close h-full overflow-y-auto */}
       </main>
 
       {/* Sync Confirmation Modal */}

@@ -81,7 +81,7 @@ export function TopPanel() {
   const isAdmin = userInfo?.role === 'admin'
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-neutral-300">
+    <header className="sticky top-0 z-50 w-full bg-white border-b border-neutral-300">
       <div className="px-2 sm:px-4 md:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Left: brand + nav */}
