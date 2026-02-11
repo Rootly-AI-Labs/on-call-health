@@ -21,10 +21,10 @@ class GitHubCollector:
     def __init__(self):
         self.cache_dir = Path('.github_cache')
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-
+        
         # Business hours configuration
         self.business_hours = {'start': 9, 'end': 17}
-
+        
         # Rate limiting
         self.last_request_time = 0
         self.min_request_interval = 0.1  # 100ms between requests
@@ -32,30 +32,24 @@ class GitHubCollector:
         # GitHub organizations - fetched dynamically based on token access
         self._organizations_cache = {}  # Cache: token_hash -> [org_list, timestamp]
         self._org_cache_ttl = 3600  # Cache orgs for 1 hour
-        self._org_cache_locks = {}  # Lock per token to prevent concurrent API calls
 
         # Cache for email mapping
         self._email_mapping_cache = None
 
-    async def _get_accessible_orgs(self, token: str) -> Optional[List[str]]:
+    async def _get_accessible_orgs(self, token: str) -> List[str]:
         """
         Fetch organizations the token has access to from GitHub API.
         Caches results for 1 hour to avoid repeated API calls.
-
-        Returns:
-            List[str]: List of organization names (empty list if user has no orgs)
-            None: If API call failed or token is invalid
         """
-        # Input validation
-        if not token or not isinstance(token, str) or len(token.strip()) == 0:
-            logger.warning("Invalid GitHub token provided")
-            return None
+        if not token:
+            logger.warning("No GitHub token provided, cannot fetch organizations")
+            return []
 
         # Create cache key (full SHA256 hash to prevent collisions)
         import hashlib
         token_hash = hashlib.sha256(token.encode()).hexdigest()
 
-        # Check cache (fast path, no lock needed)
+        # Check cache
         now = datetime.now().timestamp()
         if token_hash in self._organizations_cache:
             orgs, cached_time = self._organizations_cache[token_hash]
@@ -63,62 +57,49 @@ class GitHubCollector:
                 logger.debug(f"Using cached organizations ({len(orgs)} orgs)")
                 return orgs
 
-        # Acquire lock for this token to prevent concurrent API calls
-        if token_hash not in self._org_cache_locks:
-            self._org_cache_locks[token_hash] = asyncio.Lock()
+        # Fetch from GitHub API
+        try:
+            import aiohttp
+            headers = {
+                'Authorization': f'token {token}',
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'Rootly-Burnout-Detector'
+            }
 
-        async with self._org_cache_locks[token_hash]:
-            # Double-check cache after acquiring lock (another request might have populated it)
-            if token_hash in self._organizations_cache:
-                orgs, cached_time = self._organizations_cache[token_hash]
-                if now - cached_time < self._org_cache_ttl:
-                    logger.debug(f"Using cached organizations ({len(orgs)} orgs)")
-                    return orgs
+            # Configure timeout and SSL validation
+            timeout = aiohttp.ClientTimeout(total=30)
+            connector = aiohttp.TCPConnector(ssl=True)
 
-            # Fetch from GitHub API
-            try:
-                import aiohttp
-                headers = {
-                    'Authorization': f'token {token}',
-                    'Accept': 'application/vnd.github.v3+json',
-                    'User-Agent': 'Rootly-Burnout-Detector'
-                }
+            async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+                async with session.get("https://api.github.com/user/orgs", headers=headers) as resp:
+                    if resp.status == 200:
+                        orgs_data = await resp.json()
+                        org_names = [org.get("login") for org in orgs_data if org.get("login")]
 
-                # Configure timeout and SSL validation
-                timeout = aiohttp.ClientTimeout(total=30)
-                connector = aiohttp.TCPConnector(ssl=True)
+                        # Cache the result
+                        self._organizations_cache[token_hash] = (org_names, now)
 
-                async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
-                    async with session.get("https://api.github.com/user/orgs", headers=headers) as resp:
-                        if resp.status == 200:
-                            orgs_data = await resp.json()
-                            org_names = [org.get("login") for org in orgs_data if org.get("login")]
-
-                            # Cache the result (including empty lists)
-                            self._organizations_cache[token_hash] = (org_names, now)
-
-                            # Log count only (don't expose org names in logs)
-                            logger.info(f"✅ Token has access to {len(org_names)} organizations")
-                            return org_names
-                        elif resp.status == 401:
-                            logger.error("GitHub token is invalid or expired")
-                            return None
-                        elif resp.status == 403:
-                            logger.warning("GitHub token needs 'read:org' scope to list organizations")
-                            return None
-                        else:
-                            logger.warning(f"Failed to fetch orgs (status {resp.status})")
-                            return None
-            except aiohttp.ClientError as e:
-                logger.error(f"GitHub API client error: {type(e).__name__}")
-                return None
-            except asyncio.TimeoutError:
-                logger.error("GitHub API request timed out after 30s")
-                return None
-            except Exception as e:
-                # Sanitized logging to prevent token leakage in error messages
-                logger.error(f"Unexpected error fetching GitHub organizations: {type(e).__name__}", exc_info=False)
-                return None
+                        # Log count only (don't expose org names in logs)
+                        logger.info(f"✅ Token has access to {len(org_names)} organizations")
+                        return org_names
+                    elif resp.status == 401:
+                        logger.error("GitHub token is invalid or expired")
+                        return []
+                    elif resp.status == 403:
+                        logger.warning("GitHub token needs 'read:org' scope to list organizations")
+                        return []
+                    else:
+                        logger.warning(f"Failed to fetch orgs (status {resp.status}), using no org filter")
+                        return []
+        except aiohttp.ClientError as e:
+            logger.error(f"GitHub API client error: {e}")
+            return []
+        except asyncio.TimeoutError:
+            logger.error("GitHub API request timed out after 30s")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error fetching GitHub organizations: {type(e).__name__}: {e}")
+            return []
 
     async def _correlate_email_to_github(self, email: str, token: str, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[str]:
         """
@@ -153,11 +134,8 @@ class GitHubCollector:
                     from .enhanced_github_matcher import EnhancedGitHubMatcher
                     # Get orgs dynamically based on token access
                     accessible_orgs = await self._get_accessible_orgs(token)
-                    if accessible_orgs is None:
-                        logger.warning(f"[NAME_FALLBACK] Failed to fetch orgs - cannot perform name matching")
-                        return None
                     if not accessible_orgs:
-                        logger.debug(f"[NAME_FALLBACK] User has no organization memberships - cannot perform name matching")
+                        logger.debug(f"[NAME_FALLBACK] No orgs accessible for name matching")
                         return None
                     matcher = EnhancedGitHubMatcher(token, accessible_orgs)
                     name_match = await matcher.match_name_to_github(full_name, fallback_email=email)
@@ -309,11 +287,8 @@ class GitHubCollector:
             async with aiohttp.ClientSession() as session:
                 # Get organizations the token has access to
                 accessible_orgs = await self._get_accessible_orgs(token)
-                if accessible_orgs is None:
-                    logger.warning("Failed to fetch orgs - cannot build email mapping")
-                    return {}
                 if not accessible_orgs:
-                    logger.info("User has no organization memberships - cannot build email mapping")
+                    logger.warning("No orgs accessible - cannot build email mapping")
                     return {}
 
                 # Get all GitHub users from organizations
@@ -429,16 +404,15 @@ class GitHubCollector:
             accessible_orgs = await self._get_accessible_orgs(token)
 
             # Build org filters based on token's access
-            if accessible_orgs:  # Non-empty list
+            if accessible_orgs:
                 org_filters = "+".join([f"org:{org}" for org in accessible_orgs])
                 org_filter_query = f"+{org_filters}"
                 logger.debug(f"🔍 Using org filters for {len(accessible_orgs)} organizations")
-            elif accessible_orgs is not None:  # Empty list but API succeeded
-                logger.info(f"User has no organization memberships - searching all repos for {username}")
+            else:
+                # No orgs accessible or token doesn't have read:org scope
+                # Search ALL repos (no org filter)
                 org_filter_query = ""
-            else:  # API failed (returned None)
-                logger.warning(f"⚠️ Could not determine accessible orgs - searching all repos for {username}")
-                org_filter_query = ""
+                logger.warning(f"⚠️ No orgs accessible or token lacks 'read:org' scope - searching all repos for {username}")
 
             # Get commits across all repos (filtered by orgs if available)
             commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}{org_filter_query}&per_page=1"
@@ -666,14 +640,11 @@ class GitHubCollector:
                 accessible_orgs = await self._get_accessible_orgs(github_token)
 
                 # Build org filters based on token's access
-                if accessible_orgs:  # Non-empty list
+                if accessible_orgs:
                     org_filters = "+".join([f"org:{org}" for org in accessible_orgs])
                     query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')} {org_filters}"
-                elif accessible_orgs is not None:  # Empty list but API succeeded
-                    logger.info(f"User has no organization memberships - searching all repos for {username}")
-                    query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
-                else:  # API failed (returned None)
-                    logger.warning(f"Could not determine accessible orgs - searching all repos for {username}")
+                else:
+                    # No org filter if token doesn't have access or lacks read:org scope
                     query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
 
                 page = 1
