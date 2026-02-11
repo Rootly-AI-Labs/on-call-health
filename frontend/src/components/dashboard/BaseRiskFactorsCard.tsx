@@ -35,13 +35,14 @@ function CustomPolarAngleTick(props: any) {
   const mobileBreaks: Record<string, string[]> = {
     'After-hours activity': isMobile ? ['After', 'hours activity'] : ['After-hours activity'],
     'Consecutive incident days': isMobile ? ['Consecutive', 'incident days'] : ['Consecutive incident days'],
-    'Task load': isMobile ? ['Task', 'load'] : ['Task load'],
+    'Task load': isMobile ? ['task', 'workload'] : ['Task load'],
     'High-severity incidents': isMobile ? ['High severity', 'incidents'] : ['High-severity incidents'],
     'After Hours Activity': isMobile ? ['After', 'hours activity'] : ['After Hours Activity'],
     'Workload Intensity': isMobile ? ['Workload', 'Intensity'] : ['Workload Intensity'],
     'On-call load': isMobile ? ['On-call', 'load'] : ['On-call load'],
     'Weekend Work': isMobile ? ['Weekend', 'Work'] : ['Weekend Work'],
     'Response Time': isMobile ? ['Response', 'Time'] : ['Response Time'],
+    'Severity-weighted workload': isMobile ? ['Severity weighted', 'workload'] : ['Severity-weighted workload'],
   }
 
   const lines = mobileBreaks[payload.value] || [payload.value]
@@ -184,7 +185,8 @@ export function BaseRiskFactorsCard({
             <CardDescription>{description}</CardDescription>
           </div>
 
-          {showInfoTooltip && Object.keys(factorDescriptions).length > 0 && (
+          {/* InfoTooltip commented out - removed per user request */}
+          {/* {showInfoTooltip && Object.keys(factorDescriptions).length > 0 && (
             <div className="ml-4">
               <InfoTooltip
                 content={
@@ -196,7 +198,7 @@ export function BaseRiskFactorsCard({
                 side="left"
               />
             </div>
-          )}
+          )} */}
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 pb-2">
