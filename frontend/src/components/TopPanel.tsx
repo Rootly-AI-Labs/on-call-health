@@ -52,6 +52,9 @@ export function TopPanel() {
   const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false)
 
   useEffect(() => {
+    // Only access localStorage on client-side to prevent SSR hydration mismatch
+    if (typeof window === 'undefined') return
+
     const authToken = localStorage.getItem("auth_token")
     const userName = localStorage.getItem("user_name")
     const userEmail = localStorage.getItem("user_email")

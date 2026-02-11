@@ -91,10 +91,23 @@ export function BaseRiskFactorsCard({
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    // Only run on client-side
+    if (typeof window === 'undefined') return
+
+    let isMounted = true
+    const checkMobile = () => {
+      if (isMounted) {
+        setIsMobile(window.innerWidth < 768)
+      }
+    }
+
     checkMobile()
     window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener('resize', checkMobile)
+    }
   }, [])
 
   // Use fixed 0-100 scale for consistent axis representation

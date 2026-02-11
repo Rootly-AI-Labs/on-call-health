@@ -229,6 +229,28 @@ function DashboardContent() {
   setRedirectingToSuggested
   } = useDashboard()
 
+  // Helper function to check if run analysis button should be disabled
+  const isRunAnalysisDisabled = (): boolean => {
+    if (!dialogSelectedIntegration) return true
+    if (isCustomRange && !validateCustomDate(customStartDate).valid) return true
+
+    const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration)
+    if (!selectedIntegration) return true
+
+    // Check if no team members synced
+    if ((selectedIntegration.total_users || 0) === 0) return true
+
+    // Only check permissions for Rootly integrations, not PagerDuty
+    if (selectedIntegration.platform === 'rootly') {
+      const hasUserPermission = selectedIntegration.permissions?.users?.access
+      const hasIncidentPermission = selectedIntegration.permissions?.incidents?.access
+      return !hasUserPermission || !hasIncidentPermission
+    }
+
+    // For PagerDuty or other platforms, don't block based on permissions
+    return false
+  }
+
   // Get userId from localStorage for user-specific onboarding tracking
   const userId = typeof window !== 'undefined' ? localStorage.getItem("user_id") : null
   const onboarding = useOnboarding(userId)
@@ -243,7 +265,7 @@ function DashboardContent() {
   // Click outside sidebar detection for mobile collapse
   useEffect(() => {
     // Only handle click-outside on mobile
-    if (window.innerWidth >= 768) return
+    if (typeof window === 'undefined' || window.innerWidth >= 768) return
 
     const handleClickOutside = (event: MouseEvent) => {
       if (!sidebarCollapsed &&
@@ -314,19 +336,19 @@ function DashboardContent() {
           ref={sidebarRef}
           onMouseEnter={() => {
             // Only expand on hover on desktop
-            if (window.innerWidth >= 768) {
+            if (typeof window !== 'undefined' && window.innerWidth >= 768) {
               setSidebarCollapsed(false)
             }
           }}
           onMouseLeave={() => {
             // Only collapse on mouse leave on desktop
-            if (window.innerWidth >= 768) {
+            if (typeof window !== 'undefined' && window.innerWidth >= 768) {
               setSidebarCollapsed(true)
             }
           }}
           className={`flex ${sidebarCollapsed ? "w-10 sm:w-12 md:w-16" : "w-60"} bg-neutral-900 text-white transition-all duration-300 flex-col overflow-hidden cursor-pointer md:cursor-default relative group md:relative`}
           style={
-            mounted && !sidebarCollapsed && window.innerWidth < 768
+            mounted && !sidebarCollapsed && typeof window !== 'undefined' && window.innerWidth < 768
               ? { position: 'fixed', left: 0, top: 0, height: '100vh', zIndex: 50 }
               : {}
           }
@@ -335,13 +357,13 @@ function DashboardContent() {
           {sidebarCollapsed && (
             <div
               onClick={(e) => {
-                if (window.innerWidth < 768) {
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
                   e.stopPropagation()
                   setSidebarCollapsed(false)
                 }
               }}
               onTouchEnd={(e) => {
-                if (window.innerWidth < 768) {
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
                   e.stopPropagation()
                   setSidebarCollapsed(false)
                 }
@@ -413,7 +435,9 @@ function DashboardContent() {
                 })
                 
                 // SIMPLE: Use integration name and platform stored directly with analysis
-                const organizationName = (analysis as any).integration_name || 'Unknown Integration'
+                // Sanitize organization name to prevent XSS
+                const rawName = (analysis as any).integration_name || 'Unknown Integration'
+                const organizationName = String(rawName).replace(/[<>]/g, '') // Remove potential HTML tags
                 const analysisPlatform = (analysis as any).platform
                 const isSelected = currentAnalysis?.id === analysis.id
                 
@@ -439,7 +463,11 @@ function DashboardContent() {
                         const cachedTeamAnalysis = cachedAnalysis?.analysis_data?.team_analysis
                         const cachedMembers = Array.isArray(cachedTeamAnalysis) ? cachedTeamAnalysis : (cachedTeamAnalysis as any)?.members
 
-                        if (cachedAnalysis && cachedAnalysis.analysis_data && cachedMembers && Array.isArray(cachedMembers) && cachedMembers.length > 0) {
+                        // Check if we have valid cached data with analysis and members
+                        const hasCachedAnalysisData = cachedAnalysis?.analysis_data
+                        const hasCachedMembers = Array.isArray(cachedMembers) && cachedMembers.length > 0
+
+                        if (hasCachedAnalysisData && hasCachedMembers) {
                           // Use cached full analysis data
                           setCurrentAnalysis(cachedAnalysis)
                           setRedirectingToSuggested(false) // Turn off redirect loader
@@ -1683,28 +1711,7 @@ function DashboardContent() {
               <Button
                 onClick={runAnalysisWithTimeRange}
                 className="bg-purple-700 hover:bg-purple-800"
-                disabled={
-                  !dialogSelectedIntegration ||
-                  (isCustomRange && !validateCustomDate(customStartDate).valid) ||
-                  (() => {
-                    const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
-
-                    // Check if no team members synced
-                    if ((selectedIntegration?.total_users || 0) === 0) {
-                      return true;
-                    }
-
-                    // Only check permissions for Rootly integrations, not PagerDuty
-                    if (selectedIntegration?.platform === 'rootly') {
-                      const hasUserPermission = selectedIntegration?.permissions?.users?.access;
-                      const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
-                      return !hasUserPermission || !hasIncidentPermission;
-                    }
-
-                    // For PagerDuty or other platforms, don't block based on permissions
-                    return false;
-                  })()
-                }
+                disabled={isRunAnalysisDisabled()}
               >
                 <>
                   <Play className="w-4 h-4 mr-2" />
