@@ -100,12 +100,17 @@ class GitHubMappingService:
             for email, cached_mapping in emails_needing_activity_refresh:
                 try:
                     refreshed_data = await self._refresh_activity_data(
-                        email, cached_mapping, days, github_token, analysis_id
+                        email, cached_mapping, days, github_token, analysis_id,
+                        user_id=user_id, email_to_name=email_to_name
                     )
                     if refreshed_data:
                         results[email] = refreshed_data
                         # Update mapping record with fresh data points
                         self._update_mapping_data_points(cached_mapping, refreshed_data, analysis_id)
+                    else:
+                        # Fallback: if refresh returns None (username lookup failed), try new mapping
+                        logger.warning(f"Refresh returned None for {email}, falling back to new mapping")
+                        emails_needing_mapping.append(email)
                 except Exception as e:
                     logger.warning(f"Failed to refresh activity for {email}: {e}")
                     # Fall back to creating new mapping
@@ -170,40 +175,94 @@ class GitHubMappingService:
         return (now - created_at).total_seconds() / 86400
     
     async def _refresh_activity_data(
-        self, 
-        email: str, 
-        cached_mapping, 
-        days: int, 
+        self,
+        email: str,
+        cached_mapping,
+        days: int,
         github_token: str,
-        analysis_id: int
+        analysis_id: int,
+        user_id: Optional[int] = None,
+        email_to_name: Optional[Dict[str, str]] = None
     ) -> Optional[Dict]:
         """
         Refresh activity data for a cached mapping.
         Reuse the username but get fresh commits/PRs/reviews.
+
+        CRITICAL: Must pass user_id, full_name, and timezone to ensure:
+        - Username lookup succeeds (requires user_id for synced members check)
+        - After-hours detection uses correct timezone (Spencer=PST, Sylvain=EST)
+        - Name-based fallback matching works (requires full_name)
         """
         username = cached_mapping.target_identifier
         if not username or username == "unknown":
             return None
-            
+
         logger.debug(f"🔄 Refreshing activity for {email} -> {username}")
-        
+
+        # Extract full name from email_to_name mapping
+        full_name = email_to_name.get(email) if email_to_name else None
+
+        # Look up user's timezone from user_correlations (critical for after-hours detection)
+        user_timezone = 'UTC'  # Fallback
+        organization_id = None
+
+        if user_id is not None:
+            try:
+                from ..models import SessionLocal, UserCorrelation, User
+                from sqlalchemy import desc
+
+                db_session = SessionLocal()
+                try:
+                    # Get organization_id for filtering
+                    user = db_session.query(User).filter(User.id == user_id).first()
+                    if user:
+                        organization_id = user.organization_id
+
+                    # Query user_correlations for timezone (same logic as collect_team_github_data)
+                    filters = [
+                        UserCorrelation.email == email,
+                        UserCorrelation.user_id.is_(None)  # Team roster only
+                    ]
+                    if organization_id:
+                        filters.append(UserCorrelation.organization_id == organization_id)
+
+                    user_correlation = db_session.query(UserCorrelation).filter(*filters).order_by(
+                        UserCorrelation.github_username.isnot(None).desc(),
+                        desc(UserCorrelation.id)
+                    ).first()
+
+                    if user_correlation and user_correlation.timezone:
+                        user_timezone = user_correlation.timezone
+                        logger.debug(f"🌍 Using timezone {user_timezone} for {email}")
+                    else:
+                        logger.warning(f"⚠️ No timezone found for {email}, using UTC default")
+                finally:
+                    db_session.close()
+            except Exception as e:
+                logger.warning(f"⚠️ Timezone lookup failed for {email}: {e}")
+
         try:
-            # Get fresh activity data using cached username
+            # CRITICAL FIX: Pass user_id, full_name, and timezone to collect_github_data_for_user
+            # Without these parameters, username lookup fails and no data is collected!
             user_data = await self.github_collector.collect_github_data_for_user(
-                email, days, github_token
+                email, days, github_token,
+                user_id=user_id,           # Required for username lookup strategies
+                full_name=full_name,       # Required for name-based fallback matching
+                timezone=user_timezone     # Required for accurate after-hours detection
             )
-            
+
             if user_data and isinstance(user_data, dict):
                 # Ensure username matches cached mapping
                 user_data['username'] = username
                 user_data['email'] = email
+                logger.debug(f"✅ Refreshed activity for {email} -> {username}")
                 return user_data
             else:
-                logger.warning(f"No activity data returned for {email} -> {username}")
+                logger.warning(f"❌ No activity data returned for {email} -> {username}")
                 return None
-                
+
         except Exception as e:
-            logger.error(f"Failed to refresh activity data for {email}: {e}")
+            logger.error(f"❌ Failed to refresh activity data for {email}: {e}")
             return None
     
     async def _create_new_mappings(
