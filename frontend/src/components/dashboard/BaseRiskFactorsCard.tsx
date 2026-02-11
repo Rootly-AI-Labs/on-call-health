@@ -51,8 +51,18 @@ function CustomPolarAngleTick(props: any) {
   const dy = y - (cy || 0)
   const distance = Math.sqrt(dx * dx + dy * dy)
   const offsetFactor = isMobile ? 1.15 : 1.1 // Push labels 10% further on desktop, 15% on mobile
-  const offsetX = (dx / distance) * (distance * offsetFactor)
-  const offsetY = (dy / distance) * (distance * offsetFactor)
+
+  // Prevent division by zero when distance is 0
+  let offsetX = 0
+  let offsetY = 0
+  if (distance > 0) {
+    const unitX = dx / distance
+    const unitY = dy / distance
+    const scaledDistance = distance * offsetFactor
+    offsetX = unitX * scaledDistance
+    offsetY = unitY * scaledDistance
+  }
+
   const finalX = (cx || 0) + offsetX
   const finalY = (cy || 0) + offsetY
 

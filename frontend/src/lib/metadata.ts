@@ -17,12 +17,14 @@ export const SITE_CONFIG = {
 
 /**
  * Base metadata template used as default for all pages
+ * Allows user zooming for accessibility (WCAG compliance)
  */
 export const baseViewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  minimumScale: 1,
+  userScalable: true,
   viewportFit: 'cover',
 }
 

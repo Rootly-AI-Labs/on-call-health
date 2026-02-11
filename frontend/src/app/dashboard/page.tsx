@@ -229,6 +229,17 @@ function DashboardContent() {
   setRedirectingToSuggested
   } = useDashboard()
 
+  // Helper function to safely sanitize untrusted strings to prevent XSS
+  const sanitizeString = (str: any): string => {
+    if (typeof str !== 'string') {
+      return String(str || '')
+    }
+    // Create a temporary element to use browser's HTML parsing for safe text extraction
+    const temp = document.createElement('div')
+    temp.textContent = str
+    return temp.innerHTML
+  }
+
   // Helper function to check if run analysis button should be disabled
   const isRunAnalysisDisabled = (): boolean => {
     if (!dialogSelectedIntegration) return true
@@ -265,7 +276,8 @@ function DashboardContent() {
   // Click outside sidebar detection for mobile collapse
   useEffect(() => {
     // Only handle click-outside on mobile
-    if (typeof window === 'undefined' || window.innerWidth >= 768) return
+    if (typeof window === 'undefined') return
+    if (window.innerWidth >= 768) return
 
     const handleClickOutside = (event: MouseEvent) => {
       if (!sidebarCollapsed &&
@@ -437,7 +449,7 @@ function DashboardContent() {
                 // SIMPLE: Use integration name and platform stored directly with analysis
                 // Sanitize organization name to prevent XSS
                 const rawName = (analysis as any).integration_name || 'Unknown Integration'
-                const organizationName = String(rawName).replace(/[<>]/g, '') // Remove potential HTML tags
+                const organizationName = sanitizeString(rawName)
                 const analysisPlatform = (analysis as any).platform
                 const isSelected = currentAnalysis?.id === analysis.id
                 
