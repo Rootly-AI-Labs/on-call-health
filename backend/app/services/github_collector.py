@@ -269,8 +269,8 @@ class GitHubCollector:
             # Get pull requests count
             prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}&per_page=1"
 
-            logger.debug(f"🔍 [GITHUB_API_URL] Commits query: {commits_url}")
-            logger.debug(f"🔍 [GITHUB_API_URL] PRs query: {prs_url}")
+            logger.info(f"🔍 [GITHUB_API_URL] Commits query: {commits_url}")
+            logger.info(f"🔍 [GITHUB_API_URL] PRs query: {prs_url}")
 
             # Make resilient API calls with rate limiting and circuit breaker
             async def fetch_commits():
@@ -300,17 +300,17 @@ class GitHubCollector:
                             raise aiohttp.ClientError(f"GitHub API error for PRs: {resp.status}")
             
             # Execute with enterprise resilience patterns
-            logger.debug(f"🌐 [GITHUB_API] Fetching commits for {username}")
+            logger.info(f"🌐 [GITHUB_API] Fetching commits for {username}")
             commits_data = await github_api_manager.safe_api_call(fetch_commits, max_retries=3)
             total_commits = commits_data.get('total_count', 0) if commits_data else 0
-            logger.debug(f"📊 [GITHUB_API_RESPONSE] {username} commits response: total_count={total_commits}, incomplete_results={commits_data.get('incomplete_results', 'N/A') if commits_data else 'N/A'}")
+            logger.info(f"📊 [GITHUB_API_RESPONSE] {username} commits response: total_count={total_commits}, incomplete_results={commits_data.get('incomplete_results', 'N/A') if commits_data else 'N/A'}")
 
-            logger.debug(f"🌐 [GITHUB_API] Fetching PRs for {username}")
+            logger.info(f"🌐 [GITHUB_API] Fetching PRs for {username}")
             prs_data = await github_api_manager.safe_api_call(fetch_prs, max_retries=3)
             total_prs = prs_data.get('total_count', 0) if prs_data else 0
-            logger.debug(f"📊 [GITHUB_API_RESPONSE] {username} PRs response: total_count={total_prs}, incomplete_results={prs_data.get('incomplete_results', 'N/A') if prs_data else 'N/A'}")
+            logger.info(f"📊 [GITHUB_API_RESPONSE] {username} PRs response: total_count={total_prs}, incomplete_results={prs_data.get('incomplete_results', 'N/A') if prs_data else 'N/A'}")
 
-            logger.debug(f"✅ [GITHUB_API_SUCCESS] {username} ({email}): {total_commits} commits, {total_prs} PRs")
+            logger.info(f"✅ [GITHUB_API_SUCCESS] {username} ({email}): {total_commits} commits, {total_prs} PRs")
 
             # Fetch detailed daily commit data with timestamps
             logger.debug(f"🔄 Fetching detailed daily commit data for {username}")

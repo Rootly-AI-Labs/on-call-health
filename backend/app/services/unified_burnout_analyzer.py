@@ -5741,6 +5741,12 @@ class UnifiedBurnoutAnalyzer:
         """
         Calculate burnout score based ONLY on after-hours and weekend work patterns.
         Total commit volume is ignored - only work-life balance matters.
+
+        Score range: 0-20 (translates to 0-200 on OCH scale)
+        - After-hours work: 0-10 points based on percentage of commits outside business hours
+        - Weekend work: 0-10 points based on percentage of commits on weekends
+
+        Penalties are aggressive to strongly discourage unhealthy work patterns.
         """
         try:
             # Convert None values to 0 for safe calculations
@@ -5752,42 +5758,43 @@ class UnifiedBurnoutAnalyzer:
             if commits_count == 0:
                 return 0.0
 
-            # Burnout score based ONLY on work-life balance (0-10)
+            # Burnout score based ONLY on work-life balance (0-20)
             # High commit volume during normal hours is NOT penalized
+            # Penalties are aggressive to discourage after-hours/weekend work
             burnout_score = 0.0
 
-            # After-hours work patterns (0-5 points)
+            # After-hours work patterns (0-10 points)
             after_hours_ratio = (after_hours_commits or 0) / commits_count
-            if after_hours_ratio > 0.50:  # >50% after hours - severe
-                burnout_score += 5.0
-            elif after_hours_ratio > 0.40:  # >40% after hours
+            if after_hours_ratio > 0.50:  # >50% after hours - critical
+                burnout_score += 10.0
+            elif after_hours_ratio > 0.40:  # >40% after hours - severe
+                burnout_score += 8.0
+            elif after_hours_ratio > 0.30:  # >30% after hours - high
+                burnout_score += 6.0
+            elif after_hours_ratio > 0.20:  # >20% after hours - moderate
                 burnout_score += 4.0
-            elif after_hours_ratio > 0.30:  # >30% after hours
-                burnout_score += 3.0
-            elif after_hours_ratio > 0.20:  # >20% after hours
+            elif after_hours_ratio > 0.10:  # >10% after hours - low
                 burnout_score += 2.0
-            elif after_hours_ratio > 0.10:  # >10% after hours
+            elif after_hours_ratio > 0.05:  # >5% after hours - minimal
                 burnout_score += 1.0
-            elif after_hours_ratio > 0.05:  # >5% after hours
-                burnout_score += 0.5
 
-            # Weekend work patterns (0-5 points)
+            # Weekend work patterns (0-10 points)
             weekend_ratio = (weekend_commits or 0) / commits_count
-            if weekend_ratio > 0.40:  # >40% on weekends - severe
-                burnout_score += 5.0
-            elif weekend_ratio > 0.30:  # >30% on weekends
+            if weekend_ratio > 0.40:  # >40% on weekends - critical
+                burnout_score += 10.0
+            elif weekend_ratio > 0.30:  # >30% on weekends - severe
+                burnout_score += 8.0
+            elif weekend_ratio > 0.25:  # >25% on weekends - high
+                burnout_score += 6.0
+            elif weekend_ratio > 0.15:  # >15% on weekends - moderate
                 burnout_score += 4.0
-            elif weekend_ratio > 0.25:  # >25% on weekends
-                burnout_score += 3.0
-            elif weekend_ratio > 0.15:  # >15% on weekends
+            elif weekend_ratio > 0.10:  # >10% on weekends - low
                 burnout_score += 2.0
-            elif weekend_ratio > 0.10:  # >10% on weekends
+            elif weekend_ratio > 0.05:  # >5% on weekends - minimal
                 burnout_score += 1.0
-            elif weekend_ratio > 0.05:  # >5% on weekends
-                burnout_score += 0.5
 
-            # Cap score at 10
-            burnout_score = min(10.0, burnout_score)
+            # Cap score at 20 (200 on OCH scale when multiplied by 10)
+            burnout_score = min(20.0, burnout_score)
 
             return burnout_score
 
