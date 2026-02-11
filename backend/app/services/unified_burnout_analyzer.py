@@ -5739,8 +5739,8 @@ class UnifiedBurnoutAnalyzer:
         weekend_commits: Optional[int]
     ) -> float:
         """
-        Calculate burnout score based on GitHub activity patterns.
-        Based on burnout research but simplified for GitHub data.
+        Calculate burnout score based ONLY on after-hours and weekend work patterns.
+        Total commit volume is ignored - only work-life balance matters.
         """
         try:
             # Convert None values to 0 for safe calculations
@@ -5748,76 +5748,49 @@ class UnifiedBurnoutAnalyzer:
             commits_per_week = commits_per_week if commits_per_week is not None else 0.0
             after_hours_commits = after_hours_commits if after_hours_commits is not None else 0
             weekend_commits = weekend_commits if weekend_commits is not None else 0
-            
-            if commits_count == 0 and commits_per_week == 0:
+
+            if commits_count == 0:
                 return 0.0
-            
-            # Emotional Exhaustion Score (0-10, higher = more exhausted)
-            exhaustion_score = 0.0
-            
-            # High commit volume indicates potential overwork (more aggressive scoring)
-            if commits_per_week >= 100:  # Extreme - unsustainable pace
-                exhaustion_score += 9.0
-            elif commits_per_week >= 80:  # Very extreme
-                exhaustion_score += 8.0
-            elif commits_per_week >= 60:  # High extreme
-                exhaustion_score += 6.5
-            elif commits_per_week >= 50:  # Very high
-                exhaustion_score += 5.0
-            elif commits_per_week >= 25:  # Moderately high
-                exhaustion_score += 3.0
-            elif commits_per_week >= 15:  # Above average
-                exhaustion_score += 1.5
-            
-            # After-hours work patterns
-            if commits_count and commits_count > 0 and after_hours_commits is not None:
-                after_hours_ratio = (after_hours_commits or 0) / commits_count
-                if after_hours_ratio > 0.30:  # >30% after hours
-                    exhaustion_score += 3.0
-                elif after_hours_ratio > 0.15:  # >15% after hours
-                    exhaustion_score += 1.5
-                elif after_hours_ratio > 0.05:  # >5% after hours
-                    exhaustion_score += 0.5
-                
-                # Weekend work patterns
-                if weekend_commits is not None:
-                    weekend_ratio = (weekend_commits or 0) / commits_count
-                    if weekend_ratio > 0.25:  # >25% on weekends
-                        exhaustion_score += 2.0
-                    elif weekend_ratio > 0.10:  # >10% on weekends
-                        exhaustion_score += 1.0
-            
-            # Cap exhaustion score at 10
-            exhaustion_score = min(10.0, exhaustion_score)
 
-            # Work-Related Burnout Score (0-10, based on work patterns)
-            # High volume with poor work-life balance indicates work stress
-            work_burnout_score = 0.0
-            if commits_per_week >= 100:  # Extreme activity
-                work_burnout_score = 8.0
-            elif commits_per_week >= 80:  # Very extreme activity
-                work_burnout_score = 6.0
-            elif commits_per_week >= 60:
-                work_burnout_score = 5.0
-            elif commits_per_week >= 40:
-                work_burnout_score = 2.5
-            elif commits_per_week > 30 and (after_hours_commits + weekend_commits) > (commits_count * 0.2):
-                work_burnout_score = 3.0
-            elif commits_per_week > 20:
-                work_burnout_score = 1.0
+            # Burnout score based ONLY on work-life balance (0-10)
+            # High commit volume during normal hours is NOT penalized
+            burnout_score = 0.0
 
-            # Calculate final burnout score using OCH methodology
-            # Personal Burnout (65%), Work-Related Burnout (35%)
-            burnout_score = (
-                exhaustion_score * 0.65 +
-                work_burnout_score * 0.35
-            )
-            
-            # Ensure score is between 0 and 10
-            burnout_score = max(0.0, min(10.0, burnout_score))
-            
+            # After-hours work patterns (0-5 points)
+            after_hours_ratio = (after_hours_commits or 0) / commits_count
+            if after_hours_ratio > 0.50:  # >50% after hours - severe
+                burnout_score += 5.0
+            elif after_hours_ratio > 0.40:  # >40% after hours
+                burnout_score += 4.0
+            elif after_hours_ratio > 0.30:  # >30% after hours
+                burnout_score += 3.0
+            elif after_hours_ratio > 0.20:  # >20% after hours
+                burnout_score += 2.0
+            elif after_hours_ratio > 0.10:  # >10% after hours
+                burnout_score += 1.0
+            elif after_hours_ratio > 0.05:  # >5% after hours
+                burnout_score += 0.5
+
+            # Weekend work patterns (0-5 points)
+            weekend_ratio = (weekend_commits or 0) / commits_count
+            if weekend_ratio > 0.40:  # >40% on weekends - severe
+                burnout_score += 5.0
+            elif weekend_ratio > 0.30:  # >30% on weekends
+                burnout_score += 4.0
+            elif weekend_ratio > 0.25:  # >25% on weekends
+                burnout_score += 3.0
+            elif weekend_ratio > 0.15:  # >15% on weekends
+                burnout_score += 2.0
+            elif weekend_ratio > 0.10:  # >10% on weekends
+                burnout_score += 1.0
+            elif weekend_ratio > 0.05:  # >5% on weekends
+                burnout_score += 0.5
+
+            # Cap score at 10
+            burnout_score = min(10.0, burnout_score)
+
             return burnout_score
-            
+
         except (TypeError, ZeroDivisionError, ValueError) as e:
             logger.error(f"Error calculating GitHub burnout score (math error): {e}")
             logger.error(f"Values: commits_count={commits_count}, commits_per_week={commits_per_week}, after_hours_commits={after_hours_commits}, weekend_commits={weekend_commits}")
