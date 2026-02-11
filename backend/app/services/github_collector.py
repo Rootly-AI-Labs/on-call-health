@@ -36,95 +36,40 @@ class GitHubCollector:
         
     async def _correlate_email_to_github(self, email: str, token: str, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[str]:
         """
-        Correlate an email address to a GitHub username using multiple strategies.
+        Correlate an email address to a GitHub username.
 
-        This checks in order:
-        1. Manual mappings from user_mappings table (highest priority)
-        2. Enhanced matching algorithm with multiple strategies
-        3. Legacy discovered email mappings from organization members
+        Strategy:
+        1. Query user_correlations table for synced GitHub usernames (from "Sync Members" feature)
+
+        IMPORTANT: No fallback matching during analysis!
+        All GitHub user correlations should be done via "Sync Members" on integrations page.
+        This keeps analysis fast and predictable, consistent with Slack/Jira/Linear.
+
+        Args:
+            email: Email address to correlate
+            token: GitHub API token (not used during analysis)
+            user_id: User ID for querying user_correlations table
+            full_name: User's full name (not used during analysis)
         """
         if not token:
             logger.debug("No GitHub token provided for correlation")
             return None
 
         try:
-            # FIRST: Check user_correlations table for synced members (from "Sync Members" feature)
+            # Check user_correlations table for synced members (from "Sync Members" feature)
             logger.debug(f"🔍 [CORRELATION] Checking user_correlations for {email}")
             synced_username = await self._check_synced_members(email, user_id)
             if synced_username:
                 return synced_username
 
-            # SECOND: Check manual mappings from user_mappings table (mapping drawer)
-            if user_id:
-                logger.debug(f"🔍 [CORRELATION] Checking user_mappings for {email}")
-                manual_username = await self._check_manual_mappings(email, user_id)
-                if manual_username:
-                    return manual_username
-
-            # FALLBACK: Try name-based matching against org members
-            if full_name and token:
-                try:
-                    from .enhanced_github_matcher import EnhancedGitHubMatcher
-                    matcher = EnhancedGitHubMatcher(token, self.organizations)
-                    name_match = await matcher.match_name_to_github(full_name, fallback_email=email)
-                    if name_match:
-                        logger.info(f"✅ [NAME_FALLBACK] Matched {email} -> {name_match} via name '{full_name}'")
-                        return name_match
-                    else:
-                        logger.debug(f"[NAME_FALLBACK] No match found for name '{full_name}' ({email})")
-                except Exception as e:
-                    logger.warning(f"⚠️ [NAME_FALLBACK] Error during name matching for '{full_name}': {e}")
-
+            # IMPORTANT: No fallback matching during analysis!
+            # All GitHub username correlations should be done via "Sync Members" on integrations page.
+            # This keeps analysis fast and predictable.
+            logger.info(f"⚠️ No synced GitHub user found for {email}. Use 'Sync Members' to add GitHub users.")
             return None
 
         except Exception as e:
             logger.error(f"❌ [CORRELATION_ERROR] Error correlating email {email} to GitHub: {e}")
-            return None
-    
-    async def _check_manual_mappings(self, email: str, user_id: int) -> Optional[str]:
-        """
-        Check user_mappings table for manual GitHub mappings.
-
-        Args:
-            email: The email address to look up
-            user_id: The user ID who owns the mappings
-
-        Returns:
-            GitHub username if found, None otherwise
-        """
-        try:
-            # Validate user_id is an integer (not a PagerDuty/Rootly user ID string)
-            if not isinstance(user_id, int):
-                logger.warning(f"Invalid user_id type for manual mapping check: {type(user_id).__name__}: {user_id}")
-                return None
-
-            # Use SessionLocal to avoid connection pool exhaustion
-            from ..models import SessionLocal, UserMapping
-
-            db = SessionLocal()
-            try:
-                # Query for manual mapping
-                user_mapping = db.query(UserMapping).filter(
-                    UserMapping.user_id == user_id,
-                    UserMapping.source_platform == 'rootly',
-                    UserMapping.source_identifier == email,
-                    UserMapping.target_platform == 'github',
-                    UserMapping.target_identifier.isnot(None),
-                    UserMapping.target_identifier != ''
-                ).order_by(UserMapping.created_at.desc()).first()
-
-                if user_mapping and user_mapping.target_identifier:
-                    username = user_mapping.target_identifier
-                    logger.info(f"Found manual GitHub mapping: {email} -> {username}")
-                    return username
-                else:
-                    logger.debug(f"No manual GitHub mapping found for {email}")
-                    return None
-            finally:
-                db.close()
-
-        except Exception as e:
-            logger.error(f"Error checking manual mappings: {e}")
             return None
 
     async def _check_synced_members(self, email: str, user_id: int) -> Optional[str]:
@@ -150,7 +95,7 @@ class GitHubCollector:
                 logger.warning(f"⚠️ [SYNCED_CHECK] Invalid user_id type: {type(user_id).__name__}: {user_id}")
                 return None
 
-            logger.debug(f"🔍 [SYNCED_CHECK] Querying user_correlations for email: {email}")
+            logger.info(f"🔍 [SYNCED_CHECK] Querying user_correlations for email: {email}")
 
             # Use SessionLocal instead of creating new engine/connection for each query
             # This prevents "too many clients" error when processing large teams
@@ -168,13 +113,18 @@ class GitHubCollector:
                 ).first()
 
                 if user_correlation and user_correlation.github_username:
+                    logger.info(f"✅ [SYNCED_CHECK_SUCCESS] Found GitHub username for {email}: {user_correlation.github_username}")
                     return user_correlation.github_username
-                return None
+                else:
+                    logger.info(f"❌ [SYNCED_CHECK_NOT_FOUND] No GitHub username found for {email} in user_correlations")
+                    return None
             finally:
                 db.close()
 
         except Exception as e:
             logger.error(f"❌ [SYNCED_CHECK_ERROR] Error checking synced members for {email}: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(f"❌ [SYNCED_CHECK_ERROR] Traceback: {traceback.format_exc()}")
             return None
 
     async def _build_email_mapping(self, token: str) -> Dict[str, str]:
