@@ -62,12 +62,20 @@ class GitHubCollector:
                     return manual_username
 
             # FALLBACK: Try name-based matching against org members
+            # BUT: Respect manual mappings - don't auto-detect if username is manually mapped to someone else
             if full_name and token:
                 try:
                     from .enhanced_github_matcher import EnhancedGitHubMatcher
                     matcher = EnhancedGitHubMatcher(token, self.organizations)
                     name_match = await matcher.match_name_to_github(full_name, fallback_email=email)
                     if name_match:
+                        # Check if this GitHub username is manually mapped to a DIFFERENT user
+                        # If yes, skip auto-detection to respect the manual mapping
+                        if user_id and await self._is_username_manually_mapped_to_other_user(name_match, email, user_id):
+                            logger.warning(f"⚠️ [AUTO_DETECT_BLOCKED] Skipping auto-detected {email} -> {name_match}: "
+                                         f"username is manually mapped to another user. Respecting manual mapping.")
+                            return None
+
                         logger.info(f"✅ [NAME_FALLBACK] Matched {email} -> {name_match} via name '{full_name}'")
                         return name_match
                     else:
@@ -126,6 +134,47 @@ class GitHubCollector:
         except Exception as e:
             logger.error(f"Error checking manual mappings: {e}")
             return None
+
+    async def _is_username_manually_mapped_to_other_user(self, github_username: str, current_email: str, user_id: int) -> bool:
+        """
+        Check if a GitHub username is manually mapped to a DIFFERENT email.
+
+        This prevents auto-detection from conflicting with manual mappings.
+        If hamza@rootly.com is manually mapped to 'sylvainkalache', then
+        auto-detection should NOT map sylvain@rootly.com to 'sylvainkalache'.
+
+        Args:
+            github_username: The GitHub username to check
+            current_email: The email being processed (to exclude from check)
+            user_id: The user ID who owns the mappings
+
+        Returns:
+            True if this username is manually mapped to a different email, False otherwise
+        """
+        try:
+            from ..models import SessionLocal, UserMapping
+
+            db = SessionLocal()
+            try:
+                # Check if this GitHub username is manually mapped to ANY email
+                existing_mapping = db.query(UserMapping).filter(
+                    UserMapping.user_id == user_id,
+                    UserMapping.target_platform == 'github',
+                    UserMapping.target_identifier == github_username,
+                    UserMapping.source_identifier != current_email  # Different email
+                ).first()
+
+                if existing_mapping:
+                    logger.info(f"🔒 [MANUAL_MAPPING_PROTECTED] GitHub username '{github_username}' is manually mapped to "
+                               f"{existing_mapping.source_identifier}, blocking auto-detection for {current_email}")
+                    return True
+                return False
+            finally:
+                db.close()
+
+        except Exception as e:
+            logger.error(f"Error checking if username is manually mapped: {e}")
+            return False  # If check fails, allow auto-detection
 
     async def _check_synced_members(self, email: str, user_id: int) -> Optional[str]:
         """
