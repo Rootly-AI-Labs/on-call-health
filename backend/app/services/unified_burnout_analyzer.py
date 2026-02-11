@@ -86,7 +86,8 @@ class UnifiedBurnoutAnalyzer:
         organization_name: Optional[str] = None,
         synced_users: Optional[List[Dict[str, Any]]] = None,
         current_user_id: Optional[int] = None,
-        db: Optional["Session"] = None
+        db: Optional["Session"] = None,
+        organization_id: Optional[int] = None
     ):
         # Check for mock data mode from environment
         self.use_mock_data = os.getenv('USE_MOCK_DATA', 'false').lower() == 'true'
@@ -94,6 +95,9 @@ class UnifiedBurnoutAnalyzer:
 
         # Store current_user_id for Jira integration lookup (will not change during analysis)
         self.current_user_id = current_user_id
+
+        # Store organization_id for cross-org data isolation
+        self.organization_id = organization_id
 
         # Store db session for reuse (prevents connection pool exhaustion)
         self.db = db
@@ -503,7 +507,7 @@ class UnifiedBurnoutAnalyzer:
                         github_data = await collect_team_github_data_with_mapping(
                             team_emails, time_range_days, self.github_token,
                             user_id=self.current_user_id, analysis_id=analysis_id, source_platform=self.platform,
-                            email_to_name=email_to_name, db=self.db
+                            email_to_name=email_to_name, db=self.db, org_id=self.organization_id
                         )
                         github_duration = (datetime.now() - github_start).total_seconds()
                         log_substep_complete(

@@ -5,6 +5,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, TYPE_CHECKING
+from sqlalchemy import or_, and_
 
 from .mapping_recorder import MappingRecorder
 
@@ -21,7 +22,8 @@ async def collect_team_github_data_with_mapping(
     analysis_id: Optional[int] = None,
     source_platform: str = "rootly",
     email_to_name: Optional[Dict[str, str]] = None,
-    db: Optional["Session"] = None
+    db: Optional["Session"] = None,
+    org_id: Optional[int] = None
 ) -> Dict[str, Dict]:
     """
     Enhanced version of collect_team_github_data that records mapping attempts.
@@ -55,11 +57,25 @@ async def collect_team_github_data_with_mapping(
             github_data = {}
 
             # Query UserCorrelation for synced GitHub usernames
-            # Don't filter by user_id - allow lookups across the organization
-            user_correlations = session_to_use.query(UserCorrelation).filter(
-                UserCorrelation.email.in_(team_emails),
-                UserCorrelation.github_username.isnot(None)
-            ).all()
+            # Filter by organization to prevent cross-org data leakage
+            if user_id and org_id:
+                user_correlations = session_to_use.query(UserCorrelation).filter(
+                    UserCorrelation.email.in_(team_emails),
+                    UserCorrelation.github_username.isnot(None),
+                    or_(
+                        UserCorrelation.user_id == user_id,  # Personal mappings
+                        and_(
+                            UserCorrelation.user_id.is_(None),
+                            UserCorrelation.organization_id == org_id
+                        )  # Team roster mappings
+                    )
+                ).all()
+            else:
+                # Fallback: no organization filter if org_id not provided (backward compatibility)
+                user_correlations = session_to_use.query(UserCorrelation).filter(
+                    UserCorrelation.email.in_(team_emails),
+                    UserCorrelation.github_username.isnot(None)
+                ).all()
 
             # Create a lookup dict: email -> github_username (skip null emails)
             # Note: If duplicate emails exist, last entry wins (log warning for visibility)

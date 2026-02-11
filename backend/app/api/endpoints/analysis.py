@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from pydantic import BaseModel
+from sqlalchemy import or_, and_
 from sqlalchemy.orm import Session
 
 from ...models import get_db, User, Analysis, RootlyIntegration, UserCorrelation, JiraIntegration
@@ -500,9 +501,15 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
             # Fetch user correlations for Jira mapping
             synced_users = []
             try:
-                logger.info(f"🔍 Fetching user correlations for organization_id={user.organization_id}")
+                logger.info(f"🔍 Fetching user correlations for user_id={user.id}, organization_id={user.organization_id}")
                 user_correlations = db.query(UserCorrelation).filter(
-                    UserCorrelation.organization_id == user.organization_id
+                    or_(
+                        UserCorrelation.user_id == user.id,  # Personal mappings
+                        and_(
+                            UserCorrelation.user_id.is_(None),
+                            UserCorrelation.organization_id == user.organization_id
+                        )  # Team roster mappings
+                    )
                 ).all()
 
                 logger.info(f"🔍 Query returned {len(user_correlations)} user correlation records")
@@ -545,7 +552,8 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
                 jira_token=jira_token,
                 synced_users=synced_users,
                 current_user_id=user_id,
-                db=db  # Reuse DB session to prevent connection pool exhaustion
+                db=db,  # Reuse DB session to prevent connection pool exhaustion
+                organization_id=user.organization_id
             )
             
             # Run analysis

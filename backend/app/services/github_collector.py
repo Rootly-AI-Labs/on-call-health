@@ -10,6 +10,7 @@ import requests
 import asyncio
 import os
 import pytz
+from sqlalchemy import or_, and_
 
 logger = logging.getLogger(__name__)
 
@@ -154,17 +155,39 @@ class GitHubCollector:
 
             # Use SessionLocal instead of creating new engine/connection for each query
             # This prevents "too many clients" error when processing large teams
-            from ..models import SessionLocal, UserCorrelation
+            from ..models import SessionLocal, UserCorrelation, User
 
             db = SessionLocal()
             try:
-                # Query for synced member - match by email only (don't filter by user_id)
-                # This allows synced members to be shared across the organization
-                user_correlation = db.query(UserCorrelation).filter(
-                    UserCorrelation.email == email,
-                    UserCorrelation.github_username.isnot(None),
-                    UserCorrelation.github_username != ''
-                ).first()
+                # Get user's organization_id for filtering
+                org_id = None
+                user = db.query(User).filter(User.id == user_id).first()
+                if user:
+                    org_id = user.organization_id
+                    logger.debug(f"🔍 [SYNCED_CHECK] User {user_id} belongs to organization {org_id}")
+
+                # Query for synced member with organization filter to prevent cross-org data leakage
+                if org_id:
+                    user_correlation = db.query(UserCorrelation).filter(
+                        UserCorrelation.email == email,
+                        UserCorrelation.github_username.isnot(None),
+                        UserCorrelation.github_username != '',
+                        or_(
+                            UserCorrelation.user_id == user_id,  # Personal mappings
+                            and_(
+                                UserCorrelation.user_id.is_(None),
+                                UserCorrelation.organization_id == org_id
+                            )  # Team roster mappings
+                        )
+                    ).first()
+                else:
+                    # Fallback: no organization filter if org_id not found (backward compatibility)
+                    logger.warning(f"⚠️ [SYNCED_CHECK] No organization_id found for user {user_id}, using unfiltered query")
+                    user_correlation = db.query(UserCorrelation).filter(
+                        UserCorrelation.email == email,
+                        UserCorrelation.github_username.isnot(None),
+                        UserCorrelation.github_username != ''
+                    ).first()
 
                 if user_correlation and user_correlation.github_username:
                     return user_correlation.github_username
