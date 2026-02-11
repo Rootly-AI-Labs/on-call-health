@@ -160,7 +160,7 @@ async def collect_team_github_data_with_mapping(
                     if user_correlation and user_correlation.timezone:
                         user_timezone = user_correlation.timezone
                 except Exception as tz_error:
-                    logger.debug(f"Could not retrieve timezone for {email}: {tz_error}")
+                    logger.warning(f"⚠️ Timezone retrieval failed for {email}, defaulting to UTC: {tz_error}")
 
             # Collect data with full name and timezone for accurate after-hours detection
             user_data = await collector.collect_github_data_for_user(

@@ -100,7 +100,7 @@ class GitHubMappingService:
             for email, cached_mapping in emails_needing_activity_refresh:
                 try:
                     refreshed_data = await self._refresh_activity_data(
-                        email, cached_mapping, days, github_token, analysis_id
+                        email, cached_mapping, days, github_token, analysis_id, user_id
                     )
                     if refreshed_data:
                         results[email] = refreshed_data
@@ -170,12 +170,13 @@ class GitHubMappingService:
         return (now - created_at).total_seconds() / 86400
     
     async def _refresh_activity_data(
-        self, 
-        email: str, 
-        cached_mapping, 
-        days: int, 
+        self,
+        email: str,
+        cached_mapping,
+        days: int,
         github_token: str,
-        analysis_id: int
+        analysis_id: int,
+        user_id: Optional[int] = None
     ) -> Optional[Dict]:
         """
         Refresh activity data for a cached mapping.
@@ -217,12 +218,12 @@ class GitHubMappingService:
             if user_correlation and user_correlation.timezone:
                 user_timezone = user_correlation.timezone
         except Exception as tz_error:
-            logger.debug(f"Could not retrieve timezone for {email}: {tz_error}")
+            logger.warning(f"⚠️ Timezone retrieval failed for {email}, defaulting to UTC: {tz_error}")
 
         try:
             # Get fresh activity data using cached username and user's timezone
             user_data = await self.github_collector.collect_github_data_for_user(
-                email, days, github_token, timezone=user_timezone
+                email, days, github_token, user_id=user_id, timezone=user_timezone
             )
             
             if user_data and isinstance(user_data, dict):
