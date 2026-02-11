@@ -326,12 +326,11 @@ class GitHubCollector:
             # Build org filters to search within configured organizations
             org_filters = "+".join([f"org:{org}" for org in self.organizations])
 
-            # TEMPORARY DEBUG: Remove org filters to test if they're blocking results
             # Get commits across all repos in configured orgs
-            commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}&per_page=1"
+            commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}+{org_filters}&per_page=1"
 
             # Get pull requests count
-            prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}&per_page=1"
+            prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}+{org_filters}&per_page=1"
 
             logger.debug(f"🔍 [GITHUB_API_URL] Commits query: {commits_url}")
             logger.debug(f"🔍 [GITHUB_API_URL] PRs query: {prs_url}")
@@ -548,10 +547,9 @@ class GitHubCollector:
                 
                 # Fetch commits using search API
                 search_url = f"https://api.github.com/search/commits"
-                # TEMPORARY DEBUG: Remove org filters to test if they're blocking results
                 # Build org filters to search within configured organizations
-                # org_filters = "+".join([f"org:{org}" for org in self.organizations])
-                query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
+                org_filters = "+".join([f"org:{org}" for org in self.organizations])
+                query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')} {org_filters}"
                 
                 page = 1
                 per_page = 100
