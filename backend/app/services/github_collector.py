@@ -36,145 +36,41 @@ class GitHubCollector:
         
     async def _correlate_email_to_github(self, email: str, token: str, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[str]:
         """
-        Correlate an email address to a GitHub username using multiple strategies.
+        Correlate an email address to a GitHub username.
 
-        This checks in order:
-        1. Manual mappings from user_mappings table (highest priority)
-        2. Enhanced matching algorithm with multiple strategies
-        3. Legacy discovered email mappings from organization members
+        Strategy:
+        1. Query user_correlations table for synced GitHub usernames (from "Sync Members" feature)
+
+        IMPORTANT: No fallback matching during analysis!
+        All GitHub user correlations should be done via "Sync Members" on integrations page.
+        This keeps analysis fast and predictable, consistent with Slack/Jira/Linear.
+
+        Args:
+            email: Email address to correlate
+            token: GitHub API token (not used during analysis)
+            user_id: User ID for querying user_correlations table
+            full_name: User's full name (not used during analysis)
         """
         if not token:
             logger.debug("No GitHub token provided for correlation")
             return None
 
         try:
-            # FIRST: Check user_correlations table for synced members (from "Sync Members" feature)
+            # Check user_correlations table for synced members (from "Sync Members" feature)
             logger.debug(f"🔍 [CORRELATION] Checking user_correlations for {email}")
             synced_username = await self._check_synced_members(email, user_id)
             if synced_username:
                 return synced_username
 
-            # SECOND: Check manual mappings from user_mappings table (mapping drawer)
-            if user_id:
-                logger.debug(f"🔍 [CORRELATION] Checking user_mappings for {email}")
-                manual_username = await self._check_manual_mappings(email, user_id)
-                if manual_username:
-                    return manual_username
-
-            # FALLBACK: Try name-based matching against org members
-            # BUT: Respect manual mappings - don't auto-detect if username is manually mapped to someone else
-            if full_name and token:
-                try:
-                    from .enhanced_github_matcher import EnhancedGitHubMatcher
-                    matcher = EnhancedGitHubMatcher(token, self.organizations)
-                    name_match = await matcher.match_name_to_github(full_name, fallback_email=email)
-                    if name_match:
-                        # Check if this GitHub username is manually mapped to a DIFFERENT user
-                        # If yes, skip auto-detection to respect the manual mapping
-                        if user_id and await self._is_username_manually_mapped_to_other_user(name_match, email, user_id):
-                            logger.warning(f"⚠️ [AUTO_DETECT_BLOCKED] Skipping auto-detected {email} -> {name_match}: "
-                                         f"username is manually mapped to another user. Respecting manual mapping.")
-                            return None
-
-                        logger.info(f"✅ [NAME_FALLBACK] Matched {email} -> {name_match} via name '{full_name}'")
-                        return name_match
-                    else:
-                        logger.debug(f"[NAME_FALLBACK] No match found for name '{full_name}' ({email})")
-                except Exception as e:
-                    logger.warning(f"⚠️ [NAME_FALLBACK] Error during name matching for '{full_name}': {e}")
-
+            # IMPORTANT: No fallback matching during analysis!
+            # All GitHub username correlations should be done via "Sync Members" on integrations page.
+            # This keeps analysis fast and predictable.
+            logger.info(f"⚠️ No synced GitHub user found for {email}. Use 'Sync Members' to add GitHub users.")
             return None
 
         except Exception as e:
             logger.error(f"❌ [CORRELATION_ERROR] Error correlating email {email} to GitHub: {e}")
             return None
-    
-    async def _check_manual_mappings(self, email: str, user_id: int) -> Optional[str]:
-        """
-        Check user_mappings table for manual GitHub mappings.
-
-        Args:
-            email: The email address to look up
-            user_id: The user ID who owns the mappings
-
-        Returns:
-            GitHub username if found, None otherwise
-        """
-        try:
-            # Validate user_id is an integer (not a PagerDuty/Rootly user ID string)
-            if not isinstance(user_id, int):
-                logger.warning(f"Invalid user_id type for manual mapping check: {type(user_id).__name__}: {user_id}")
-                return None
-
-            # Use SessionLocal to avoid connection pool exhaustion
-            from ..models import SessionLocal, UserMapping
-
-            db = SessionLocal()
-            try:
-                # Query for manual mapping
-                user_mapping = db.query(UserMapping).filter(
-                    UserMapping.user_id == user_id,
-                    UserMapping.source_platform == 'rootly',
-                    UserMapping.source_identifier == email,
-                    UserMapping.target_platform == 'github',
-                    UserMapping.target_identifier.isnot(None),
-                    UserMapping.target_identifier != ''
-                ).order_by(UserMapping.created_at.desc()).first()
-
-                if user_mapping and user_mapping.target_identifier:
-                    username = user_mapping.target_identifier
-                    logger.info(f"Found manual GitHub mapping: {email} -> {username}")
-                    return username
-                else:
-                    logger.debug(f"No manual GitHub mapping found for {email}")
-                    return None
-            finally:
-                db.close()
-
-        except Exception as e:
-            logger.error(f"Error checking manual mappings: {e}")
-            return None
-
-    async def _is_username_manually_mapped_to_other_user(self, github_username: str, current_email: str, user_id: int) -> bool:
-        """
-        Check if a GitHub username is manually mapped to a DIFFERENT email.
-
-        This prevents auto-detection from conflicting with manual mappings.
-        If hamza@rootly.com is manually mapped to 'sylvainkalache', then
-        auto-detection should NOT map sylvain@rootly.com to 'sylvainkalache'.
-
-        Args:
-            github_username: The GitHub username to check
-            current_email: The email being processed (to exclude from check)
-            user_id: The user ID who owns the mappings
-
-        Returns:
-            True if this username is manually mapped to a different email, False otherwise
-        """
-        try:
-            from ..models import SessionLocal, UserMapping
-
-            db = SessionLocal()
-            try:
-                # Check if this GitHub username is manually mapped to ANY email
-                existing_mapping = db.query(UserMapping).filter(
-                    UserMapping.user_id == user_id,
-                    UserMapping.target_platform == 'github',
-                    UserMapping.target_identifier == github_username,
-                    UserMapping.source_identifier != current_email  # Different email
-                ).first()
-
-                if existing_mapping:
-                    logger.info(f"🔒 [MANUAL_MAPPING_PROTECTED] GitHub username '{github_username}' is manually mapped to "
-                               f"{existing_mapping.source_identifier}, blocking auto-detection for {current_email}")
-                    return True
-                return False
-            finally:
-                db.close()
-
-        except Exception as e:
-            logger.error(f"Error checking if username is manually mapped: {e}")
-            return False  # If check fails, allow auto-detection
 
     async def _check_synced_members(self, email: str, user_id: int) -> Optional[str]:
         """
