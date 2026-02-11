@@ -4896,12 +4896,12 @@ class UnifiedBurnoutAnalyzer:
                     else:
                         updated_member["risk_level"] = "low"
 
-                    # Add GitHub burnout breakdown for transparency
+                    # Add GitHub burnout breakdown for transparency (match frontend types)
                     updated_member["github_burnout_breakdown"] = {
-                        "github_och_score": round(github_och_contribution, 2),
-                        "original_och": round(original_och, 2),
-                        "final_och": round(final_och, 2),
-                        "github_added_risk": round(github_added_risk, 2),
+                        "github_score": round(github_och_contribution, 2),  # Frontend expects this name
+                        "original_score": round(original_och, 2),  # Frontend expects this name
+                        "final_score": round(final_och, 2),  # Frontend expects this name
+                        "score_source": "github",  # Frontend expects this field
                         "github_indicators": {
                             "commits_count": commits_count,
                             "commits_per_week": round(commits_per_week, 2),
