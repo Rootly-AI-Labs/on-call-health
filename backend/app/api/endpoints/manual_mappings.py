@@ -149,10 +149,22 @@ async def update_mapping(
     """
     try:
         # Get existing mapping
-        mapping = db.query(UserMapping).filter(
+        mapping_query = db.query(UserMapping).filter(
             UserMapping.id == mapping_id,
             UserMapping.user_id == current_user.id
-        ).first()
+        )
+
+        # SECURITY: Filter by organization_id for multi-tenancy isolation
+        if current_user.organization_id:
+            from sqlalchemy import or_
+            mapping_query = mapping_query.filter(
+                or_(
+                    UserMapping.organization_id == current_user.organization_id,
+                    UserMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
+                )
+            )
+
+        mapping = mapping_query.first()
 
         if not mapping:
             raise HTTPException(status_code=404, detail="Mapping not found")
@@ -385,10 +397,21 @@ async def cleanup_duplicate_mappings(
         logger.info(f"Starting duplicate cleanup for user {current_user.id}, platform {target_platform}")
         
         # Debug: Show all mappings for this user/platform
-        all_mappings = db.query(UserMapping).filter(
+        all_mappings_query = db.query(UserMapping).filter(
             UserMapping.user_id == current_user.id,
             UserMapping.target_platform == target_platform
-        ).all()
+        )
+
+        # SECURITY: Filter by organization_id for multi-tenancy isolation
+        if current_user.organization_id:
+            all_mappings_query = all_mappings_query.filter(
+                or_(
+                    UserMapping.organization_id == current_user.organization_id,
+                    UserMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
+                )
+            )
+
+        all_mappings = all_mappings_query.all()
         
         logger.info(f"Found {len(all_mappings)} total mappings for platform {target_platform}")
         for mapping in all_mappings:
@@ -398,6 +421,20 @@ async def cleanup_duplicate_mappings(
         from sqlalchemy import and_, func
         
         # Query to find duplicates - group by source_identifier only since source_platform can be null
+        subquery_filters = [
+            UserMapping.user_id == current_user.id,
+            UserMapping.target_platform == target_platform
+        ]
+
+        # SECURITY: Filter by organization_id for multi-tenancy isolation
+        if current_user.organization_id:
+            subquery_filters.append(
+                or_(
+                    UserMapping.organization_id == current_user.organization_id,
+                    UserMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
+                )
+            )
+
         subquery = db.query(
             UserMapping.user_id,
             UserMapping.source_identifier,
@@ -405,24 +442,32 @@ async def cleanup_duplicate_mappings(
             func.count(UserMapping.id).label('mapping_count'),
             func.min(UserMapping.id).label('keep_id'),
             func.max(UserMapping.updated_at).label('latest_update')
-        ).filter(
-            UserMapping.user_id == current_user.id,
-            UserMapping.target_platform == target_platform
-        ).group_by(
+        ).filter(*subquery_filters).group_by(
             UserMapping.user_id,
             UserMapping.source_identifier,
             UserMapping.target_platform
         ).having(func.count(UserMapping.id) > 1).subquery()
-        
+
         # Get the actual duplicate records
-        duplicates = db.query(UserMapping).join(
+        duplicates_query = db.query(UserMapping).join(
             subquery,
             and_(
                 UserMapping.user_id == subquery.c.user_id,
                 UserMapping.source_identifier == subquery.c.source_identifier,
                 UserMapping.target_platform == subquery.c.target_platform
             )
-        ).all()
+        )
+
+        # SECURITY: Also filter main query by organization_id
+        if current_user.organization_id:
+            duplicates_query = duplicates_query.filter(
+                or_(
+                    UserMapping.organization_id == current_user.organization_id,
+                    UserMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
+                )
+            )
+
+        duplicates = duplicates_query.all()
         
         # Group duplicates by source identifier  
         logger.info(f"Found {len(duplicates)} duplicate mapping records")
@@ -481,11 +526,22 @@ async def cleanup_duplicate_mappings(
         # Find test emails with + symbols
         test_email_mappings = []
         if remove_test_emails:
-            test_emails = db.query(UserMapping).filter(
+            test_emails_query = db.query(UserMapping).filter(
                 UserMapping.user_id == current_user.id,
                 UserMapping.target_platform == target_platform,
                 UserMapping.source_identifier.like('%+%')
-            ).all()
+            )
+
+            # SECURITY: Filter by organization_id for multi-tenancy isolation
+            if current_user.organization_id:
+                test_emails_query = test_emails_query.filter(
+                    or_(
+                        UserMapping.organization_id == current_user.organization_id,
+                        UserMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
+                    )
+                )
+
+            test_emails = test_emails_query.all()
             
             logger.info(f"Found {len(test_emails)} test email mappings with + symbols")
             for mapping in test_emails:
@@ -512,10 +568,21 @@ async def cleanup_duplicate_mappings(
             removed_count = 0
             for plan in cleanup_plan:
                 for remove_mapping in plan["remove"]:
-                    mapping = db.query(UserMapping).filter(
+                    mapping_query = db.query(UserMapping).filter(
                         UserMapping.id == remove_mapping["id"],
                         UserMapping.user_id == current_user.id
-                    ).first()
+                    )
+
+                    # SECURITY: Filter by organization_id for multi-tenancy isolation
+                    if current_user.organization_id:
+                        mapping_query = mapping_query.filter(
+                            or_(
+                                UserMapping.organization_id == current_user.organization_id,
+                                UserMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
+                            )
+                        )
+
+                    mapping = mapping_query.first()
                     if mapping:
                         db.delete(mapping)
                         removed_count += 1
