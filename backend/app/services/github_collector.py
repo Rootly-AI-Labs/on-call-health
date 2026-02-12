@@ -21,20 +21,106 @@ class GitHubCollector:
     def __init__(self):
         self.cache_dir = Path('.github_cache')
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Business hours configuration
         self.business_hours = {'start': 9, 'end': 17}
-        
+
         # Rate limiting
         self.last_request_time = 0
         self.min_request_interval = 0.1  # 100ms between requests
-        
-        # GitHub organizations to search
-        self.organizations = ["Rootly-AI-Labs", "rootlyhq"]
+
+        # GitHub organizations - fetched dynamically based on token access
+        self._organizations_cache = {}  # Cache: token_hash -> [org_list, timestamp]
+        self._org_cache_ttl = 3600  # Cache orgs for 1 hour
+        self._org_cache_locks = {}  # Lock per token to prevent concurrent API calls
 
         # Cache for email mapping
         self._email_mapping_cache = None
-        
+
+    async def get_accessible_orgs(self, token: str) -> Optional[List[str]]:
+        """
+        Fetch organizations the token has access to from GitHub API.
+        Caches results for 1 hour to avoid repeated API calls.
+
+        Returns:
+            List[str]: List of organization names (empty list if user has no orgs)
+            None: If API call failed or token is invalid
+        """
+        # Input validation
+        if not token or not isinstance(token, str) or len(token.strip()) == 0:
+            logger.warning("Invalid GitHub token provided")
+            return None
+
+        # Create cache key (full SHA256 hash to prevent collisions)
+        import hashlib
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+        # Check cache (fast path, no lock needed)
+        now = datetime.now().timestamp()
+        if token_hash in self._organizations_cache:
+            orgs, cached_time = self._organizations_cache[token_hash]
+            if now - cached_time < self._org_cache_ttl:
+                logger.debug(f"Using cached organizations ({len(orgs)} orgs)")
+                return orgs
+
+        # Acquire lock for this token to prevent concurrent API calls
+        if token_hash not in self._org_cache_locks:
+            self._org_cache_locks[token_hash] = asyncio.Lock()
+
+        async with self._org_cache_locks[token_hash]:
+            # Double-check cache after acquiring lock (another request might have populated it)
+            if token_hash in self._organizations_cache:
+                orgs, cached_time = self._organizations_cache[token_hash]
+                if now - cached_time < self._org_cache_ttl:
+                    logger.debug(f"Using cached organizations ({len(orgs)} orgs)")
+                    return orgs
+
+            # Fetch from GitHub API
+            try:
+                import aiohttp
+                headers = {
+                    'Authorization': f'token {token}',
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'Rootly-Burnout-Detector'
+                }
+
+                # Configure timeout and SSL validation
+                # Use shorter timeout (5s) to avoid blocking other operations
+                timeout = aiohttp.ClientTimeout(total=5)
+                connector = aiohttp.TCPConnector(ssl=True)
+
+                async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+                    async with session.get("https://api.github.com/user/orgs", headers=headers) as resp:
+                        if resp.status == 200:
+                            orgs_data = await resp.json()
+                            org_names = [org.get("login") for org in orgs_data if org.get("login")]
+
+                            # Cache the result (including empty lists)
+                            self._organizations_cache[token_hash] = (org_names, now)
+
+                            # Log count only (don't expose org names in logs)
+                            logger.info(f"✅ Token has access to {len(org_names)} organizations")
+                            return org_names
+                        elif resp.status == 401:
+                            logger.error("GitHub token is invalid or expired")
+                            return None
+                        elif resp.status == 403:
+                            logger.warning("GitHub token needs 'read:org' scope to list organizations")
+                            return None
+                        else:
+                            logger.warning(f"Failed to fetch orgs (status {resp.status})")
+                            return None
+            except aiohttp.ClientError as e:
+                logger.error(f"GitHub API client error: {type(e).__name__}")
+                return None
+            except asyncio.TimeoutError:
+                logger.error("GitHub API request timed out after 5s")
+                return None
+            except Exception as e:
+                # Sanitized logging to prevent token leakage in error messages
+                logger.error(f"Unexpected error fetching GitHub organizations: {type(e).__name__}", exc_info=False)
+                return None
+
     async def _correlate_email_to_github(self, email: str, token: str, user_id: Optional[int] = None, full_name: Optional[str] = None) -> Optional[str]:
         """
         Correlate an email address to a GitHub username using multiple strategies.
@@ -66,7 +152,15 @@ class GitHubCollector:
             if full_name and token:
                 try:
                     from .enhanced_github_matcher import EnhancedGitHubMatcher
-                    matcher = EnhancedGitHubMatcher(token, self.organizations)
+                    # Get orgs dynamically based on token access
+                    accessible_orgs = await self.get_accessible_orgs(token)
+                    if accessible_orgs is None:
+                        logger.warning(f"[NAME_FALLBACK] Failed to fetch orgs - cannot perform name matching")
+                        return None
+                    if not accessible_orgs:
+                        logger.debug(f"[NAME_FALLBACK] User has no organization memberships - cannot perform name matching")
+                        return None
+                    matcher = EnhancedGitHubMatcher(token, accessible_orgs)
                     name_match = await matcher.match_name_to_github(full_name, fallback_email=email)
                     if name_match:
                         logger.info(f"✅ [NAME_FALLBACK] Matched {email} -> {name_match} via name '{full_name}'")
@@ -214,10 +308,19 @@ class GitHubCollector:
         try:
             import aiohttp
             async with aiohttp.ClientSession() as session:
+                # Get organizations the token has access to
+                accessible_orgs = await self.get_accessible_orgs(token)
+                if accessible_orgs is None:
+                    logger.warning("Failed to fetch orgs - cannot build email mapping")
+                    return {}
+                if not accessible_orgs:
+                    logger.info("User has no organization memberships - cannot build email mapping")
+                    return {}
+
                 # Get all GitHub users from organizations
                 github_users = set()
-                
-                for org in self.organizations:
+
+                for org in accessible_orgs:
                     try:
                         # Get organization members
                         members_url = f"https://api.github.com/orgs/{org}/members"
@@ -323,11 +426,26 @@ class GitHubCollector:
             from .github_api_manager import github_api_manager, GitHubPermissionError
 
             # Use search API to get counts only (1 call instead of paginating)
-            # Get commits across all repos
-            commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}&per_page=1"
+            # Get organizations the token has access to (cached)
+            accessible_orgs = await self.get_accessible_orgs(token)
+
+            # Build org filters based on token's access
+            if accessible_orgs:  # Non-empty list
+                org_filters = "+".join([f"org:{org}" for org in accessible_orgs])
+                org_filter_query = f"+{org_filters}"
+                logger.debug(f"🔍 Using org filters for {len(accessible_orgs)} organizations")
+            elif accessible_orgs is not None:  # Empty list but API succeeded
+                logger.info(f"User has no organization memberships - searching all repos for {username}")
+                org_filter_query = ""
+            else:  # API failed (returned None)
+                logger.warning(f"⚠️ Could not determine accessible orgs - searching all repos for {username}")
+                org_filter_query = ""
+
+            # Get commits across all repos (filtered by orgs if available)
+            commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}{org_filter_query}&per_page=1"
 
             # Get pull requests count
-            prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}&per_page=1"
+            prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}{org_filter_query}&per_page=1"
 
             logger.debug(f"🔍 [GITHUB_API_URL] Commits query: {commits_url}")
             logger.debug(f"🔍 [GITHUB_API_URL] PRs query: {prs_url}")
@@ -544,8 +662,21 @@ class GitHubCollector:
                 
                 # Fetch commits using search API
                 search_url = f"https://api.github.com/search/commits"
-                query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
-                
+
+                # Get organizations the token has access to (cached)
+                accessible_orgs = await self.get_accessible_orgs(github_token)
+
+                # Build org filters based on token's access
+                if accessible_orgs:  # Non-empty list
+                    org_filters = "+".join([f"org:{org}" for org in accessible_orgs])
+                    query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')} {org_filters}"
+                elif accessible_orgs is not None:  # Empty list but API succeeded
+                    logger.info(f"User has no organization memberships - searching all repos for {username}")
+                    query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
+                else:  # API failed (returned None)
+                    logger.warning(f"Could not determine accessible orgs - searching all repos for {username}")
+                    query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}"
+
                 page = 1
                 per_page = 100
                 total_fetched = 0
@@ -788,7 +919,7 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
         days: Number of days to analyze
         github_token: GitHub API token for real data collection
         user_id: User ID for checking manual mappings
-        timezone: User's timezone for business hours calculation (default: 'UTC')
+        timezone: Fallback timezone if per-user timezone not found (default: 'UTC')
         email_to_name: Optional mapping of email -> full name for name-based matching
 
     Returns:
@@ -797,14 +928,68 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
     collector = GitHubCollector()
     github_data = {}
 
-    for email in team_emails:
+    # Get organization_id for filtering user_correlations
+    organization_id = None
+    if user_id is not None:
         try:
-            full_name = email_to_name.get(email) if email_to_name else None
-            user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, full_name=full_name, timezone=timezone)
-            if user_data:
-                github_data[email] = user_data
+            from ..models import SessionLocal, User
+            db = SessionLocal()
+            try:
+                user = db.query(User).filter(User.id == user_id).first()
+                if user:
+                    organization_id = user.organization_id
+                    logger.debug(f"User {user_id} belongs to organization {organization_id}")
+            finally:
+                db.close()
         except Exception as e:
-            logger.error(f"Failed to collect GitHub data for {email}: {e}")
-    
+            logger.warning(f"Could not retrieve organization_id: {e}")
+
+    # Open single database connection for all timezone lookups (performance optimization)
+    db_session = None
+    if user_id is not None:
+        try:
+            from ..models import SessionLocal, UserCorrelation
+            from sqlalchemy import desc
+            db_session = SessionLocal()
+        except Exception as e:
+            logger.warning(f"⚠️ Could not create database session for timezone lookups: {e}")
+
+    try:
+        for email in team_emails:
+            try:
+                full_name = email_to_name.get(email) if email_to_name else None
+
+                # Get user-specific timezone from UserCorrelation if available
+                user_timezone = timezone  # Use parameter as fallback
+                if db_session is not None:
+                    try:
+                        # Filter by organization_id to avoid cross-org contamination
+                        filters = [
+                            UserCorrelation.email == email,
+                            UserCorrelation.user_id.is_(None)  # Team roster only
+                        ]
+                        if organization_id:
+                            filters.append(UserCorrelation.organization_id == organization_id)
+
+                        user_correlation = db_session.query(UserCorrelation).filter(*filters).order_by(
+                            UserCorrelation.github_username.isnot(None).desc(),  # Prefer records with username
+                            desc(UserCorrelation.id)  # Most recent first
+                        ).first()
+                        if user_correlation and user_correlation.timezone:
+                            user_timezone = user_correlation.timezone
+                            logger.debug(f"Using timezone {user_timezone} for {email}")
+                    except Exception as tz_error:
+                        logger.warning(f"⚠️ Timezone retrieval failed for {email}, defaulting to {timezone}: {tz_error}")
+
+                user_data = await collector.collect_github_data_for_user(email, days, github_token, user_id, full_name=full_name, timezone=user_timezone)
+                if user_data:
+                    github_data[email] = user_data
+            except Exception as e:
+                logger.error(f"Failed to collect GitHub data for {email}: {e}")
+    finally:
+        # Close database connection after all timezone lookups complete
+        if db_session is not None:
+            db_session.close()
+
     logger.info(f"Collected GitHub data for {len(github_data)} users out of {len(team_emails)}")
     return github_data
