@@ -8,11 +8,10 @@ from .base import Base
 
 class UserMapping(Base):
     __tablename__ = "user_mappings"
-
+    
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)  # For multi-tenancy isolation
-
+    
     # Source platform identification (where the user comes from)
     source_platform = Column(String(50), nullable=False)  # "rootly", "pagerduty"
     source_identifier = Column(String(255), nullable=False)  # email, name, user_id
@@ -40,7 +39,6 @@ class UserMapping(Base):
         Index('ix_user_mapping_source', 'user_id', 'source_platform', 'source_identifier'),
         Index('ix_user_mapping_target', 'user_id', 'target_platform'),
         Index('ix_user_mapping_lookup', 'source_platform', 'source_identifier', 'target_platform'),
-        Index('ix_user_mapping_org_user', 'organization_id', 'user_id'),  # For multi-tenancy queries
     )
     
     def __repr__(self):

@@ -84,22 +84,10 @@ async def get_analysis_mappings(
         
         # Get all manual mappings for this user and target platform
         # We'll filter them later to prioritize analysis-relevant ones
-        manual_query = db.query(UserMapping).filter(
+        manual_mappings = db.query(UserMapping).filter(
             UserMapping.user_id == current_user.id,
             UserMapping.target_platform.in_(["github", "slack", "jira"])  # Only include relevant platforms
-        )
-
-        # SECURITY: Filter by organization_id for multi-tenancy isolation
-        if current_user.organization_id:
-            from sqlalchemy import or_
-            manual_query = manual_query.filter(
-                or_(
-                    UserMapping.organization_id == current_user.organization_id,
-                    UserMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
-                )
-            )
-
-        manual_mappings = manual_query.all()
+        ).all()
         
         # Get emails from integration mappings for analysis context
         integration_emails = set(m.source_identifier for m in integration_mappings)
@@ -249,41 +237,16 @@ async def get_platform_mappings(
                 logger.warning(f"Could not extract user names from analysis: {e}")
 
         # Get most recent integration mappings, limited to prevent UI overload
-        from sqlalchemy import or_
-
-        query = db.query(IntegrationMapping).filter(
+        integration_mappings = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id,
             IntegrationMapping.target_platform == platform
-        )
-
-        # Filter by organization_id for cross-org data isolation
-        if current_user.organization_id:
-            query = query.filter(
-                or_(
-                    IntegrationMapping.organization_id == current_user.organization_id,
-                    IntegrationMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
-                )
-            )
-            logger.info(f"Filtering platform mappings by organization_id={current_user.organization_id}")
-
-        integration_mappings = query.order_by(IntegrationMapping.created_at.desc()).limit(limit).all()
+        ).order_by(IntegrationMapping.created_at.desc()).limit(limit).all()
         
         # Get manual mappings for this platform
-        manual_query = db.query(UserMapping).filter(
+        manual_mappings = db.query(UserMapping).filter(
             UserMapping.user_id == current_user.id,
             UserMapping.target_platform == platform
-        )
-
-        # SECURITY: Filter by organization_id for multi-tenancy isolation
-        if current_user.organization_id:
-            manual_query = manual_query.filter(
-                or_(
-                    UserMapping.organization_id == current_user.organization_id,
-                    UserMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
-                )
-            )
-
-        manual_mappings = manual_query.all()
+        ).all()
         
         # Revert to working dual-table approach temporarily
         all_mappings = []
@@ -360,26 +323,14 @@ async def get_success_rates(
             github_was_enabled = bool(row[0])
         
         # Get integration mappings for this user, optionally filtered by platform
-        from sqlalchemy import or_
-
         query = db.query(IntegrationMapping).filter(
             IntegrationMapping.user_id == current_user.id
         )
-
+        
         if platform:
             query = query.filter(IntegrationMapping.target_platform == platform)
             logger.info(f"🔍 DEBUG: Filtering by platform: {platform}")
-
-        # Filter by organization_id for cross-org data isolation
-        if current_user.organization_id:
-            query = query.filter(
-                or_(
-                    IntegrationMapping.organization_id == current_user.organization_id,
-                    IntegrationMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
-                )
-            )
-            logger.info(f"Filtering success rates by organization_id={current_user.organization_id}")
-
+            
         # Apply same ordering and limit as platform endpoint to ensure consistency
         integration_mappings = query.order_by(IntegrationMapping.created_at.desc()).limit(50).all()
         
@@ -389,16 +340,6 @@ async def get_success_rates(
         )
         if platform:
             manual_query = manual_query.filter(UserMapping.target_platform == platform)
-
-        # SECURITY: Filter by organization_id for multi-tenancy isolation
-        if current_user.organization_id:
-            manual_query = manual_query.filter(
-                or_(
-                    UserMapping.organization_id == current_user.organization_id,
-                    UserMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
-                )
-            )
-
         manual_mappings = manual_query.all()
         
         logger.info(f"🔍 DEBUG: Found {len(integration_mappings)} integration + {len(manual_mappings)} manual mappings for user {current_user.id}, platform: {platform}")
