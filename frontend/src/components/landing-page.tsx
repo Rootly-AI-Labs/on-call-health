@@ -171,15 +171,25 @@ export default function LandingPage() {
                 </a>
               </div>
             </div>
-            <a
-              href="https://github.com/Rootly-AI-Labs/On-Call-Health"
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] flex items-center gap-2"
-            >
-              <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} className="h-4 w-4 lg:h-5 lg:w-5" />
-              <span className="relative top-[2px]">View on GitHub</span>
-            </a>
+            <div className="flex items-center gap-2">
+              <a
+                href="https://www.producthunt.com/products/on-call-health"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-2xl bg-[#ff6154] px-5 py-2 text-sm font-semibold font-display text-white hover:bg-[#e5574b] flex items-center gap-2"
+              >
+                <span className="relative top-[2px]">Product Hunt</span>
+              </a>
+              <a
+                href="https://github.com/Rootly-AI-Labs/On-Call-Health"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] flex items-center gap-2"
+              >
+                <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} className="h-4 w-4 lg:h-5 lg:w-5" />
+                <span className="relative top-[2px]">View on GitHub</span>
+              </a>
+            </div>
           </div>
         </div>
         <div className="container flex flex-col lg:flex-row flex-grow mx-auto px-4">
