@@ -61,7 +61,7 @@
   "devDependencies": {
     "@playwright/test": "^1.58.1",
     "dotenv": "^17.2.3",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "^16.1.6",
     "husky": "^9.1.7"
   }
