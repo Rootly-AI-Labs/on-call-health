@@ -647,25 +647,34 @@ async def run_github_mapping(
             if user_email or user_name:
                 unmapped_users.append(user)
         
-        # Discover GitHub organizations from the token instead of hardcoding
+        # Discover GitHub organizations dynamically from token
+        github_orgs = []
         try:
-            from ...services.enhanced_github_matcher import EnhancedGitHubMatcher
-            temp_matcher = EnhancedGitHubMatcher(github_token, [])  # Empty org list initially
-            github_orgs = await temp_matcher.discover_accessible_organizations()
-            logger.info(f"🔍 Discovered {len(github_orgs)} accessible organizations: {github_orgs}")
+            from ...services.github_collector import GitHubCollector
+            collector = GitHubCollector()
+            discovered_orgs = await collector.get_accessible_orgs(github_token)
+
+            if discovered_orgs is not None:
+                github_orgs = discovered_orgs
+                logger.info(f"🔍 Discovered {len(github_orgs)} accessible organizations")
+            else:
+                logger.warning("Failed to fetch organizations from GitHub API - will proceed with empty org list")
+                github_orgs = []
         except Exception as e:
-            logger.error(f"Failed to discover organizations from token, using fallback: {e}")
-            # Fallback to checking integration settings or defaults
-            github_orgs = []
+            logger.error(f"Failed to discover organizations from token: {e}")
+            # Fallback to checking integration's stored organizations
             if hasattr(github_integration, 'github_organizations') and github_integration.github_organizations:
                 import json
                 try:
                     github_orgs = json.loads(github_integration.github_organizations)
-                except:
-                    github_orgs = ["Rootly-AI-Labs", "rootlyhq"]
-            
+                    logger.info(f"Using stored organizations from integration: {len(github_orgs)} orgs")
+                except Exception as json_error:
+                    logger.warning(f"Failed to parse stored organizations: {json_error}")
+                    github_orgs = []
+
             if not github_orgs:
-                github_orgs = ["Rootly-AI-Labs", "rootlyhq"]
+                logger.warning("No organizations available - proceeding with empty list")
+                github_orgs = []
             
         # Run matching process with timeout protection
         async def run_matching_with_timeout():
