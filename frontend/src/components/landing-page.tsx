@@ -173,12 +173,16 @@ export default function LandingPage() {
             </div>
             <div className="flex items-center gap-2">
               <a
-                href="https://www.producthunt.com/products/on-call-health"
+                href="https://www.producthunt.com/products/on-call-health?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-on-call-health"
                 target="_blank"
-                rel="noreferrer"
-                className="rounded-2xl bg-[#ff6154] px-5 py-2 text-sm font-semibold font-display text-white hover:bg-[#e5574b] flex items-center gap-2"
+                rel="noopener noreferrer"
               >
-                Product Hunt
+                <img
+                  alt="On-Call Health - Catch overload before it burns out your incident responders | Product Hunt"
+                  width="250"
+                  height="54"
+                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1077510&theme=light&t=1770911341982"
+                />
               </a>
               <a
                 href="https://github.com/Rootly-AI-Labs/On-Call-Health"
