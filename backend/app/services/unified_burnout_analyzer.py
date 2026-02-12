@@ -748,12 +748,7 @@ class UnifiedBurnoutAnalyzer:
                 # Get current user ID (assuming it's passed in somehow - for now use 1 as default)
                 current_user_id = getattr(self, 'current_user_id', 1)  # Default to user 1 (Spencer)
                 analysis_id = getattr(self, 'analysis_id', None)
-                organization_id = getattr(self, 'organization_id', None)
-                correlation_service = GitHubCorrelationService(
-                    current_user_id=current_user_id,
-                    analysis_id=analysis_id,
-                    organization_id=organization_id
-                )
+                correlation_service = GitHubCorrelationService(current_user_id=current_user_id, analysis_id=analysis_id)
                 
                 # Get original team members before correlation
                 original_members = team_analysis["members"].copy()

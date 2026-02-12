@@ -270,15 +270,7 @@ async def run_burnout_analysis(
         logger.info(f"Analysis request: integration={request.integration_id}, github={request.include_github}, slack={request.include_slack}")
         logger.info(f"ENDPOINT_DEBUG: Entered run_burnout_analysis for integration {request.integration_id}")
         logger.info(f"ENDPOINT_DEBUG: Request params - include_github: {request.include_github}, include_slack: {request.include_slack}")
-
-        # SECURITY: Validate organization_id to prevent cross-org data exposure
-        if not current_user.organization_id:
-            logger.error(f"Analysis rejected: User {current_user.id} has no organization_id")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User must be part of an organization to run analyses"
-            )
-
+        
         # Get the integration from database
         integration = db.query(RootlyIntegration).filter(
             RootlyIntegration.id == request.integration_id,
@@ -391,8 +383,7 @@ async def run_burnout_analysis(
                 include_jira=request.include_jira,
                 include_linear=request.include_linear,
                 user_id=current_user.id,
-                enable_ai=request.enable_ai,
-                organization_id=current_user.organization_id
+                enable_ai=request.enable_ai
             )
             logger.info(f"ENDPOINT: Successfully added background task for analysis {analysis.id}")
         except Exception as e:
@@ -2816,8 +2807,7 @@ async def run_analysis_task(
     include_jira: bool = False,
     include_linear: bool = False,
     user_id: int = None,
-    enable_ai: bool = False,
-    organization_id: int = None
+    enable_ai: bool = False
 ):
     """Background task to run the actual burnout analysis."""
     import asyncio
@@ -3184,10 +3174,9 @@ async def run_analysis_task(
             organization_name=organization_name,
             synced_users=synced_users,  # Pass synced users from Team Sync
             current_user_id=user_id,  # Pass the current user ID for Jira integration lookup
-            db=db,  # Reuse DB session to prevent connection pool exhaustion
-            organization_id=organization_id  # Pass organization_id for cross-org data isolation
+            db=db  # Reuse DB session to prevent connection pool exhaustion
         )
-        logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}, current_user_id={user_id}, organization_id={organization_id}")
+        logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}, current_user_id={user_id}")
         
         # Run the analysis with timeout (15 minutes max)
         logger.info(f"BACKGROUND_TASK: Starting burnout analysis with 15-minute timeout for analysis {analysis_ref}")
