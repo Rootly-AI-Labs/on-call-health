@@ -15,11 +15,10 @@ class GitHubCorrelationService:
     This gives us ALL successful GitHub mappings, not just the top 5 contributors
     """
     
-    def __init__(self, current_user_id: Optional[int] = None, analysis_id: Optional[int] = None, organization_id: Optional[int] = None):
+    def __init__(self, current_user_id: Optional[int] = None, analysis_id: Optional[int] = None):
         self.logger = logger
         self.current_user_id = current_user_id
         self.analysis_id = analysis_id
-        self.organization_id = organization_id
         
     def correlate_github_data(
         self, 
@@ -132,12 +131,11 @@ class GitHubCorrelationService:
     
     def _fetch_integration_mappings(self) -> List[Dict[str, Any]]:
         """
-        Fetch successful GitHub mappings from BOTH integration_mappings and user_correlations tables
+        Fetch successful GitHub mappings from BOTH integration_mappings and user_mappings tables
         """
         try:
             # Use SessionLocal instead of creating new engine to avoid connection pool exhaustion
-            from ..models import SessionLocal, IntegrationMapping, UserCorrelation
-            from sqlalchemy import or_, and_
+            from ..models import SessionLocal, IntegrationMapping, UserMapping
 
             db = SessionLocal()
             try:
@@ -155,18 +153,6 @@ class GitHubCorrelationService:
                     query = query.filter(IntegrationMapping.analysis_id == self.analysis_id)
                 else:
                     self.logger.warning(f"⚠️ No analysis_id provided - fetching ALL GitHub mappings!")
-
-                # SECURITY: Require organization_id for cross-org data isolation
-                if not self.organization_id:
-                    raise ValueError("organization_id is required for GitHub correlation to prevent cross-organization data exposure")
-
-                query = query.filter(
-                    or_(
-                        IntegrationMapping.organization_id == self.organization_id,
-                        IntegrationMapping.organization_id.is_(None)  # Include NULL for backwards compatibility
-                    )
-                )
-                self.logger.info(f"Filtering IntegrationMappings by organization_id={self.organization_id}")
 
                 auto_mappings = query.order_by(IntegrationMapping.created_at.desc()).all()
             
@@ -188,36 +174,25 @@ class GitHubCorrelationService:
                             'source': 'auto_detected'
                         })
                         seen_emails.add(email_lower)
-
-                # Second, get user correlations from user_correlations table (organization-scoped)
-                # Query UserCorrelation for GitHub usernames - supports both team roster and personal mappings
-                user_correlation_query = db.query(UserCorrelation).filter(
-                    UserCorrelation.github_username.isnot(None),
-                    UserCorrelation.github_username != ''
+            
+                # Second, get manual mappings from user_mappings table
+                # Manual mappings are user-specific, so we filter by current_user_id
+                manual_query = db.query(UserMapping).filter(
+                    UserMapping.source_platform == 'rootly',
+                    UserMapping.target_platform == 'github',
+                    UserMapping.target_identifier.isnot(None),
+                    UserMapping.target_identifier != ''
                 )
 
-                # SECURITY: Require organization_id for multi-tenancy isolation
-                if not self.organization_id:
-                    raise ValueError("organization_id is required for GitHub correlation to prevent cross-organization data exposure")
+                if self.current_user_id:
+                    manual_query = manual_query.filter(UserMapping.user_id == self.current_user_id)
 
-                # Filter by organization_id (team roster) or user_id (personal mappings)
-                user_correlation_query = user_correlation_query.filter(
-                    or_(
-                        and_(
-                            UserCorrelation.user_id.is_(None),
-                            UserCorrelation.organization_id == self.organization_id
-                        ),  # Team roster mappings (org-scoped)
-                        UserCorrelation.user_id == self.current_user_id  # Personal mappings
-                    )
-                )
-                self.logger.info(f"Filtering UserCorrelations by organization_id={self.organization_id} (team roster) or user_id={self.current_user_id} (personal)")
+                manual_mappings = manual_query.order_by(UserMapping.created_at.desc()).all()
 
-                user_correlations = user_correlation_query.order_by(UserCorrelation.created_at.desc()).all()
-
-                # Process user correlations, preferring them over auto-detected
-                for correlation in user_correlations:
-                    email = correlation.email
-                    username = correlation.github_username
+                # Process manual mappings, preferring them over auto-detected
+                for mapping in manual_mappings:
+                    email = mapping.source_identifier
+                    username = mapping.target_identifier
                     email_lower = email.lower()
 
                     # Check if there's an existing auto-detected mapping with data_points
@@ -230,37 +205,30 @@ class GitHubCorrelationService:
                     # Remove any existing auto-detected mapping for this email
                     mappings = [m for m in mappings if m['email'].lower() != email_lower]
 
-                    # Determine if this is a team roster or personal mapping
-                    mapping_scope = 'team_roster' if correlation.user_id is None else 'personal'
-
-                    # Add the user correlation mapping, preserving data_points from auto-detected mapping
+                    # Add the manual mapping, preserving data_points from auto-detected mapping
                     mappings.append({
                         'email': email,
                         'username': username,
                         'data_points': existing_data_points,  # Preserve data from auto-detected mapping
                         'mapping_successful': True,
-                        'created_at': correlation.created_at,
-                        'source': f'user_correlation_{mapping_scope}'
+                        'created_at': mapping.created_at,
+                        'source': 'manual'
                     })
 
-                    self.logger.info(f"📝 [USER_CORRELATION_{mapping_scope.upper()}] {email} → {username}: preserved data_points={existing_data_points}")
+                    self.logger.info(f"📝 [MANUAL_MAPPING] {email} → {username}: preserved data_points={existing_data_points}")
                     seen_emails.add(email_lower)
             finally:
                 db.close()
-
+            
             auto_count = len([m for m in mappings if m['source'] == 'auto_detected'])
-            user_correlation_count = len([m for m in mappings if 'user_correlation' in m['source']])
-            self.logger.info(f"Fetched {len(mappings)} GitHub mappings ({auto_count} auto-detected, {user_correlation_count} user_correlation)")
+            manual_count = len([m for m in mappings if m['source'] == 'manual'])
+            self.logger.info(f"Fetched {len(mappings)} GitHub mappings ({auto_count} auto-detected, {manual_count} manual)")
 
-            # Log which emails have mappings for debugging
-            mapped_emails = set(m['email'] for m in mappings)
-            self.logger.info(f"Emails with GitHub mappings: {mapped_emails}")
-
-            # Log user correlation mappings at DEBUG level
+            # Log manual mappings at DEBUG level
             for mapping in mappings:
-                if 'user_correlation' in mapping['source']:
-                    self.logger.debug(f"  User correlation mapping: {mapping['email']} → {mapping['username']} (scope: {mapping['source']})")
-
+                if mapping['source'] == 'manual':
+                    self.logger.debug(f"  Manual mapping: {mapping['email']} → {mapping['username']}")
+            
             return mappings
             
         except Exception as e:
