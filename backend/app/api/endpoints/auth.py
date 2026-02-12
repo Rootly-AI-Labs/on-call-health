@@ -160,6 +160,12 @@ async def google_login(request: Request, redirect_origin: str = Query(None)):
         state = redirect_origin
     
     authorization_url = google_oauth.get_authorization_url(state=state)
+
+    # If browser navigation (e.g. link from external site), redirect directly
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and "application/json" not in accept:
+        return RedirectResponse(url=authorization_url)
+
     return {"authorization_url": authorization_url}
 
 @router.get("/google/callback")
@@ -285,6 +291,12 @@ async def github_login(request: Request, redirect_origin: str = Query(None)):
         state = redirect_origin
     
     authorization_url = github_oauth.get_authorization_url(state=state)
+
+    # If browser navigation (e.g. link from external site), redirect directly
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and "application/json" not in accept:
+        return RedirectResponse(url=authorization_url)
+
     return {"authorization_url": authorization_url}
 
 @router.get("/github/callback")
