@@ -178,7 +178,7 @@ export default function LandingPage() {
                 rel="noreferrer"
                 className="rounded-2xl bg-[#ff6154] px-5 py-2 text-sm font-semibold font-display text-white hover:bg-[#e5574b] flex items-center gap-2"
               >
-                <span className="relative top-[2px]">Product Hunt</span>
+                Product Hunt
               </a>
               <a
                 href="https://github.com/Rootly-AI-Labs/On-Call-Health"
@@ -187,7 +187,7 @@ export default function LandingPage() {
                 className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] flex items-center gap-2"
               >
                 <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} className="h-4 w-4 lg:h-5 lg:w-5" />
-                <span className="relative top-[2px]">View on GitHub</span>
+                View on GitHub
               </a>
             </div>
           </div>
