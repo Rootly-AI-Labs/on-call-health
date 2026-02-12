@@ -179,9 +179,10 @@ export default function LandingPage() {
               >
                 <img
                   alt="On-Call Health - Catch overload before it burns out your incident responders | Product Hunt"
-                  width="250"
-                  height="54"
+                  width="150"
+                  height="32"
                   src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1077510&theme=light&t=1770911341982"
+                  className="h-8"
                 />
               </a>
               <a
