@@ -36,7 +36,7 @@ class AccountLinkingService:
         if provider == "github":
             all_emails = await github_oauth.get_all_emails(access_token)
             primary_email = github_oauth.select_primary_email(all_emails) or user_info.get("email")
-            email_list = [email["email"] for email in all_emails]
+            email_list = [primary_email]  # Only use primary email for user matching
         elif provider == "google":
             # Google typically provides one verified email
             primary_email = user_info.get("email")
