@@ -5,6 +5,7 @@ import logging
 from typing import Dict, Any, Optional, List, Tuple
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
+from fastapi import HTTPException, status
 
 from ..models import User, OAuthProvider, UserEmail, Organization, OrganizationInvitation
 from ..auth.oauth import github_oauth, google_oauth
@@ -50,14 +51,49 @@ class AccountLinkingService:
 
         if not primary_email:
             raise ValueError(f"No valid email found for {provider} user")
-        
+
         # Check if this OAuth provider is already linked
+        logger.info(f"🔍 [OAUTH_CHECK] Checking if {provider} provider_user_id={provider_user_id} is already linked")
+
         existing_oauth = self.db.query(OAuthProvider).filter(
             OAuthProvider.provider == provider,
             OAuthProvider.provider_user_id == provider_user_id
         ).first()
-        
+
         if existing_oauth:
+            logger.info(f"✅ [OAUTH_CHECK] FOUND! {provider} provider already linked to user {existing_oauth.user_id} (email: {existing_oauth.user.email})")
+
+            # Validate that OAuth email matches user's registered emails
+            user = existing_oauth.user
+
+            # Get all emails for this user (primary + secondary)
+            # Use set comprehension with lowercase for case-insensitive comparison
+            user_emails = {user.email.lower()}
+            if user.emails:  # Secondary emails from user_emails table
+                user_emails.update(ue.email.lower() for ue in user.emails)
+
+            # Check if OAuth session email matches any of the user's emails
+            oauth_email = primary_email.lower()
+
+            if oauth_email not in user_emails:
+                # EMAIL MISMATCH - Different person trying to use same OAuth provider
+                logger.warning(
+                    f"🚨 [EMAIL_MISMATCH] OAuth {provider} provider_user_id={provider_user_id} "
+                    f"is linked to user {user.id} (email: {user.email}), "
+                    f"but current OAuth session uses different email: {primary_email}. "
+                    f"Rejecting login to prevent cross-account access."
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"This {provider.capitalize()} account is already linked to a different user account. "
+                        f"If you believe this is an error, please contact support."
+                    )
+                )
+
+            # Email matches - safe to proceed with login
+            logger.info(f"✅ [EMAIL_VALIDATION] OAuth email '{primary_email}' matches user {user.id} emails. Proceeding with login.")
+
             try:
                 # Update existing OAuth provider
                 existing_oauth.access_token = access_token
@@ -86,6 +122,9 @@ class AccountLinkingService:
                 logger.error(f"Error in OAuth update: {e}")
                 self.db.rollback()
                 raise
+
+        # No existing OAuth provider found - log this before looking for user by emails
+        logger.info(f"❌ [OAUTH_CHECK] No existing {provider} provider found for provider_user_id={provider_user_id}")
         
         # Look for existing user by any of the emails
         existing_user = self._find_user_by_emails(email_list)
@@ -144,17 +183,28 @@ class AccountLinkingService:
     
     def _find_user_by_emails(self, email_list: List[str]) -> Optional[User]:
         """Find existing user by any of the provided emails."""
+        logger.info(f"🔍 [FIND_USER] Searching for user with emails: {email_list}")
+
         for email in email_list:
             # Check primary email
+            logger.info(f"🔍 [FIND_USER] Checking PRIMARY email: {email}")
             user = self.db.query(User).filter(User.email == email).first()
             if user:
+                logger.info(f"✅ [FIND_USER] MATCH! Found user {user.id} ({user.email}) by PRIMARY email match: {email}")
                 return user
-            
+            else:
+                logger.info(f"❌ [FIND_USER] No primary email match for: {email}")
+
             # Check secondary emails
+            logger.info(f"🔍 [FIND_USER] Checking SECONDARY emails for: {email}")
             user_email = self.db.query(UserEmail).filter(UserEmail.email == email).first()
             if user_email:
+                logger.info(f"✅ [FIND_USER] MATCH! Found user {user_email.user_id} by SECONDARY email: {email} (source: {user_email.source}, primary: {user_email.is_primary})")
                 return user_email.user
-        
+            else:
+                logger.info(f"❌ [FIND_USER] No secondary email match for: {email}")
+
+        logger.info(f"⭕ [FIND_USER] RESULT: No user found for emails: {email_list}")
         return None
     
     def _create_new_user(
