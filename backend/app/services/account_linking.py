@@ -2,6 +2,7 @@
 Account linking service for managing multiple OAuth providers and email addresses.
 """
 import logging
+import re
 from typing import Dict, Any, Optional, List, Tuple
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -10,6 +11,9 @@ from ..models import User, OAuthProvider, UserEmail, Organization, OrganizationI
 from ..auth.oauth import github_oauth, google_oauth
 
 logger = logging.getLogger(__name__)
+
+# Email validation regex to prevent injection attacks
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 class AccountLinkingService:
     """Service for linking OAuth accounts and managing user emails."""
@@ -59,7 +63,7 @@ class AccountLinkingService:
                 # Update existing OAuth provider
                 existing_oauth.access_token = access_token
                 existing_oauth.refresh_token = refresh_token
-                existing_oauth.updated_at = datetime.now()
+                existing_oauth.updated_at = datetime.now(timezone.utc)
 
                 # Check if user needs organization assignment (for existing users after migration)
                 user = existing_oauth.user
@@ -79,7 +83,7 @@ class AccountLinkingService:
                         # Retry just the OAuth update without organization assignment
                         existing_oauth.access_token = access_token
                         existing_oauth.refresh_token = refresh_token
-                        existing_oauth.updated_at = datetime.now()
+                        existing_oauth.updated_at = datetime.now(timezone.utc)
 
                 self.db.commit()
                 return user, False
@@ -271,7 +275,7 @@ class AccountLinkingService:
             existing.provider_user_id = provider_user_id
             existing.access_token = access_token
             existing.refresh_token = refresh_token
-            existing.updated_at = datetime.now()
+            existing.updated_at = datetime.now(timezone.utc)
         else:
             # Add new provider
             is_primary = len(user.oauth_providers) == 0
@@ -451,7 +455,12 @@ class AccountLinkingService:
     def _assign_user_to_organization(self, user: User, email: str) -> None:
         """Assign user to organization based on email domain or invitation."""
         try:
-            domain = email.split('@')[1] if '@' in email else None
+            # Validate email format before processing
+            if not EMAIL_REGEX.match(email):
+                logger.warning(f"Invalid email format: {email}")
+                return
+
+            domain = email.split('@')[1]  # Safe after validation
             if not domain:
                 logger.info(f"No domain found in email {email}")
                 return
@@ -494,16 +503,19 @@ class AccountLinkingService:
                     self.db.flush()  # Get the ID
                     logger.info(f"Auto-created organization '{org_name}' (id={organization.id}) for domain {domain}")
 
-                # Check if this is the first user from this domain (make them admin)
-                existing_users = self.db.query(User).filter(
+                # Assign user to organization first
+                user.organization_id = organization.id
+                user.joined_org_at = datetime.now(timezone.utc)
+                self.db.flush()  # Ensure user is persisted before counting
+
+                # Count users AFTER this user is added (prevents race condition)
+                total_users = self.db.query(User).filter(
                     User.organization_id == organization.id,
                     User.status == 'active'
                 ).count()
 
-                user.organization_id = organization.id
-                # First user is admin, subsequent users are members
-                user.role = 'admin' if existing_users == 0 else 'member'
-                user.joined_org_at = datetime.now()
+                # First user (total_users == 1) is admin, others are members
+                user.role = 'admin' if total_users == 1 else 'member'
 
                 logger.info(f"Auto-assigned {email} to org {organization.id} ({organization.name}) as {user.role}")
 
