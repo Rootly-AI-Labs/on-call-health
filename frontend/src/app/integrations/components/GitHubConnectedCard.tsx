@@ -98,28 +98,34 @@ export function GitHubConnectedCard({
                   Token Invalid
                 </Badge>
               ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Badge
-                      variant="secondary"
-                      className="bg-green-100 text-green-700 cursor-pointer hover:bg-green-200 transition-colors"
-                    >
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Connected
-                      <ChevronDown className="w-3 h-3 ml-1" />
-                    </Badge>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={onTest} disabled={isLoading}>
-                      {isLoading ? (
-                        <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                      ) : (
-                        <Zap className="w-3 h-3 mr-2" />
-                      )}
-                      Test Connection
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onMouseUp={(e) => e.stopPropagation()}
+                >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-700 cursor-pointer hover:bg-green-200 transition-colors"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Connected
+                        <ChevronDown className="w-3 h-3 ml-1" />
+                      </Badge>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem onClick={onTest} disabled={isLoading}>
+                        {isLoading ? (
+                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                        ) : (
+                          <Zap className="w-3 h-3 mr-2" />
+                        )}
+                        Test Connection
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               )}
             </CardTitle>
             <p className="text-sm text-slate-600">Repository collaboration<br />and code management</p>

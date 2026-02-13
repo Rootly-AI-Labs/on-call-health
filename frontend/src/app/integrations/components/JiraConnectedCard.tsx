@@ -51,28 +51,34 @@ export function JiraConnectedCard({
               {hasTokenError ? (
                 <StatusIndicator status="error" />
               ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <div className="cursor-pointer">
-                      <StatusIndicator
-                        status="connected"
-                        authMethod={integration.token_source as AuthMethod}
-                        className="hover:bg-green-200 transition-colors"
-                      />
-                      <ChevronDown className="w-3 h-3 ml-1 inline" />
-                    </div>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={onTest} disabled={isLoading}>
-                      {isLoading ? (
-                        <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                      ) : (
-                        <Zap className="w-3 h-3 mr-2" />
-                      )}
-                      Test Connection
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onMouseUp={(e) => e.stopPropagation()}
+                >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <div className="cursor-pointer">
+                        <StatusIndicator
+                          status="connected"
+                          authMethod={integration.token_source as AuthMethod}
+                          className="hover:bg-green-200 transition-colors"
+                        />
+                        <ChevronDown className="w-3 h-3 ml-1 inline" />
+                      </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem onClick={onTest} disabled={isLoading}>
+                        {isLoading ? (
+                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                        ) : (
+                          <Zap className="w-3 h-3 mr-2" />
+                        )}
+                        Test Connection
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               )}
             </CardTitle>
             <p className="text-sm text-slate-600">Project management and issue tracking</p>

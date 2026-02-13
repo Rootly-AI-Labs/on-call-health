@@ -63,6 +63,11 @@ class AccountLinkingService:
 
                 # Check if user needs organization assignment (for existing users after migration)
                 user = existing_oauth.user
+
+                # Update user's email if it changed from OAuth provider
+                if user.email != primary_email:
+                    self._update_user_email(user, primary_email, provider)
+
                 if not user.organization_id:
                     try:
                         self._assign_user_to_organization(user, user.email)
@@ -91,6 +96,11 @@ class AccountLinkingService:
             try:
                 # Link this provider to existing user
                 logger.info(f"Linking {provider} account to existing user {existing_user.id}")
+
+                # Update user's email to the OAuth-provided email
+                if existing_user.email != primary_email:
+                    self._update_user_email(existing_user, primary_email, provider)
+
                 self._link_provider_to_user(
                     existing_user, provider, provider_user_id,
                     access_token, refresh_token, user_info
@@ -278,9 +288,72 @@ class AccountLinkingService:
         # Update user name if not set
         if not user.name and user_info.get("name"):
             user.name = user_info["name"]
-        
+
         self.db.commit()
-    
+
+    def _update_user_email(self, user: User, new_email: str, provider: str) -> None:
+        """
+        Update user's primary email address.
+
+        Args:
+            user: User object to update
+            new_email: New primary email from OAuth provider
+            provider: OAuth provider name (for logging)
+        """
+        old_email = user.email
+
+        # Check if new email is already used by another user
+        existing_user = self.db.query(User).filter(
+            User.email == new_email,
+            User.id != user.id
+        ).first()
+
+        if existing_user:
+            logger.warning(
+                f"Cannot update user {user.id} email to {new_email}: "
+                f"already used by user {existing_user.id}. Keeping current email."
+            )
+            return
+
+        # Update user's primary email
+        logger.info(
+            f"Updating user {user.id} email from {old_email} to {new_email} "
+            f"(source: {provider} OAuth)"
+        )
+        user.email = new_email
+        user.update_email_domain()  # Update email_domain field
+
+        # Update or create UserEmail record for new primary email
+        user_email = self.db.query(UserEmail).filter(
+            UserEmail.user_id == user.id,
+            UserEmail.email == new_email
+        ).first()
+
+        if user_email:
+            # Email already exists, mark it as primary
+            user_email.is_primary = True
+            user_email.is_verified = True
+            user_email.source = provider
+        else:
+            # Create new UserEmail record
+            new_user_email = UserEmail(
+                user_id=user.id,
+                email=new_email,
+                is_primary=True,
+                is_verified=True,
+                source=provider
+            )
+            self.db.add(new_user_email)
+
+        # Mark old primary email as non-primary (if it exists in UserEmail)
+        if old_email != new_email:
+            old_user_email = self.db.query(UserEmail).filter(
+                UserEmail.user_id == user.id,
+                UserEmail.email == old_email
+            ).first()
+            if old_user_email:
+                old_user_email.is_primary = False
+
     def _add_emails_to_user(
         self, 
         user: User, 

@@ -183,29 +183,28 @@ class GitHubOAuth(OAuthProvider):
         return verified_emails
     
     def select_primary_email(self, github_emails: list[Dict[str, Any]]) -> Optional[str]:
-        """Select the best primary email from GitHub emails."""
+        """
+        Select primary email from GitHub emails.
+
+        Priority:
+        1. Email marked as "primary" in GitHub settings
+        2. First verified email
+        3. First email in list
+        """
         if not github_emails:
             return None
-        
-        # Prioritize work domains (common business email domains)
-        work_domains = [
-            ".com", ".org", ".net", ".edu", ".gov",  # General business
-            "company", "corp", "inc", "ltd", "llc"   # Business keywords
-        ]
-        
-        # First, look for primary email
+
+        # First, look for email marked as primary in GitHub settings
         for email_data in github_emails:
             if email_data.get("primary", False):
                 return email_data["email"]
-        
-        # Then, prefer work-looking emails
-        for email_data in github_emails:
-            email = email_data["email"]
-            # Skip obvious personal domains
-            if not any(personal in email.lower() for personal in ["gmail", "yahoo", "hotmail", "outlook", "icloud"]):
-                return email
-        
+
         # Fall back to first verified email
+        for email_data in github_emails:
+            if email_data.get("verified", False):
+                return email_data["email"]
+
+        # Last resort: first email in list
         return github_emails[0]["email"] if github_emails else None
 
 # Provider instances

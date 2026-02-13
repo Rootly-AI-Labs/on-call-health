@@ -2892,10 +2892,10 @@ export default function IntegrationsPage() {
               </Card>
             ) : (
                 <Card
-                  className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
+                  className={`border-2 border-solid transition-all ${
                     activeEnhancementTab === 'github'
-                      ? 'border-neutral-500 shadow-md bg-neutral-100'
-                      : 'border-neutral-300 hover:border-neutral-400'
+                      ? 'border-neutral-500 shadow-md bg-neutral-100 pointer-events-none'
+                      : 'border-neutral-300 hover:border-neutral-400 cursor-pointer hover:shadow-md'
                   } p-4 flex items-center justify-center relative h-20`}
                   onClick={() => {
                     setActiveEnhancementTab(activeEnhancementTab === 'github' ? null : 'github')
@@ -2941,10 +2941,10 @@ export default function IntegrationsPage() {
               </Card>
             ) : (
               <Card
-                className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
+                className={`border-2 border-solid transition-all ${
                   activeEnhancementTab === 'slack'
-                    ? 'border-purple-500 shadow-md bg-purple-200'
-                    : 'border-neutral-300 hover:border-purple-500'
+                    ? 'border-purple-500 shadow-md bg-purple-200 pointer-events-none'
+                    : 'border-neutral-300 hover:border-purple-500 cursor-pointer hover:shadow-md'
                 } p-4 flex items-center justify-center relative h-20`}
                 onClick={() => {
                   setActiveEnhancementTab(activeEnhancementTab === 'slack' ? null : 'slack')
@@ -2988,10 +2988,10 @@ export default function IntegrationsPage() {
               </Card>
             ) : (
               <Card
-                className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
+                className={`border-2 border-solid transition-all ${
                   activeEnhancementTab === 'jira'
-                    ? 'border-blue-500 shadow-md bg-blue-50'
-                    : 'border-neutral-300 hover:border-blue-300'
+                    ? 'border-blue-500 shadow-md bg-blue-50 pointer-events-none'
+                    : 'border-neutral-300 hover:border-blue-300 cursor-pointer hover:shadow-md'
                 } p-4 flex items-center justify-center relative h-20`}
                 onClick={() => {
                   setActiveEnhancementTab(activeEnhancementTab === 'jira' ? null : 'jira')
@@ -3036,10 +3036,10 @@ export default function IntegrationsPage() {
               </Card>
             ) : (
               <Card
-                className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
+                className={`border-2 border-solid transition-all ${
                   activeEnhancementTab === 'linear'
-                    ? 'border-neutral-800 shadow-md bg-neutral-100'
-                    : 'border-neutral-300 hover:border-neutral-400'
+                    ? 'border-neutral-800 shadow-md bg-neutral-100 pointer-events-none'
+                    : 'border-neutral-300 hover:border-neutral-400 cursor-pointer hover:shadow-md'
                 } p-4 flex items-center justify-center relative h-20`}
                 onClick={() => {
                   setActiveEnhancementTab(activeEnhancementTab === 'linear' ? null : 'linear')
