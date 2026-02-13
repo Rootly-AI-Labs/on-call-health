@@ -45,6 +45,9 @@ class AccountLinkingService:
         else:
             raise ValueError(f"Unsupported provider: {provider}")
         
+        # DEBUG: Log the email being used for this OAuth login
+        logger.info(f"OAuth {provider} login - primary_email: {primary_email}, user_info email: {user_info.get('email')}")
+
         if not primary_email:
             raise ValueError(f"No valid email found for {provider} user")
         
@@ -122,8 +125,11 @@ class AccountLinkingService:
                 raise
         else:
             try:
+                # Ensure we're not seeing stale data from previous transaction
+                self.db.expire_all()  # Clear any cached data
+
                 # Create new user
-                logger.info(f"Creating new user for {provider} account")
+                logger.info(f"Creating new user for {provider} account with email: {primary_email}, name: {user_info.get('name')}")
                 new_user = self._create_new_user(
                     primary_email, user_info.get("name"),
                     provider, provider_user_id, access_token, refresh_token
@@ -152,8 +158,8 @@ class AccountLinkingService:
         return None
     
     def _create_new_user(
-        self, 
-        primary_email: str, 
+        self,
+        primary_email: str,
         name: Optional[str],
         provider: str,
         provider_user_id: str,
@@ -161,6 +167,13 @@ class AccountLinkingService:
         refresh_token: Optional[str]
     ) -> User:
         """Create a new user with OAuth provider."""
+        # Validate email is present and not from wrong source
+        if not primary_email or '@' not in primary_email:
+            raise ValueError(f"Invalid primary_email for new user: {primary_email}")
+
+        # DEBUG: Confirm email being used for new user
+        logger.info(f"_create_new_user called with primary_email={primary_email}, provider={provider}")
+
         user = User(
             email=primary_email,
             name=name,
