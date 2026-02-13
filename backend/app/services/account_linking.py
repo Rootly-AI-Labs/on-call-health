@@ -32,69 +32,32 @@ class AccountLinkingService:
         """
         provider_user_id = str(user_info.get("id"))
         
-        # Get all emails for this provider
+        # Get primary email only (no secondary emails)
         if provider == "github":
             all_emails = await github_oauth.get_all_emails(access_token)
             primary_email = github_oauth.select_primary_email(all_emails) or user_info.get("email")
             email_list = [primary_email]  # Only use primary email for user matching
+            # Only store primary email (no secondary emails)
+            primary_email_data = [{"email": primary_email, "verified": True, "primary": True}]
         elif provider == "google":
             # Google typically provides one verified email
             primary_email = user_info.get("email")
             email_list = [primary_email] if primary_email else []
-            all_emails = [{"email": primary_email, "verified": True, "primary": True}] if primary_email else []
+            # Only store primary email
+            primary_email_data = [{"email": primary_email, "verified": True, "primary": True}] if primary_email else []
         else:
             raise ValueError(f"Unsupported provider: {provider}")
-        
+
         # DEBUG: Log the email being used for this OAuth login
         logger.info(f"OAuth {provider} login - primary_email: {primary_email}, user_info email: {user_info.get('email')}")
 
         if not primary_email:
             raise ValueError(f"No valid email found for {provider} user")
 
-        # Check if this OAuth provider is already linked
-        logger.info(f"🔍 [OAUTH_CHECK] Checking if {provider} provider_user_id={provider_user_id} is already linked")
+        # STRICT EMAIL-BASED MATCHING: Always check by primary email first (ignore OAuth provider history)
+        logger.info(f"🔍 [EMAIL_CHECK] Checking if user exists with primary email: {primary_email}")
 
-        existing_oauth = self.db.query(OAuthProvider).filter(
-            OAuthProvider.provider == provider,
-            OAuthProvider.provider_user_id == provider_user_id
-        ).first()
-
-        if existing_oauth:
-            logger.info(f"✅ [OAUTH_CHECK] FOUND! {provider} provider already linked to user {existing_oauth.user_id} (email: {existing_oauth.user.email})")
-
-            try:
-                # Update existing OAuth provider
-                existing_oauth.access_token = access_token
-                existing_oauth.refresh_token = refresh_token
-                existing_oauth.updated_at = datetime.now()
-
-                # Check if user needs organization assignment (for existing users after migration)
-                user = existing_oauth.user
-                if not user.organization_id:
-                    try:
-                        self._assign_user_to_organization(user, user.email)
-                    except Exception as e:
-                        logger.error(f"Error assigning user to organization: {e}")
-                        # Rollback the transaction and start fresh
-                        self.db.rollback()
-
-                        # Retry just the OAuth update without organization assignment
-                        existing_oauth.access_token = access_token
-                        existing_oauth.refresh_token = refresh_token
-                        existing_oauth.updated_at = datetime.now()
-
-                self.db.commit()
-                return user, False
-
-            except Exception as e:
-                logger.error(f"Error in OAuth update: {e}")
-                self.db.rollback()
-                raise
-
-        # No existing OAuth provider found - log this before looking for user by emails
-        logger.info(f"❌ [OAUTH_CHECK] No existing {provider} provider found for provider_user_id={provider_user_id}")
-        
-        # Look for existing user by any of the emails
+        # Look for existing user by primary email only
         existing_user = self._find_user_by_emails(email_list)
         
         if existing_user:
@@ -105,7 +68,7 @@ class AccountLinkingService:
                     existing_user, provider, provider_user_id,
                     access_token, refresh_token, user_info
                 )
-                self._add_emails_to_user(existing_user, all_emails, provider)
+                self._add_emails_to_user(existing_user, primary_email_data, provider)
 
                 # Check if user needs organization assignment (for existing users after migration)
                 if not existing_user.organization_id:
@@ -121,7 +84,7 @@ class AccountLinkingService:
                             existing_user, provider, provider_user_id,
                             access_token, refresh_token, user_info
                         )
-                        self._add_emails_to_user(existing_user, all_emails, provider)
+                        self._add_emails_to_user(existing_user, primary_email_data, provider)
 
                 self.db.commit()
                 return existing_user, False
@@ -141,7 +104,7 @@ class AccountLinkingService:
                     primary_email, user_info.get("name"),
                     provider, provider_user_id, access_token, refresh_token
                 )
-                self._add_emails_to_user(new_user, all_emails, provider)
+                self._add_emails_to_user(new_user, primary_email_data, provider)
                 return new_user, True
 
             except Exception as e:
@@ -271,21 +234,34 @@ class AccountLinkingService:
         refresh_token: Optional[str],
         user_info: Dict[str, Any]
     ) -> None:
-        """Link a new OAuth provider to existing user."""
-        # Check if this provider is already linked
-        existing = self.db.query(OAuthProvider).filter(
-            OAuthProvider.user_id == user.id,
-            OAuthProvider.provider == provider
+        """Link OAuth provider to user (unlinks from old user if needed)."""
+
+        # Check if this OAuth provider (by provider + provider_user_id) is linked to ANY user
+        existing_oauth = self.db.query(OAuthProvider).filter(
+            OAuthProvider.provider == provider,
+            OAuthProvider.provider_user_id == provider_user_id
         ).first()
-        
-        if existing:
-            # Update existing provider
-            existing.provider_user_id = provider_user_id
-            existing.access_token = access_token
-            existing.refresh_token = refresh_token
-            existing.updated_at = datetime.now()
+
+        if existing_oauth:
+            if existing_oauth.user_id == user.id:
+                # Already linked to this user - just update tokens
+                logger.info(f"✅ Updating existing {provider} OAuth link for user {user.id}")
+                existing_oauth.access_token = access_token
+                existing_oauth.refresh_token = refresh_token
+                existing_oauth.updated_at = datetime.now()
+            else:
+                # Linked to a DIFFERENT user - unlink and relink to current user
+                old_user_id = existing_oauth.user_id
+                logger.info(f"🔄 Unlinking {provider} from user {old_user_id} and relinking to user {user.id}")
+
+                # Update the OAuth record to point to new user
+                existing_oauth.user_id = user.id
+                existing_oauth.access_token = access_token
+                existing_oauth.refresh_token = refresh_token
+                existing_oauth.updated_at = datetime.now()
         else:
-            # Add new provider
+            # No existing link - create new one
+            logger.info(f"➕ Creating new {provider} OAuth link for user {user.id}")
             is_primary = len(user.oauth_providers) == 0
             oauth_provider = OAuthProvider(
                 user_id=user.id,
@@ -296,11 +272,11 @@ class AccountLinkingService:
                 is_primary=is_primary
             )
             self.db.add(oauth_provider)
-        
+
         # Update user name if not set
         if not user.name and user_info.get("name"):
             user.name = user_info["name"]
-        
+
         self.db.commit()
     
     def _add_emails_to_user(
