@@ -162,7 +162,8 @@ async def github_callback(
                     github_username=github_username,
                     is_active=1
                 ).on_conflict_do_update(
-                    index_elements=['user_id', 'email'],  # Composite key to match constraint
+                    index_elements=['user_id', 'email'],
+                    index_where=UserCorrelation.user_id.isnot(None),  # Match partial unique index WHERE clause
                     set_={
                         'github_username': github_username,
                         'organization_id': current_user.organization_id,
@@ -556,7 +557,8 @@ async def connect_github_with_token(
                     github_username=github_username,
                     is_active=1
                 ).on_conflict_do_update(
-                    index_elements=['user_id', 'email'],  # Composite key to match constraint
+                    index_elements=['user_id', 'email'],
+                    index_where=UserCorrelation.user_id.isnot(None),  # Match partial unique index WHERE clause
                     set_={
                         'github_username': github_username,
                         'organization_id': current_user.organization_id,
