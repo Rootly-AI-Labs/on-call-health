@@ -660,8 +660,14 @@ function DashboardContent() {
                         </p>
                       </div>
                     </div>
-                    {/* Only show connect button if no Rootly or PagerDuty integration exists */}
-                    {!integrations.some(i => i.platform === 'rootly' || i.platform === 'pagerduty') && (
+                    {integrations.some(i => i.platform === 'rootly' || i.platform === 'pagerduty') ? (
+                      <button
+                        onClick={() => setShowTimeRangeDialog(true)}
+                        className="px-6 py-2.5 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors shadow-md"
+                      >
+                        New Analysis →
+                      </button>
+                    ) : (
                       <a
                         href="/integrations"
                         className="px-6 py-2.5 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors shadow-md"
