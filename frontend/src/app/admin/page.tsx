@@ -24,6 +24,8 @@ interface StatsSummary {
   total_organizations: number
   total_analyses: number
   total_api_keys: number
+  users_google: number
+  users_github: number
   new_users_last_30_days: number
   new_users_last_7_days: number
   new_users_today: number
@@ -627,7 +629,7 @@ export default function AdminDashboard() {
               <StatCard
                 title="Logged-in Users"
                 value={stats.total_users}
-                subtitle={`+${stats.new_users_last_30_days} this month`}
+                subtitle={`Google: ${stats.users_google} | GitHub: ${stats.users_github}`}
                 icon={Users}
                 trend={`+${stats.new_users_today} today`}
               />
