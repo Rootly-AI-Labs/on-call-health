@@ -867,7 +867,7 @@ class UnifiedBurnoutAnalyzer:
                 stats={
                     "members_analyzed": len(team_analysis.get("members", [])) if team_analysis else 0,
                     "members_with_incidents": len([m for m in team_analysis.get("members", []) if m.get('incidents_count', 0) > 0]),
-                    "github_correlated": len([m for m in team_analysis["members"] if m.get('github_activity', {}).get('commits', 0) > 0]),
+                    "github_correlated": len([m for m in team_analysis["members"] if bool(m.get('github_burnout_breakdown'))]),
                     "jira_correlated": len([m for m in team_analysis["members"] if m.get('jira_workload', {}).get('active_tickets', 0) > 0]),
                     "linear_correlated": len([m for m in team_analysis["members"] if m.get('linear_workload', {}).get('active_issues', 0) > 0])
                 }
@@ -1012,7 +1012,8 @@ class UnifiedBurnoutAnalyzer:
                     for member in result.get("team_analysis", {}).get("members", []):
                         github_activity = member.get("github_activity", {})
                         github_indicators = github_activity.get("burnout_indicators", {})
-                        if any(github_indicators.values()):
+                        has_real_github = bool(member.get("github_burnout_breakdown"))
+                        if any(github_indicators.values()) or has_real_github:
                             risk_level = member.get("risk_level", "low")
                             if risk_level in github_members_by_risk:
                                 github_members_by_risk[risk_level] += 1
