@@ -495,7 +495,8 @@ export default function AdminDashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
-        credentials: 'include'
+        credentials: 'include',
+        redirect: 'manual'
       })
 
       if (res.ok) {
@@ -693,7 +694,7 @@ export default function AdminDashboard() {
 
             {/* Tables */}
             <div className="grid grid-cols-1 gap-6">
-              <div className="overflow-x-auto max-h-80 overflow-y-auto">
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <UsersTable users={users} />
               </div>
             </div>
@@ -704,7 +705,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Integrations Table - full width */}
-            <div className="mt-6 overflow-x-auto max-h-80 overflow-y-auto">
+            <div className="mt-6 overflow-x-auto max-h-96 overflow-y-auto">
               <IntegrationsTable integrations={integrations} />
             </div>
           </>
