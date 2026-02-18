@@ -134,13 +134,13 @@ function IntegrationsTable({ integrations }: { integrations: IntegrationItem[] }
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('id')}>ID<SortIcon column="id" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('platform')}>Platform<SortIcon column="platform" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>Name<SortIcon column="name" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('user_email')}>User<SortIcon column="user_email" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('organization_name')}>Organization<SortIcon column="organization_name" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('is_active')}>Status<SortIcon column="is_active" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('created_at')}>Added<SortIcon column="created_at" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('id')}>ID<SortIcon column="id" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('platform')}>Platform<SortIcon column="platform" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>Name<SortIcon column="name" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('user_email')}>User<SortIcon column="user_email" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('organization_name')}>Organization<SortIcon column="organization_name" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('is_active')}>Status<SortIcon column="is_active" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('created_at')}>Added<SortIcon column="created_at" /></th>
               </tr>
             </thead>
             <tbody>
@@ -313,13 +313,13 @@ function UsersTable({ users }: { users: UserItem[] }) {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('id')}>ID< SortIcon column="id" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>Name< SortIcon column="name" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('email')}>Email< SortIcon column="email" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('organization_name')}>Organization< SortIcon column="organization_name" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('role')}>Role< SortIcon column="role" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">OAuth</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('created_at')}>Signed Up< SortIcon column="created_at" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('id')}>ID< SortIcon column="id" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>Name< SortIcon column="name" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('email')}>Email< SortIcon column="email" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('organization_name')}>Organization< SortIcon column="organization_name" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('role')}>Role< SortIcon column="role" /></th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500">OAuth</th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('created_at')}>Signed Up< SortIcon column="created_at" /></th>
               </tr>
             </thead>
             <tbody>
@@ -376,9 +376,9 @@ function RecentSignupsTable({ users }: { users: RecentSignupItem[] }) {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">User</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Email</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Signed Up</th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500">User</th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500">Email</th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500">Signed Up</th>
               </tr>
             </thead>
             <tbody>
@@ -425,11 +425,11 @@ function RecentAnalysesTable({ analyses }: { analyses: RecentAnalysisItem[] }) {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">ID</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">User</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Integration</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Status</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Run At</th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500">ID</th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500">User</th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500">Integration</th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500">Status</th>
+                <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500">Run At</th>
               </tr>
             </thead>
             <tbody>
@@ -693,7 +693,7 @@ export default function AdminDashboard() {
 
             {/* Tables */}
             <div className="grid grid-cols-1 gap-6">
-              <div className="overflow-x-auto max-h-64 overflow-y-auto">
+              <div className="overflow-x-auto max-h-80 overflow-y-auto">
                 <UsersTable users={users} />
               </div>
             </div>
@@ -704,7 +704,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Integrations Table - full width */}
-            <div className="mt-6 overflow-x-auto max-h-64 overflow-y-auto">
+            <div className="mt-6 overflow-x-auto max-h-80 overflow-y-auto">
               <IntegrationsTable integrations={integrations} />
             </div>
           </>
