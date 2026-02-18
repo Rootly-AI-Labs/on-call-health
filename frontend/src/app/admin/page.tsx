@@ -448,6 +448,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<StatsSummary | null>(null)
   const [userTrends, setUserTrends] = useState<TrendDataPoint[]>([])
+  const [syncedUserTrends, setSyncedUserTrends] = useState<TrendDataPoint[]>([])
   const [loginTrends, setLoginTrends] = useState<TrendDataPoint[]>([])
   const [analysisTrends, setAnalysisTrends] = useState<TrendDataPoint[]>([])
   const [users, setUsers] = useState<UserItem[]>([])
@@ -521,13 +522,14 @@ export default function AdminDashboard() {
         }
       }
 
-      const [statsRes, usersRes, recentAnalysesRes, integrationsRes, userTrendsRes, loginTrendsRes, analysisTrendsRes] =
+      const [statsRes, usersRes, recentAnalysesRes, integrationsRes, userTrendsRes, syncedUserTrendsRes, loginTrendsRes, analysisTrendsRes] =
         await Promise.allSettled([
           makeRequest(`${API_BASE}/api/admin/stats/summary`),
           makeRequest(`${API_BASE}/api/admin/stats/users?limit=20`),
           makeRequest(`${API_BASE}/api/admin/stats/recent-analyses?limit=50`),
           makeRequest(`${API_BASE}/api/admin/stats/integrations`),
           makeRequest(`${API_BASE}/api/admin/stats/trends/users?days=30`),
+          makeRequest(`${API_BASE}/api/admin/stats/trends/synced-users?days=30`),
           makeRequest(`${API_BASE}/api/admin/stats/trends/logins?days=30`),
           makeRequest(`${API_BASE}/api/admin/stats/trends/analyses?days=30`),
         ])
@@ -565,6 +567,7 @@ export default function AdminDashboard() {
       const recentAnalysesData = await recentAnalyses.json()
       const integrationsData = await (integrationsRes as any).value.json()
       const userTrendsData = await (userTrendsRes as any).value.json()
+      const syncedUserTrendsData = await (syncedUserTrendsRes as any).value.json()
       const loginTrendsData = await (loginTrendsRes as any).value.json()
       const analysisTrendsData = await (analysisTrendsRes as any).value.json()
 
@@ -574,6 +577,7 @@ export default function AdminDashboard() {
       setIntegrations(integrationsData.integrations)
       setPlatformCounts(integrationsData.platform_counts || {})
       setUserTrends(userTrendsData.trends)
+      setSyncedUserTrends(syncedUserTrendsData.trends)
       setLoginTrends(loginTrendsData.trends)
       setAnalysisTrends(analysisTrendsData.trends)
     } catch (err) {
@@ -661,8 +665,9 @@ export default function AdminDashboard() {
             </div>
 
             {/* Trend Charts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               <TrendChart title="User Signups" data={userTrends} color="#3b82f6" />
+              <TrendChart title="Synced Users" data={syncedUserTrends} color="#10b981" />
               <TrendChart title="Analyses Run" data={analysisTrends} color="#8b5cf6" />
             </div>
 

@@ -756,6 +756,43 @@ async def get_analysis_trends(
     return {"trends": [t.model_dump() for t in trends]}
 
 
+@router.get("/stats/trends/synced-users")
+@admin_rate_limit()
+async def get_synced_users_trends(
+    request: Request,
+    x_admin_api_key: str = Header(None, alias="X-Admin-API-Key"),
+    db: Session = Depends(get_db),
+    days: int = Query(30, ge=7, le=90)
+) -> dict:
+    """
+    Get synced users trends over time for admin dashboard.
+    """
+    client_ip = _get_client_ip(request)
+
+    # No password validation - open access
+
+    from sqlalchemy import func, cast, Date
+
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # Group by date using created_at
+    results = db.query(
+        cast(UserCorrelation.created_at, Date).label('date'),
+        func.count(UserCorrelation.id).label('count')
+    ).filter(
+        UserCorrelation.created_at >= start_date,
+        UserCorrelation.is_active == 1
+    ).group_by(
+        cast(UserCorrelation.created_at, Date)
+    ).order_by(
+        cast(UserCorrelation.created_at, Date)
+    ).all()
+
+    trends = [TrendDataPoint(date=str(r.date), count=r.count) for r in results]
+
+    return {"trends": [t.model_dump() for t in trends]}
+
+
 @router.get("/stats/recent-signups")
 @admin_rate_limit()
 async def get_recent_signups(
