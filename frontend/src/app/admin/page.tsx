@@ -725,9 +725,9 @@ export default function AdminDashboard() {
       const analysisTrendsData = await (analysisTrendsRes as any).value.json()
 
       setStats(statsData)
-      setUsers(usersData.users)
+      setUsers(usersData.users || [])
       setRecentAnalyses(recentAnalysesData.analyses || [])
-      setIntegrations(integrationsData.integrations)
+      setIntegrations(integrationsData.integrations || [])
       setPlatformCounts(integrationsData.platform_counts || {})
       setUserTrends(userTrendsData.trends)
       setSyncedUserTrends(syncedUserTrendsData.trends)
