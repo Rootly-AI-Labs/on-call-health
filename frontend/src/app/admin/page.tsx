@@ -20,6 +20,7 @@ import { Users, FileText, TrendingUp, Loader2 } from "lucide-react"
 
 interface StatsSummary {
   total_users: number
+  total_synced_users: number
   total_organizations: number
   total_analyses: number
   total_api_keys: number
@@ -622,13 +623,19 @@ export default function AdminDashboard() {
         ) : stats ? (
           <>
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
               <StatCard
-                title="Total Users"
+                title="Logged-in Users"
                 value={stats.total_users}
                 subtitle={`+${stats.new_users_last_30_days} this month`}
                 icon={Users}
                 trend={`+${stats.new_users_today} today`}
+              />
+              <StatCard
+                title="Synced Users"
+                value={stats.total_synced_users}
+                subtitle="Team members via integrations"
+                icon={Users}
               />
               <StatCard
                 title="Total Analyses"

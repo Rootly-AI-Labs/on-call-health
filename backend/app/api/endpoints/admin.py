@@ -361,6 +361,7 @@ from pydantic import BaseModel
 class AdminStatsResponse(BaseModel):
     """Response model for admin stats endpoints."""
     total_users: int
+    total_synced_users: int
     total_organizations: int
     total_analyses: int
     total_api_keys: int
@@ -445,6 +446,7 @@ async def get_admin_stats_summary(
 
     # Total counts
     total_users = db.query(User).count()
+    total_synced_users = db.query(UserCorrelation).filter(UserCorrelation.is_active == 1).count()
     total_organizations = db.query(Organization).count()
     total_analyses = db.query(Analysis).count()
     total_api_keys = db.query(APIKey).filter(APIKey.revoked_at.is_(None)).count()
@@ -472,6 +474,7 @@ async def get_admin_stats_summary(
 
     return AdminStatsResponse(
         total_users=total_users,
+        total_synced_users=total_synced_users,
         total_organizations=total_organizations,
         total_analyses=total_analyses,
         total_api_keys=total_api_keys,
