@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-  // Only protect /admin routes
-  if (request.nextUrl.pathname.startsWith('/admin')) {
+  // Only protect /api/admin routes (the actual admin API endpoints)
+  // The /admin page has its own login form
+  if (request.nextUrl.pathname.startsWith('/api/admin')) {
     // Skip if no password configured (allow in dev)
     const adminPassword = process.env.ADMIN_PASSWORD
     if (!adminPassword) {
+      return NextResponse.next()
+    }
+
+    // Skip for localhost development (optional - remove for production)
+    if (request.nextUrl.hostname === 'localhost' || request.nextUrl.hostname === '127.0.0.1') {
       return NextResponse.next()
     }
 
@@ -20,7 +26,6 @@ export function middleware(request: NextRequest) {
           'WWW-Authenticate': 'Basic realm="Admin Area"',
           'Content-Type': 'text/html',
         },
-        // Include a simple login form for browser access
       })
     }
   }
@@ -28,5 +33,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/admin/:path*',
+  matcher: '/api/admin/:path*',
 }
