@@ -332,7 +332,7 @@ function UsersTable({ users }: { users: UserItem[] }) {
                   <td className="py-3 px-4 text-sm">{user.role || "user"}</td>
                   <td className="py-3 px-4 text-sm">
                     {user.oauth_provider ? (
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.oauth_provider === 'google' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.oauth_provider === 'google' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
                         {user.oauth_provider}
                       </span>
                     ) : "-"}
