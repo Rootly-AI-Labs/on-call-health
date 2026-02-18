@@ -675,7 +675,7 @@ function DashboardContent() {
 
               {/* GitHub Integration Connected but No Data Warning */}
               {!currentAnalysis?.config?.is_demo &&
-               integrations.some(i => i.platform === 'github') &&
+               connectedIntegrations.has('github') &&
                (!currentAnalysis?.analysis_data?.github_data ||
                 Object.keys(currentAnalysis.analysis_data.github_data).length === 0) && (
                 <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
