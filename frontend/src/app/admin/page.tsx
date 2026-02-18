@@ -148,7 +148,12 @@ function IntegrationsTable({ integrations }: { integrations: IntegrationItem[] }
                 <tr key={integration.id} className="border-b hover:bg-gray-50">
                   <td className="py-3 px-4 text-sm text-gray-500">{integration.id}</td>
                   <td className="py-3 px-4">
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      integration.platform === 'rootly' ? 'bg-purple-100 text-purple-800' :
+                      integration.platform === 'pagerduty' ? 'bg-green-100 text-green-800' :
+                      integration.platform === 'github' ? 'bg-gray-100 text-gray-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
                       {integration.platform}
                     </span>
                   </td>
@@ -327,7 +332,7 @@ function UsersTable({ users }: { users: UserItem[] }) {
                   <td className="py-3 px-4 text-sm">{user.role || "user"}</td>
                   <td className="py-3 px-4 text-sm">
                     {user.oauth_provider ? (
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.oauth_provider === 'google' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.oauth_provider === 'google' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                         {user.oauth_provider}
                       </span>
                     ) : "-"}
