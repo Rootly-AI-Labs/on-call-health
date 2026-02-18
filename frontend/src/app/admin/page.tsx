@@ -545,7 +545,7 @@ export default function AdminDashboard() {
       const [statsRes, usersRes, recentAnalysesRes, integrationsRes, userTrendsRes, syncedUserTrendsRes, loginTrendsRes, analysisTrendsRes] =
         await Promise.allSettled([
           makeRequest(`${API_BASE}/api/admin/stats/summary`),
-          makeRequest(`${API_BASE}/api/admin/stats/users?limit=20`),
+          makeRequest(`${API_BASE}/api/admin/stats/users?limit=500`),
           makeRequest(`${API_BASE}/api/admin/stats/recent-analyses?limit=50`),
           makeRequest(`${API_BASE}/api/admin/stats/integrations`),
           makeRequest(`${API_BASE}/api/admin/stats/trends/users?days=30`),
@@ -693,7 +693,9 @@ export default function AdminDashboard() {
 
             {/* Tables */}
             <div className="grid grid-cols-1 gap-6">
-              <UsersTable users={users} />
+              <div className="overflow-x-auto">
+                <UsersTable users={users} />
+              </div>
             </div>
 
             {/* Recent Analyses */}
@@ -702,7 +704,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Integrations Table - full width */}
-            <div className="mt-6">
+            <div className="mt-6 overflow-x-auto">
               <IntegrationsTable integrations={integrations} />
             </div>
           </>
