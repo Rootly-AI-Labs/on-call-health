@@ -83,6 +83,17 @@ interface RecentAnalysisItem {
   completed_at: string | null
 }
 
+interface OrganizationBreakdownItem {
+  id: number
+  name: string
+  domain: string | null
+  created_at: string | null
+  user_count: number
+  analysis_count: number
+  has_rootly: boolean
+  has_pagerduty: boolean
+}
+
 function IntegrationsTable({ integrations }: { integrations: IntegrationItem[] }) {
   const [sortBy, setSortBy] = useState<keyof IntegrationItem>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -458,6 +469,120 @@ function RecentAnalysesTable({ analyses }: { analyses: RecentAnalysisItem[] }) {
   )
 }
 
+function OrganizationBreakdownTable({
+  organizations,
+  domainFilter,
+  onDomainFilterChange,
+  loading
+}: {
+  organizations: OrganizationBreakdownItem[]
+  domainFilter: string
+  onDomainFilterChange: (value: string) => void
+  loading: boolean
+}) {
+  const [sortBy, setSortBy] = useState<keyof OrganizationBreakdownItem>('created_at')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
+  const handleSort = (column: keyof OrganizationBreakdownItem) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(column)
+      setSortOrder('desc')
+    }
+  }
+
+  const sortedOrganizations = [...organizations].sort((a, b) => {
+    const aVal = a[sortBy]
+    const bVal = b[sortBy]
+    if (aVal === null || aVal === undefined) return 1
+    if (bVal === null || bVal === undefined) return -1
+    if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1
+    if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1
+    return 0
+  })
+
+  const SortIcon = ({ column }: { column: keyof OrganizationBreakdownItem }) => {
+    if (sortBy !== column) return null
+    return sortOrder === 'asc' ? ' ↑' : ' ↓'
+  }
+
+  return (
+    <Card className="bg-white dark:bg-gray-800">
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold">Organization Breakdown</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4 flex items-center gap-2">
+          <Input
+            type="text"
+            placeholder="Filter by domain (e.g., example.com)"
+            value={domainFilter}
+            onChange={(e) => onDomainFilterChange(e.target.value)}
+            className="max-w-sm"
+          />
+        </div>
+        {loading ? (
+          <div className="flex items-center justify-center h-32">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+          </div>
+        ) : !organizations || organizations.length === 0 ? (
+          <p className="text-gray-500">No organizations found</p>
+        ) : (
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-gray-50">
+                  <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('id')}>ID<SortIcon column="id" /></th>
+                  <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>Name<SortIcon column="name" /></th>
+                  <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('domain')}>Domain<SortIcon column="domain" /></th>
+                  <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('user_count')}>Users<SortIcon column="user_count" /></th>
+                  <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('analysis_count')}>Analyses<SortIcon column="analysis_count" /></th>
+                  <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500">Platform</th>
+                  <th className="sticky top-0 bg-gray-50 text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('created_at')}>Created<SortIcon column="created_at" /></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedOrganizations.map((org) => (
+                  <tr key={org.id} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4 text-sm text-gray-500">{org.id}</td>
+                    <td className="py-3 px-4 font-medium">{org.name || "-"}</td>
+                    <td className="py-3 px-4 text-sm">{org.domain || "-"}</td>
+                    <td className="py-3 px-4 text-sm">{org.user_count}</td>
+                    <td className="py-3 px-4 text-sm">{org.analysis_count}</td>
+                    <td className="py-3 px-4">
+                      <div className="flex gap-1">
+                        {org.has_rootly && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            Rootly
+                          </span>
+                        )}
+                        {org.has_pagerduty && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            PagerDuty
+                          </span>
+                        )}
+                        {!org.has_rootly && !org.has_pagerduty && (
+                          <span className="text-gray-400 text-xs">-</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-sm">
+                      {org.created_at
+                        ? new Date(org.created_at).toLocaleDateString()
+                        : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<StatsSummary | null>(null)
@@ -469,6 +594,9 @@ export default function AdminDashboard() {
   const [recentAnalyses, setRecentAnalyses] = useState<RecentAnalysisItem[]>([])
   const [integrations, setIntegrations] = useState<IntegrationItem[]>([])
   const [platformCounts, setPlatformCounts] = useState<{[key: string]: number}>({})
+  const [organizations, setOrganizations] = useState<OrganizationBreakdownItem[]>([])
+  const [domainFilter, setDomainFilter] = useState("")
+  const [orgLoading, setOrgLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [authenticated, setAuthenticated] = useState(() => {
@@ -605,6 +733,15 @@ export default function AdminDashboard() {
       setSyncedUserTrends(syncedUserTrendsData.trends)
       setLoginTrends(loginTrendsData.trends)
       setAnalysisTrends(analysisTrendsData.trends)
+
+      // Fetch organizations separately (has its own endpoint)
+      try {
+        const orgRes = await makeRequest(`${API_BASE}/api/admin/stats/organizations?limit=100`)
+        const orgData = await orgRes.json()
+        setOrganizations(orgData.organizations || [])
+      } catch (orgErr) {
+        console.error("Failed to fetch organizations:", orgErr)
+      }
     } catch (err) {
       setError(`Failed to load admin data: ${err}`)
       console.error("Admin fetch error:", err)
@@ -616,6 +753,35 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  // Fetch organizations when domain filter changes
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      setOrgLoading(true)
+      try {
+        const domainParam = domainFilter ? `&domain_filter=${encodeURIComponent(domainFilter)}` : ''
+        const res = await fetch(`${API_BASE}/api/admin/stats/organizations?limit=100${domainParam}`, {
+          mode: 'cors',
+          credentials: 'include'
+        })
+        const data = await res.json()
+        setOrganizations(data.organizations || [])
+      } catch (err) {
+        console.error("Failed to fetch organizations:", err)
+      } finally {
+        setOrgLoading(false)
+      }
+    }
+
+    // Only fetch after initial load is complete
+    if (!loading) {
+      fetchOrganizations()
+    }
+  }, [domainFilter, loading])
+
+  const handleDomainFilterChange = (value: string) => {
+    setDomainFilter(value)
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
@@ -704,6 +870,16 @@ export default function AdminDashboard() {
             {/* Recent Analyses */}
             <div className="grid grid-cols-1 gap-6 mt-6">
               <RecentAnalysesTable analyses={recentAnalyses} />
+            </div>
+
+            {/* Organization Breakdown Table - full width */}
+            <div className="mt-6">
+              <OrganizationBreakdownTable
+                organizations={organizations}
+                domainFilter={domainFilter}
+                onDomainFilterChange={handleDomainFilterChange}
+                loading={orgLoading}
+              />
             </div>
 
             {/* Integrations Table - full width */}

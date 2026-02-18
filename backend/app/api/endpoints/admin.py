@@ -841,6 +841,113 @@ async def get_recent_signups(
     }
 
 
+@router.get("/stats/organizations")
+@admin_rate_limit()
+async def get_organization_breakdown(
+    request: Request,
+    x_admin_api_key: str = Header(None, alias="X-Admin-API-Key"),
+    db: Session = Depends(get_db),
+    domain_filter: str = Query(None, description="Filter organizations by domain (e.g., 'example.com')"),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0)
+) -> dict:
+    """
+    Get organization breakdown with user counts, analysis counts, and platform info.
+    Shows which organizations use Rootly or PagerDuty.
+    """
+    from ...models.rootly_integration import RootlyIntegration
+
+    # Base query for organizations
+    org_query = db.query(Organization)
+
+    # Apply domain filter if provided
+    if domain_filter:
+        org_query = org_query.filter(Organization.domain.ilike(f"%{domain_filter}%"))
+
+    # Get total count before pagination
+    total_count = org_query.count()
+
+    # Get organizations with pagination
+    organizations = org_query.order_by(Organization.created_at.desc()).offset(offset).limit(limit).all()
+
+    org_ids = [org.id for org in organizations]
+
+    # Get user counts per organization
+    user_counts = {}
+    if org_ids:
+        user_count_results = db.query(
+            User.organization_id,
+            func.count(User.id).label('count')
+        ).filter(
+            User.organization_id.in_(org_ids),
+            User.is_verified == True
+        ).group_by(User.organization_id).all()
+        user_counts = {oc.organization_id: oc.count for oc in user_count_results}
+
+    # Get analysis counts per organization
+    analysis_counts = {}
+    if org_ids:
+        analysis_count_results = db.query(
+            Analysis.organization_id,
+            func.count(Analysis.id).label('count')
+        ).filter(
+            Analysis.organization_id.in_(org_ids)
+        ).group_by(Analysis.organization_id).all()
+        analysis_counts = {ac.organization_id: ac.count for ac in analysis_count_results}
+
+    # Get Rootly/PagerDuty integrations per organization
+    # Need to join through User to get org_id
+    has_rootly = {}
+    has_pagerduty = {}
+    if org_ids:
+        # Get users in these organizations
+        users_in_orgs = db.query(User.id, User.organization_id).filter(
+            User.organization_id.in_(org_ids)
+        ).all()
+        user_org_map = {u.id: u.organization_id for u in users_in_orgs}
+        user_ids = list(user_org_map.keys())
+
+        if user_ids:
+            # Get integrations for these users
+            integrations = db.query(
+                RootlyIntegration.user_id,
+                RootlyIntegration.platform
+            ).filter(
+                RootlyIntegration.user_id.in_(user_ids),
+                RootlyIntegration.is_active == True
+            ).all()
+
+            for user_id, platform in integrations:
+                org_id = user_org_map.get(user_id)
+                if org_id:
+                    if platform == 'rootly':
+                        has_rootly[org_id] = True
+                    elif platform == 'pagerduty':
+                        has_pagerduty[org_id] = True
+
+    # Build response
+    org_list = []
+    for org in organizations:
+        org_list.append({
+            "id": org.id,
+            "name": org.name,
+            "domain": org.domain,
+            "created_at": org.created_at.isoformat() if org.created_at else None,
+            "user_count": user_counts.get(org.id, 0),
+            "analysis_count": analysis_counts.get(org.id, 0),
+            "has_rootly": has_rootly.get(org.id, False),
+            "has_pagerduty": has_pagerduty.get(org.id, False)
+        })
+
+    return {
+        "organizations": org_list,
+        "total": total_count,
+        "limit": limit,
+        "offset": offset,
+        "domain_filter": domain_filter
+    }
+
+
 @router.get("/stats/recent-analyses")
 @admin_rate_limit()
 async def get_recent_analyses(
