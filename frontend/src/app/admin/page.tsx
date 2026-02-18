@@ -130,7 +130,7 @@ function IntegrationsTable({ integrations }: { integrations: IntegrationItem[] }
         <CardTitle className="text-lg font-semibold">Integrations ({integrations.length})</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50">
@@ -239,8 +239,8 @@ function TrendChart({
             <AreaChart data={data}>
               <defs>
                 <linearGradient id={`gradient-${title}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0} />
+                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -263,7 +263,7 @@ function TrendChart({
               <Area
                 type="monotone"
                 dataKey="count"
-                stroke={color}
+                stroke="#8b5cf6"
                 fillOpacity={1}
                 fill={`url(#gradient-${title})`}
               />
@@ -309,7 +309,7 @@ function UsersTable({ users }: { users: UserItem[] }) {
         <CardTitle className="text-lg font-semibold">All Users ({users.length})</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50">
@@ -332,7 +332,7 @@ function UsersTable({ users }: { users: UserItem[] }) {
                   <td className="py-3 px-4 text-sm">{user.role || "user"}</td>
                   <td className="py-3 px-4 text-sm">
                     {user.oauth_provider ? (
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.oauth_provider === 'google' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.oauth_provider === 'google' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                         {user.oauth_provider}
                       </span>
                     ) : "-"}
@@ -372,7 +372,7 @@ function RecentSignupsTable({ users }: { users: RecentSignupItem[] }) {
         <CardTitle className="text-lg font-semibold">Recent Signups</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50">
@@ -486,31 +486,36 @@ export default function AdminDashboard() {
     setMounted(true)
   }, [])
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handlePasswordSubmit = async () => {
     setError(null)
 
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-        credentials: 'include'
-      })
+    return new Promise<void>((resolve) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${API_BASE}/api/admin/auth/login`, true)
+      xhr.withCredentials = true
+      xhr.setRequestHeader('Content-Type', 'application/json')
 
-      if (res.ok) {
-        setAuthenticated(true)
-        sessionStorage.setItem('admin_auth', 'true')
-      } else {
+      xhr.onload = function() {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setAuthenticated(true)
+          sessionStorage.setItem('admin_auth', 'true')
+        } else {
+          setError("Invalid password")
+          setShake(true)
+          setTimeout(() => setShake(false), 500)
+        }
+        resolve()
+      }
+
+      xhr.onerror = function() {
         setError("Invalid password")
         setShake(true)
         setTimeout(() => setShake(false), 500)
+        resolve()
       }
-    } catch {
-      setError("Invalid password")
-      setShake(true)
-      setTimeout(() => setShake(false), 500)
-    }
+
+      xhr.send(JSON.stringify({ password }))
+    })
   }
 
   // No auth needed
@@ -627,7 +632,7 @@ export default function AdminDashboard() {
               <CardTitle>Admin Password Required</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handlePasswordSubmit}>
+              <form onSubmit={(e) => { e.preventDefault(); handlePasswordSubmit(); }}>
                 <Input
                   type="password"
                   placeholder="Enter admin password"
@@ -693,9 +698,7 @@ export default function AdminDashboard() {
 
             {/* Tables */}
             <div className="grid grid-cols-1 gap-6">
-              <div className="overflow-x-auto max-h-80 overflow-y-auto">
-                <UsersTable users={users} />
-              </div>
+              <UsersTable users={users} />
             </div>
 
             {/* Recent Analyses */}
@@ -704,7 +707,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Integrations Table - full width */}
-            <div className="mt-6 overflow-x-auto max-h-80 overflow-y-auto">
+            <div className="mt-6">
               <IntegrationsTable integrations={integrations} />
             </div>
           </>
