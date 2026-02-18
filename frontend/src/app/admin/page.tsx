@@ -50,6 +50,7 @@ interface UserItem {
   created_at: string
   last_login: string | null
   role: string
+  oauth_provider: string | null
 }
 
 interface IntegrationItem {
@@ -312,6 +313,7 @@ function UsersTable({ users }: { users: UserItem[] }) {
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('email')}>Email< SortIcon column="email" /></th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('organization_name')}>Organization< SortIcon column="organization_name" /></th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('role')}>Role< SortIcon column="role" /></th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">OAuth</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('created_at')}>Signed Up< SortIcon column="created_at" /></th>
               </tr>
             </thead>
@@ -323,6 +325,13 @@ function UsersTable({ users }: { users: UserItem[] }) {
                   <td className="py-3 px-4 text-sm">{user.email}</td>
                   <td className="py-3 px-4 text-sm">{user.organization_name || "-"}</td>
                   <td className="py-3 px-4 text-sm">{user.role || "user"}</td>
+                  <td className="py-3 px-4 text-sm">
+                    {user.oauth_provider ? (
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.oauth_provider === 'google' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {user.oauth_provider}
+                      </span>
+                    ) : "-"}
+                  </td>
                   <td className="py-3 px-4 text-sm">
                     {user.created_at
                       ? new Date(user.created_at).toLocaleDateString()
