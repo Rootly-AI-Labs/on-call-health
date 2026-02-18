@@ -665,12 +665,13 @@ async def get_user_trends(
 
     start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # Group by date
+    # Group by date - only verified users (OAuth'd)
     results = db.query(
         cast(User.created_at, Date).label('date'),
         func.count(User.id).label('count')
     ).filter(
-        User.created_at >= start_date
+        User.created_at >= start_date,
+        User.is_verified == True
     ).group_by(
         cast(User.created_at, Date)
     ).order_by(
