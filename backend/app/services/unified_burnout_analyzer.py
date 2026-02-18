@@ -63,6 +63,12 @@ BUSINESS_HOURS_END = settings.BUSINESS_HOURS_END
 LATE_NIGHT_START = settings.LATE_NIGHT_START
 LATE_NIGHT_END = settings.LATE_NIGHT_END
 
+# Adjustable impact factor for after-hours GitHub activity on risk level score.
+# Range: 0.0 (no after-hours contribution) to 1.0 (full contribution).
+# At 1.0: >30% after-hours ratio adds up to 3.0 exhaustion points (on 0-10 scale).
+# At 0.5: >30% after-hours ratio adds up to 1.5 exhaustion points.
+AFTER_HOURS_RISK_IMPACT_FACTOR = 0.5
+
 
 class UnifiedBurnoutAnalyzer:
     """
@@ -649,8 +655,8 @@ class UnifiedBurnoutAnalyzer:
 
                                     logger.info(f"UNIFIED ANALYZER: Collected Jira data for {len(jira_data)} users")
                                     # Log aggregate stats instead of user keys
-                                    total_issues = sum(user_data.get('jira', {}).get('total_tickets', 0) for user_data in jira_data.values())
-                                    users_with_issues = sum(1 for user_data in jira_data.values() if user_data.get('jira', {}).get('total_tickets', 0) > 0)
+                                    total_issues = sum((user_data or {}).get('jira', {}).get('total_tickets', 0) for user_data in jira_data.values())
+                                    users_with_issues = sum(1 for user_data in jira_data.values() if (user_data or {}).get('jira', {}).get('total_tickets', 0) > 0)
                                     logger.info(f"Jira data summary: {users_with_issues}/{len(jira_data)} users with issues, {total_issues} total tickets")
                                 else:
                                     logger.warning(f"No Jira integration or cloud_id found for user {user_id}")
@@ -773,7 +779,7 @@ class UnifiedBurnoutAnalyzer:
                 
                 # GITHUB BURNOUT ADJUSTMENT: Recalculate burnout scores using GitHub data
                 logger.info(f"GITHUB BURNOUT: Recalculating scores with GitHub activity data")
-                team_analysis["members"] = self._recalculate_burnout_with_github(team_analysis["members"], metadata)
+                team_analysis["members"] = self._recalculate_burnout_with_github(team_analysis["members"], metadata, github_data)
 
             # JIRA OCH ADJUSTMENT: Update OCH scores using Jira ticket workload
             if self.features['jira'] and self.current_user_id:
@@ -861,7 +867,7 @@ class UnifiedBurnoutAnalyzer:
                 stats={
                     "members_analyzed": len(team_analysis.get("members", [])) if team_analysis else 0,
                     "members_with_incidents": len([m for m in team_analysis.get("members", []) if m.get('incidents_count', 0) > 0]),
-                    "github_correlated": len([m for m in team_analysis["members"] if m.get('github_activity', {}).get('commits', 0) > 0]),
+                    "github_correlated": len([m for m in team_analysis["members"] if bool(m.get('github_burnout_breakdown'))]),
                     "jira_correlated": len([m for m in team_analysis["members"] if m.get('jira_workload', {}).get('active_tickets', 0) > 0]),
                     "linear_correlated": len([m for m in team_analysis["members"] if m.get('linear_workload', {}).get('active_issues', 0) > 0])
                 }
@@ -922,8 +928,8 @@ class UnifiedBurnoutAnalyzer:
             )
 
             # Calculate period summary for consistent UI display
-            team_overall_score = team_health.get("overall_score", 0.0)  # This is already health scale 0-10
-            period_average_score = team_overall_score * 10  # Convert to percentage scale 0-100
+            team_overall_score = team_health.get("overall_score", 0.0)  # Already on 0-100 scale
+            period_average_score = team_overall_score  # No conversion needed
             
             logger.info(f"Period summary calculation: team_overall_score={team_overall_score}, period_average_score={period_average_score}")
             logger.info(f"Team health keys: {list(team_health.keys()) if team_health else 'None'}")
@@ -1006,7 +1012,8 @@ class UnifiedBurnoutAnalyzer:
                     for member in result.get("team_analysis", {}).get("members", []):
                         github_activity = member.get("github_activity", {})
                         github_indicators = github_activity.get("burnout_indicators", {})
-                        if any(github_indicators.values()):
+                        has_real_github = bool(member.get("github_burnout_breakdown"))
+                        if any(github_indicators.values()) or has_real_github:
                             risk_level = member.get("risk_level", "low")
                             if risk_level in github_members_by_risk:
                                 github_members_by_risk[risk_level] += 1
@@ -4825,88 +4832,140 @@ class UnifiedBurnoutAnalyzer:
         else:
             return "critical"
     
-    def _recalculate_burnout_with_github(self, members: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _recalculate_burnout_with_github(
+        self,
+        members: List[Dict[str, Any]],
+        metadata: Dict[str, Any],
+        github_data_by_email: Optional[Dict[str, Dict]] = None
+    ) -> List[Dict[str, Any]]:
         """
         Recalculate burnout scores incorporating GitHub activity data.
         This handles users with 0 incidents but significant GitHub activity.
+
+        Prefers real collected github_data (from enhanced_github_collector) over
+        stub data from the correlation service, which only has data_points estimates.
+        After-hours contribution is scaled by AFTER_HOURS_RISK_IMPACT_FACTOR.
         """
         try:
             updated_members = []
             github_adjustments_made = 0
-            
+
             for member in members:
                 if not isinstance(member, dict):
                     updated_members.append(member)
                     continue
-                
+
                 # Get current burnout info
                 current_score = member.get("health_score", 0)
                 incident_count = member.get("incident_count", 0)
+                email = member.get("user_email", "")
+
+                # Prefer real collected data over stub data from correlation service
+                real_data = github_data_by_email.get(email) if github_data_by_email and email else None
                 github_activity = member.get("github_activity", {})
-                
-                # Extract GitHub metrics (even if no activity to properly set score_source)
-                commits_count = github_activity.get("commits_count", 0) if github_activity else 0
-                commits_per_week = github_activity.get("commits_per_week", 0) if github_activity else 0
-                after_hours_commits = github_activity.get("after_hours_commits", 0) if github_activity else 0
-                weekend_commits = github_activity.get("weekend_commits", 0) if github_activity else 0
+
+                if real_data:
+                    # Use real data from enhanced_github_collector
+                    commits_list = real_data.get("commits", [])
+                    commits_count = len(commits_list)
+                    after_hours_commits = real_data.get("after_hours_commits", 0) or 0
+                    weekend_commits = real_data.get("weekend_commits", 0) or 0
+                    has_github_username = real_data.get("username") or github_activity.get("username") if github_activity else real_data.get("username")
+                    days_analyzed = metadata.get("days_analyzed", 30)
+                    weeks = max(days_analyzed / 7.0, 1)
+                    commits_per_week = round(commits_count / weeks, 2)
+                    logger.debug(
+                        f"[GITHUB_BURNOUT] Using real data for {email}: "
+                        f"{commits_count} commits, {after_hours_commits} after-hours ({round(after_hours_commits/max(commits_count,1)*100)}%)"
+                    )
+                else:
+                    # Fall back to stub data from correlation service
+                    commits_count = github_activity.get("commits_count", 0) if github_activity else 0
+                    commits_per_week = github_activity.get("commits_per_week", 0) if github_activity else 0
+                    after_hours_commits = github_activity.get("after_hours_commits", 0) if github_activity else 0
+                    weekend_commits = github_activity.get("weekend_commits", 0) if github_activity else 0
+                    has_github_username = github_activity.get("username") if github_activity else None
 
                 # Ensure None values are converted to 0 to prevent NoneType errors
                 commits_count = commits_count if commits_count is not None else 0
                 commits_per_week = commits_per_week if commits_per_week is not None else 0
                 after_hours_commits = after_hours_commits if after_hours_commits is not None else 0
                 weekend_commits = weekend_commits if weekend_commits is not None else 0
-                has_github_username = github_activity.get("username") if github_activity else None
 
-                # FALLBACK: Calculate commits_per_week from commits_count if missing
-                # This handles older analyses where commits_per_week wasn't stored
+                # FALLBACK: Calculate commits_per_week from commits_count if still missing
                 if commits_per_week == 0 and commits_count > 0:
-                    # Assume standard 30-day analysis period
                     days_analyzed = metadata.get("days_analyzed", 30)
                     weeks = days_analyzed / 7.0
                     commits_per_week = round(commits_count / weeks, 2) if weeks > 0 else 0
-                    logger.info(f"Calculated commits_per_week for {member.get('user_email')}: {commits_per_week} ({commits_count} commits / {weeks:.1f} weeks)")
+                    logger.info(f"Calculated commits_per_week for {email}: {commits_per_week} ({commits_count} commits / {weeks:.1f} weeks)")
                 
-                # Calculate GitHub-based burnout score (even if 0 to determine score_source properly)
+                # Compute after-hours percentage before it's used in logs or breakdown
+                after_hours_pct = round(after_hours_commits / max(commits_count, 1) * 100, 1) if commits_count > 0 else 0.0
+
+                # Calculate GitHub-based burnout score (0-10 internal scale)
                 github_burnout_score = 0.0
                 if has_github_username and (commits_count > 0 or commits_per_week > 0):
                     github_burnout_score = self._calculate_github_burnout_score(
                         commits_count, commits_per_week, after_hours_commits, weekend_commits
                     )
-                
-                # Determine final burnout score based on available data
-                final_score = current_score  # Default to current score
-                score_source = "incident_based"  # Default score source
-                
+
+                # Scale to 0-100 to match och_score (what the UI Risk Level card displays)
+                github_och_score = round(min(100.0, github_burnout_score * 10), 2)
+                current_och = member.get("och_score", 0) or 0
+
+                # Determine final scores based on available data
+                final_score = current_score          # health_score (0-10)
+                final_och_score = current_och        # och_score (0-100, shown in UI)
+                score_source = "incident_based"
+
                 if incident_count == 0 and github_burnout_score > 0:
-                    # User has no incidents but GitHub activity - use GitHub score
+                    # No incidents but GitHub activity → GitHub drives the score entirely
                     final_score = github_burnout_score
+                    final_och_score = github_och_score
                     score_source = "github_based"
                     github_adjustments_made += 1
+                    logger.info(
+                        f"[GITHUB_BURNOUT] {email}: github_only "
+                        f"health={round(final_score,2)}/10  och={round(final_och_score,1)}/100 "
+                        f"(commits={commits_count}, after_hours={after_hours_pct}%, factor={AFTER_HOURS_RISK_IMPACT_FACTOR})"
+                    )
                 elif incident_count > 0 and github_burnout_score > 0:
-                    # User has both incidents and GitHub activity - combine scores
-                    # Weight: 70% incident-based, 30% GitHub-based for users with incidents
+                    # Both incidents and GitHub → blend 70/30
                     final_score = (current_score * 0.7) + (github_burnout_score * 0.3)
+                    final_och_score = round((current_och * 0.7) + (github_och_score * 0.3), 2)
                     score_source = "hybrid"
                     github_adjustments_made += 1
+                    logger.info(
+                        f"[GITHUB_BURNOUT] {email}: hybrid "
+                        f"health={round(final_score,2)}/10  och={round(final_och_score,1)}/100 "
+                        f"(incident_och={round(current_och,1)}, github_och={round(github_och_score,1)}, "
+                        f"after_hours={after_hours_pct}%, factor={AFTER_HOURS_RISK_IMPACT_FACTOR})"
+                    )
                 elif incident_count == 0 and github_burnout_score == 0:
-                    # User has no incidents and no GitHub activity
-                    score_source = "incident_based"  # Keep as incident_based since that's the baseline
-                
-                # Update member with new score
+                    score_source = "incident_based"
+
+                # Update member with new scores
                 updated_member = member.copy()
                 updated_member["health_score"] = round(final_score, 2)
+                updated_member["och_score"] = round(final_och_score, 2)
                 updated_member["risk_level"] = self._determine_risk_level(final_score)
-                
+
                 # Add GitHub burnout breakdown for transparency
                 updated_member["github_burnout_breakdown"] = {
                     "github_score": round(github_burnout_score, 2),
+                    "github_och_score": round(github_och_score, 2),
                     "original_score": round(current_score, 2),
+                    "original_och_score": round(current_och, 2),
                     "final_score": round(final_score, 2),
+                    "final_och_score": round(final_och_score, 2),
                     "score_source": score_source,
+                    "data_source": "real_collected" if real_data else "correlation_stub",
+                    "after_hours_pct": after_hours_pct,
+                    "after_hours_impact_factor": AFTER_HOURS_RISK_IMPACT_FACTOR,
                     "github_indicators": {
                         "high_commit_volume": commits_per_week > 25,
                         "excessive_commits": commits_per_week > 50,
-                        "after_hours_work": (after_hours_commits / max(commits_count, 1)) > 0.15 if commits_count and commits_count > 0 and after_hours_commits is not None else False,
+                        "after_hours_work": after_hours_pct > 15,
                         "weekend_work": (weekend_commits / max(commits_count, 1)) > 0.10 if commits_count and commits_count > 0 and weekend_commits is not None else False
                     }
                 }
@@ -5717,16 +5776,16 @@ class UnifiedBurnoutAnalyzer:
             elif commits_per_week >= 15:  # Above average
                 exhaustion_score += 1.5
             
-            # After-hours work patterns
+            # After-hours work patterns — contribution scaled by AFTER_HOURS_RISK_IMPACT_FACTOR
             if commits_count and commits_count > 0 and after_hours_commits is not None:
                 after_hours_ratio = (after_hours_commits or 0) / commits_count
                 if after_hours_ratio > 0.30:  # >30% after hours
-                    exhaustion_score += 3.0
+                    exhaustion_score += 3.0 * AFTER_HOURS_RISK_IMPACT_FACTOR
                 elif after_hours_ratio > 0.15:  # >15% after hours
-                    exhaustion_score += 1.5
+                    exhaustion_score += 1.5 * AFTER_HOURS_RISK_IMPACT_FACTOR
                 elif after_hours_ratio > 0.05:  # >5% after hours
-                    exhaustion_score += 0.5
-                
+                    exhaustion_score += 0.5 * AFTER_HOURS_RISK_IMPACT_FACTOR
+
                 # Weekend work patterns
                 if weekend_commits is not None:
                     weekend_ratio = (weekend_commits or 0) / commits_count

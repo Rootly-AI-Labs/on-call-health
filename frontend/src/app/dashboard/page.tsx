@@ -237,7 +237,7 @@ function DashboardContent() {
     // Create a temporary element to use browser's HTML parsing for safe text extraction
     const temp = document.createElement('div')
     temp.textContent = str
-    return temp.innerHTML
+    return temp.textContent ?? ''
   }
 
   // Helper function to check if run analysis button should be disabled
@@ -669,6 +669,31 @@ function DashboardContent() {
                         Connect Integrations →
                       </a>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* GitHub Integration Connected but No Data Warning */}
+              {!currentAnalysis?.config?.is_demo &&
+               connectedIntegrations.has('github') &&
+               !currentAnalysis?.analysis_data?.data_sources?.github_data && (
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-3">
+                      <Info className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <p className="text-blue-900 font-semibold">No GitHub Data Available</p>
+                        <p className="text-blue-700 text-sm">
+                          Sync members in the Management page to link GitHub accounts with your team.
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href="/management"
+                      className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Sync Members →
+                    </a>
                   </div>
                 </div>
               )}
