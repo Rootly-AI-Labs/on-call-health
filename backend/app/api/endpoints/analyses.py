@@ -3174,6 +3174,7 @@ async def run_analysis_task(
             organization_name=organization_name,
             synced_users=synced_users,  # Pass synced users from Team Sync
             current_user_id=user_id,  # Pass the current user ID for Jira integration lookup
+            organization_id=user.organization_id if user else None,  # Pass org_id for GitHub pre-filter scoping
             db=db  # Reuse DB session to prevent connection pool exhaustion
         )
         logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}, current_user_id={user_id}")
