@@ -237,7 +237,7 @@ function DashboardContent() {
     // Create a temporary element to use browser's HTML parsing for safe text extraction
     const temp = document.createElement('div')
     temp.textContent = str
-    return temp.innerHTML
+    return temp.textContent ?? ''
   }
 
   // Helper function to check if run analysis button should be disabled
@@ -676,8 +676,7 @@ function DashboardContent() {
               {/* GitHub Integration Connected but No Data Warning */}
               {!currentAnalysis?.config?.is_demo &&
                connectedIntegrations.has('github') &&
-               (!currentAnalysis?.analysis_data?.github_data ||
-                Object.keys(currentAnalysis.analysis_data.github_data).length === 0) && (
+               !currentAnalysis?.analysis_data?.data_sources?.github_data && (
                 <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between flex-wrap gap-4">
                     <div className="flex items-center gap-3">

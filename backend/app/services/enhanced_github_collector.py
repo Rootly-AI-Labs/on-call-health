@@ -63,7 +63,7 @@ async def collect_team_github_data_with_mapping(
         # Reuse passed db session or create new one if not provided/invalid
         session_to_use = db
         should_close = False
-        if session_to_use is None or not session_to_use.is_active:
+        if session_to_use is None:
             from ..models import SessionLocal
             session_to_use = SessionLocal()
             should_close = True

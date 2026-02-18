@@ -215,16 +215,13 @@ class GitHubCollector:
             GitHub username if found, None otherwise
         """
         try:
-            # Convert user_id to int if it's a string
-            if isinstance(user_id, str):
+            # Convert user_id to int if it's not already
+            if not isinstance(user_id, int):
                 try:
                     user_id = int(user_id)
                 except (ValueError, TypeError):
                     logger.warning(f"⚠️ [SYNCED_CHECK] Invalid user_id type: {type(user_id).__name__}: {user_id}")
                     return None
-            elif not isinstance(user_id, int):
-                logger.warning(f"⚠️ [SYNCED_CHECK] Invalid user_id type: {type(user_id).__name__}: {user_id}")
-                return None
 
             logger.debug(f"🔍 [SYNCED_CHECK] Querying user_correlations for email: {email}")
 
