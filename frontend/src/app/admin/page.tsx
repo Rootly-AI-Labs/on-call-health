@@ -693,7 +693,7 @@ export default function AdminDashboard() {
 
             {/* Tables */}
             <div className="grid grid-cols-1 gap-6">
-              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+              <div className="overflow-x-auto max-h-64 overflow-y-auto">
                 <UsersTable users={users} />
               </div>
             </div>
@@ -704,7 +704,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Integrations Table - full width */}
-            <div className="mt-6 overflow-x-auto max-h-48">
+            <div className="mt-6 overflow-x-auto max-h-64 overflow-y-auto">
               <IntegrationsTable integrations={integrations} />
             </div>
           </>
