@@ -486,43 +486,36 @@ export default function AdminDashboard() {
     setMounted(true)
   }, [])
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handlePasswordSubmit = async () => {
     setError(null)
 
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-        credentials: 'include',
-        redirect: 'manual'
-      })
+    return new Promise<void>((resolve) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${API_BASE}/api/admin/auth/login`, true)
+      xhr.withCredentials = true
+      xhr.setRequestHeader('Content-Type', 'application/json')
 
-      // With redirect: 'manual', 3xx responses become opaque (type: 'opaqueredirect')
-      if (res.type === 'opaqueredirect') {
+      xhr.onload = function() {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setAuthenticated(true)
+          sessionStorage.setItem('admin_auth', 'true')
+        } else {
+          setError("Invalid password")
+          setShake(true)
+          setTimeout(() => setShake(false), 500)
+        }
+        resolve()
+      }
+
+      xhr.onerror = function() {
         setError("Invalid password")
         setShake(true)
         setTimeout(() => setShake(false), 500)
-        return
+        resolve()
       }
 
-      if (res.ok) {
-        setAuthenticated(true)
-        sessionStorage.setItem('admin_auth', 'true')
-      } else {
-        setError("Invalid password")
-        setShake(true)
-        setTimeout(() => setShake(false), 500)
-      }
-    } catch {
-      setError("Invalid password")
-      setShake(true)
-      setTimeout(() => setShake(false), 500)
-    }
-
-    return false
+      xhr.send(JSON.stringify({ password }))
+    })
   }
 
   // No auth needed
@@ -639,7 +632,7 @@ export default function AdminDashboard() {
               <CardTitle>Admin Password Required</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handlePasswordSubmit}>
+              <form onSubmit={(e) => { e.preventDefault(); handlePasswordSubmit(); }}>
                 <Input
                   type="password"
                   placeholder="Enter admin password"
