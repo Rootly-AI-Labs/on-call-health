@@ -388,6 +388,7 @@ class UserStatsItem(BaseModel):
     created_at: str
     last_login: Optional[str]
     role: str
+    oauth_provider: Optional[str]
 
 
 class APIKeyStatsItem(BaseModel):
@@ -529,6 +530,17 @@ async def get_admin_users(
 
     total_count = db.query(User).filter(User.is_verified == True).count()
 
+    # Get OAuth providers for these users
+    user_ids = [u.id for u, _ in users]
+    oauth_providers = {}
+    if user_ids:
+        provider_records = db.query(OAuthProvider.user_id, OAuthProvider.provider).filter(
+            OAuthProvider.user_id.in_(user_ids)
+        ).all()
+        for user_id, provider in provider_records:
+            if user_id not in oauth_providers:
+                oauth_providers[user_id] = provider
+
     user_list = []
     for user, org_name in users:
         user_list.append(UserStatsItem(
@@ -538,7 +550,8 @@ async def get_admin_users(
             organization_name=org_name,
             created_at=user.created_at.isoformat() if user.created_at else "",
             last_login=user.last_active_at.isoformat() if user.last_active_at else None,
-            role=user.role
+            role=user.role,
+            oauth_provider=oauth_providers.get(user.id)
         ))
 
     return {
