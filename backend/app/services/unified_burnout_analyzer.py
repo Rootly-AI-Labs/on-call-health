@@ -1010,7 +1010,7 @@ class UnifiedBurnoutAnalyzer:
                     github_members_details = []
 
                     for member in result.get("team_analysis", {}).get("members", []):
-                        github_activity = member.get("github_activity", {})
+                        github_activity = member.get("github_activity") or {}
                         github_indicators = github_activity.get("burnout_indicators", {})
                         has_real_github = bool(member.get("github_burnout_breakdown"))
                         if any(github_indicators.values()) or has_real_github:
@@ -1713,9 +1713,10 @@ class UnifiedBurnoutAnalyzer:
                     "weekend_percentage": 0,
                     "avg_response_time_minutes": 0,
                     "severity_distribution": {}
-                }
+                },
+                "github_activity": github_data.get("activity_data") if github_data and github_data.get("activity_data") else None,
             }
-        
+
         # Calculate base metrics from incidents and GitHub data
         days_analyzed = metadata.get("days_analyzed") or 30
         user_tz = self.user_tz_by_id.get(str(user_id), "UTC")
@@ -4868,8 +4869,9 @@ class UnifiedBurnoutAnalyzer:
                     # Use real data from enhanced_github_collector
                     commits_list = real_data.get("commits", [])
                     commits_count = len(commits_list)
-                    after_hours_commits = real_data.get("after_hours_commits", 0) or 0
-                    weekend_commits = real_data.get("weekend_commits", 0) or 0
+                    activity_data = real_data.get("activity_data", {})
+                    after_hours_commits = activity_data.get("after_hours_commits", 0) or 0
+                    weekend_commits = activity_data.get("weekend_commits", 0) or 0
                     has_github_username = real_data.get("username") or github_activity.get("username") if github_activity else real_data.get("username")
                     days_analyzed = metadata.get("days_analyzed", 30)
                     weeks = max(days_analyzed / 7.0, 1)
