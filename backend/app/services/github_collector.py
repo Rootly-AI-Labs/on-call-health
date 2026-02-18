@@ -644,9 +644,13 @@ class GitHubCollector:
                 # Get organizations the token has access to (cached)
                 accessible_orgs = await self.get_accessible_orgs(github_token)
 
-                # Build org filters based on token's access
+                # Build org filters based on token's access.
+                # IMPORTANT: Use space " " as separator (not "+"). When the query is passed
+                # via aiohttp params dict, aiohttp URL-encodes "+" as "%2B", which makes
+                # org filters invalid and causes GitHub to return 422. Spaces are correctly
+                # encoded as "+" by aiohttp, which GitHub interprets as the query separator.
                 if accessible_orgs:  # Non-empty list
-                    org_filters = "+".join([f"org:{org}" for org in accessible_orgs])
+                    org_filters = " ".join([f"org:{org}" for org in accessible_orgs])
                     query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')} {org_filters}"
                 elif accessible_orgs is not None:  # Empty list but API succeeded
                     logger.info(f"User has no organization memberships - searching all repos for {username}")
