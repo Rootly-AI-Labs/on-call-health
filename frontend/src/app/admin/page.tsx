@@ -130,7 +130,7 @@ function IntegrationsTable({ integrations }: { integrations: IntegrationItem[] }
         <CardTitle className="text-lg font-semibold">Integrations ({integrations.length})</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50">
@@ -239,8 +239,8 @@ function TrendChart({
             <AreaChart data={data}>
               <defs>
                 <linearGradient id={`gradient-${title}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0} />
+                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -263,7 +263,7 @@ function TrendChart({
               <Area
                 type="monotone"
                 dataKey="count"
-                stroke={color}
+                stroke="#8b5cf6"
                 fillOpacity={1}
                 fill={`url(#gradient-${title})`}
               />
@@ -309,7 +309,7 @@ function UsersTable({ users }: { users: UserItem[] }) {
         <CardTitle className="text-lg font-semibold">All Users ({users.length})</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50">
@@ -372,7 +372,7 @@ function RecentSignupsTable({ users }: { users: RecentSignupItem[] }) {
         <CardTitle className="text-lg font-semibold">Recent Signups</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50">
@@ -694,9 +694,7 @@ export default function AdminDashboard() {
 
             {/* Tables */}
             <div className="grid grid-cols-1 gap-6">
-              <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                <UsersTable users={users} />
-              </div>
+              <UsersTable users={users} />
             </div>
 
             {/* Recent Analyses */}
@@ -705,7 +703,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Integrations Table - full width */}
-            <div className="mt-6 overflow-x-auto max-h-96 overflow-y-auto">
+            <div className="mt-6">
               <IntegrationsTable integrations={integrations} />
             </div>
           </>
