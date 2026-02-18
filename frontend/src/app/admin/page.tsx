@@ -488,6 +488,7 @@ export default function AdminDashboard() {
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     setError(null)
 
     try {
@@ -498,6 +499,14 @@ export default function AdminDashboard() {
         credentials: 'include',
         redirect: 'manual'
       })
+
+      // With redirect: 'manual', 3xx responses become opaque (type: 'opaqueredirect')
+      if (res.type === 'opaqueredirect') {
+        setError("Invalid password")
+        setShake(true)
+        setTimeout(() => setShake(false), 500)
+        return
+      }
 
       if (res.ok) {
         setAuthenticated(true)
@@ -512,6 +521,8 @@ export default function AdminDashboard() {
       setShake(true)
       setTimeout(() => setShake(false), 500)
     }
+
+    return false
   }
 
   // No auth needed
