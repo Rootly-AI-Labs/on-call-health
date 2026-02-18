@@ -458,17 +458,31 @@ export default function AdminDashboard() {
   const [shake, setShake] = useState(false)
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-  const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "showmethedata"
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (password === ADMIN_PASSWORD) {
-      setAuthenticated(true)
-    } else {
+    setError(null)
+
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+        credentials: 'include'
+      })
+
+      if (res.ok) {
+        setAuthenticated(true)
+      } else {
+        setError("Invalid password")
+        setShake(true)
+        setTimeout(() => setShake(false), 500)
+      }
+    } catch {
       setError("Invalid password")
       setShake(true)
       setTimeout(() => setShake(false), 500)
