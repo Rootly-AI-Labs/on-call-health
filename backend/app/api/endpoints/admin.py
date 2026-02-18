@@ -123,6 +123,25 @@ _ip_whitelist = _parse_ip_whitelist()
 logger.info("SECURITY: Admin IP whitelist check disabled")
 
 
+@router.post("/auth/login")
+async def admin_login(
+    request: Request,
+    body: dict = None
+) -> dict:
+    """Admin login endpoint - validates password and returns session token."""
+    if not body or "password" not in body:
+        raise HTTPException(status_code=400, detail="Password required")
+
+    password = body["password"]
+
+    # Validate password server-side
+    if not _validate_password(password):
+        raise HTTPException(status_code=401, detail="Invalid password")
+
+    # Return success - frontend stores this in session
+    return {"authenticated": True, "expires": "24h"}
+
+
 @router.post("/refresh-demo-analyses")
 @admin_rate_limit()
 async def refresh_demo_analyses(
