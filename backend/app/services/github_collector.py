@@ -646,7 +646,7 @@ class GitHubCollector:
 
                 # Build org filters based on token's access
                 if accessible_orgs:  # Non-empty list
-                    org_filters = "+".join([f"org:{org}" for org in accessible_orgs])
+                    org_filters = " ".join([f"org:{org}" for org in accessible_orgs])
                     query = f"author:{username} author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')} {org_filters}"
                 elif accessible_orgs is not None:  # Empty list but API succeeded
                     logger.info(f"User has no organization memberships - searching all repos for {username}")
