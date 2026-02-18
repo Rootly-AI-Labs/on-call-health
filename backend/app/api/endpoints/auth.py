@@ -163,6 +163,12 @@ async def google_login(request: Request, redirect_origin: str = Query(None)):
         state = redirect_origin
     
     authorization_url = google_oauth.get_authorization_url(state=state)
+
+    # If browser navigation (e.g. link from external site), redirect directly
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and "application/json" not in accept:
+        return RedirectResponse(url=authorization_url)
+
     return {"authorization_url": authorization_url}
 
 @router.get("/google/callback")
@@ -178,7 +184,7 @@ async def google_callback(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="Google OAuth not configured"
         )
-    
+
     # Handle user cancellation
     if error:
         if error == "access_denied":
@@ -189,8 +195,9 @@ async def google_callback(
             error_url = build_error_redirect(settings.FRONTEND_URL, f'OAuth error: {error}')
             return RedirectResponse(url=error_url)
 
-    # No code means user canceled without error parameter
+    # Validate state parameter to prevent session replay
     if not code:
+        logger.warning("Google OAuth callback received without authorization code")
         return RedirectResponse(url=settings.FRONTEND_URL)
 
     try:
@@ -288,6 +295,12 @@ async def github_login(request: Request, redirect_origin: str = Query(None)):
         state = redirect_origin
     
     authorization_url = github_oauth.get_authorization_url(state=state)
+
+    # If browser navigation (e.g. link from external site), redirect directly
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and "application/json" not in accept:
+        return RedirectResponse(url=authorization_url)
+
     return {"authorization_url": authorization_url}
 
 @router.get("/github/callback")

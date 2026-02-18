@@ -60,7 +60,7 @@ export function AIInsightsModal({ isOpen, onClose, currentAnalysis }: AIInsights
                 variant="outline"
                 size="sm"
                 onClick={handleCopy}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 mr-8"
               >
                 {copied ? (
                   <>

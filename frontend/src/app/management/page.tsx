@@ -1692,12 +1692,6 @@ function TeamPageContent() {
               )}
               </div>
           )}
-
-          {!selectedOrganization && !loadingIntegrations && (
-            <div className="flex items-center justify-center h-96">
-              <p className="text-neutral-600">Please select an organization to view users</p>
-            </div>
-          )}
             </div>  {/* Close max-w-4xl mx-auto */}
           </div>  {/* Close p-6 lg:p-8 */}
         </div>  {/* Close h-full overflow-y-auto */}

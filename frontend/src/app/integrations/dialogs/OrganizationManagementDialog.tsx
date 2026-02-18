@@ -9,6 +9,17 @@ import { toast } from "sonner"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+/**
+ * Check if an email address is a Gmail account
+ * @param email - Email address to check
+ * @returns true if the email is a Gmail or GoogleMail address
+ */
+const isGmailAddress = (email: string): boolean => {
+  if (!email) return false
+  const domain = email.toLowerCase().split('@')[1]
+  return domain === 'gmail.com' || domain === 'googlemail.com'
+}
+
 const TEAM_MEMBERS_PER_PAGE = 10
 
 interface OrganizationMember {
@@ -645,8 +656,19 @@ export function OrganizationManagementDialog({
               {!loadingOrgData && orgMembers.length === 0 && pendingInvitations.length === 0 && (
                 <div className={asInlineView ? "px-6 text-center py-8 text-neutral-500" : "text-center py-8 text-neutral-500"}>
                   <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No organization members or pending invitations found</p>
-                  <p className="text-sm mt-1">Start by inviting team members above</p>
+                  {userInfo && isGmailAddress(userInfo.email) ? (
+                    <>
+                      <p>Organizations are available for company email addresses</p>
+                      <p className="text-sm mt-1">
+                        Gmail users can join organizations when invited by someone with a company email
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>No organization members or pending invitations found</p>
+                      <p className="text-sm mt-1">Start by inviting team members above</p>
+                    </>
+                  )}
                 </div>
               )}
             </div>

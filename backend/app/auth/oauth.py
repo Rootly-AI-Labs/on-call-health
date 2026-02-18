@@ -79,18 +79,23 @@ class GoogleOAuth(OAuthProvider):
     
     async def get_user_info(self, access_token: str) -> Dict[str, Any]:
         """Get Google user information."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         headers = {"Authorization": f"Bearer {access_token}"}
-        
+
         async with httpx.AsyncClient() as client:
             response = await client.get(self.user_info_url, headers=headers)
-        
+
         if response.status_code != 200:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to get user info"
             )
-        
-        return response.json()
+
+        user_data = response.json()
+        logger.info(f"Google OAuth user_info: email={user_data.get('email')}, id={user_data.get('id')}")
+        return user_data
 
 class GitHubOAuth(OAuthProvider):
     """GitHub OAuth provider."""
