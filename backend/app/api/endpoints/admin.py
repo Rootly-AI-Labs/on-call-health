@@ -98,6 +98,7 @@ def _is_ip_whitelisted(client_ip: str, whitelist: set[str]) -> bool:
 def _validate_password(password: str) -> bool:
     """Validate the admin password."""
     if not ADMIN_PASSWORD:
+        logger.warning("ADMIN_PASSWORD not configured - admin access denied")
         return False  # No password configured, deny access
     return password == ADMIN_PASSWORD
 
@@ -135,10 +136,14 @@ async def admin_login(
 
     password = body["password"]
 
+    logger.info(f"Admin login attempt received, ADMIN_PASSWORD configured: {bool(ADMIN_PASSWORD)}")
+
     # Validate password server-side
     if not _validate_password(password):
+        logger.warning(f"Admin login failed - password validation returned false")
         raise HTTPException(status_code=401, detail="Invalid password")
 
+    logger.info("Admin login successful")
     # Return success - frontend stores this in session
     return {"authenticated": True, "expires": "24h"}
 
