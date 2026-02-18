@@ -148,28 +148,9 @@ class GitHubCollector:
                 if manual_username:
                     return manual_username
 
-            # FALLBACK: Try name-based matching against org members
-            if full_name and token:
-                try:
-                    from .enhanced_github_matcher import EnhancedGitHubMatcher
-                    # Get orgs dynamically based on token access
-                    accessible_orgs = await self.get_accessible_orgs(token)
-                    if accessible_orgs is None:
-                        logger.warning(f"[NAME_FALLBACK] Failed to fetch orgs - cannot perform name matching")
-                        return None
-                    if not accessible_orgs:
-                        logger.debug(f"[NAME_FALLBACK] User has no organization memberships - cannot perform name matching")
-                        return None
-                    matcher = EnhancedGitHubMatcher(token, accessible_orgs)
-                    name_match = await matcher.match_name_to_github(full_name, fallback_email=email)
-                    if name_match:
-                        logger.info(f"✅ [NAME_FALLBACK] Matched {email} -> {name_match} via name '{full_name}'")
-                        return name_match
-                    else:
-                        logger.debug(f"[NAME_FALLBACK] No match found for name '{full_name}' ({email})")
-                except Exception as e:
-                    logger.warning(f"⚠️ [NAME_FALLBACK] Error during name matching for '{full_name}': {e}")
-
+            # NO FALLBACK - If not synced, return None
+            # Users must sync members in the Management page to get GitHub data
+            logger.info(f"⚠️ [NO_MAPPING] No GitHub mapping found for {email}. User must sync members in Management page.")
             return None
 
         except Exception as e:
@@ -234,16 +215,13 @@ class GitHubCollector:
             GitHub username if found, None otherwise
         """
         try:
-            # Convert user_id to int if it's a string
-            if isinstance(user_id, str):
+            # Convert user_id to int if it's not already
+            if not isinstance(user_id, int):
                 try:
                     user_id = int(user_id)
                 except (ValueError, TypeError):
                     logger.warning(f"⚠️ [SYNCED_CHECK] Invalid user_id type: {type(user_id).__name__}: {user_id}")
                     return None
-            elif not isinstance(user_id, int):
-                logger.warning(f"⚠️ [SYNCED_CHECK] Invalid user_id type: {type(user_id).__name__}: {user_id}")
-                return None
 
             logger.debug(f"🔍 [SYNCED_CHECK] Querying user_correlations for email: {email}")
 
@@ -787,7 +765,10 @@ class GitHubCollector:
         # Use email-based correlation to find GitHub username
         github_username = await self._correlate_email_to_github(user_email, github_token, user_id, full_name)
 
-        if not github_username:
+        if github_username:
+            logger.info(f"✅ [SYNC_STATUS] Using cached GitHub mapping for {user_email}: {github_username}")
+        else:
+            logger.warning(f"⚠️ [SYNC_STATUS] No GitHub mapping for {user_email}. Sync required in Management page.")
             return None
 
         # Set up date range
