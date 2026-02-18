@@ -2157,8 +2157,8 @@ export default function useDashboard() {
         const riskInfo = getRiskFromHealthScore(healthScore);
 
         return {
-          name: member.user_name.split(" ")[0],
-          fullName: member.user_name,
+          name: (member.user_name || member.user_email || '').split(" ")[0],
+          fullName: member.user_name || member.user_email || '',
           score: healthScore,
           riskLevel: riskInfo.level,
           backendRiskLevel: member.risk_level, // Keep original for reference
