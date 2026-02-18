@@ -653,15 +653,22 @@ function DashboardContent() {
                       </div>
                       <div>
                         <p className="text-white font-semibold text-lg">You&apos;re viewing sample data</p>
-                        <p className="text-white/90 text-sm">Connect your incident management platform to see real insights</p>
+                        <p className="text-white/90 text-sm">
+                          {integrations.some(i => i.platform === 'rootly' || i.platform === 'pagerduty')
+                            ? 'Run an analysis to see real insights'
+                            : 'Connect your incident management platform and run an analysis to see real insights'}
+                        </p>
                       </div>
                     </div>
-                    <a
-                      href="/integrations"
-                      className="px-6 py-2.5 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors shadow-md"
-                    >
-                      Connect Integrations →
-                    </a>
+                    {/* Only show connect button if no Rootly or PagerDuty integration exists */}
+                    {!integrations.some(i => i.platform === 'rootly' || i.platform === 'pagerduty') && (
+                      <a
+                        href="/integrations"
+                        className="px-6 py-2.5 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors shadow-md"
+                      >
+                        Connect Integrations →
+                      </a>
+                    )}
                   </div>
                 </div>
               )}
