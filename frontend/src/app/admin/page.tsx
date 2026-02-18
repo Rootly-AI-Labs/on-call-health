@@ -457,7 +457,12 @@ export default function AdminDashboard() {
   const [platformCounts, setPlatformCounts] = useState<{[key: string]: number}>({})
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
-  const [authenticated, setAuthenticated] = useState(false)
+  const [authenticated, setAuthenticated] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('admin_auth') === 'true'
+    }
+    return false
+  })
   const [password, setPassword] = useState("")
   const [shake, setShake] = useState(false)
 
@@ -481,6 +486,7 @@ export default function AdminDashboard() {
 
       if (res.ok) {
         setAuthenticated(true)
+        sessionStorage.setItem('admin_auth', 'true')
       } else {
         setError("Invalid password")
         setShake(true)
