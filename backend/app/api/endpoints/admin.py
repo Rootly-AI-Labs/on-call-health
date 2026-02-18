@@ -19,6 +19,7 @@ from ...models.user import User
 from ...models.user_correlation import UserCorrelation
 from ...models.user_burnout_report import UserBurnoutReport
 from ...models.api_key import APIKey
+from ...models.oauth_provider import OAuthProvider
 from ...services.demo_analysis_service import _get_or_create_demo_organization, _load_health_checkins_for_user
 
 logger = logging.getLogger(__name__)
@@ -365,6 +366,8 @@ class AdminStatsResponse(BaseModel):
     total_organizations: int
     total_analyses: int
     total_api_keys: int
+    users_google: int
+    users_github: int
     new_users_last_30_days: int
     new_users_last_7_days: int
     new_users_today: int
@@ -444,12 +447,20 @@ async def get_admin_stats_summary(
     days_7_ago = now - timedelta(days=7)
     days_30_ago = now - timedelta(days=30)
 
-    # Total counts
-    total_users = db.query(User).count()
-    total_synced_users = db.query(UserCorrelation).filter(UserCorrelation.is_active == 1).count()
+    # Total counts - only verified users (OAuth'd)
+    total_users = db.query(User).filter(User.is_verified == True).count()
+    # Unique synced users (distinct by email)
+    total_synced_users = db.query(UserCorrelation.email).filter(
+        UserCorrelation.is_active == 1,
+        UserCorrelation.email.isnot(None)
+    ).distinct().count()
     total_organizations = db.query(Organization).count()
     total_analyses = db.query(Analysis).count()
     total_api_keys = db.query(APIKey).filter(APIKey.revoked_at.is_(None)).count()
+
+    # Users by OAuth provider
+    users_google = db.query(OAuthProvider).filter(OAuthProvider.provider == 'google').distinct(OAuthProvider.user_id).count()
+    users_github = db.query(OAuthProvider).filter(OAuthProvider.provider == 'github').distinct(OAuthProvider.user_id).count()
 
     # New users
     new_users_today = db.query(User).filter(User.created_at >= today_start).count()
@@ -478,6 +489,8 @@ async def get_admin_stats_summary(
         total_organizations=total_organizations,
         total_analyses=total_analyses,
         total_api_keys=total_api_keys,
+        users_google=users_google,
+        users_github=users_github,
         new_users_last_30_days=new_users_last_30_days,
         new_users_last_7_days=new_users_last_7_days,
         new_users_today=new_users_today,
