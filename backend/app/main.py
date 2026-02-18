@@ -121,6 +121,9 @@ def get_cors_origins() -> list[str]:
     if vercel_url:
         origins.append(f"https://{vercel_url}")
 
+    # Allow all Vercel preview deployments for testing
+    origins.append("https://*.vercel.app")
+
     # Remove duplicates while preserving order
     unique_origins = list(dict.fromkeys(origins))
     logger.info(f"CORS allowed origins: {unique_origins}")
