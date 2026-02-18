@@ -454,15 +454,15 @@ async def get_admin_stats_summary(
     new_users_last_7_days = db.query(User).filter(User.created_at >= days_7_ago).count()
     new_users_last_30_days = db.query(User).filter(User.created_at >= days_30_ago).count()
 
-    # Logins (using last_login)
+    # Logins (using last_active_at)
     logins_today = db.query(User).filter(
-        User.last_login >= today_start
+        User.last_active_at >= today_start
     ).count()
     logins_last_7_days = db.query(User).filter(
-        User.last_login >= days_7_ago
+        User.last_active_at >= days_7_ago
     ).count()
     logins_last_30_days = db.query(User).filter(
-        User.last_login >= days_30_ago
+        User.last_active_at >= days_30_ago
     ).count()
 
     # Analyses
@@ -521,7 +521,7 @@ async def get_admin_users(
             name=user.name,
             organization_name=org_name,
             created_at=user.created_at.isoformat() if user.created_at else "",
-            last_login=user.last_login.isoformat() if user.last_login else None,
+            last_login=user.last_active_at.isoformat() if user.last_active_at else None,
             role=user.role
         ))
 
@@ -687,15 +687,15 @@ async def get_login_trends(
 
     # Group by date (only users with logins)
     results = db.query(
-        cast(User.last_login, Date).label('date'),
+        cast(User.last_active_at, Date).label('date'),
         func.count(User.id).label('count')
     ).filter(
-        User.last_login >= start_date,
-        User.last_login.isnot(None)
+        User.last_active_at >= start_date,
+        User.last_active_at.isnot(None)
     ).group_by(
-        cast(User.last_login, Date)
+        cast(User.last_active_at, Date)
     ).order_by(
-        cast(User.last_login, Date)
+        cast(User.last_active_at, Date)
     ).all()
 
     trends = [TrendDataPoint(date=str(r.date), count=r.count) for r in results]
