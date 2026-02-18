@@ -29,6 +29,10 @@ class GitHubCollector:
         self.last_request_time = 0
         self.min_request_interval = 0.1  # 100ms between requests
 
+        # Track when GitHub search rate limit is hit so we can abort remaining users
+        self._rate_limited = False
+        self._rate_limit_reset = None  # Unix timestamp string from X-RateLimit-Reset header
+
         # GitHub organizations - fetched dynamically based on token access
         self._organizations_cache = {}  # Cache: token_hash -> [org_list, timestamp]
         self._org_cache_ttl = 3600  # Cache orgs for 1 hour
@@ -401,10 +405,9 @@ class GitHubCollector:
 
         try:
             # Phase 2.3: Use API manager for resilient GitHub API calls
-            from .github_api_manager import github_api_manager, GitHubPermissionError
+            from .github_api_manager import github_api_manager, GitHubPermissionError, GitHubRateLimitError
 
-            # Use search API to get counts only (1 call instead of paginating)
-            # Get organizations the token has access to (cached)
+            # Get organizations the token has access to (cached after first user)
             accessible_orgs = await self.get_accessible_orgs(token)
 
             # Build org filters based on token's access
@@ -419,58 +422,47 @@ class GitHubCollector:
                 logger.warning(f"⚠️ Could not determine accessible orgs - searching all repos for {username}")
                 org_filter_query = ""
 
-            # Get commits across all repos (filtered by orgs if available)
-            commits_url = f"https://api.github.com/search/commits?q=author:{username}+author-date:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}{org_filter_query}&per_page=1"
-
-            # Get pull requests count
-            prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}{org_filter_query}&per_page=1"
-
-            logger.debug(f"🔍 [GITHUB_API_URL] Commits query: {commits_url}")
-            logger.debug(f"🔍 [GITHUB_API_URL] PRs query: {prs_url}")
-
-            # Make resilient API calls with rate limiting and circuit breaker
-            async def fetch_commits():
-                import aiohttp
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(commits_url, headers=headers) as resp:
-                        if resp.status == 200:
-                            return await resp.json()
-                        elif resp.status == 401:
-                            raise aiohttp.ClientError(f"GitHub API authentication failed (401) - token may be expired or invalid")
-                        elif resp.status == 403:
-                            raise GitHubPermissionError(f"GitHub API forbidden (403) - token needs 'repo' permission for private repos")
-                        else:
-                            raise aiohttp.ClientError(f"GitHub API error for commits: {resp.status}")
-
-            async def fetch_prs():
-                import aiohttp
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(prs_url, headers=headers) as resp:
-                        if resp.status == 200:
-                            return await resp.json()
-                        elif resp.status == 401:
-                            raise aiohttp.ClientError(f"GitHub API authentication failed (401) - token may be expired or invalid")
-                        elif resp.status == 403:
-                            raise GitHubPermissionError(f"GitHub API forbidden (403) - token needs 'repo' permission for private repos")
-                        else:
-                            raise aiohttp.ClientError(f"GitHub API error for PRs: {resp.status}")
-            
-            # Execute with enterprise resilience patterns
-            logger.debug(f"🌐 [GITHUB_API] Fetching commits for {username}")
-            commits_data = await github_api_manager.safe_api_call(fetch_commits, max_retries=3)
-            total_commits = commits_data.get('total_count', 0) if commits_data else 0
-            logger.debug(f"📊 [GITHUB_API_RESPONSE] {username} commits response: total_count={total_commits}, incomplete_results={commits_data.get('incomplete_results', 'N/A') if commits_data else 'N/A'}")
-
-            logger.debug(f"🌐 [GITHUB_API] Fetching PRs for {username}")
-            prs_data = await github_api_manager.safe_api_call(fetch_prs, max_retries=3)
-            total_prs = prs_data.get('total_count', 0) if prs_data else 0
-            logger.debug(f"📊 [GITHUB_API_RESPONSE] {username} PRs response: total_count={total_prs}, incomplete_results={prs_data.get('incomplete_results', 'N/A') if prs_data else 'N/A'}")
-
-            logger.debug(f"✅ [GITHUB_API_SUCCESS] {username} ({email}): {total_commits} commits, {total_prs} PRs")
-
-            # Fetch detailed daily commit data with timestamps
+            # Step 1: Fetch detailed daily commit data (paginated search/commits call).
+            # total_commits is derived from this data — no separate count-only call needed.
             logger.debug(f"🔄 Fetching detailed daily commit data for {username}")
             daily_commits_data = await self.fetch_daily_commit_data(username, start_date, end_date, token, timezone)
+
+            # Derive total_commits from daily data (avoids a redundant /search/commits?per_page=1 call)
+            total_commits = sum(d.get('total_commits', 0) for d in daily_commits_data) if daily_commits_data else 0
+            logger.debug(f"📊 [GITHUB_API_RESPONSE] {username} commits from daily data: {total_commits}")
+
+            # Step 2: Fetch PR count (not available from daily data — still needs one search call).
+            # Skip if rate limited by daily commit fetch.
+            total_prs = 0
+            if not self._rate_limited:
+                prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}{org_filter_query}&per_page=1"
+                logger.debug(f"🔍 [GITHUB_API_URL] PRs query: {prs_url}")
+
+                async def fetch_prs():
+                    import aiohttp
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(prs_url, headers=headers) as resp:
+                            if resp.status == 200:
+                                return await resp.json()
+                            elif resp.status == 401:
+                                raise aiohttp.ClientError(f"GitHub API authentication failed (401) - token may be expired or invalid")
+                            elif resp.status == 403:
+                                remaining = resp.headers.get('X-RateLimit-Remaining', '1')
+                                if remaining == '0':
+                                    self._rate_limited = True
+                                    reset = resp.headers.get('X-RateLimit-Reset', 'unknown')
+                                    self._rate_limit_reset = reset
+                                    raise GitHubRateLimitError(f"Search rate limit exhausted (resets at {reset})")
+                                raise GitHubPermissionError(f"GitHub API forbidden (403) - token needs 'repo' permission for private repos")
+                            else:
+                                raise aiohttp.ClientError(f"GitHub API error for PRs: {resp.status}")
+
+                logger.debug(f"🌐 [GITHUB_API] Fetching PRs for {username}")
+                prs_data = await github_api_manager.safe_api_call(fetch_prs, max_retries=3)
+                total_prs = prs_data.get('total_count', 0) if prs_data else 0
+                logger.debug(f"📊 [GITHUB_API_RESPONSE] {username} PRs response: total_count={total_prs}")
+
+            logger.debug(f"✅ [GITHUB_API_SUCCESS] {username} ({email}): {total_commits} commits, {total_prs} PRs")
 
             # Build commits array from daily data for timeline processing
             commits_array = []
@@ -552,7 +544,7 @@ class GitHubCollector:
                     'after_hours_commit_percentage': round(after_hours_percentage, 3),
                     'weekend_commit_percentage': round(weekend_percentage, 3),
                     'repositories_touched': 3,  # Estimate
-                    'avg_pr_size': int(total_commits / max(total_prs, 1)) if total_prs > 0 else 50,
+                    'avg_pr_size': 0,  # PR size in lines not available from GitHub Search API
                     'clustered_commits': 0  # Would need more detailed analysis
                 },
                 'burnout_indicators': burnout_indicators,
@@ -562,7 +554,8 @@ class GitHubCollector:
                     'reviews_count': total_reviews,
                     'after_hours_commits': after_hours_commits,
                     'weekend_commits': weekend_commits,
-                    'avg_pr_size': int(total_commits / max(total_prs, 1)) if total_prs > 0 else 50,
+                    'commits_per_week': round(commits_per_week, 2),
+                    'avg_pr_size': 0,  # PR size in lines not available from GitHub Search API
                     'burnout_indicators': burnout_indicators
                 },
                 'commits': commits_array
@@ -609,21 +602,6 @@ class GitHubCollector:
         try:
             import aiohttp
             async with aiohttp.ClientSession() as session:
-                # Check rate limit before starting
-                rate_check_url = "https://api.github.com/rate_limit"
-                async with session.get(rate_check_url, headers=headers) as resp:
-                    if resp.status == 200:
-                        rate_data = await resp.json()
-                        remaining = rate_data['rate']['remaining']
-                        reset_time = rate_data['rate']['reset']
-                        logger.debug(f"GITHUB API: Rate limit remaining: {remaining}, resets at {datetime.fromtimestamp(reset_time)}")
-
-                        if remaining < 100:
-                            logger.warning(f"GITHUB API: ⚠️ Rate limit low! Remaining: {remaining}, Reset: {reset_time}")
-                        if remaining < 10:
-                            logger.error(f"GITHUB API: 🚫 Critical rate limit ({remaining} remaining)! Aborting.")
-                            return None
-                
                 # Initialize daily data structure
                 daily_commits = {}
                 current_date = start_date
@@ -725,9 +703,14 @@ class GitHubCollector:
                             logger.error(f"GITHUB API: 🔐 Authentication failed for user {username} - token may be expired or invalid")
                             return None
                         elif resp.status == 403:
-                            rate_remaining = resp.headers.get('X-RateLimit-Remaining', 'unknown')
+                            rate_remaining = resp.headers.get('X-RateLimit-Remaining', '1')
                             rate_reset = resp.headers.get('X-RateLimit-Reset', 'unknown')
-                            logger.error(f"GITHUB API: 🚫 RATE LIMITED (403)! Remaining: {rate_remaining}, Reset: {rate_reset}")
+                            if rate_remaining == '0':
+                                self._rate_limited = True
+                                self._rate_limit_reset = rate_reset
+                                logger.error(f"GITHUB API: 🚫 SEARCH RATE LIMITED (403)! Remaining: {rate_remaining}, Reset: {rate_reset}. Aborting remaining users.")
+                            else:
+                                logger.warning(f"GITHUB API: 🚫 FORBIDDEN (403) - likely insufficient token permissions")
                             return None
                         elif resp.status == 429:
                             retry_after = resp.headers.get('Retry-After', 'unknown')
@@ -937,6 +920,17 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
 
     try:
         for email in team_emails:
+            # Abort early if a previous user exhausted the GitHub Search rate limit.
+            # Continuing would just produce 403s for every remaining user.
+            if collector._rate_limited:
+                from datetime import datetime as _dt
+                try:
+                    reset_readable = _dt.fromtimestamp(int(collector._rate_limit_reset)).strftime('%H:%M:%S') if collector._rate_limit_reset else 'unknown'
+                except (ValueError, TypeError):
+                    reset_readable = str(collector._rate_limit_reset)
+                logger.warning(f"⏭️ [RATE_LIMIT] Skipping {email} — GitHub Search rate limit exhausted (resets at {reset_readable})")
+                continue
+
             try:
                 full_name = email_to_name.get(email) if email_to_name else None
 

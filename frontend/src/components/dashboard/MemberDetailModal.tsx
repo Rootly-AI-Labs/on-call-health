@@ -347,7 +347,9 @@ export function MemberDetailModal({
       >
         {selectedMember && (() => {
           // Find the correct member data from the analysis (consistent with dashboard)
-          const memberData = members?.find(m => m.user_name === selectedMember.name);
+          const memberData = members?.find(m => m.user_id && m.user_id === selectedMember.id)
+            || members?.find(m => m.user_email && m.user_email === selectedMember.email)
+            || members?.find(m => m.user_name && m.user_name === selectedMember.name);
 
           return (
             <>
@@ -493,34 +495,27 @@ export function MemberDetailModal({
                     },
                     {
                       id: 'githubSlack',
-                      hasData: (selectedMember.github_activity?.commits_count > 0 ||
-                        selectedMember.github_activity?.pull_requests_count > 0 ||
-                        selectedMember.slack_activity?.messages_sent > 0 ||
-                        selectedMember.slack_activity?.channels_active > 0),
+                      hasData: true,
                       component: (() => {
-                        const hasGitHubData = selectedMember.github_activity?.commits_count > 0 ||
-                          selectedMember.github_activity?.pull_requests_count > 0
+                        const hasGitHubData = !!selectedMember.github_activity
 
                         const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
                           selectedMember.slack_activity?.channels_active > 0
 
-                        const tabCount = [hasGitHubData, hasSlackData].filter(Boolean).length
-                        const defaultTab = hasGitHubData ? "github" : "communication"
-
-                        if (tabCount === 0) return null
+                        const tabCount = [true, hasSlackData].filter(Boolean).length
+                        const defaultTab = "github"
 
                         return (
                           <Tabs key="githubSlack" defaultValue={defaultTab} className="w-full">
                             {tabCount > 1 && (
                               <TabsList className={`grid w-full ${getGridColsClass(tabCount)}`}>
-                                {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
+                                <TabsTrigger value="github">GitHub</TabsTrigger>
                                 {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
                               </TabsList>
                             )}
 
                             <TabsContent value="github" className="space-y-4">
-                              {/* COMMENTED OUT - GitHub Activity Card */}
-                              {/* {selectedMember.github_activity ? (
+                              {selectedMember.github_activity ? (
                                 <Card>
                                   <CardHeader>
                                     <CardTitle>GitHub Activity</CardTitle>
@@ -635,7 +630,7 @@ export function MemberDetailModal({
                                         </div>
                                         <div className="bg-neutral-100 p-3 rounded-md">
                                           <p className="text-xs text-neutral-700">Avg PR Size</p>
-                                          <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.avg_pr_size || 0} lines</p>
+                                          <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.avg_pr_size > 0 ? `${selectedMember.github_activity.avg_pr_size} lines` : 'N/A'}</p>
                                         </div>
                                       </div>
                                       <div className="space-y-3">
@@ -665,7 +660,7 @@ export function MemberDetailModal({
                                     <p className="text-neutral-500">No GitHub activity data available</p>
                                   </CardContent>
                                 </Card>
-                              )} */}
+                              )}
                             </TabsContent>
 
                             <TabsContent value="communication" className="space-y-4">

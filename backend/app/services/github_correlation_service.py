@@ -278,7 +278,7 @@ class GitHubCorrelationService:
                 'after_hours_commits': int(estimated_commits * 0.1),  # 10% estimate
                 'weekend_commits': int(estimated_commits * 0.05),  # 5% estimate
                 'commits_per_week': commits_per_week,
-                'avg_pr_size': 50,  # Default estimate
+                'avg_pr_size': 0,
                 'username': username,
                 'email': email,
                 'burnout_indicators': burnout_indicators,
@@ -410,7 +410,7 @@ class GitHubCorrelationService:
                 'after_hours_commits': after_hours_commits,
                 'weekend_commits': weekend_commits,
                 'commits_per_week': round(commits_per_week, 2),
-                'avg_pr_size': 50,
+                'avg_pr_size': 0,
                 'username': github_data.get('username', ''),
                 'email': github_data.get('email', ''),
                 'burnout_indicators': burnout_indicators,

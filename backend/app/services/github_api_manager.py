@@ -24,6 +24,16 @@ class GitHubPermissionError(Exception):
     pass
 
 
+class GitHubRateLimitError(Exception):
+    """Raised when GitHub API returns 403/429 with X-RateLimit-Remaining: 0.
+
+    Distinct from GitHubPermissionError: this means the rate limit bucket
+    (commonly the Search API's 30 req/min limit) is exhausted. Non-retryable
+    within the current request — caller should abort remaining users.
+    """
+    pass
+
+
 class CircuitBreakerState(Enum):
     CLOSED = "closed"      # Normal operation
     OPEN = "open"          # Failing, blocking requests
@@ -120,10 +130,16 @@ class GitHubAPIManager:
 
                 return result
 
+            except GitHubRateLimitError as e:
+                # Non-retryable rate limit: fail fast, don't count as circuit-breaker failure
+                self.metrics["rate_limited_requests"] += 1
+                logger.warning(f"⚠️ GitHub rate limit hit (non-retryable): {e}")
+                return None
+
             except GitHubPermissionError as e:
                 # Non-retryable permission error: fail fast without retry
                 # Note: Don't record as failure for circuit breaker - 403 is expected for private repos
-                logger.warning(f"⚠️ GitHub permission error (non-retryable): {e}")
+                logger.warning(f"⚠️ GitHub permission erroor (non-retryable): {e}")
                 return None
 
             except aiohttp.ClientError as e:
