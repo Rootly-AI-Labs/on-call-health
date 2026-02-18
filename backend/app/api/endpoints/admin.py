@@ -522,12 +522,12 @@ async def get_admin_users(
     # Import here to avoid circular imports
     from ...models import Organization
 
-    # Get users with organization join
+    # Get users with organization join - only verified users
     users = db.query(User, Organization.name.label('org_name')).outerjoin(
         Organization, User.organization_id == Organization.id
-    ).order_by(User.created_at.desc()).offset(offset).limit(limit).all()
+    ).filter(User.is_verified == True).order_by(User.created_at.desc()).offset(offset).limit(limit).all()
 
-    total_count = db.query(User).count()
+    total_count = db.query(User).filter(User.is_verified == True).count()
 
     user_list = []
     for user, org_name in users:
