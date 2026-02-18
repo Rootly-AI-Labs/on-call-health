@@ -240,6 +240,10 @@ async def google_callback(
                 logger.error(f"Failed to create demo analysis for new user {user.id}: {e}")
                 # Don't fail the auth flow if demo creation fails
 
+        # Record last login time
+        user.last_login = datetime.now(timezone.utc)
+        db.commit()
+
         # Create JWT token
         jwt_token = create_access_token(data={"sub": user.id})
         
@@ -370,6 +374,10 @@ async def github_callback(
                 logger.error(f"Failed to create demo analysis for new user {user.id}: {e}")
                 # Don't fail the auth flow if demo creation fails
 
+        # Record last login time
+        user.last_login = datetime.now(timezone.utc)
+        db.commit()
+
         # Create JWT token
         jwt_token = create_access_token(data={"sub": user.id})
         
@@ -414,8 +422,14 @@ async def get_current_user_info(
     db: Session = Depends(get_db)
 ):
     """Get current user information."""
+    # Update last_login if not set or more than 1 hour ago
+    now = datetime.now(timezone.utc)
+    if not current_user.last_login or (now - current_user.last_login).total_seconds() > 3600:
+        current_user.last_login = now
+        db.commit()
+
     linking_service = AccountLinkingService(db)
-    
+
     return {
         "id": current_user.id,
         "email": current_user.email,
@@ -1091,6 +1105,10 @@ async def password_login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
+
+    # Record last login time
+    user.last_login = datetime.now(timezone.utc)
+    db.commit()
 
     # Create JWT token
     access_token = create_access_token(data={"sub": str(user.id)})

@@ -31,6 +31,7 @@ class User(Base):
     role = Column(String(20), default="member")  # 'admin', 'member'
     joined_org_at = Column(DateTime(timezone=True), server_default=func.now())
     last_active_at = Column(DateTime(timezone=True))
+    last_login = Column(DateTime(timezone=True))  # Track last successful login
     status = Column(String(20), default="active")  # 'active', 'suspended', 'pending'
 
     # Domain-based data sharing
@@ -189,6 +190,7 @@ class User(Base):
             'is_verified': self.is_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_active_at': self.last_active_at.isoformat() if self.last_active_at else None,
+            'last_login': self.last_login.isoformat() if self.last_login else None,
             'connected_platforms': self.connected_platforms
         }
 
