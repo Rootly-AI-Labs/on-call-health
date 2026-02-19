@@ -502,18 +502,20 @@ export function MemberDetailModal({
                         const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
                           selectedMember.slack_activity?.channels_active > 0
 
-                        const tabCount = [true, hasSlackData].filter(Boolean).length
-                        const defaultTab = "github"
+                        // GitHub tab temporarily hidden — tabCount excludes it
+                        const tabCount = [hasSlackData].filter(Boolean).length
+                        const defaultTab = "communication"
 
                         return (
                           <Tabs key="githubSlack" defaultValue={defaultTab} className="w-full">
                             {tabCount > 1 && (
                               <TabsList className={`grid w-full ${getGridColsClass(tabCount)}`}>
-                                <TabsTrigger value="github">GitHub</TabsTrigger>
+                                {/* <TabsTrigger value="github">GitHub</TabsTrigger> */}
                                 {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
                               </TabsList>
                             )}
 
+                            {/* GitHub Activity Card — temporarily commented out
                             <TabsContent value="github" className="space-y-4">
                               {selectedMember.github_activity ? (
                                 <Card>
@@ -662,6 +664,7 @@ export function MemberDetailModal({
                                 </Card>
                               )}
                             </TabsContent>
+                            */}
 
                             <TabsContent value="communication" className="space-y-4">
                               {selectedMember.slack_activity ? (
