@@ -67,7 +67,7 @@ LATE_NIGHT_END = settings.LATE_NIGHT_END
 # Range: 0.0 (no after-hours contribution) to 1.0 (full contribution).
 # At 1.0: >30% after-hours ratio adds up to 3.0 exhaustion points (on 0-10 scale).
 # At 0.5: >30% after-hours ratio adds up to 1.5 exhaustion points.
-AFTER_HOURS_RISK_IMPACT_FACTOR = 0.5
+AFTER_HOURS_RISK_IMPACT_FACTOR = 0.3
 
 
 class UnifiedBurnoutAnalyzer:
