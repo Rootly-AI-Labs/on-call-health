@@ -67,7 +67,8 @@ LATE_NIGHT_END = settings.LATE_NIGHT_END
 # Range: 0.0 (no after-hours contribution) to 1.0 (full contribution).
 # At 1.0: >30% after-hours ratio adds up to 3.0 exhaustion points (on 0-10 scale).
 # At 0.5: >30% after-hours ratio adds up to 1.5 exhaustion points.
-AFTER_HOURS_RISK_IMPACT_FACTOR = 0.3
+AFTER_HOURS_RISK_IMPACT_FACTOR = 0.5
+GITHUB_COMMIT_AFTER_HOURS_WEIGHT = 0.25  # GitHub commits count at 50% vs incident responses in after-hours %
 
 
 class UnifiedBurnoutAnalyzer:
@@ -2295,9 +2296,9 @@ class UnifiedBurnoutAnalyzer:
 
         # After-hours activity includes GitHub commits + incident response timestamps
         # Slack after-hours data is merged in later via _enhance_metrics_with_slack_data
-        total_voluntary_after_hours = github_after_hours_commits + incident_response_after_hours
-        total_voluntary_weekend = github_weekend_commits + incident_response_weekend
-        total_voluntary_activities = total_commits + total_incident_responses
+        total_voluntary_after_hours = (github_after_hours_commits * GITHUB_COMMIT_AFTER_HOURS_WEIGHT) + incident_response_after_hours
+        total_voluntary_weekend = (github_weekend_commits * GITHUB_COMMIT_AFTER_HOURS_WEIGHT) + incident_response_weekend
+        total_voluntary_activities = total_commits + total_incident_responses  # denominator unchanged
 
         total_non_business_hours = total_voluntary_after_hours + total_voluntary_weekend
         after_hours_percentage = total_non_business_hours / total_voluntary_activities if total_voluntary_activities > 0 else 0
