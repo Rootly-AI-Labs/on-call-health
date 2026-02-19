@@ -1010,7 +1010,7 @@ class GitHubCollector:
         if sampled_count == 0 and total_commits > 0:
             logger.warning(
                 f"⚠️ [GRAPHQL] {username}: {total_commits} commits found but no timestamps retrieved "
-                f"(private repos or no defaultBranchRef) — after-hours data unavailable"
+                f"(possible causes: private repos, no defaultBranchRef, rate limit, or API error) — after-hours data unavailable"
             )
 
         daily_data = sorted(daily_commits.values(), key=lambda x: x['date'])
