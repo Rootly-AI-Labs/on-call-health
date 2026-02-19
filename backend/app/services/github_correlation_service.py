@@ -252,31 +252,20 @@ class GitHubCorrelationService:
 
             self.logger.debug(f"Creating activity for {email} → {username}: data_points={data_points}")
             
-            # If we have data points, use them; otherwise create a basic structure
-            if data_points > 0:
-                # Estimate metrics based on data points (could be refined with actual API data)
-                estimated_commits = data_points
-                estimated_prs = max(1, int(data_points * 0.15))  # ~15% of activity results in PRs
-                estimated_reviews = max(1, int(data_points * 0.25))  # ~25% review rate
-                commits_per_week = round(data_points / 4.3, 2)  # Approximate weeks in a month
-            else:
-                # Mapping exists but no data collected
-                estimated_commits = 0
-                estimated_prs = 0
-                estimated_reviews = 0
-                commits_per_week = 0
-            
-            # Calculate burnout indicators
+            commits_count = data_points if data_points > 0 else 0
+            commits_per_week = round(data_points / 4.3, 2) if data_points > 0 else 0
+
+            # Calculate burnout indicators from real commit data only
             burnout_indicators = self._calculate_github_burnout_indicators(
-                estimated_commits, commits_per_week
+                commits_count, commits_per_week
             )
-            
+
             github_activity = {
-                'commits_count': estimated_commits,
-                'pull_requests_count': estimated_prs,
-                'reviews_count': estimated_reviews,
-                'after_hours_commits': int(estimated_commits * 0.1),  # 10% estimate
-                'weekend_commits': int(estimated_commits * 0.05),  # 5% estimate
+                'commits_count': commits_count,
+                'pull_requests_count': 0,   # Not available from integration mapping
+                'reviews_count': 0,          # Not available from integration mapping
+                'after_hours_commits': 0,    # Not available — no timestamps in this path
+                'weekend_commits': 0,        # Not available — no timestamps in this path
                 'commits_per_week': commits_per_week,
                 'avg_pr_size': 0,
                 'username': username,
@@ -288,7 +277,7 @@ class GitHubCorrelationService:
                 'mapping_status': 'successful_with_data' if data_points > 0 else 'successful_no_data'
             }
 
-            self.logger.debug(f"Activity created for {email}: commits={estimated_commits}, PRs={estimated_prs}")
+            self.logger.debug(f"Activity created for {email}: commits={commits_count}")
             
             return github_activity
             
@@ -387,28 +376,18 @@ class GitHubCorrelationService:
         try:
             total_commits = github_data.get('total_commits', 0)
             commits_per_week = github_data.get('commits_per_week', 0)
-            
-            # Calculate derived metrics
-            estimated_prs = max(1, int(total_commits * 0.15))
-            estimated_reviews = max(1, int(total_commits * 0.25))
-            
-            # Estimate after-hours activity
-            after_hours_rate = 0.1
-            after_hours_commits = int(total_commits * after_hours_rate)
-            weekend_rate = 0.05
-            weekend_commits = int(total_commits * weekend_rate)
-            
-            # Burnout indicators
+
+            # Burnout indicators from real commit data only
             burnout_indicators = self._calculate_github_burnout_indicators(
                 total_commits, commits_per_week
             )
-            
+
             github_activity = {
                 'commits_count': total_commits,
-                'pull_requests_count': estimated_prs,
-                'reviews_count': estimated_reviews,
-                'after_hours_commits': after_hours_commits,
-                'weekend_commits': weekend_commits,
+                'pull_requests_count': 0,   # Not available from contributor data
+                'reviews_count': 0,          # Not available from contributor data
+                'after_hours_commits': 0,    # Not available — no timestamps in this path
+                'weekend_commits': 0,        # Not available — no timestamps in this path
                 'commits_per_week': round(commits_per_week, 2),
                 'avg_pr_size': 0,
                 'username': github_data.get('username', ''),

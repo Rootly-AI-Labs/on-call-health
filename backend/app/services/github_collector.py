@@ -422,94 +422,23 @@ class GitHubCollector:
                 logger.warning(f"⚠️ Could not determine accessible orgs - searching all repos for {username}")
                 org_filter_query = ""
 
-            # Step 1: Fetch detailed daily commit data (paginated search/commits call).
-            # total_commits is derived from this data — no separate count-only call needed.
-            logger.debug(f"🔄 Fetching detailed daily commit data for {username}")
-            daily_commits_data = await self.fetch_daily_commit_data(username, start_date, end_date, token, timezone)
-
-            # Derive total_commits from daily data (avoids a redundant /search/commits?per_page=1 call)
-            total_commits = sum(d.get('total_commits', 0) for d in daily_commits_data) if daily_commits_data else 0
-            logger.debug(f"📊 [GITHUB_API_RESPONSE] {username} commits from daily data: {total_commits}")
-
-            # Step 2: Fetch PR count (not available from daily data — still needs one search call).
-            # Skip if rate limited by daily commit fetch.
-            total_prs = 0
-            if not self._rate_limited:
-                prs_url = f"https://api.github.com/search/issues?q=author:{username}+type:pr+created:{start_date.strftime('%Y-%m-%d')}..{end_date.strftime('%Y-%m-%d')}{org_filter_query}&per_page=1"
-                logger.debug(f"🔍 [GITHUB_API_URL] PRs query: {prs_url}")
-
-                async def fetch_prs():
-                    import aiohttp
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(prs_url, headers=headers) as resp:
-                            if resp.status == 200:
-                                return await resp.json()
-                            elif resp.status == 401:
-                                raise aiohttp.ClientError(f"GitHub API authentication failed (401) - token may be expired or invalid")
-                            elif resp.status == 403:
-                                remaining = resp.headers.get('X-RateLimit-Remaining', '1')
-                                if remaining == '0':
-                                    self._rate_limited = True
-                                    reset = resp.headers.get('X-RateLimit-Reset', 'unknown')
-                                    self._rate_limit_reset = reset
-                                    raise GitHubRateLimitError(f"Search rate limit exhausted (resets at {reset})")
-                                raise GitHubPermissionError(f"GitHub API forbidden (403) - token needs 'repo' permission for private repos")
-                            else:
-                                raise aiohttp.ClientError(f"GitHub API error for PRs: {resp.status}")
-
-                logger.debug(f"🌐 [GITHUB_API] Fetching PRs for {username}")
-                prs_data = await github_api_manager.safe_api_call(fetch_prs, max_retries=3)
-                total_prs = prs_data.get('total_count', 0) if prs_data else 0
-                logger.debug(f"📊 [GITHUB_API_RESPONSE] {username} PRs response: total_count={total_prs}")
+            # Step 1 & 2: Fetch daily commit data + PR count via GraphQL.
+            # GraphQL uses 5,000 points/hour vs Search API's 30 requests/minute — same token works.
+            logger.debug(f"🔄 [GRAPHQL] Fetching daily commit data for {username}")
+            daily_commits_data, total_commits, total_prs, real_timestamps, repos_count = await self.fetch_daily_commit_data_graphql(
+                username, email, start_date, end_date, token, timezone
+            )
 
             logger.debug(f"✅ [GITHUB_API_SUCCESS] {username} ({email}): {total_commits} commits, {total_prs} PRs")
 
-            # Build commits array from daily data for timeline processing
-            commits_array = []
-            after_hours_commits = 0
-            weekend_commits = 0
-            if daily_commits_data:
-                for daily in daily_commits_data:
-                    # Create a timestamp for aggregation at midnight of that date
-                    date_str = daily.get('date', '')
-                    if date_str:
-                        # Create timestamps for all commits on this day
-                        date_obj = datetime.fromisoformat(date_str)
-                        after_hours_count = daily.get('after_hours_commits', 0)
-                        weekend_count = daily.get('weekend_commits', 0)  # Tracked for metrics, not separate timestamps
-                        total_today = daily.get('total_commits', 0)
+            # Build commits array from real timestamps fetched via GraphQL
+            commits_array = [{"timestamp": ts} for ts in real_timestamps]
 
-                        # Calculate business-hours commits (all commits that are NOT after-hours)
-                        business_hours_count = max(0, total_today - after_hours_count)
+            # Sum after-hours and weekend counts from daily classification
+            after_hours_commits = sum(d.get('after_hours_commits', 0) for d in daily_commits_data) if daily_commits_data else 0
+            weekend_commits = sum(d.get('weekend_commits', 0) for d in daily_commits_data) if daily_commits_data else 0
 
-                        # IMPORTANT: Generate timestamps for BOTH after-hours and business-hours commits
-                        # Note: weekend_commits are a subset of after_hours_count or business_hours_count
-                        # (a weekend commit is counted in after_hours if at night, or business_hours if during day)
-                        # We do NOT generate separate weekend timestamps to avoid double-counting
-
-                        # Generate timestamps for after-hours commits (22:00-23:59 or 00:00-08:59)
-                        for i in range(after_hours_count):
-                            hour = 22 + (i % 2)  # Alternate between 22 and 23
-                            minute = (i * 17) % 60  # Distribute by minute
-                            commit_dt = date_obj.replace(hour=hour, minute=minute).isoformat() + 'Z'
-                            commits_array.append({"timestamp": commit_dt})
-
-                        # Generate timestamps for business-hours commits (09:00-16:59)
-                        for i in range(business_hours_count):
-                            hour = 9 + (i % 8)  # Distribute across 8 business hours (9-16)
-                            minute = (i * 13) % 60  # Different distribution than after-hours
-                            commit_dt = date_obj.replace(hour=hour, minute=minute).isoformat() + 'Z'
-                            commits_array.append({"timestamp": commit_dt})
-
-                        after_hours_commits += after_hours_count
-                        weekend_commits += weekend_count
-
-            # If we couldn't fetch detailed commit data, report zeros rather than guessing
-            if not daily_commits_data:
-                after_hours_commits = 0
-                weekend_commits = 0
-
-            total_reviews = int(total_prs * 1.5)             # Estimate 1.5 reviews per PR
+            total_reviews = 0  # Not fetched from GitHub
 
             days_analyzed = (end_date - start_date).days
             weeks = days_analyzed / 7
@@ -543,9 +472,9 @@ class GitHubCollector:
                     'prs_per_week': round(total_prs / weeks if weeks > 0 else 0, 2),
                     'after_hours_commit_percentage': round(after_hours_percentage, 3),
                     'weekend_commit_percentage': round(weekend_percentage, 3),
-                    'repositories_touched': 3,  # Estimate
-                    'avg_pr_size': 0,  # PR size in lines not available from GitHub Search API
-                    'clustered_commits': 0  # Would need more detailed analysis
+                    'repositories_touched': repos_count,
+                    'avg_pr_size': 0,
+                    'clustered_commits': 0
                 },
                 'burnout_indicators': burnout_indicators,
                 'activity_data': {
@@ -729,7 +658,372 @@ class GitHubCollector:
         except Exception as e:
             logger.error(f"Error fetching daily commit data for {username}: {e}")
             return None
-    
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # GraphQL methods — use 5,000 points/hour vs Search API's 30 requests/min
+    # Same Personal Access Token (ghp_) works — no token change needed.
+    # ─────────────────────────────────────────────────────────────────────────
+
+    async def _graphql_query(self, query: str, variables: dict, token: str) -> Optional[dict]:
+        """
+        Execute a GitHub GraphQL query.
+        Uses a separate rate limit bucket (5,000 points/hour) vs REST Search API (30/min).
+        """
+        import aiohttp
+        url = "https://api.github.com/graphql"
+        headers = {
+            "Authorization": f"bearer {token}",
+            "Content-Type": "application/json",
+            "User-Agent": "Rootly-Burnout-Detector"
+        }
+        payload = {"query": query, "variables": variables}
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=headers) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+
+                        # Read rate limit from response HEADERS (always present, unlike extensions)
+                        from datetime import timezone as _tz
+                        remaining = int(resp.headers.get('X-RateLimit-Remaining', 5000))
+                        limit = int(resp.headers.get('X-RateLimit-Limit', 5000))
+                        reset_ts = resp.headers.get('X-RateLimit-Reset')
+
+                        try:
+                            if reset_ts:
+                                reset_dt = datetime.fromtimestamp(int(reset_ts), tz=_tz.utc)
+                                now_utc = datetime.now(_tz.utc)
+                                mins_left = max(0, int((reset_dt - now_utc).total_seconds() / 60))
+                                reset_str = reset_dt.strftime('%H:%M:%S UTC')
+                                logger.info(
+                                    f"📊 [GRAPHQL_RATE] Remaining: {remaining}/{limit} pts | "
+                                    f"Resets at: {reset_str} (in {mins_left}m)"
+                                )
+                            else:
+                                logger.info(f"📊 [GRAPHQL_RATE] Remaining: {remaining}/{limit} pts")
+                        except Exception:
+                            logger.info(f"📊 [GRAPHQL_RATE] Remaining: {remaining}/{limit} pts")
+
+                        # Flag rate limited if running low
+                        if remaining < 300:
+                            self._rate_limited = True
+                            self._rate_limit_reset = reset_ts
+                            logger.warning(f"⚠️ [GRAPHQL_RATE_LIMIT] Only {remaining} points remaining — flagging rate limited")
+
+                        if "errors" in result:
+                            logger.warning(f"⚠️ [GRAPHQL_ERRORS] {result['errors']}")
+
+                        return result.get("data")
+
+                    elif resp.status == 401:
+                        logger.error("GitHub GraphQL: 🔐 Authentication failed (401) — token may be expired")
+                        return None
+                    elif resp.status == 403:
+                        self._rate_limited = True
+                        logger.error("GitHub GraphQL: 🚫 RATE LIMITED (403)")
+                        return None
+                    elif resp.status == 502:
+                        logger.warning("GitHub GraphQL: 502 Bad Gateway — skipping")
+                        return None
+                    else:
+                        logger.warning(f"GitHub GraphQL: Unexpected status {resp.status}")
+                        return None
+
+        except Exception as e:
+            logger.error(f"GitHub GraphQL request failed: {type(e).__name__}: {e}")
+            return None
+
+    async def _fetch_contributions_summary(self, username: str, start_date: datetime, end_date: datetime, token: str) -> Optional[dict]:
+        """
+        Fetch contribution summary for a GitHub user using GraphQL.
+        Returns total commits, total PRs, daily counts, and top repos.
+        Cost: 1 GraphQL point (vs 1+ Search API calls per page).
+        """
+        from datetime import timezone as dt_timezone
+
+        # GitHub GraphQL DateTime requires timezone-aware ISO 8601
+        if start_date.tzinfo is None:
+            from_dt = start_date.replace(tzinfo=dt_timezone.utc).isoformat()
+        else:
+            from_dt = start_date.isoformat()
+
+        if end_date.tzinfo is None:
+            to_dt = end_date.replace(tzinfo=dt_timezone.utc).isoformat()
+        else:
+            to_dt = end_date.isoformat()
+
+        query = """
+        query ContributionSummary($login: String!, $from: DateTime!, $to: DateTime!) {
+          user(login: $login) {
+            id
+            contributionsCollection(from: $from, to: $to) {
+              totalCommitContributions
+              totalPullRequestContributions
+              commitContributionsByRepository(maxRepositories: 100) {
+                repository {
+                  name
+                  owner { login }
+                }
+                contributions { totalCount }
+              }
+              contributionCalendar {
+                weeks {
+                  contributionDays {
+                    date
+                    contributionCount
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+        variables = {"login": username, "from": from_dt, "to": to_dt}
+        data = await self._graphql_query(query, variables, token)
+
+        if not data:
+            logger.warning(f"⚠️ [GRAPHQL] No contribution data returned for {username}")
+            return None
+
+        user_data = data.get("user")
+        if not user_data:
+            logger.warning(f"⚠️ [GRAPHQL] User '{username}' not found in GitHub")
+            return None
+
+        # GitHub node ID — used to filter commit history by user identity (not email)
+        github_node_id = user_data.get("id")
+
+        contributions = user_data.get("contributionsCollection", {})
+        total_commits = contributions.get("totalCommitContributions", 0)
+        total_prs = contributions.get("totalPullRequestContributions", 0)
+
+        # Build daily counts from contribution calendar
+        daily_counts = {}
+        for week in contributions.get("contributionCalendar", {}).get("weeks", []):
+            for day in week.get("contributionDays", []):
+                date_str = day.get("date")
+                count = day.get("contributionCount", 0)
+                if date_str and count > 0:
+                    daily_counts[date_str] = count
+
+        # Build top repos list sorted by contribution count
+        top_repos = []
+        for repo_entry in contributions.get("commitContributionsByRepository", []):
+            repo = repo_entry.get("repository", {})
+            count = repo_entry.get("contributions", {}).get("totalCount", 0)
+            owner = repo.get("owner", {}).get("login", "")
+            name = repo.get("name", "")
+            if owner and name and count > 0:
+                top_repos.append({"owner": owner, "name": name, "count": count})
+        top_repos.sort(key=lambda r: r["count"], reverse=True)
+
+        logger.info(
+            f"📊 [GRAPHQL_CONTRIBUTIONS] {username}: {total_commits} commits, "
+            f"{total_prs} PRs, {len(top_repos)} repos with activity"
+        )
+
+        return {
+            "total_commits": total_commits,
+            "total_prs": total_prs,
+            "daily_counts": daily_counts,
+            "top_repos": top_repos,
+            "github_node_id": github_node_id  # Used for accurate commit author filtering
+        }
+
+    async def _fetch_repo_commit_timestamps(self, owner: str, repo: str, user_id: str, since: str, until: str, token: str, max_commits: int = 10000) -> List[str]:
+        """
+        Fetch commit timestamps for a user from one repository using GraphQL.
+        Filters by GitHub node ID (user.id) so ALL of this user's commits are returned
+        regardless of which email address they used to commit.
+        Paginates until all commits fetched or max_commits reached.
+
+        Returns list of ISO timestamp strings (committedDate).
+        Cost: ~1 point per 100 commits returned.
+        """
+        query = """
+        query RepoTimestamps($owner: String!, $name: String!, $since: GitTimestamp!, $until: GitTimestamp!, $userId: ID!, $after: String) {
+          repository(owner: $owner, name: $name) {
+            defaultBranchRef {
+              target {
+                ... on Commit {
+                  history(since: $since, until: $until, first: 100, after: $after,
+                          author: { id: $userId }) {
+                    nodes { committedDate }
+                    pageInfo { hasNextPage endCursor }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+        timestamps = []
+        cursor = None
+
+        while len(timestamps) < max_commits:
+            variables = {
+                "owner": owner,
+                "name": repo,
+                "since": since,
+                "until": until,
+                "userId": user_id,
+                "after": cursor
+            }
+
+            data = await self._graphql_query(query, variables, token)
+            if not data or self._rate_limited:
+                break
+
+            repo_data = data.get("repository")
+            if not repo_data:
+                break
+
+            default_branch = repo_data.get("defaultBranchRef")
+            if not default_branch:
+                break  # Empty repo or no default branch
+
+            history = default_branch.get("target", {}).get("history", {})
+            nodes = history.get("nodes", [])
+            page_info = history.get("pageInfo", {})
+
+            for node in nodes:
+                committed_date = node.get("committedDate")
+                if committed_date:
+                    timestamps.append(committed_date)
+
+            if not page_info.get("hasNextPage") or not nodes:
+                break
+
+            cursor = page_info.get("endCursor")
+
+        return timestamps
+
+    async def fetch_daily_commit_data_graphql(self, username: str, email: str, start_date: datetime, end_date: datetime, token: str, timezone: str = 'UTC') -> tuple:
+        """
+        Fetch daily commit data using GitHub GraphQL API instead of REST Search API.
+
+        GraphQL rate limit: 5,000 points/hour (vs Search API: 30 requests/MINUTE)
+        Same Personal Access Token works — no token change needed.
+
+        Returns:
+            Tuple of (daily_data_list, total_commits, total_prs)
+            - daily_data_list: same format as fetch_daily_commit_data()
+            - total_commits: total commits in the period
+            - total_prs: total PRs in the period
+        """
+        # Build empty daily structure covering the full date range
+        daily_commits = {}
+        current = start_date
+        while current <= end_date:
+            date_str = current.strftime('%Y-%m-%d')
+            daily_commits[date_str] = {
+                'date': date_str,
+                'total_commits': 0,
+                'after_hours_commits': 0,
+                'weekend_commits': 0
+            }
+            current += timedelta(days=1)
+
+        # Step 1: Contribution summary — 1 GraphQL point
+        summary = await self._fetch_contributions_summary(username, start_date, end_date, token)
+        if not summary:
+            logger.warning(f"⚠️ [GRAPHQL] Could not fetch contributions for {username}, returning empty data")
+            return (list(daily_commits.values()), 0, 0, [], 0)
+
+        total_commits = summary["total_commits"]
+        total_prs = summary["total_prs"]
+        github_node_id = summary.get("github_node_id")
+
+        # Fill daily totals from contribution calendar
+        for date_str, count in summary["daily_counts"].items():
+            if date_str in daily_commits:
+                daily_commits[date_str]["total_commits"] = count
+
+        repos_count = len(summary.get("top_repos", []))
+
+        if total_commits == 0:
+            logger.info(f"📊 [GRAPHQL] {username}: 0 commits in period")
+            return (sorted(daily_commits.values(), key=lambda x: x['date']), 0, total_prs, [], repos_count)
+
+        if not github_node_id:
+            logger.warning(f"⚠️ [GRAPHQL] No GitHub node ID for {username} — cannot filter timestamps by user, skipping after-hours data")
+            return (sorted(daily_commits.values(), key=lambda x: x['date']), total_commits, total_prs, [], repos_count)
+
+        # Step 2: Fetch commit timestamps from top repos for after_hours/weekend classification
+        # Uses GitHub node ID (not email) to match commits regardless of which email the user committed with
+        since_iso = (start_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+                     if start_date.tzinfo is None else start_date.isoformat())
+        until_iso = (end_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+                     if end_date.tzinfo is None else end_date.isoformat())
+
+        all_timestamps = []
+        for repo_info in summary.get("top_repos", []):
+            if self._rate_limited:
+                logger.warning(f"⚠️ [GRAPHQL] Rate limited mid-fetch for {username} — using partial timestamp data")
+                break
+
+            owner = repo_info.get("owner", "")
+            repo_name = repo_info.get("name", "")
+            if not owner or not repo_name:
+                continue
+
+            logger.debug(f"🔍 [GRAPHQL] Fetching timestamps from {owner}/{repo_name} for {username} (node_id={github_node_id})")
+            timestamps = await self._fetch_repo_commit_timestamps(
+                owner=owner,
+                repo=repo_name,
+                user_id=github_node_id,
+                since=since_iso,
+                until=until_iso,
+                token=token
+            )
+            all_timestamps.extend(timestamps)
+            logger.debug(f"📊 [GRAPHQL] Got {len(timestamps)} timestamps from {owner}/{repo_name}")
+
+        # Step 3: Classify timestamps into after_hours / weekend using user's timezone
+        try:
+            tz = pytz.timezone(timezone)
+        except Exception:
+            logger.warning(f"Invalid timezone '{timezone}' for {username}, using UTC")
+            tz = pytz.UTC
+
+        for ts in all_timestamps:
+            try:
+                dt_utc = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                dt_local = dt_utc.astimezone(tz)
+                date_str = dt_local.strftime('%Y-%m-%d')
+
+                if date_str not in daily_commits:
+                    continue
+
+                if dt_local.hour < self.business_hours['start'] or dt_local.hour >= self.business_hours['end']:
+                    daily_commits[date_str]['after_hours_commits'] += 1
+                if dt_local.weekday() >= 5:  # Saturday=5, Sunday=6
+                    daily_commits[date_str]['weekend_commits'] += 1
+            except Exception as ts_err:
+                logger.debug(f"Could not parse timestamp {ts}: {ts_err}")
+                continue
+
+        sampled_count = len(all_timestamps)
+        if sampled_count == 0 and total_commits > 0:
+            logger.warning(
+                f"⚠️ [GRAPHQL] {username}: {total_commits} commits found but no timestamps retrieved "
+                f"(private repos or no defaultBranchRef) — after-hours data unavailable"
+            )
+
+        daily_data = sorted(daily_commits.values(), key=lambda x: x['date'])
+
+        total_after = sum(d['after_hours_commits'] for d in daily_data)
+        total_weekend = sum(d['weekend_commits'] for d in daily_data)
+        logger.info(
+            f"✅ [GRAPHQL] {username}: {total_commits} commits, {total_prs} PRs, "
+            f"{total_after} after-hours, {total_weekend} weekend"
+        )
+
+        return (daily_data, total_commits, total_prs, all_timestamps, repos_count)
+
     async def collect_github_data_for_user(self, user_email: str, days: int = 30, github_token: str = None, user_id: Optional[int] = None, full_name: Optional[str] = None, timezone: str = 'UTC') -> Optional[Dict]:
         """
         Collect GitHub activity data for a single user using email correlation.
@@ -907,6 +1201,49 @@ async def collect_team_github_data(team_emails: List[str], days: int = 30, githu
                 db.close()
         except Exception as e:
             logger.warning(f"Could not retrieve organization_id: {e}")
+
+    # Log GitHub Search rate-limit status once before processing any users.
+    # Checks the 'search' bucket (30 req/min) — NOT the core bucket (5000/hr).
+    if github_token and team_emails:
+        try:
+            import aiohttp
+            headers = {
+                'Authorization': f'token {github_token}',
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'Rootly-Burnout-Detector'
+            }
+            async with aiohttp.ClientSession() as _sess:
+                async with _sess.get("https://api.github.com/rate_limit", headers=headers) as resp:
+                    if resp.status == 200:
+                        rl_data = await resp.json()
+                        search = rl_data.get('resources', {}).get('search', {})
+                        remaining = search.get('remaining', '?')
+                        limit = search.get('limit', 30)
+                        reset_ts = search.get('reset')
+                        if reset_ts:
+                            reset_str = datetime.fromtimestamp(reset_ts).strftime('%H:%M:%S')
+                            secs_left = max(0, int(reset_ts - datetime.now().timestamp()))
+                            mins, secs = divmod(secs_left, 60)
+                        else:
+                            reset_str = 'unknown'
+                            mins = secs = 0
+
+                        if remaining == 0:
+                            logger.warning(
+                                f"⏳ [GITHUB_RATE_LIMIT] Search API exhausted — "
+                                f"resets at {reset_str} (in {mins}m {secs}s). "
+                                f"All {len(team_emails)} users will be skipped."
+                            )
+                            collector._rate_limited = True
+                            collector._rate_limit_reset = str(reset_ts)
+                        else:
+                            logger.info(
+                                f"📊 [GITHUB_RATE_LIMIT] Search API: {remaining}/{limit} requests remaining "
+                                f"(resets at {reset_str} in {mins}m {secs}s) — "
+                                f"about to process {len(team_emails)} users"
+                            )
+        except Exception as _e:
+            logger.debug(f"Could not fetch rate limit status: {_e}")
 
     # Open single database connection for all timezone lookups (performance optimization)
     db_session = None
