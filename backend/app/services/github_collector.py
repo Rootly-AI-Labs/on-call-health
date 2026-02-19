@@ -73,6 +73,8 @@ class GitHubCollector:
 
         async with self._org_cache_locks[token_hash]:
             # Double-check cache after acquiring lock (another request might have populated it)
+            # Re-capture now inside the lock — the outer `now` may be stale if we waited
+            now = datetime.now().timestamp()
             if token_hash in self._organizations_cache:
                 orgs, cached_time = self._organizations_cache[token_hash]
                 if now - cached_time < self._org_cache_ttl:
@@ -139,18 +141,26 @@ class GitHubCollector:
             return None
 
         try:
-            # FIRST: Check user_correlations table for synced members (from "Sync Members" feature)
-            logger.debug(f"🔍 [CORRELATION] Checking user_correlations for {email}")
-            synced_username = await self._check_synced_members(email, user_id)
-            if synced_username:
-                return synced_username
+            from ..models import SessionLocal
 
-            # SECOND: Check manual mappings from user_mappings table (mapping drawer)
-            if user_id:
-                logger.debug(f"🔍 [CORRELATION] Checking user_mappings for {email}")
-                manual_username = await self._check_manual_mappings(email, user_id)
-                if manual_username:
-                    return manual_username
+            # Open one shared session for both lookup calls to avoid opening a new
+            # connection per call when iterating over many team members
+            db = SessionLocal()
+            try:
+                # FIRST: Check user_correlations table for synced members (from "Sync Members" feature)
+                logger.debug(f"🔍 [CORRELATION] Checking user_correlations for {email}")
+                synced_username = await self._check_synced_members(email, user_id, db_session=db)
+                if synced_username:
+                    return synced_username
+
+                # SECOND: Check manual mappings from user_mappings table (mapping drawer)
+                if user_id:
+                    logger.debug(f"🔍 [CORRELATION] Checking user_mappings for {email}")
+                    manual_username = await self._check_manual_mappings(email, user_id, db_session=db)
+                    if manual_username:
+                        return manual_username
+            finally:
+                db.close()
 
             # NO FALLBACK - If not synced, return None
             # Users must sync members in the Management page to get GitHub data
@@ -161,13 +171,14 @@ class GitHubCollector:
             logger.error(f"❌ [CORRELATION_ERROR] Error correlating email {email} to GitHub: {e}")
             return None
     
-    async def _check_manual_mappings(self, email: str, user_id: int) -> Optional[str]:
+    async def _check_manual_mappings(self, email: str, user_id: int, db_session=None) -> Optional[str]:
         """
         Check user_mappings table for manual GitHub mappings.
 
         Args:
             email: The email address to look up
             user_id: The user ID who owns the mappings
+            db_session: Optional shared session; if None, a new one is opened and closed internally
 
         Returns:
             GitHub username if found, None otherwise
@@ -178,10 +189,10 @@ class GitHubCollector:
                 logger.warning(f"Invalid user_id type for manual mapping check: {type(user_id).__name__}: {user_id}")
                 return None
 
-            # Use SessionLocal to avoid connection pool exhaustion
             from ..models import SessionLocal, UserMapping
 
-            db = SessionLocal()
+            own_session = db_session is None
+            db = db_session if db_session is not None else SessionLocal()
             try:
                 # Query for manual mapping
                 user_mapping = db.query(UserMapping).filter(
@@ -201,19 +212,21 @@ class GitHubCollector:
                     logger.debug(f"No manual GitHub mapping found for {email}")
                     return None
             finally:
-                db.close()
+                if own_session:
+                    db.close()
 
         except Exception as e:
             logger.error(f"Error checking manual mappings: {e}")
             return None
 
-    async def _check_synced_members(self, email: str, user_id: int) -> Optional[str]:
+    async def _check_synced_members(self, email: str, user_id: int, db_session=None) -> Optional[str]:
         """
         Check user_correlations table for synced GitHub usernames (from Sync Members feature).
 
         Args:
             email: The email address to look up
             user_id: The user ID who owns the correlations
+            db_session: Optional shared session; if None, a new one is opened and closed internally
 
         Returns:
             GitHub username if found, None otherwise
@@ -229,11 +242,10 @@ class GitHubCollector:
 
             logger.debug(f"🔍 [SYNCED_CHECK] Querying user_correlations for email: {email}")
 
-            # Use SessionLocal instead of creating new engine/connection for each query
-            # This prevents "too many clients" error when processing large teams
             from ..models import SessionLocal, UserCorrelation, User
 
-            db = SessionLocal()
+            own_session = db_session is None
+            db = db_session if db_session is not None else SessionLocal()
             try:
                 # Get user's organization_id for filtering
                 org_id = None
@@ -269,7 +281,8 @@ class GitHubCollector:
                     return user_correlation.github_username
                 return None
             finally:
-                db.close()
+                if own_session:
+                    db.close()
 
         except Exception as e:
             logger.error(f"❌ [SYNCED_CHECK_ERROR] Error checking synced members for {email}: {type(e).__name__}: {e}")
