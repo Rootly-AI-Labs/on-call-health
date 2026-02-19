@@ -72,7 +72,7 @@ Security Notes:
     parser.add_argument(
         '--database-url',
         type=str,
-        help='Database URL (e.g., postgresql://user:pass@host:5432/db). Overrides DATABASE_URL env var.'
+        help='Database URL (e.g., postgresql://user:pass@host:5432/db). Overrides DATABASE_URL env var. WARNING: avoid on shared machines — password stored in shell history. Use DATABASE_URL env var instead.'
     )
 
     parser.add_argument(
@@ -103,6 +103,7 @@ def get_database_url(args):
     # Priority 1: Command-line argument
     if args.database_url:
         print("ℹ️  Using DATABASE_URL from --database-url argument")
+        print("⚠️  Tip: prefer DATABASE_URL env var to avoid credentials in shell history")
         return args.database_url
 
     # Priority 2: --deployed flag requires environment variable
