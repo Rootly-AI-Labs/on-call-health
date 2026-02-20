@@ -216,6 +216,10 @@ function DashboardContent() {
   setDialogSelectedIntegration,
   noIntegrationsFound,
   setNoIntegrationsFound,
+  autoRefreshEnabled,
+  setAutoRefreshEnabled,
+  autoRefreshInterval,
+  setAutoRefreshInterval,
 
   // delete modal
   deleteDialogOpen,
@@ -1670,9 +1674,13 @@ function DashboardContent() {
                     const defaultDate = new Date()
                     defaultDate.setDate(defaultDate.getDate() - 30)
                     setCustomStartDate(defaultDate)
+                    setAutoRefreshEnabled(false)
                   } else {
                     setIsCustomRange(false)
                     setSelectedTimeRange(value)
+                    if (value !== "30" && value !== "90") {
+                      setAutoRefreshEnabled(false)
+                    }
                   }
                 }}
               >
@@ -1754,6 +1762,75 @@ function DashboardContent() {
                 </div>
               )}
             </div>
+
+            {/* Auto Refresh Section */}
+            {(() => {
+              const autoRefreshAvailable = selectedTimeRange === "30" || selectedTimeRange === "90"
+              return (
+                <div className="space-y-2">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <RefreshCw className="w-4 h-4 text-neutral-600" />
+                      <span className="text-sm font-medium text-neutral-700">Auto Refresh</span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="text-neutral-400 hover:text-neutral-600 transition-colors">
+                            <Info className="w-3.5 h-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 text-sm text-neutral-700 p-3" side="top" align="start">
+                          Auto Refresh is available for Last 30 days or Last 90 days time ranges. Once enabled, select how often you want the analysis to automatically re-run.
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <Switch
+                      checked={autoRefreshEnabled}
+                      onCheckedChange={(checked) => {
+                        if (autoRefreshAvailable) {
+                          setAutoRefreshEnabled(checked)
+                        }
+                      }}
+                      disabled={!autoRefreshAvailable}
+                    />
+                  </div>
+
+                  {/* Body box */}
+                  <div className={`rounded-md border p-3 space-y-2 transition-colors ${
+                    autoRefreshEnabled
+                      ? "border-purple-300 bg-purple-50"
+                      : "border-neutral-200 bg-neutral-50"
+                  }`}>
+                    <p className={`text-xs ${autoRefreshEnabled ? "text-purple-700" : "text-neutral-400"}`}>
+                      {autoRefreshEnabled
+                        ? "Analysis will automatically refresh at the selected interval"
+                        : "Enable to automatically re-run analysis on a schedule"}
+                    </p>
+                    <Select
+                      value={autoRefreshInterval}
+                      onValueChange={setAutoRefreshInterval}
+                      disabled={!autoRefreshEnabled}
+                    >
+                      <SelectTrigger className={`bg-white ${!autoRefreshEnabled ? "opacity-50" : ""}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="24h">Every 24 hours</SelectItem>
+                        <SelectItem value="3d">Every 3 days</SelectItem>
+                        <SelectItem value="7d">Every 7 days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {autoRefreshEnabled && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <span className="text-xs font-medium text-green-700">Auto refresh enabled</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+
             <div className="flex justify-end space-x-2 pt-4">
               <Button variant="outline" onClick={() => setShowTimeRangeDialog(false)}>
                 Cancel
