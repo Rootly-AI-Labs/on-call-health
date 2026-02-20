@@ -1458,6 +1458,8 @@ export default function useDashboard() {
   const [isCustomRange, setIsCustomRange] = useState(false)
   const [dialogSelectedIntegration, setDialogSelectedIntegration] = useState<string>("")
   const [noIntegrationsFound, setNoIntegrationsFound] = useState(false)
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState("24h")
   
   // GitHub/Slack integration states
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
@@ -2412,6 +2414,10 @@ return {
   setDialogSelectedIntegration,
   noIntegrationsFound,
   setNoIntegrationsFound,
+  autoRefreshEnabled,
+  setAutoRefreshEnabled,
+  autoRefreshInterval,
+  setAutoRefreshInterval,
 
   // delete modal
   deleteDialogOpen,
