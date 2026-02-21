@@ -214,6 +214,20 @@ async def startup_event():
     mcp_cleanup_scheduler.start()
     print("MCP connection cleanup scheduler started (every 5 minutes)")
 
+    # Start auto-refresh analysis scheduler (runs hourly)
+    from app.services.auto_refresh_scheduler import check_and_run_auto_refresh_analyses
+
+    auto_refresh_scheduler = AsyncIOScheduler()
+    auto_refresh_scheduler.add_job(
+        check_and_run_auto_refresh_analyses,
+        trigger="interval",
+        hours=1,
+        id="auto_refresh_analyses",
+        replace_existing=True,
+    )
+    auto_refresh_scheduler.start()
+    print("Auto-refresh analysis scheduler started (every hour)")
+
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
