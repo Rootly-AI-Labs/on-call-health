@@ -1241,6 +1241,34 @@ class MigrationRunner:
                 "description": "Add organization_id column to slack_integrations for org-level Slack management",
                 "sql_file": "2026_02_06_add_organization_id_to_slack_integrations.sql"
             },
+            {
+                "name": "046_add_analysis_save_and_autorefresh",
+                "description": "Add is_saved, is_auto_refresh, and auto_refresh_interval columns to analyses table",
+                "sql": [
+                    """
+                    ALTER TABLE analyses ADD COLUMN IF NOT EXISTS is_saved BOOLEAN NOT NULL DEFAULT FALSE
+                    """,
+                    """
+                    ALTER TABLE analyses ADD COLUMN IF NOT EXISTS is_auto_refresh BOOLEAN NOT NULL DEFAULT FALSE
+                    """,
+                    """
+                    ALTER TABLE analyses ADD COLUMN IF NOT EXISTS auto_refresh_interval VARCHAR(20)
+                    """,
+                    """
+                    UPDATE analyses SET is_saved = TRUE WHERE is_saved = FALSE
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_analyses_user_auto_refresh
+                    ON analyses(user_id, organization_id, is_auto_refresh)
+                    WHERE is_auto_refresh = TRUE
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_analyses_user_saved
+                    ON analyses(user_id, organization_id, is_saved)
+                    WHERE is_saved = TRUE
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
         ]
 
