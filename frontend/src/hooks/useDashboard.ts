@@ -31,6 +31,7 @@ export default function useDashboard() {
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
   const [targetProgress, setTargetProgress] = useState(0)
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null)
+  const [autoRefreshAnalysis, setAutoRefreshAnalysis] = useState<AnalysisResult | null>(null)
   const [previousAnalyses, setPreviousAnalyses] = useState<AnalysisResult[]>([])
   const [hasMoreAnalyses, setHasMoreAnalyses] = useState(true)
   const [loadingMoreAnalyses, setLoadingMoreAnalyses] = useState(false)
@@ -340,6 +341,7 @@ export default function useDashboard() {
         // Load data with individual error handling to prevent blocking
         const results = await Promise.allSettled([
           loadPreviousAnalyses(),
+          loadAutoRefreshAnalysis(),
           loadIntegrations(false, false) // Don't force refresh, don't show global loading
         ])
 
@@ -710,6 +712,12 @@ export default function useDashboard() {
           const urlParams = new URLSearchParams(window.location.search)
           const analysisId = urlParams.get('analysis')
 
+          // If no URL analysis param, prefer autoRefreshAnalysis, else fall back to most recent saved
+          if (!analysisId && autoRefreshAnalysis && !currentAnalysis) {
+            // Auto-refresh analysis takes priority when nothing else is selected
+            // It will be set in setCurrentAnalysis by the caller - skip for now
+          }
+
           // Always load the most recent analysis if no analysis is specified in URL
           if (!analysisId && data.analyses && data.analyses.length > 0) {
             const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
@@ -818,6 +826,49 @@ export default function useDashboard() {
       } else {
         setLoadingAnalyses(false)
       }
+    }
+  }
+
+  const loadAutoRefreshAnalysis = async () => {
+    try {
+      const authToken = checkAuthToken()
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/analyses/auto-refresh`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAutoRefreshAnalysis(data) // null if no auto-refresh analysis exists
+      }
+    } catch (error) {
+      // Non-critical: don't show toast
+    }
+  }
+
+  const saveCurrentAnalysis = async () => {
+    if (!currentAnalysis || currentAnalysis.is_saved || currentAnalysis.is_auto_refresh) return
+
+    try {
+      const authToken = checkAuthToken()
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/analyses/${currentAnalysis.id}/save`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      if (response.ok) {
+        setCurrentAnalysis({ ...currentAnalysis, is_saved: true })
+        // Reload saved analyses list
+        await loadPreviousAnalyses()
+        toast.success("Analysis saved")
+      } else {
+        toast.error("Failed to save analysis")
+      }
+    } catch (error) {
+      toast.error("Failed to save analysis")
     }
   }
 
@@ -1002,6 +1053,11 @@ export default function useDashboard() {
           newCache.delete(analysisId)
           return newCache
         })
+
+        // Clear auto-refresh state if this was the auto-refresh analysis
+        if (autoRefreshAnalysis && String(autoRefreshAnalysis.id) === analysisId) {
+          setAutoRefreshAnalysis(null)
+        }
 
         // Clear selection if this analysis was selected
         if (currentAnalysis?.id === analysisToDelete.id) {
@@ -1737,6 +1793,24 @@ export default function useDashboard() {
         console.warn('Integration validation failed, continuing anyway:', validationError)
       }
       
+      // Discard unsaved non-auto-refresh analysis before running a new one
+      if (currentAnalysis &&
+          currentAnalysis.status === 'completed' &&
+          currentAnalysis.is_saved !== true &&
+          currentAnalysis.is_auto_refresh !== true) {
+        try {
+          const discardToken = getValidToken()
+          if (discardToken) {
+            await fetch(`${API_BASE}/analyses/${currentAnalysis.id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${discardToken}` }
+            })
+          }
+        } catch (_) {
+          // Non-critical: continue even if discard fails
+        }
+      }
+
       const requestData = {
         integration_id: integrationId,
         time_range: parseInt(selectedTimeRange),
@@ -1745,7 +1819,9 @@ export default function useDashboard() {
         include_slack: slackIntegration ? includeSlack : false,
         include_jira: jiraIntegration ? includeJira : false,
         include_linear: linearIntegration ? includeLinear : false,
-        enable_ai: enableAI  // User can toggle, uses Railway token when enabled
+        enable_ai: enableAI,  // User can toggle, uses Railway token when enabled
+        auto_refresh_enabled: autoRefreshEnabled,
+        auto_refresh_interval: autoRefreshEnabled ? autoRefreshInterval : null,
       }
       
 
@@ -1902,7 +1978,11 @@ export default function useDashboard() {
               
               // Reload previous analyses from API to ensure sidebar is up-to-date
               await loadPreviousAnalyses()
-              
+              // Reload auto-refresh analysis if this was an auto-refresh run
+              if (autoRefreshEnabled) {
+                await loadAutoRefreshAnalysis()
+              }
+
               toast.success("Analysis completed!")
               return
             } else if (analysisData.status === 'failed') {
@@ -2324,6 +2404,7 @@ return {
   // core data
   integrations,
   currentAnalysis,
+  autoRefreshAnalysis,
   previousAnalyses,
   totalAnalysesCount,
   historicalTrends,
@@ -2387,6 +2468,8 @@ return {
   openDeleteDialog,
   confirmDeleteAnalysis,
   loadPreviousAnalyses,
+  loadAutoRefreshAnalysis,
+  saveCurrentAnalysis,
   loadSpecificAnalysis,
   loadHistoricalTrends,
   fetchPlatformMappings,

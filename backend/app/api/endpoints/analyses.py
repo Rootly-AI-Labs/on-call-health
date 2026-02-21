@@ -105,17 +105,22 @@ class AnalysisResponse(BaseModel):
     id: int
     uuid: Optional[str]
     integration_id: Optional[int]
-    
+
     # NEW: Integration details stored directly with analysis (optional for backward compatibility)
     integration_name: Optional[str] = None  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
     platform: Optional[str] = None          # "rootly", "pagerduty"
-    
+
     status: str
     created_at: datetime
     completed_at: Optional[datetime]
     time_range: int
     analysis_data: Optional[dict]
     config: Optional[dict]
+
+    # Save and auto-refresh fields
+    is_saved: bool = False
+    is_auto_refresh: bool = False
+    auto_refresh_interval: Optional[str] = None
 
 
 class AnalysisListResponse(BaseModel):
@@ -324,6 +329,21 @@ async def run_burnout_analysis(
         if hasattr(integration, 'organization_name'):
             logger.info(f"🔍 Integration organization_name: '{integration.organization_name}'")
 
+        # Handle auto-refresh: delete existing auto-refresh analysis for same user/org
+        auto_refresh_enabled = getattr(request, 'auto_refresh_enabled', False)
+        auto_refresh_interval = getattr(request, 'auto_refresh_interval', None) if auto_refresh_enabled else None
+
+        if auto_refresh_enabled:
+            existing_auto_refresh = db.query(Analysis).filter(
+                Analysis.user_id == current_user.id,
+                Analysis.organization_id == current_user.organization_id,
+                Analysis.is_auto_refresh == True
+            ).first()
+            if existing_auto_refresh:
+                logger.info(f"🔄 [AUTO_REFRESH] Deleting previous auto-refresh analysis {existing_auto_refresh.id} for user {current_user.id}")
+                db.delete(existing_auto_refresh)
+                db.commit()
+
         analysis = Analysis(
             user_id=current_user.id,
             organization_id=current_user.organization_id,  # Add organization_id for multi-tenancy
@@ -335,6 +355,9 @@ async def run_burnout_analysis(
 
             time_range=request.time_range,
             status="pending",
+            is_saved=False,
+            is_auto_refresh=auto_refresh_enabled,
+            auto_refresh_interval=auto_refresh_interval,
             config={
                 "include_weekends": request.include_weekends,
                 "include_github": request.include_github,
@@ -394,17 +417,20 @@ async def run_burnout_analysis(
             id=analysis.id,
             uuid=getattr(analysis, 'uuid', None),
             integration_id=analysis.rootly_integration_id,
-            
+
             # Include new integration fields
             integration_name=analysis.integration_name,
             platform=analysis.platform,
-            
+
             status=analysis.status,
             created_at=analysis.created_at,
             completed_at=analysis.completed_at,
             time_range=analysis.time_range,
             analysis_data=None,
-            config=analysis.config
+            config=analysis.config,
+            is_saved=analysis.is_saved,
+            is_auto_refresh=analysis.is_auto_refresh,
+            auto_refresh_interval=analysis.auto_refresh_interval,
         )
     except Exception as e:
         logger.error(f"Critical error in run_burnout_analysis: {str(e)}")
@@ -438,7 +464,11 @@ async def list_analyses(
     logger.info(f"📋 [LIST_ANALYSES] Request received - user_id={current_user.id}, limit={limit}, offset={offset}, status={filter_status}")
 
     # Build base filter conditions
-    filters = [Analysis.user_id == current_user.id]
+    filters = [
+        Analysis.user_id == current_user.id,
+        Analysis.is_saved == True,
+        Analysis.is_auto_refresh == False,
+    ]
 
     # Filter by integration if specified
     if integration_id:
@@ -479,6 +509,9 @@ async def list_analyses(
         Analysis.integration_name,
         Analysis.platform,
         Analysis.rootly_integration_id,
+        Analysis.is_saved,
+        Analysis.is_auto_refresh,
+        Analysis.auto_refresh_interval,
         count_window
     ).filter(
         *filters
@@ -506,7 +539,10 @@ async def list_analyses(
                 completed_at=row.completed_at,
                 time_range=row.time_range or 30,
                 analysis_data=extract_analysis_summary(None),  # Don't access results - excluded
-                config=row.config
+                config=row.config,
+                is_saved=getattr(row, 'is_saved', True),
+                is_auto_refresh=getattr(row, 'is_auto_refresh', False),
+                auto_refresh_interval=getattr(row, 'auto_refresh_interval', None),
             )
         )
 
@@ -514,6 +550,77 @@ async def list_analyses(
     return AnalysisListResponse(
         analyses=response_analyses,
         total=total
+    )
+
+
+@router.get("/auto-refresh", response_model=Optional[AnalysisResponse])
+async def get_auto_refresh_analysis(
+    current_user: User = Depends(get_current_user_flexible),
+    db: Session = Depends(get_db)
+):
+    """Get the current auto-refresh analysis for this user/org."""
+    analysis = db.query(Analysis).options(defer(Analysis.results)).filter(
+        Analysis.user_id == current_user.id,
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.is_auto_refresh == True
+    ).order_by(Analysis.created_at.desc()).first()
+
+    if not analysis:
+        return None
+
+    return AnalysisResponse(
+        id=analysis.id,
+        uuid=getattr(analysis, 'uuid', None),
+        integration_id=analysis.rootly_integration_id,
+        integration_name=analysis.integration_name,
+        platform=analysis.platform,
+        status=analysis.status,
+        created_at=analysis.created_at,
+        completed_at=analysis.completed_at,
+        time_range=analysis.time_range or 30,
+        analysis_data=extract_analysis_summary(None),
+        config=analysis.config,
+        is_saved=False,
+        is_auto_refresh=True,
+        auto_refresh_interval=getattr(analysis, 'auto_refresh_interval', None),
+    )
+
+
+@router.post("/{analysis_id}/save", response_model=AnalysisResponse)
+async def save_analysis(
+    analysis_id: int,
+    current_user: User = Depends(get_current_user_flexible),
+    db: Session = Depends(get_db)
+):
+    """Mark an analysis as saved."""
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id,
+        Analysis.user_id == current_user.id,
+        Analysis.is_auto_refresh == False
+    ).first()
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    analysis.is_saved = True
+    db.commit()
+    db.refresh(analysis)
+
+    return AnalysisResponse(
+        id=analysis.id,
+        uuid=getattr(analysis, 'uuid', None),
+        integration_id=analysis.rootly_integration_id,
+        integration_name=analysis.integration_name,
+        platform=analysis.platform,
+        status=analysis.status,
+        created_at=analysis.created_at,
+        completed_at=analysis.completed_at,
+        time_range=analysis.time_range or 30,
+        analysis_data=extract_analysis_summary(None),
+        config=analysis.config,
+        is_saved=True,
+        is_auto_refresh=False,
+        auto_refresh_interval=getattr(analysis, 'auto_refresh_interval', None),
     )
 
 
@@ -587,7 +694,10 @@ async def get_analysis_by_uuid(
         completed_at=analysis.completed_at,
         time_range=analysis.time_range or 30,
         analysis_data=analysis_data,
-        config=analysis.config
+        config=analysis.config,
+        is_saved=getattr(analysis, 'is_saved', True),
+        is_auto_refresh=getattr(analysis, 'is_auto_refresh', False),
+        auto_refresh_interval=getattr(analysis, 'auto_refresh_interval', None),
     )
 
 
@@ -646,7 +756,10 @@ async def get_analysis(
         completed_at=analysis.completed_at,
         time_range=analysis.time_range or 30,
         analysis_data=analysis_data,
-        config=analysis.config
+        config=analysis.config,
+        is_saved=getattr(analysis, 'is_saved', True),
+        is_auto_refresh=getattr(analysis, 'is_auto_refresh', False),
+        auto_refresh_interval=getattr(analysis, 'auto_refresh_interval', None),
     )
 
 
