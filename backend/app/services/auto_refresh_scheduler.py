@@ -1,15 +1,31 @@
 """
 Auto-refresh analysis scheduler.
 
-Runs hourly to check if any auto-refresh analyses are due for a re-run.
-When due, creates a new Analysis record (same params) and fires the background task.
+Registers one CronTrigger job per supported interval (24h / 3d / 7d) so each
+fires at exactly the right cadence and only processes analyses for that interval.
 """
 import asyncio
 import logging
 import uuid as uuid_module
 from datetime import datetime, timedelta, timezone
 
+from apscheduler.triggers.cron import CronTrigger
+
 logger = logging.getLogger(__name__)
+
+
+def _make_cron_trigger(interval_str: str) -> CronTrigger:
+    """Map an interval string to the appropriate CronTrigger."""
+    if interval_str == "10m":
+        return CronTrigger(minute="*/10")                # every 10 minutes (testing)
+    elif interval_str == "24h":
+        return CronTrigger(hour=0, minute=0)             # daily at midnight
+    elif interval_str == "3d":
+        return CronTrigger(day="*/3", hour=0, minute=0)  # every 3 days at midnight
+    elif interval_str == "7d":
+        return CronTrigger(day="*/7", hour=0, minute=0)  # every 7 days at midnight
+    else:
+        return CronTrigger(hour=0, minute=0)              # fallback: daily
 
 
 def _parse_interval(interval_str: str) -> timedelta:
@@ -17,6 +33,8 @@ def _parse_interval(interval_str: str) -> timedelta:
     if not interval_str:
         return timedelta(days=1)
     interval_str = interval_str.strip().lower()
+    if interval_str.endswith("m"):
+        return timedelta(minutes=int(interval_str[:-1]))
     if interval_str.endswith("h"):
         return timedelta(hours=int(interval_str[:-1]))
     if interval_str.endswith("d"):
@@ -28,27 +46,31 @@ def _parse_interval(interval_str: str) -> timedelta:
         return timedelta(days=1)
 
 
-async def check_and_run_auto_refresh_analyses():
+async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
     """
-    Hourly job: find all auto-refresh analyses whose interval has elapsed
-    since their last completion and re-run them.
+    Cron job: find auto-refresh analyses matching `interval_filter` that are due
+    and re-run them.  Pass interval_filter=None to process all intervals.
     """
     from ..models import SessionLocal, Analysis, RootlyIntegration
     from ..api.endpoints.analyses import run_analysis_task
 
-    logger.info("🔄 [AUTO_REFRESH_SCHEDULER] Checking for due auto-refresh analyses...")
+    label = interval_filter or "all"
+    logger.info(f"🔄 [AUTO_REFRESH_SCHEDULER] Checking for due auto-refresh analyses (interval={label})...")
 
     db = SessionLocal()
     due_analyses = []
 
     try:
-        # Fetch all completed auto-refresh analyses
+        # Fetch completed auto-refresh analyses, optionally scoped to one interval
         candidates = db.query(Analysis).filter(
             Analysis.is_auto_refresh == True,
             Analysis.status == "completed",
             Analysis.auto_refresh_interval != None,
             Analysis.completed_at != None,
-        ).all()
+        )
+        if interval_filter:
+            candidates = candidates.filter(Analysis.auto_refresh_interval == interval_filter)
+        candidates = candidates.all()
 
         now = datetime.now(timezone.utc)
 

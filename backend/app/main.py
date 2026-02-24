@@ -214,19 +214,24 @@ async def startup_event():
     mcp_cleanup_scheduler.start()
     print("MCP connection cleanup scheduler started (every 5 minutes)")
 
-    # Start auto-refresh analysis scheduler (runs hourly)
-    from app.services.auto_refresh_scheduler import check_and_run_auto_refresh_analyses
+    # Start auto-refresh analysis scheduler — one cron job per interval cadence
+    from apscheduler.triggers.cron import CronTrigger
+    from app.services.auto_refresh_scheduler import (
+        check_and_run_auto_refresh_analyses,
+        _make_cron_trigger,
+    )
 
     auto_refresh_scheduler = AsyncIOScheduler()
-    auto_refresh_scheduler.add_job(
-        check_and_run_auto_refresh_analyses,
-        trigger="interval",
-        hours=1,
-        id="auto_refresh_analyses",
-        replace_existing=True,
-    )
+    for interval in ["10m", "24h", "3d", "7d"]:
+        auto_refresh_scheduler.add_job(
+            check_and_run_auto_refresh_analyses,
+            trigger=_make_cron_trigger(interval),
+            id=f"auto_refresh_{interval}",
+            replace_existing=True,
+            kwargs={"interval_filter": interval},
+        )
     auto_refresh_scheduler.start()
-    print("Auto-refresh analysis scheduler started (every hour)")
+    print("Auto-refresh analysis scheduler started (10m: every 10 min | 24h: daily | 3d: every 3 days | 7d: every 7 days)")
 
 
 # Include API routers
