@@ -345,12 +345,15 @@ export default function useDashboard() {
           loadIntegrations(false, false) // Don't force refresh, don't show global loading
         ])
 
-        // Log any failures but don't block the UI
-        results.forEach((result, index) => {
-          const functionNames = ['loadPreviousAnalyses', 'loadIntegrations']
-          if (result.status === 'rejected') {
-            }
-        })
+        // If an auto-refresh analysis exists and no specific analysis was requested via URL,
+        // promote it to the current analysis (takes priority over the most-recent fallback).
+        const autoRefreshResult = results[1]
+        if (autoRefreshResult.status === 'fulfilled' && autoRefreshResult.value) {
+          const urlParams = new URLSearchParams(window.location.search)
+          if (!urlParams.get('analysis')) {
+            setCurrentAnalysis(autoRefreshResult.value)
+          }
+        }
 
         // Mark as loaded - the data is ready even if currentAnalysis isn't set yet
         // The UI will update when currentAnalysis is set in the next render
@@ -829,10 +832,10 @@ export default function useDashboard() {
     }
   }
 
-  const loadAutoRefreshAnalysis = async () => {
+  const loadAutoRefreshAnalysis = async (): Promise<AnalysisResult | null> => {
     try {
       const authToken = checkAuthToken()
-      if (!authToken) return
+      if (!authToken) return null
 
       const response = await fetch(`${API_BASE}/analyses/auto-refresh`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
@@ -841,10 +844,12 @@ export default function useDashboard() {
       if (response.ok) {
         const data = await response.json()
         setAutoRefreshAnalysis(data) // null if no auto-refresh analysis exists
+        return data
       }
     } catch (error) {
       // Non-critical: don't show toast
     }
+    return null
   }
 
   const saveCurrentAnalysis = async () => {
