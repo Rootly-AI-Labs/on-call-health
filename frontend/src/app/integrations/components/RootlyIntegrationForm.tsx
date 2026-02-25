@@ -154,9 +154,9 @@ export function RootlyIntegrationForm({
                     <li><strong>1.</strong> Log in to your Rootly account</li>
                     <li><strong>2.</strong> Navigate to <code className="bg-purple-100 px-1 rounded">Settings → API Keys</code></li>
                     <li><strong>3.</strong> Click <strong>Generate New API Key</strong></li>
-                    <li><strong>4.</strong> Select <strong>Global API key</strong> (org admins) or <strong>Team API key</strong> (team admins)</li>
+                    <li><strong>4.</strong> Select <strong>Global API key</strong> or <strong>Personal API Key</strong></li>
                     <li><strong>5a.</strong> For <strong>Global API key</strong>: pick <strong>Admin</strong> or <strong>Owner</strong> as Role (required to read all team members)</li>
-                    <li><strong>5b.</strong> For <strong>Team API key</strong>: Note — Team API keys do not have access to incident data. Use a Global API key for On-Call Health analysis.</li>
+                    <li><strong>5b.</strong> For <strong>Personal API key</strong>: pick <strong>User</strong> permission or higher</li>
                     <li><strong>6.</strong> Click <strong>Create</strong> and copy the generated token (starts with <strong>"rootly_"</strong>)</li>
                   </ol>
                 </AlertDescription>
@@ -173,7 +173,7 @@ export function RootlyIntegrationForm({
               name="rootlyToken"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Rootly API Token (Global or Team type)</FormLabel>
+                  <FormLabel>Rootly API Token (Global or Personal type)</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
