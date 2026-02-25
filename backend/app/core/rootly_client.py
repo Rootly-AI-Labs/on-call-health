@@ -379,7 +379,7 @@ class RootlyAPIClient:
                             "id": team.get("id"),
                             "name": team.get("attributes", {}).get("name"),
                             "slug": team.get("attributes", {}).get("slug"),
-                            "member_count": team.get("attributes", {}).get("user_ids") and len(team["attributes"]["user_ids"]) or 0,
+                            "member_count": len(team.get("attributes", {}).get("user_ids") or []),
                         })
                     meta = data.get("meta", {})
                     if page >= meta.get("total_pages", 1):

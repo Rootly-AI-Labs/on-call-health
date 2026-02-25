@@ -103,6 +103,7 @@ export function RootlyIntegrationForm({
     let cancelled = false
     setLoadingTeams(true)
     const authToken = localStorage.getItem('auth_token')
+    if (!authToken) { setLoadingTeams(false); return }
     fetch(`${API_BASE}/rootly/token/teams`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
