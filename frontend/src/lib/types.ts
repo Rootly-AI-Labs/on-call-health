@@ -9,6 +9,8 @@ export interface Integration {
   last_used_at: string | null
   token_suffix: string
   platform?: 'rootly' | 'pagerduty'
+  key_type?: string
+  team_name?: string
   permissions?: {
     users?: {
       access: boolean
@@ -424,4 +426,3 @@ export interface AnalysisResult {
 }
 
 export type AnalysisStage = "loading" | "connecting" | "fetching_users" | "fetching" | "fetching_github" | "fetching_slack" | "calculating" | "analyzing" | "preparing" | "complete"
-

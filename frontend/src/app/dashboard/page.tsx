@@ -1302,7 +1302,6 @@ function DashboardContent() {
                 {(() => {
                   const selected = integrations.find(i => i.id.toString() === dialogSelectedIntegration)
                   if (selected) {
-                    // Use same logic as integrations page - show integration.name
                     const organizationName = selected.name
                     
                     // Use platform field from backend (not inferred from name)
@@ -1323,9 +1322,14 @@ function DashboardContent() {
                       <div>
                         <div className="flex items-center">
                           <div className={`w-2 h-2 rounded-full mr-2 ${platformColor}`}></div>
-                          <span className="font-medium">
-                            {organizationName}
-                          </span>
+                          <div className="min-w-0">
+                            <span className="font-medium block truncate">{organizationName}</span>
+                            {selected.platform === 'rootly' && selected.team_name && (
+                              <span className="mt-1 inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700">
+                                Team scope: {selected.team_name}
+                              </span>
+                            )}
+                          </div>
                           <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-auto" />
                         </div>
                         <button 
