@@ -1,7 +1,7 @@
 """
 Rootly integration API endpoints.
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
 import logging
 import os
@@ -28,6 +28,8 @@ class RootlyIntegrationAdd(BaseModel):
     organization_name: str = None
     total_users: int = 0
     permissions: Dict[str, Any] = None
+    key_type: str = "global"
+    team_name: Optional[str] = None
 
 class RootlyIntegrationUpdate(BaseModel):
     name: str = None
@@ -148,9 +150,13 @@ async def test_rootly_token_preview(
         suggested_name = f"{base_name} #{counter}"
         counter += 1
     
-    # Check permissions for the token
-    permissions = await client.check_permissions()
-    
+    # Reuse permissions already fetched inside test_connection() — no extra API call needed
+    permissions = account_info.get("permissions", {})
+
+    # Extract team-scoped key metadata
+    key_type = account_info.get("key_type", "global")
+    team_name = account_info.get("team_name")
+
     return {
         "status": "success",
         "message": "Token is valid and ready to add",
@@ -158,13 +164,26 @@ async def test_rootly_token_preview(
             "organization_name": organization_name,
             "suggested_name": suggested_name,
             "total_users": total_users,
-            "can_add": True
+            "can_add": True,
+            "key_type": key_type,
+            "team_name": team_name,
         },
         "account_info": {
             **account_info,
             "permissions": permissions
         }
     }
+
+@router.post("/token/teams")
+async def get_rootly_teams(
+    token_request: RootlyTokenRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Fetch available teams for a Rootly global API token."""
+    client = RootlyAPIClient(token_request.token.strip())
+    teams = await client.get_teams()
+    return {"teams": teams}
+
 
 @router.post("/token/add")
 async def add_rootly_integration(
@@ -225,7 +244,9 @@ async def add_rootly_integration(
         created_at=datetime.now(timezone.utc),
         last_used_at=datetime.now(timezone.utc),
         cached_permissions=permissions,  # Cache permissions from preview
-        permissions_checked_at=datetime.now(timezone.utc)  # Set cache timestamp
+        permissions_checked_at=datetime.now(timezone.utc),  # Set cache timestamp
+        key_type=integration_data.key_type,
+        team_name=integration_data.team_name,
     )
     
     try:
@@ -295,7 +316,9 @@ async def list_integrations(
             "is_default": integration.is_default,
             "created_at": integration.created_at.isoformat(),
             "last_used_at": integration.last_used_at.isoformat() if integration.last_used_at else None,
-            "token_suffix": f"****{integration.api_token[-4:]}" if integration.api_token and len(integration.api_token) >= 4 else "****"
+            "token_suffix": f"****{integration.api_token[-4:]}" if integration.api_token and len(integration.api_token) >= 4 else "****",
+            "key_type": integration.key_type,
+            "team_name": integration.team_name,
         }
         result_integrations.append(integration_data)
 

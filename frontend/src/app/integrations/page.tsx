@@ -641,6 +641,7 @@ export default function IntegrationsPage() {
   const [isTestingConnection, setIsTestingConnection] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error' | 'duplicate'>('idle')
   const [previewData, setPreviewData] = useState<PreviewData | null>(null)
+  const orgTotalUsersRef = useRef<number | null>(null)  // original org-wide user count before team scope
   const [duplicateInfo, setDuplicateInfo] = useState<any>(null)
   const [errorDetails, setErrorDetails] = useState<{ user_message: string; user_guidance: string; error_code: string } | null>(null)
   const [isAddingRootly, setIsAddingRootly] = useState(false)
@@ -2163,7 +2164,11 @@ export default function IntegrationsPage() {
 
   // Close active enhancement tab when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleMouseDown = (event: MouseEvent) => {
+      // If the click target was detached from the DOM before mousedown fired
+      // (Radix removes its portal/overlay on pointerdown), ignore this event.
+      if (!(event.target as Node).isConnected) return
+      if (document.querySelector('[data-radix-popper-content-wrapper]')) return
       const enhancedSection = document.querySelector('[data-enhancement-section]')
       if (enhancedSection && !enhancedSection.contains(event.target as Node)) {
         setActiveEnhancementTab(null)
@@ -2171,14 +2176,21 @@ export default function IntegrationsPage() {
     }
 
     if (activeEnhancementTab) {
-      document.addEventListener('click', handleClickOutside)
-      return () => document.removeEventListener('click', handleClickOutside)
+      document.addEventListener('mousedown', handleMouseDown)
+      return () => document.removeEventListener('mousedown', handleMouseDown)
     }
   }, [activeEnhancementTab])
 
   // Close active incident management tab and form when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    if (!activeTab && !addingPlatform) return
+
+    const handleMouseDown = (event: MouseEvent) => {
+      // If the click target was detached from the DOM before mousedown fired
+      // (Radix removes its portal/overlay on pointerdown), ignore this event.
+      if (!(event.target as Node).isConnected) return
+      if (document.querySelector('[data-radix-popper-content-wrapper]')) return
+
       const incidentSection = document.querySelector('[data-incident-section]')
       if (incidentSection && !incidentSection.contains(event.target as Node)) {
         setActiveTab(null)
@@ -2186,9 +2198,9 @@ export default function IntegrationsPage() {
       }
     }
 
-    document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
-  }, [])
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [activeTab, addingPlatform])
 
   return (
     <div className="flex flex-col h-screen w-full bg-neutral-100">
@@ -2336,6 +2348,21 @@ export default function IntegrationsPage() {
                 form={rootlyForm}
                 onTest={testConnection}
                 onAdd={() => addIntegration('rootly')}
+                onTeamSelect={(teamName, memberCount) => setPreviewData(prev => {
+                  if (!prev) return prev
+                  if (teamName) {
+                    // Save the original org-wide count the first time a team is selected
+                    if (orgTotalUsersRef.current === null) {
+                      orgTotalUsersRef.current = prev.total_users
+                    }
+                    return { ...prev, team_name: teamName, total_users: memberCount ?? prev.total_users }
+                  } else {
+                    // Restore org-wide count when "all teams" is re-selected
+                    const restored = orgTotalUsersRef.current ?? prev.total_users
+                    orgTotalUsersRef.current = null
+                    return { ...prev, team_name: undefined, total_users: restored }
+                  }
+                })}
                 connectionStatus={connectionStatus}
                 previewData={previewData}
                 duplicateInfo={duplicateInfo}
@@ -2486,6 +2513,11 @@ export default function IntegrationsPage() {
                                       selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
                                     }`}></div>
                                     <span className="font-medium text-sm sm:text-base truncate">{selected.name}</span>
+                                    {selected.platform === 'rootly' && selected.team_name && (
+                                      <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 flex-shrink-0">
+                                        {selected.key_type === 'global' ? 'Scope' : 'Team'}: {selected.team_name}
+                                      </span>
+                                    )}
                                   </div>
                                   <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 ml-2 sm:ml-4" />
                                 </div>
@@ -2519,6 +2551,11 @@ export default function IntegrationsPage() {
                                     <div className="flex items-center gap-1 overflow-hidden">
                                       <div className="w-3 h-3 bg-purple-500 rounded-full flex-shrink-0"></div>
                                       <span className="font-medium text-sm sm:text-base truncate">{integration.name}</span>
+                                      {integration.platform === 'rootly' && integration.team_name && (
+                                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 flex-shrink-0">
+                                          {integration.key_type === 'global' ? 'Scope' : 'Team'}: {integration.team_name}
+                                        </span>
+                                      )}
                                       {hasPermissionIssues && (
                                         <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700 flex-shrink-0 hidden">
                                           Missing Permissions
@@ -2693,6 +2730,17 @@ export default function IntegrationsPage() {
                                 <div className="text-neutral-700">{integration.total_users}</div>
                               </div>
                             </div>
+                            {integration.platform === 'rootly' && integration.team_name && (
+                              <div className="flex items-start space-x-2">
+                                <Shield className="w-4 h-4 mt-0.5 text-purple-500" />
+                                <div>
+                                  <div className="font-bold text-neutral-900">
+                                    {integration.key_type === 'global' ? 'Team Scope' : 'Team'}
+                                  </div>
+                                  <div className="text-purple-700 font-medium">{integration.team_name}</div>
+                                </div>
+                              </div>
+                            )}
                             {integration.platform === 'pagerduty' && integration.total_services !== undefined && (
                               <div className="flex items-start space-x-2">
                                 <Zap className="w-4 h-4 mt-0.5 text-neutral-500" />

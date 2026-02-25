@@ -69,6 +69,8 @@ export async function testConnection(
           total_users: data.preview?.total_users || data.account_info?.total_users,
           suggested_name: data.preview?.suggested_name || data.account_info?.suggested_name,
           can_add: data.preview?.can_add || data.account_info?.can_add,
+          key_type: data.preview?.key_type || data.account_info?.key_type,
+          team_name: data.preview?.team_name || data.account_info?.team_name,
           permissions: data.account_info?.permissions
         })
       } else {
@@ -270,6 +272,8 @@ export async function addIntegration(
           organization_name: previewData.organization_name,
           total_users: previewData.total_users || 0,
           permissions: previewData.permissions || {},
+          key_type: previewData.key_type || 'global',
+          team_name: previewData.team_name || null,
         }
       : {
           token: token,
