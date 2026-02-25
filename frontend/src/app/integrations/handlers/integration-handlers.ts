@@ -309,10 +309,10 @@ export async function addIntegration(
       localStorage.removeItem('all_integrations')
       localStorage.removeItem('all_integrations_timestamp')
 
-      // If this is the first integration, set it as selected for dashboard
+      // Always select the newly added integration for dashboard / sync flow
       try {
         const newIntegrationId = responseData.integration?.id || responseData.id
-        if (newIntegrationId && integrations.length === 0) {
+        if (newIntegrationId) {
           const integrationIdStr = newIntegrationId.toString()
           localStorage.setItem('selected_organization', integrationIdStr)
           // Update React state to reflect the selection in UI
