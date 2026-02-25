@@ -383,10 +383,11 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
 
         # Attempt to collect incident data to determine if GitHub-only analysis is needed
         incident_data_available = False
+        rootly_team_name = getattr(integration, 'team_name', None)
         try:
             logger.info(f"Testing incident data availability for integration '{integration.name}'")
-            client = RootlyAPIClient(integration.api_token)
-            test_data = await client.collect_analysis_data(days_back=1)  # Quick test with 1 day
+            client = RootlyAPIClient(integration.api_token, team_name=rootly_team_name)
+            test_data = await client.collect_analysis_data(days_back=1, team_name=rootly_team_name)  # Quick test with 1 day
             
             # Check if we got meaningful incident data
             incidents = test_data.get("incidents", [])
@@ -529,6 +530,33 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
                 ]
 
                 logger.info(f"[Analysis {analysis_ref}] ✅ Fetched {len(synced_users)} user correlations")
+
+                # If integration is team-scoped, filter synced_users to only that team's members.
+                # This prevents all org users appearing as "no activity" on the dashboard.
+                # Filter by email (always populated) rather than rootly_user_id (may be NULL).
+                if rootly_team_name and synced_users:
+                    try:
+                        team_client = RootlyAPIClient(integration.api_token)
+                        team_emails = await team_client.get_team_member_emails(rootly_team_name)
+                        if team_emails:
+                            before = len(synced_users)
+                            synced_users = [
+                                u for u in synced_users
+                                if (u.get("email") or "").lower() in team_emails
+                            ]
+                            logger.info(
+                                f"[Analysis {analysis_ref}] Team scope '{rootly_team_name}': "
+                                f"filtered synced_users {before} → {len(synced_users)} "
+                                f"(matched against {len(team_emails)} team member emails)"
+                            )
+                        else:
+                            logger.warning(
+                                f"[Analysis {analysis_ref}] Could not resolve team emails for '{rootly_team_name}', "
+                                f"using all {len(synced_users)} synced users"
+                            )
+                    except Exception as e:
+                        logger.warning(f"[Analysis {analysis_ref}] Team filter for synced_users failed: {e}")
+
                 users_with_jira = [u for u in synced_users if u.get("jira_account_id")]
                 if users_with_jira:
                     logger.info(f"  ✅ {len(users_with_jira)} users have Jira mapping")
@@ -553,7 +581,8 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
                 synced_users=synced_users,
                 current_user_id=user_id,
                 db=db,  # Reuse DB session to prevent connection pool exhaustion
-                organization_id=user.organization_id
+                organization_id=user.organization_id,
+                team_name=rootly_team_name,
             )
             
             # Run analysis

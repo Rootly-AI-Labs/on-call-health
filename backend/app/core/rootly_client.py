@@ -48,9 +48,10 @@ RETRYABLE_EXCEPTIONS = (
 
 class RootlyAPIClient:
     """Direct HTTP client for Rootly API."""
-    
-    def __init__(self, api_token: str):
+
+    def __init__(self, api_token: str, team_name: str = None):
         self.api_token = api_token
+        self.team_name = team_name
         self.base_url = settings.ROOTLY_API_BASE_URL
         self.headers = {
             "Authorization": f"Bearer {api_token}",
@@ -121,13 +122,18 @@ class RootlyAPIClient:
         if last_exception:
             raise last_exception
 
-    async def check_permissions(self) -> Dict[str, Any]:
-        """Check permissions for specific API endpoints."""
+    async def check_permissions(self, team_name: str = None) -> Dict[str, Any]:
+        """Check permissions for specific API endpoints.
+
+        For team-scoped keys, if the global incidents endpoint returns 404,
+        incidents access is denied immediately — Rootly team keys have no IR role
+        and cannot access incident data under any filter.
+        """
         permissions = {
             "users": {"access": False, "error": None},
             "incidents": {"access": False, "error": None}
         }
-        
+
         try:
             async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
                 # Test users endpoint
@@ -137,7 +143,7 @@ class RootlyAPIClient:
                         headers=self.headers,
                         params={"page[size]": 1}
                     )
-                    
+
                     if response.status_code == 200:
                         permissions["users"]["access"] = True
                         logger.info(f" Rootly users permission check: SUCCESS")
@@ -157,42 +163,55 @@ class RootlyAPIClient:
                 except Exception as e:
                     permissions["users"]["error"] = f"Connection error: {str(e)}"
                     logger.error(f"Rootly users permission check: Exception - {str(e)}")
-                
+
                 # Test incidents endpoint
                 try:
                     response = await client.get(
                         f"{self.base_url}/v1/incidents",
                         headers=self.headers,
                         params={"page[size]": 1},
-                        timeout=30.0  # Increased from 10s to match other API calls
+                        timeout=30.0
                     )
-                    
+
                     if response.status_code == 200:
                         permissions["incidents"]["access"] = True
                     elif response.status_code == 401:
                         permissions["incidents"]["error"] = "Unauthorized - check API token"
                     elif response.status_code == 403:
                         permissions["incidents"]["error"] = "Token needs 'incidents:read' permission"
+                    elif response.status_code == 404 and team_name:
+                        # Team-scoped keys always return 404 on /v1/incidents — Rootly product limitation.
+                        # Team keys have no IR role and cannot access incident data under any filter.
+                        permissions["incidents"]["error"] = (
+                            "Team API keys do not have access to incident data. "
+                            "Please use a Global API key (created by an org admin) to analyze incidents."
+                        )
+                        logger.warning(f"Rootly incidents: 404 for team key '{team_name}' — team keys cannot access incidents")
                     elif response.status_code == 404:
                         permissions["incidents"]["error"] = "API token doesn't have access to incident data"
                     else:
                         permissions["incidents"]["error"] = f"HTTP {response.status_code}"
-                        
+
                 except Exception as e:
                     permissions["incidents"]["error"] = f"Connection error: {str(e)}"
-                
+
         except Exception as e:
             logger.error(f"Error checking permissions: {e}")
             permissions["users"]["error"] = f"General error: {str(e)}"
             permissions["incidents"]["error"] = f"General error: {str(e)}"
-            
+
         return permissions
 
     async def test_connection(self) -> Dict[str, Any]:
-        """Test API connection and return basic account info with permissions."""
+        """Test API connection and return basic account info with permissions.
+
+        Key type detection uses the incidents endpoint (not full_name_with_team):
+        - GET /v1/incidents returns 200  → global key
+        - GET /v1/incidents returns 404  → team-scoped key (can't see all incidents)
+        """
         try:
             async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-                # Make both API calls in parallel for faster response
+                # Make four API calls in parallel for faster response
                 me_task = client.get(
                     f"{self.base_url}/v1/users/me",
                     headers=self.headers
@@ -201,9 +220,21 @@ class RootlyAPIClient:
                     f"{self.base_url}/v1/users?page[size]=1",
                     headers=self.headers
                 )
+                incidents_task = client.get(
+                    f"{self.base_url}/v1/incidents",
+                    headers=self.headers,
+                    params={"page[size]": 1},
+                )
+                teams_task = client.get(
+                    f"{self.base_url}/v1/teams",
+                    headers=self.headers,
+                    params={"page[size]": 5}
+                )
 
-                # Wait for both calls to complete in parallel
-                me_response, users_response = await asyncio.gather(me_task, users_task)
+                # Wait for all four calls to complete in parallel
+                me_response, users_response, incidents_response, teams_response = await asyncio.gather(
+                    me_task, users_task, incidents_task, teams_task
+                )
 
                 # Check /v1/users/me response for errors
                 if me_response.status_code != 200:
@@ -235,27 +266,56 @@ class RootlyAPIClient:
                         "error_code": "INVALID_RESPONSE"
                     }
 
-                # Extract organization name from authenticated user
+                # --- Key type detection ---
+                # Global keys: /v1/incidents returns 200
+                # Team-scoped keys: /v1/incidents returns 404 (they can't list all incidents)
+                key_type = "global"
+                team_name = None
+
+                if incidents_response.status_code == 404:
+                    key_type = "team"
+                    # Get owning team name from /v1/teams (team keys only see their own team)
+                    if teams_response.status_code == 200:
+                        teams_list = teams_response.json().get("data", [])
+                        if teams_list:
+                            team_name = teams_list[0].get("attributes", {}).get("name")
+                            logger.info(f" Team-scoped key detected via 404. Owning team: '{team_name}'")
+                        else:
+                            logger.info(f" Team-scoped key: /v1/teams returned empty list")
+                    else:
+                        logger.info(f" Team-scoped key: /v1/teams status={teams_response.status_code}")
+                else:
+                    logger.info(f" Global key detected (incidents endpoint: {incidents_response.status_code})")
+
+                # --- Extract organization name from /v1/users/me ---
                 organization_name = None
                 if "data" in me_data and isinstance(me_data["data"], dict):
                     user = me_data["data"]
                     if "attributes" in user:
                         attrs = user["attributes"]
-                        logger.info(f" Rootly API returned user attributes: full_name_with_team='{attrs.get('full_name_with_team')}', organization_name='{attrs.get('organization_name')}', company='{attrs.get('company')}'")
+                        full_name_with_team = attrs.get("full_name_with_team")
+                        logger.info(
+                            f" Rootly API returned user attributes: "
+                            f"full_name_with_team='{full_name_with_team}', "
+                            f"organization_name='{attrs.get('organization_name')}', "
+                            f"company='{attrs.get('company')}'"
+                        )
 
-                        # Extract organization name from full_name_with_team: "[Team Name] User Name"
-                        if "full_name_with_team" in attrs:
-                            full_name_with_team = attrs["full_name_with_team"]
+                        if key_type == "team" and team_name:
+                            # For team keys, use the team name as the display name
+                            organization_name = team_name
+                        else:
+                            # For global keys, extract org name from full_name_with_team brackets
+                            # (format: "[Org Name] User Full Name") or fall back to other fields
                             if full_name_with_team and full_name_with_team.startswith("[") and "]" in full_name_with_team:
                                 organization_name = full_name_with_team.split("]")[0][1:]
                                 logger.info(f" Extracted org name from full_name_with_team: '{organization_name}'")
-                        # Fallback to other fields
-                        elif "organization_name" in attrs:
-                            organization_name = attrs["organization_name"]
-                            logger.info(f" Using organization_name attribute: '{organization_name}'")
-                        elif "company" in attrs:
-                            organization_name = attrs["company"]
-                            logger.info(f" Using company attribute: '{organization_name}'")
+                            elif "organization_name" in attrs:
+                                organization_name = attrs["organization_name"]
+                                logger.info(f" Using organization_name attribute: '{organization_name}'")
+                            elif "company" in attrs:
+                                organization_name = attrs["company"]
+                                logger.info(f" Using company attribute: '{organization_name}'")
 
                 # Extract total user count from /v1/users response
                 total_users = 0
@@ -268,14 +328,16 @@ class RootlyAPIClient:
                 # Build account info
                 account_info = {
                     "api_version": "v1",
-                    "total_users": total_users
+                    "total_users": total_users,
+                    "key_type": key_type,
+                    "team_name": team_name,
                 }
 
                 if organization_name:
                     account_info["organization_name"] = organization_name
 
-                # Check permissions for required endpoints (run in parallel with main requests if needed)
-                permissions = await self.check_permissions()
+                # Check permissions — pass team_name so team-scoped 404 is handled correctly
+                permissions = await self.check_permissions(team_name=team_name)
                 account_info["permissions"] = permissions
 
                 return {
@@ -283,7 +345,7 @@ class RootlyAPIClient:
                     "message": "Connected successfully",
                     "account_info": account_info
                 }
-                    
+
         except httpx.ConnectError:
             return {
                 "status": "error",
@@ -297,6 +359,92 @@ class RootlyAPIClient:
                 "error_code": "UNKNOWN_ERROR"
             }
     
+    async def get_teams(self) -> List[Dict[str, Any]]:
+        """Fetch all teams from Rootly API (global keys only)."""
+        all_teams = []
+        page = 1
+        try:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+                while True:
+                    response = await client.get(
+                        f"{self.base_url}/v1/teams",
+                        headers=self.headers,
+                        params={"page[size]": 100, "page[number]": page}
+                    )
+                    if response.status_code != 200:
+                        break
+                    data = response.json()
+                    for team in data.get("data", []):
+                        all_teams.append({
+                            "id": team.get("id"),
+                            "name": team.get("attributes", {}).get("name"),
+                            "slug": team.get("attributes", {}).get("slug"),
+                            "member_count": len(team.get("attributes", {}).get("user_ids") or []),
+                        })
+                    meta = data.get("meta", {})
+                    if page >= meta.get("total_pages", 1):
+                        break
+                    page += 1
+        except Exception as e:
+            logger.error(f"Error fetching teams: {e}")
+        return all_teams
+
+    async def get_team_user_ids(self, team_name: str) -> List[str]:
+        """Fetch Rootly user IDs that belong to a specific team.
+
+        Uses GET /v1/teams?filter[name]=<team_name> and returns the user_ids
+        list from the matching team's attributes.
+
+        Returns:
+            List of Rootly user ID strings (e.g. ["154534", "154535"]).
+            Empty list if the team is not found or request fails.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+                response = await client.get(
+                    f"{self.base_url}/v1/teams",
+                    headers=self.headers,
+                    params={"filter[name]": team_name, "page[size]": 10}
+                )
+                if response.status_code != 200:
+                    logger.warning(f"Could not fetch team '{team_name}': HTTP {response.status_code}")
+                    return []
+                data = response.json()
+                for team in data.get("data", []):
+                    name = team.get("attributes", {}).get("name", "")
+                    if name.lower() == team_name.lower():
+                        user_ids = team.get("attributes", {}).get("user_ids") or []
+                        logger.info(f"Team '{team_name}' has {len(user_ids)} members: {user_ids}")
+                        return [str(uid) for uid in user_ids]
+                logger.warning(f"Team '{team_name}' not found in teams response")
+        except Exception as e:
+            logger.error(f"Error fetching team user IDs for '{team_name}': {e}")
+        return []
+
+    async def get_team_member_emails(self, team_name: str) -> set:
+        """Return the set of lowercase emails for all members of a team.
+
+        Combines get_team_user_ids() with the cached get_users() response so
+        we only hit the /v1/teams endpoint (no extra /v1/users call if users
+        are already cached).
+        """
+        team_user_ids = await self.get_team_user_ids(team_name)
+        if not team_user_ids:
+            return set()
+
+        team_ids_set = set(team_user_ids)
+        all_users = await self.get_users(limit=10000)  # served from cache when warm
+
+        emails = set()
+        for user in all_users:
+            if str(user.get("id", "")) in team_ids_set:
+                email = user.get("attributes", {}).get("email", "")
+                if email:
+                    emails.add(email.lower())
+
+        logger.info(f"Team '{team_name}': resolved {len(emails)} member emails from {len(team_user_ids)} user IDs")
+        return emails
+
     async def get_users(self, limit: int = 100, include_role: bool = False, force_refresh: bool = False):
         """Fetch users from Rootly API with Redis caching.
 
@@ -626,11 +774,14 @@ class RootlyAPIClient:
         logger.info(f" Filtered {len(users)} users → {len(incident_responders)} incident responders (excluded observers/no_access)")
         return incident_responders
 
-    async def get_incidents(self, days_back: int = 30, limit: int = 1000) -> List[Dict[str, Any]]:
+    async def get_incidents(self, days_back: int = 30, limit: int = 1000, team_name: str = None) -> List[Dict[str, Any]]:
         """Fetch incidents from Rootly API.
 
         Uses INCIDENTS_TIMEOUT (32s) based on benchmark showing incidents
         endpoints have avg 10-15s latency with p95 up to 21s.
+
+        Args:
+            team_name: If set, filter incidents to this team only (for team-scoped keys).
         """
         fetch_start_time = datetime.now()
         all_incidents = []
@@ -645,10 +796,13 @@ class RootlyAPIClient:
         try:
             async with httpx.AsyncClient(timeout=INCIDENTS_TIMEOUT) as client:
                 # Test basic access to incidents endpoint
+                test_params = {"page[size]": 1}
+                if team_name:
+                    test_params["filter[team_names]"] = team_name
                 test_response = await client.get(
                     f"{self.base_url}/v1/incidents",
                     headers=self.headers,
-                    params={"page[size]": 1}
+                    params=test_params
                 )
                 api_calls_made += 1
 
@@ -683,6 +837,8 @@ class RootlyAPIClient:
                         "include": "severity,user,started_by,resolved_by,mitigated_by",
                         "fields[incidents]": "created_at,started_at,acknowledged_at,resolved_at,mitigated_at,mitigated_by,started_by,resolved_by,severity,user,title,status"
                     }
+                    if team_name:
+                        params["filter[team_names]"] = team_name
 
                     params_encoded = urlencode(params)
 
@@ -808,7 +964,7 @@ class RootlyAPIClient:
         # For now, return empty list - this can be expanded based on Rootly API capabilities
         return []
     
-    async def collect_analysis_data(self, days_back: int = 30) -> Dict[str, Any]:
+    async def collect_analysis_data(self, days_back: int = 30, team_name: str = None) -> Dict[str, Any]:
         """Collect all data needed for burnout analysis."""
         start_time = datetime.now()
 
@@ -818,9 +974,6 @@ class RootlyAPIClient:
 
             if connection_test["status"] != "success":
                 raise Exception(f"Connection test failed: {connection_test['message']}")
-
-            # Collect users and incidents in parallel (no limits for complete data collection)
-            users_task = self.get_users(limit=10000)  # Get all users (increased from 1000)
 
             # Use conservative incident limits to prevent timeout on longer analyses
             incident_limits_by_range = {
@@ -838,17 +991,51 @@ class RootlyAPIClient:
                     incident_limit = incident_limits_by_range[range_days]
                     break
 
-            incidents_task = self.get_incidents(days_back=days_back, limit=incident_limit)
+            # When team_name is set, fetch team membership and incidents in parallel
+            # alongside all users so we can filter users down to team members only.
+            if team_name:
+                users_task = self.get_users(limit=10000)
+                incidents_task = self.get_incidents(days_back=days_back, limit=incident_limit, team_name=team_name)
+                team_user_ids_task = self.get_team_user_ids(team_name)
 
-            # Collect users (required)
-            users = await users_task
+                users_raw, team_user_ids_result, incidents_result = await asyncio.gather(
+                    users_task,
+                    team_user_ids_task,
+                    incidents_task,
+                    return_exceptions=True
+                )
 
-            # Try to collect incidents but don't fail if permission denied
-            incidents = []
-            try:
-                incidents = await incidents_task
-            except Exception as e:
-                logger.warning(f"Could not fetch incidents: {e}. Proceeding with user data only.")
+                users = users_raw if not isinstance(users_raw, Exception) else []
+                team_user_ids = team_user_ids_result if not isinstance(team_user_ids_result, Exception) else []
+                incidents = incidents_result if not isinstance(incidents_result, Exception) else []
+                if isinstance(incidents_result, Exception):
+                    logger.warning(f"Could not fetch incidents: {incidents_result}. Proceeding with user data only.")
+
+                # Filter users to team members only
+                if team_user_ids:
+                    team_user_ids_set = set(team_user_ids)
+                    users_before = len(users)
+                    users = [u for u in users if str(u.get("id")) in team_user_ids_set]
+                    logger.info(
+                        f"Team scope '{team_name}': filtered users from {users_before} → {len(users)} "
+                        f"({len(team_user_ids)} member IDs in team)"
+                    )
+                else:
+                    logger.warning(
+                        f"Team scope '{team_name}': could not fetch member IDs, using all {len(users)} org users"
+                    )
+            else:
+                # No team scope — fetch all users and all incidents normally
+                users_task = self.get_users(limit=10000)
+                incidents_task = self.get_incidents(days_back=days_back, limit=incident_limit, team_name=None)
+
+                users = await users_task
+
+                incidents = []
+                try:
+                    incidents = await incidents_task
+                except Exception as e:
+                    logger.warning(f"Could not fetch incidents: {e}. Proceeding with user data only.")
 
             # Validate data
             if not users:

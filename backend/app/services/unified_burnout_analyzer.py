@@ -94,7 +94,8 @@ class UnifiedBurnoutAnalyzer:
         synced_users: Optional[List[Dict[str, Any]]] = None,
         current_user_id: Optional[int] = None,
         db: Optional["Session"] = None,
-        organization_id: Optional[int] = None
+        organization_id: Optional[int] = None,
+        team_name: Optional[str] = None,
     ):
         # Check for mock data mode from environment
         self.use_mock_data = os.getenv('USE_MOCK_DATA', 'false').lower() == 'true'
@@ -105,6 +106,9 @@ class UnifiedBurnoutAnalyzer:
 
         # Store organization_id for cross-org data isolation
         self.organization_id = organization_id
+
+        # Store team_name for team-scoped Rootly keys
+        self.team_name = team_name
 
         # Store db session for reuse (prevents connection pool exhaustion)
         self.db = db
@@ -124,7 +128,7 @@ class UnifiedBurnoutAnalyzer:
             if platform == "pagerduty":
                 self.client = PagerDutyAPIClient(api_token)
             else:
-                self.client = RootlyAPIClient(api_token)
+                self.client = RootlyAPIClient(api_token, team_name=team_name)
         else:
             self.client = None  # No API client needed in mock mode
             logger.info("MOCK MODE: Skipping API client initialization")
@@ -1203,6 +1207,10 @@ class UnifiedBurnoutAnalyzer:
                     until = datetime.now(pytz.UTC)
                     raw_incidents = await self.client.get_incidents(since=since, until=until, limit=5000)
                 else:  # rootly
+                    # Don't pass team_name here: synced_users already contains only team members,
+                    # so incident-to-member matching naturally scopes the results.
+                    # filter[team_names] only matches incidents explicitly tagged to a team,
+                    # not incidents where team members were individual responders.
                     raw_incidents = await self.client.get_incidents(days_back=days_back, limit=5000)
 
                 # Normalize incidents for PagerDuty to extract assigned_to from assignments array
@@ -1246,7 +1254,7 @@ class UnifiedBurnoutAnalyzer:
 
             # Fallback: Use the existing data collection method (backward compatibility)
             logger.info(f"ANALYZER DATA FETCH: No synced users provided, delegating to client.collect_analysis_data for {days_back} days")
-            data = await self.client.collect_analysis_data(days_back=days_back)
+            data = await self.client.collect_analysis_data(days_back=days_back, team_name=self.team_name)
             
             fetch_duration = (datetime.now() - fetch_start_time).total_seconds()
             logger.info(f"ANALYZER DATA FETCH: Client returned after {fetch_duration:.2f}s - Type: {type(data)}")
