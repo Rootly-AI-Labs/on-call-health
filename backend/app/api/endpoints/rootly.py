@@ -117,23 +117,32 @@ async def test_rootly_token_preview(
         # No organization name found in Rootly - use generic name
         base_name = "Rootly"
     
-    # Check if user already has this exact token (only active integrations)
-    existing_token = db.query(RootlyIntegration).filter(
-        RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.api_token == token,  # Use stripped token
-        RootlyIntegration.is_active == True
-    ).first()
-    
-    if existing_token:
-        return {
-            "status": "duplicate_token",
-            "message": f"This token is already connected as '{existing_token.name}'",
-            "existing_integration": {
-                "id": existing_token.id,
-                "name": existing_token.name,
-                "organization_name": existing_token.organization_name
+    # Extract team-scoped key metadata
+    key_type = account_info.get("key_type", "global")
+    team_name = account_info.get("team_name")
+
+    # For team-scoped keys, we can fully validate duplicate scope at test time.
+    # For global keys, users may select a team scope after this step, so we defer
+    # exact duplicate checking to /token/add.
+    if key_type == "team":
+        existing_token = db.query(RootlyIntegration).filter(
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.platform == "rootly",
+            RootlyIntegration.api_token == token,
+            RootlyIntegration.team_name == team_name,
+            RootlyIntegration.is_active == True
+        ).first()
+
+        if existing_token:
+            return {
+                "status": "duplicate_token",
+                "message": f"This token is already connected as '{existing_token.name}'",
+                "existing_integration": {
+                    "id": existing_token.id,
+                    "name": existing_token.name,
+                    "organization_name": existing_token.organization_name
+                }
             }
-        }
     
     # Generate a unique name if team name already exists
     existing_names = [
@@ -152,10 +161,6 @@ async def test_rootly_token_preview(
     
     # Reuse permissions already fetched inside test_connection() — no extra API call needed
     permissions = account_info.get("permissions", {})
-
-    # Extract team-scoped key metadata
-    key_type = account_info.get("key_type", "global")
-    team_name = account_info.get("team_name")
 
     return {
         "status": "success",
@@ -200,10 +205,18 @@ async def add_rootly_integration(
     organization_name = integration_data.organization_name
     total_users = integration_data.total_users
 
-    # Check if user already has this exact token (prevent duplicates, only active integrations)
+    # Allow same token across multiple team scopes, but prevent exact duplicate scope.
+    # scope=None means org-wide ("all teams").
+    scope_filter = (
+        RootlyIntegration.team_name.is_(None)
+        if integration_data.team_name is None
+        else RootlyIntegration.team_name == integration_data.team_name
+    )
     existing_token = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.api_token == token,  # Use stripped token
+        RootlyIntegration.platform == "rootly",
+        RootlyIntegration.api_token == token,
+        scope_filter,
         RootlyIntegration.is_active == True
     ).first()
 
@@ -211,7 +224,7 @@ async def add_rootly_integration(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "message": f"This token is already connected as '{existing_token.name}'",
+                "message": f"This token is already connected for this scope as '{existing_token.name}'",
                 "existing_integration": {
                     "id": existing_token.id,
                     "name": existing_token.name,
