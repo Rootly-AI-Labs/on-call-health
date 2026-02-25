@@ -637,6 +637,7 @@ export default function IntegrationsPage() {
   
   // Add integration state
   const [addingPlatform, setAddingPlatform] = useState<"rootly" | "pagerduty" | null>(null)
+  const [minimizedAddPlatform, setMinimizedAddPlatform] = useState<"rootly" | "pagerduty" | null>(null)
   const [isShowingToken, setIsShowingToken] = useState(false)
   const [isTestingConnection, setIsTestingConnection] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error' | 'duplicate'>('idle')
@@ -648,9 +649,6 @@ export default function IntegrationsPage() {
   const [isAddingPagerDuty, setIsAddingPagerDuty] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  // Ref for scrolling to form
-  const formSectionRef = useRef<HTMLDivElement>(null)
-  
   // Edit/Delete state
   const [editingIntegration, setEditingIntegration] = useState<number | null>(null)
   const [editingName, setEditingName] = useState("")
@@ -2181,9 +2179,10 @@ export default function IntegrationsPage() {
     }
   }, [activeEnhancementTab])
 
-  // Close active incident management tab and form when clicking outside
+  // Close active incident management tab when clicking outside.
+  // If add modal is open, keep tab selection stable and let modal handle closure.
   useEffect(() => {
-    if (!activeTab && !addingPlatform) return
+    if (!activeTab || addingPlatform) return
 
     const handleMouseDown = (event: MouseEvent) => {
       // If the click target was detached from the DOM before mousedown fired
@@ -2194,7 +2193,6 @@ export default function IntegrationsPage() {
       const incidentSection = document.querySelector('[data-incident-section]')
       if (incidentSection && !incidentSection.contains(event.target as Node)) {
         setActiveTab(null)
-        setAddingPlatform(null)
       }
     }
 
@@ -2259,6 +2257,7 @@ export default function IntegrationsPage() {
                 onClick={() => {
                   setActiveTab('rootly')
                   setAddingPlatform('rootly')
+                  setMinimizedAddPlatform(null)
                   // Reset connection state when switching platforms
                   setConnectionStatus('idle')
                   setPreviewData(null)
@@ -2310,6 +2309,7 @@ export default function IntegrationsPage() {
               onClick={() => {
                 setActiveTab('pagerduty')
                 setAddingPlatform('pagerduty')
+                setMinimizedAddPlatform(null)
                 // Reset connection state when switching platforms
                 setConnectionStatus('idle')
                 setPreviewData(null)
@@ -2340,57 +2340,91 @@ export default function IntegrationsPage() {
           ))}
         </div>
 
-        <div ref={formSectionRef} className="space-y-6 scroll-mt-20">
-
-            {/* Add Rootly Integration Form */}
-            {addingPlatform === 'rootly' && (
-              <RootlyIntegrationForm
-                form={rootlyForm}
-                onTest={testConnection}
-                onAdd={() => addIntegration('rootly')}
-                onTeamSelect={(teamName, memberCount) => setPreviewData(prev => {
-                  if (!prev) return prev
-                  if (teamName) {
-                    // Save the original org-wide count the first time a team is selected
-                    if (orgTotalUsersRef.current === null) {
-                      orgTotalUsersRef.current = prev.total_users
-                    }
-                    return { ...prev, team_name: teamName, total_users: memberCount ?? prev.total_users }
-                  } else {
-                    // Restore org-wide count when "all teams" is re-selected
-                    const restored = orgTotalUsersRef.current ?? prev.total_users
-                    orgTotalUsersRef.current = null
-                    return { ...prev, team_name: undefined, total_users: restored }
-                  }
-                })}
-                connectionStatus={connectionStatus}
-                previewData={previewData}
-                duplicateInfo={duplicateInfo}
-                isTestingConnection={isTestingConnection}
-                isAdding={isAddingRootly}
-                isValidToken={isValidRootlyToken}
-                onCopyToken={copyToClipboard}
-                copied={copied}
-                errorDetails={errorDetails}
-              />
+        <div className="space-y-6 scroll-mt-20">
+            {addingPlatform === null && minimizedAddPlatform && (
+              <Card className="max-w-2xl mx-auto border-neutral-300 bg-white">
+                <CardContent className="py-3 px-4">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between text-left"
+                    onClick={() => {
+                      setAddingPlatform(minimizedAddPlatform)
+                      setMinimizedAddPlatform(null)
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Key className="w-4 h-4 text-purple-600" />
+                      <span className="text-sm font-medium text-neutral-800">
+                        Continue setting up your {minimizedAddPlatform === "rootly" ? "Rootly" : "PagerDuty"} token
+                      </span>
+                    </div>
+                    <span className="text-xs font-medium text-purple-700">Expand</span>
+                  </button>
+                </CardContent>
+              </Card>
             )}
 
-            {/* Add PagerDuty Integration Form */}
+            {/* Add Rootly Integration Form (accordion-style inline card) */}
+            {addingPlatform === 'rootly' && (
+              <>
+                <RootlyIntegrationForm
+                  form={rootlyForm}
+                  onTest={testConnection}
+                  onAdd={() => addIntegration('rootly')}
+                  onMinimize={() => {
+                    setAddingPlatform(null)
+                    setMinimizedAddPlatform('rootly')
+                  }}
+                  onTeamSelect={(teamName, memberCount) => setPreviewData(prev => {
+                    if (!prev) return prev
+                    if (teamName) {
+                      // Save the original org-wide count the first time a team is selected
+                      if (orgTotalUsersRef.current === null) {
+                        orgTotalUsersRef.current = prev.total_users
+                      }
+                      return { ...prev, team_name: teamName, total_users: memberCount ?? prev.total_users }
+                    } else {
+                      // Restore org-wide count when "all teams" is re-selected
+                      const restored = orgTotalUsersRef.current ?? prev.total_users
+                      orgTotalUsersRef.current = null
+                      return { ...prev, team_name: undefined, total_users: restored }
+                    }
+                  })}
+                  connectionStatus={connectionStatus}
+                  previewData={previewData}
+                  duplicateInfo={duplicateInfo}
+                  isTestingConnection={isTestingConnection}
+                  isAdding={isAddingRootly}
+                  isValidToken={isValidRootlyToken}
+                  onCopyToken={copyToClipboard}
+                  copied={copied}
+                  errorDetails={errorDetails}
+                />
+              </>
+            )}
+
+            {/* Add PagerDuty Integration Form (accordion-style inline card) */}
             {addingPlatform === 'pagerduty' && (
-              <PagerDutyIntegrationForm
-                form={pagerdutyForm}
-                onTest={testConnection}
-                onAdd={() => addIntegration('pagerduty')}
-                connectionStatus={connectionStatus}
-                previewData={previewData}
-                duplicateInfo={duplicateInfo}
-                isTestingConnection={isTestingConnection}
-                isAdding={isAddingPagerDuty}
-                isValidToken={isValidPagerDutyToken}
-                onCopyToken={copyToClipboard}
-                copied={copied}
-                errorDetails={errorDetails}
-              />
+              <>
+                <PagerDutyIntegrationForm
+                  form={pagerdutyForm}
+                  onTest={testConnection}
+                  onAdd={() => addIntegration('pagerduty')}
+                  onMinimize={() => {
+                    setAddingPlatform(null)
+                    setMinimizedAddPlatform('pagerduty')
+                  }}
+                  connectionStatus={connectionStatus}
+                  previewData={previewData}
+                  duplicateInfo={duplicateInfo}
+                  isTestingConnection={isTestingConnection}
+                  isAdding={isAddingPagerDuty}
+                  isValidToken={isValidPagerDutyToken}
+                  onCopyToken={copyToClipboard}
+                  copied={copied}
+                  errorDetails={errorDetails}
+                />
+              </>
             )}
 
             {/* Existing Integrations */}
@@ -2515,7 +2549,7 @@ export default function IntegrationsPage() {
                                     <span className="font-medium text-sm sm:text-base truncate">{selected.name}</span>
                                     {selected.platform === 'rootly' && selected.team_name && (
                                       <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 flex-shrink-0">
-                                        {selected.key_type === 'global' ? 'Scope' : 'Team'}: {selected.team_name}
+                                        Team: {selected.team_name}
                                       </span>
                                     )}
                                   </div>
@@ -2553,7 +2587,7 @@ export default function IntegrationsPage() {
                                       <span className="font-medium text-sm sm:text-base truncate">{integration.name}</span>
                                       {integration.platform === 'rootly' && integration.team_name && (
                                         <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 flex-shrink-0">
-                                          {integration.key_type === 'global' ? 'Scope' : 'Team'}: {integration.team_name}
+                                          Team: {integration.team_name}
                                         </span>
                                       )}
                                       {hasPermissionIssues && (
@@ -2612,6 +2646,11 @@ export default function IntegrationsPage() {
                   <div className="space-y-2">
                     {filteredIntegrations.map((integration) => {
                       const isExpanded = expandedIntegrations.has(integration.id)
+                      const rootlyScopeLabel = integration.platform === 'rootly'
+                        ? (integration.team_name
+                          ? `Team: ${integration.team_name}`
+                          : 'Team: All users')
+                        : null
 
                       return (
                       <div key={integration.id} className={`
@@ -2684,15 +2723,16 @@ export default function IntegrationsPage() {
                               <Users className="w-3 h-3" />
                               <span>{integration.total_users}</span>
                             </div>
+                            {rootlyScopeLabel && (
+                              <div className="w-44 flex-shrink-0 hidden lg:block">
+                                <span className="inline-flex items-center rounded bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                                  {rootlyScopeLabel}
+                                </span>
+                              </div>
+                            )}
                             <div className="text-sm text-neutral-500 w-28 flex-shrink-0 hidden md:block">•••{integration.token_suffix}</div>
                           </>
                         )}
-
-                        {/* Badge - fixed width for alignment */}
-                        <Badge variant={integration.platform === 'rootly' ? 'default' : 'secondary'}
-                               className={`flex-shrink-0 w-24 justify-center ${integration.platform === 'rootly' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
-                          {integration.platform}
-                        </Badge>
                       </div>
 
                       {/* Expanded Details */}
@@ -2730,14 +2770,14 @@ export default function IntegrationsPage() {
                                 <div className="text-neutral-700">{integration.total_users}</div>
                               </div>
                             </div>
-                            {integration.platform === 'rootly' && integration.team_name && (
+                            {integration.platform === 'rootly' && (
                               <div className="flex items-start space-x-2">
                                 <Shield className="w-4 h-4 mt-0.5 text-purple-500" />
                                 <div>
-                                  <div className="font-bold text-neutral-900">
-                                    {integration.key_type === 'global' ? 'Team Scope' : 'Team'}
+                                  <div className="font-bold text-neutral-900">Team</div>
+                                  <div className="text-purple-700 font-medium">
+                                    {integration.team_name || 'All users'}
                                   </div>
-                                  <div className="text-purple-700 font-medium">{integration.team_name}</div>
                                 </div>
                               </div>
                             )}

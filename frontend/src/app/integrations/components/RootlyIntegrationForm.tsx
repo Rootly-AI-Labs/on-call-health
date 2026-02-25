@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { HelpCircle, ChevronDown, CheckCircle, AlertCircle, Shield, Plus, Loader2, Eye, EyeOff, Copy, Check, Edit3, Users } from "lucide-react"
+import { HelpCircle, ChevronDown, CheckCircle, AlertCircle, Shield, Plus, Loader2, Eye, EyeOff, Copy, Check, Edit3, Users, ChevronUp } from "lucide-react"
 import { UseFormReturn } from "react-hook-form"
 import { RootlyFormData, PreviewData, RootlyTeam, API_BASE } from "../types"
 
@@ -23,6 +23,7 @@ interface RootlyIntegrationFormProps {
   isValidToken: (token: string) => boolean
   onCopyToken: (token: string) => void
   copied: boolean
+  onMinimize?: () => void
   errorDetails?: { user_message: string; user_guidance: string; error_code: string } | null
 }
 
@@ -39,6 +40,7 @@ export function RootlyIntegrationForm({
   isValidToken,
   onCopyToken,
   copied,
+  onMinimize,
   errorDetails
 }: RootlyIntegrationFormProps) {
   const [showInstructions, setShowInstructions] = useState(false)
@@ -126,13 +128,28 @@ export function RootlyIntegrationForm({
   return (
     <Card className="border-purple-200 max-w-2xl mx-auto">
       <CardHeader className="p-8">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-            <Image src="/images/rootly-logo-icon.jpg" alt="Rootly" width={24} height={24} />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Image src="/images/rootly-logo-icon.jpg" alt="Rootly" width={24} height={24} />
+            </div>
+            <div>
+              <CardTitle>Add Rootly Integration</CardTitle>
+            </div>
           </div>
-          <div>
-            <CardTitle>Add Rootly Integration</CardTitle>
-          </div>
+          {onMinimize && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-neutral-500 hover:text-neutral-700"
+              onClick={onMinimize}
+              disabled={isAdding}
+              aria-label="Minimize add integration card"
+            >
+              <ChevronUp className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4 p-8 pt-0">
