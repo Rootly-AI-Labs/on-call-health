@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { HelpCircle, ChevronDown, CheckCircle, AlertCircle, Shield, Plus, Loader2, Eye, EyeOff, Copy, Check } from "lucide-react"
+import { HelpCircle, ChevronDown, CheckCircle, AlertCircle, Shield, Plus, Loader2, Eye, EyeOff, Copy, Check, ChevronUp } from "lucide-react"
 import { UseFormReturn } from "react-hook-form"
 import { PagerDutyFormData, PreviewData } from "../types"
 
@@ -20,6 +20,7 @@ interface PagerDutyIntegrationFormProps {
   isValidToken: (token: string) => boolean
   onCopyToken: (token: string) => void
   copied: boolean
+  onMinimize?: () => void
   errorDetails?: { user_message: string; user_guidance: string; error_code: string } | null
 }
 
@@ -35,6 +36,7 @@ export function PagerDutyIntegrationForm({
   isValidToken,
   onCopyToken,
   copied,
+  onMinimize,
   errorDetails
 }: PagerDutyIntegrationFormProps) {
   const [showInstructions, setShowInstructions] = useState(false)
@@ -74,13 +76,28 @@ export function PagerDutyIntegrationForm({
   return (
     <Card className="border-green-200 max-w-2xl mx-auto">
       <CardHeader className="p-8">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-            <span className="text-green-600 font-bold">PD</span>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <span className="text-green-600 font-bold">PD</span>
+            </div>
+            <div>
+              <CardTitle>Add PagerDuty Integration</CardTitle>
+            </div>
           </div>
-          <div>
-            <CardTitle>Add PagerDuty Integration</CardTitle>
-          </div>
+          {onMinimize && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-neutral-500 hover:text-neutral-700"
+              onClick={onMinimize}
+              disabled={isAdding}
+              aria-label="Minimize add integration card"
+            >
+              <ChevronUp className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4 p-8 pt-0">
