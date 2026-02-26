@@ -341,10 +341,12 @@ export function RootlyIntegrationForm({
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="all" className={allTeamsScope.already_added ? "text-amber-700" : undefined}>
-                                  {`${allTeamsScope.already_added ? "[Already added] " : ""}All teams (entire org)${
+                                  {`All teams (entire org)${
+                                    allTeamsScope.already_added ? " (already added)" : ""
+                                  }${
                                     allTeamsScope.already_added && allTeamsScope.existing_integration_name
                                       ? ` - ${allTeamsScope.existing_integration_name}`
-                                      : ''
+                                      : ""
                                   }`}
                                 </SelectItem>
                                 {teams.map(team => (
@@ -353,7 +355,7 @@ export function RootlyIntegrationForm({
                                     value={team.name}
                                     className={team.already_added ? "text-amber-700" : undefined}
                                   >
-                                    {`${team.already_added ? "[Already added] " : ""}${team.name}${
+                                    {`${team.name}${team.already_added ? " (already added)" : ""}${
                                       team.member_count > 0 ? ` (${team.member_count} members)` : ''
                                     }${
                                       team.already_added && team.existing_integration_name
