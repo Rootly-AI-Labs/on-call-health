@@ -2544,7 +2544,7 @@ export default function IntegrationsPage() {
                         }
                       }}
                     >
-                      <SelectTrigger className="w-full sm:flex-1 min-h-12 h-auto whitespace-normal py-2 border-neutral-300 hover:border-neutral-400 transition-colors [&>span]:line-clamp-none [&>span]:w-full [&>span]:pr-2 [&>span]:text-left">
+                      <SelectTrigger className="w-full sm:flex-1 h-11 border-neutral-300 hover:border-neutral-400 transition-colors [&>span]:line-clamp-none [&>span]:w-full [&>span]:pr-2 [&>span]:text-left">
                         <SelectValue placeholder="Select organization">
                           {selectedOrganization && (() => {
                             const selected = integrations.find(i => i.id.toString() === selectedOrganization)
@@ -2564,33 +2564,29 @@ export default function IntegrationsPage() {
                                 ? (selected.team_name || 'All users')
                                 : null
                               return (
-                                <div className="flex w-full items-start gap-2">
-                                  <div className={`mt-1 h-3 w-3 rounded-full flex-shrink-0 ${
+                                <div className="flex w-full items-center gap-2">
+                                  <div className={`h-3 w-3 rounded-full flex-shrink-0 ${
                                     selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
                                   }`}></div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <span
-                                        title={selectedDisplayName}
-                                        className="block min-w-0 flex-1 font-medium text-sm sm:text-base leading-tight truncate"
-                                      >
-                                        {selectedDisplayName}
-                                      </span>
-                                      {selected.is_default && (
-                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0 mt-0.5" />
-                                      )}
-                                    </div>
+                                  <div className="min-w-0 flex flex-1 items-center gap-2">
+                                    <span
+                                      title={selectedDisplayName}
+                                      className="block min-w-0 flex-1 font-medium text-sm sm:text-base truncate"
+                                    >
+                                      {selectedDisplayName}
+                                    </span>
                                     {selectedScopeLabel && (
-                                      <div className="mt-1">
-                                        <span
-                                          title={selectedScopeLabel}
-                                          className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 inline-block max-w-full truncate align-middle"
-                                        >
-                                          {selectedScopeLabel}
-                                        </span>
-                                      </div>
+                                      <span
+                                        title={selectedScopeLabel}
+                                        className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 inline-block max-w-44 flex-shrink-0 truncate align-middle"
+                                      >
+                                        {selectedScopeLabel}
+                                      </span>
                                     )}
                                   </div>
+                                  {selected.is_default && (
+                                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                                  )}
                                 </div>
                               )
                             }
@@ -2607,29 +2603,41 @@ export default function IntegrationsPage() {
                           return (
                             <>
                               {/* Rootly Integrations */}
-                              {rootlyIntegrations.map((integration) => (
-                                <SelectItem
-                                  key={integration.id}
-                                  value={integration.id.toString()}
-                                  className="cursor-pointer py-2"
-                                >
-                                  <div className="flex items-start gap-2 w-full min-w-0">
-                                    <div className="w-3 h-3 bg-purple-500 rounded-full mt-0.5 flex-shrink-0"></div>
-                                    <div className="min-w-0 flex-1">
-                                      <div className="font-medium text-sm sm:text-base leading-tight line-clamp-2 break-words">
-                                        {integration.name}
-                                      </div>
-                                      {integration.team_name && (
-                                        <div className="mt-1">
-                                          <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 inline-flex max-w-full break-words">
-                                            Team: {integration.team_name}
-                                          </span>
+                              {rootlyIntegrations.map((integration) => {
+                                const dropdownDisplayName = (() => {
+                                  const withoutRootlyPrefix = integration.name.replace(/^Rootly\s*-\s*/i, '').trim()
+                                  if (!integration.team_name) return withoutRootlyPrefix
+
+                                  const teamSuffix = ` - ${integration.team_name}`
+                                  return withoutRootlyPrefix.toLowerCase().endsWith(teamSuffix.toLowerCase())
+                                    ? withoutRootlyPrefix.slice(0, -teamSuffix.length).trim()
+                                    : withoutRootlyPrefix
+                                })()
+
+                                return (
+                                  <SelectItem
+                                    key={integration.id}
+                                    value={integration.id.toString()}
+                                    className="cursor-pointer py-2"
+                                  >
+                                    <div className="flex items-start gap-2 w-full min-w-0">
+                                      <div className="w-3 h-3 bg-purple-500 rounded-full mt-0.5 flex-shrink-0"></div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-sm sm:text-base leading-tight line-clamp-2 break-words">
+                                          {dropdownDisplayName}
                                         </div>
-                                      )}
+                                        {integration.team_name && (
+                                          <div className="mt-1">
+                                            <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 inline-flex max-w-full break-words">
+                                              Team: {integration.team_name}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                </SelectItem>
-                              ))}
+                                  </SelectItem>
+                                )
+                              })}
 
                               {/* Separator between platforms */}
                               {rootlyIntegrations.length > 0 && pagerdutyIntegrations.length > 0 && (
