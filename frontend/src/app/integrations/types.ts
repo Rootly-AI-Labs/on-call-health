@@ -215,6 +215,9 @@ export interface RootlyTeam {
   name: string
   slug: string
   member_count: number
+  already_added?: boolean
+  existing_integration_name?: string | null
+  existing_integration_id?: number | null
 }
 
 export interface PreviewData {
