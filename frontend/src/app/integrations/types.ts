@@ -229,6 +229,8 @@ export interface PreviewData {
   current_user?: string
   key_type?: string       // "global" | "team"
   team_name?: string      // selected team filter (null = all teams)
+  team_names?: string[]   // selected team filters for multi-select mode
+  team_scopes?: Array<{ name: string; member_count: number }>
   teams?: RootlyTeam[]    // available teams for global keys
   permissions?: {
     users?: {

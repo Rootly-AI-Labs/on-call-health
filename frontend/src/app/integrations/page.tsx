@@ -2375,19 +2375,28 @@ export default function IntegrationsPage() {
                     setAddingPlatform(null)
                     setMinimizedAddPlatform('rootly')
                   }}
-                  onTeamSelect={(teamName, memberCount) => setPreviewData(prev => {
+                  onTeamSelect={(teamNames, selectedTeams) => setPreviewData(prev => {
                     if (!prev) return prev
-                    if (teamName) {
+                    if (teamNames.length > 0) {
                       // Save the original org-wide count the first time a team is selected
                       if (orgTotalUsersRef.current === null) {
                         orgTotalUsersRef.current = prev.total_users
                       }
-                      return { ...prev, team_name: teamName, total_users: memberCount ?? prev.total_users }
+                      const nextTotalUsers = teamNames.length === 1
+                        ? (selectedTeams[0]?.member_count ?? prev.total_users)
+                        : (orgTotalUsersRef.current ?? prev.total_users)
+                      return {
+                        ...prev,
+                        team_name: teamNames.length === 1 ? teamNames[0] : undefined,
+                        team_names: teamNames,
+                        team_scopes: selectedTeams.map((team) => ({ name: team.name, member_count: team.member_count })),
+                        total_users: nextTotalUsers,
+                      }
                     } else {
                       // Restore org-wide count when "all teams" is re-selected
                       const restored = orgTotalUsersRef.current ?? prev.total_users
                       orgTotalUsersRef.current = null
-                      return { ...prev, team_name: undefined, total_users: restored }
+                      return { ...prev, team_name: undefined, team_names: [], team_scopes: [], total_users: restored }
                     }
                   })}
                   connectionStatus={connectionStatus}
