@@ -26,7 +26,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* Preload critical background images for landing page */}
-        <link rel="preload" as="image" href="/images/landing/rootly-bg.avif" />
+        <link rel="preload" as="image" href="/images/landing/rootly-bg-hq.webp" />
         <link rel="preload" as="image" href="/images/landing/rootly-bg-gradient.avif" />
       </head>
       <body className={inter.className} suppressHydrationWarning>
