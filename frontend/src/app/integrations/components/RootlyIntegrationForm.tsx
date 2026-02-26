@@ -50,8 +50,13 @@ export function RootlyIntegrationForm({
   const [teams, setTeams] = useState<RootlyTeam[]>([])
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState<string>('all')
+  const [allTeamsScope, setAllTeamsScope] = useState<{ already_added: boolean; existing_integration_name?: string | null }>({
+    already_added: false,
+    existing_integration_name: null,
+  })
 
   const tokenValue = form.watch('rootlyToken')
+  const alreadyAddedTeams = teams.filter((team) => team.already_added)
 
   // Auto-validate token when it's fully entered and valid format
   useEffect(() => {
@@ -97,6 +102,7 @@ export function RootlyIntegrationForm({
     if (connectionStatus !== 'success' || previewData?.key_type !== 'global') {
       setTeams([])
       setSelectedTeam('all')
+      setAllTeamsScope({ already_added: false, existing_integration_name: null })
       return
     }
     const token = form.getValues('rootlyToken')
@@ -115,11 +121,20 @@ export function RootlyIntegrationForm({
       .then(data => {
         if (!cancelled) {
           setTeams(data.teams || [])
+          setAllTeamsScope({
+            already_added: Boolean(data.all_teams_scope?.already_added),
+            existing_integration_name: data.all_teams_scope?.existing_integration_name ?? null,
+          })
           setSelectedTeam('all')
           onTeamSelect(null)
         }
       })
-      .catch(() => { if (!cancelled) setTeams([]) })
+      .catch(() => {
+        if (!cancelled) {
+          setTeams([])
+          setAllTeamsScope({ already_added: false, existing_integration_name: null })
+        }
+      })
       .finally(() => { if (!cancelled) setLoadingTeams(false) })
 
     return () => { cancelled = true }
@@ -325,19 +340,35 @@ export function RootlyIntegrationForm({
                                 <SelectValue placeholder="All teams (entire org)" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="all">All teams (entire org)</SelectItem>
+                                <SelectItem value="all">
+                                  {`All teams (entire org)${
+                                    allTeamsScope.already_added
+                                      ? ` - already added${allTeamsScope.existing_integration_name ? ` as ${allTeamsScope.existing_integration_name}` : ''}`
+                                      : ''
+                                  }`}
+                                </SelectItem>
                                 {teams.map(team => (
                                   <SelectItem key={team.id} value={team.name}>
-                                    {team.name}
-                                    {team.member_count > 0 && (
-                                      <span className="ml-1.5 text-xs text-neutral-400">({team.member_count} members)</span>
-                                    )}
+                                    {`${team.name}${
+                                      team.member_count > 0 ? ` (${team.member_count} members)` : ''
+                                    }${
+                                      team.already_added
+                                        ? ` - already added${team.existing_integration_name ? ` as ${team.existing_integration_name}` : ''}`
+                                        : ''
+                                    }`}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           ) : (
                             <p className="text-xs text-green-700">No teams found — analysis will cover the entire org.</p>
+                          )}
+                          {!loadingTeams && (
+                            <p className={`text-xs mt-1 ${allTeamsScope.already_added || alreadyAddedTeams.length > 0 ? "text-amber-700" : "text-green-700"}`}>
+                              {allTeamsScope.already_added || alreadyAddedTeams.length > 0
+                                ? `Already added with this token:${allTeamsScope.already_added ? " all teams" : ""}${allTeamsScope.already_added && alreadyAddedTeams.length > 0 ? "," : ""}${alreadyAddedTeams.length > 0 ? ` ${alreadyAddedTeams.map((team) => team.name).join(", ")}` : ""}`
+                                : "No scopes added with this token yet."}
+                            </p>
                           )}
                           {selectedTeam !== 'all' && (
                             <p className="text-xs text-green-700 mt-1">
