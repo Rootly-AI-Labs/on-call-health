@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { HelpCircle, ChevronDown, CheckCircle, AlertCircle, Shield, Plus, Loader2, Eye, EyeOff, Copy, Check, Edit3, Users, ChevronUp } from "lucide-react"
 import { UseFormReturn } from "react-hook-form"
 import { RootlyFormData, PreviewData, RootlyTeam, API_BASE } from "../types"
@@ -14,7 +14,7 @@ interface RootlyIntegrationFormProps {
   form: UseFormReturn<RootlyFormData>
   onTest: (platform: 'rootly', token: string) => Promise<void>
   onAdd: () => void
-  onTeamSelect: (teamName: string | null, memberCount?: number) => void
+  onTeamSelect: (teamNames: string[], selectedTeams: RootlyTeam[]) => void
   connectionStatus: 'idle' | 'success' | 'error' | 'duplicate'
   previewData: PreviewData | null
   duplicateInfo: any
@@ -49,7 +49,7 @@ export function RootlyIntegrationForm({
   const [editingInline, setEditingInline] = useState(false)
   const [teams, setTeams] = useState<RootlyTeam[]>([])
   const [loadingTeams, setLoadingTeams] = useState(false)
-  const [selectedTeam, setSelectedTeam] = useState<string>('all')
+  const [selectedTeamNames, setSelectedTeamNames] = useState<string[]>([])
   const [allTeamsScope, setAllTeamsScope] = useState<{ already_added: boolean; existing_integration_name?: string | null }>({
     already_added: false,
     existing_integration_name: null,
@@ -57,6 +57,27 @@ export function RootlyIntegrationForm({
 
   const tokenValue = form.watch('rootlyToken')
   const alreadyAddedTeams = teams.filter((team) => team.already_added)
+  const selectedTeams = teams.filter((team) => selectedTeamNames.includes(team.name))
+  const selectedTeamLabel = selectedTeamNames.length === 0
+    ? "All teams (entire org)"
+    : selectedTeamNames.length === 1
+      ? selectedTeamNames[0]
+      : `${selectedTeamNames.length} teams selected`
+
+  const updateSelectedTeams = (teamNames: string[]) => {
+    setSelectedTeamNames(teamNames)
+    const selectedTeamObjects = teams.filter((team) => teamNames.includes(team.name))
+    onTeamSelect(teamNames, selectedTeamObjects)
+  }
+
+  const toggleTeamSelection = (teamName: string, checked: boolean) => {
+    if (checked) {
+      if (selectedTeamNames.includes(teamName)) return
+      updateSelectedTeams([...selectedTeamNames, teamName])
+      return
+    }
+    updateSelectedTeams(selectedTeamNames.filter((name) => name !== teamName))
+  }
 
   // Auto-validate token when it's fully entered and valid format
   useEffect(() => {
@@ -101,7 +122,7 @@ export function RootlyIntegrationForm({
   useEffect(() => {
     if (connectionStatus !== 'success' || previewData?.key_type !== 'global') {
       setTeams([])
-      setSelectedTeam('all')
+      setSelectedTeamNames([])
       setAllTeamsScope({ already_added: false, existing_integration_name: null })
       return
     }
@@ -125,8 +146,8 @@ export function RootlyIntegrationForm({
             already_added: Boolean(data.all_teams_scope?.already_added),
             existing_integration_name: data.all_teams_scope?.existing_integration_name ?? null,
           })
-          setSelectedTeam('all')
-          onTeamSelect(null)
+          setSelectedTeamNames([])
+          onTeamSelect([], [])
         }
       })
       .catch(() => {
@@ -328,19 +349,31 @@ export function RootlyIntegrationForm({
                               Loading teams...
                             </div>
                           ) : teams.length > 0 ? (
-                            <Select
-                              value={selectedTeam}
-                              onValueChange={(value) => {
-                                setSelectedTeam(value)
-                                const team = teams.find(t => t.name === value)
-                                onTeamSelect(value === 'all' ? null : value, team?.member_count)
-                              }}
-                            >
-                              <SelectTrigger className="h-8 text-xs bg-white border-green-300 text-green-900">
-                                <SelectValue placeholder="All teams (entire org)" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all" className={allTeamsScope.already_added ? "text-amber-700" : undefined}>
+                            <DropdownMenu modal={false}>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="h-8 w-full justify-between text-xs bg-white border-green-300 text-green-900"
+                                >
+                                  <span className="truncate">{selectedTeamLabel}</span>
+                                  <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="start"
+                                className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-72 overflow-y-auto"
+                              >
+                                <DropdownMenuCheckboxItem
+                                  checked={selectedTeamNames.length === 0}
+                                  onSelect={(event) => event.preventDefault()}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      updateSelectedTeams([])
+                                    }
+                                  }}
+                                  className={allTeamsScope.already_added ? "text-amber-700" : undefined}
+                                >
                                   {`All teams (entire org)${
                                     allTeamsScope.already_added ? " (already added)" : ""
                                   }${
@@ -348,24 +381,27 @@ export function RootlyIntegrationForm({
                                       ? ` - ${allTeamsScope.existing_integration_name}`
                                       : ""
                                   }`}
-                                </SelectItem>
-                                {teams.map(team => (
-                                  <SelectItem
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuSeparator />
+                                {teams.map((team) => (
+                                  <DropdownMenuCheckboxItem
                                     key={team.id}
-                                    value={team.name}
+                                    checked={selectedTeamNames.includes(team.name)}
+                                    onSelect={(event) => event.preventDefault()}
+                                    onCheckedChange={(checked) => toggleTeamSelection(team.name, checked === true)}
                                     className={team.already_added ? "text-amber-700" : undefined}
                                   >
                                     {`${team.name}${team.already_added ? " (already added)" : ""}${
-                                      team.member_count > 0 ? ` (${team.member_count} members)` : ''
+                                      team.member_count > 0 ? ` (${team.member_count} members)` : ""
                                     }${
                                       team.already_added && team.existing_integration_name
                                         ? ` - ${team.existing_integration_name}`
-                                        : ''
+                                        : ""
                                     }`}
-                                  </SelectItem>
+                                  </DropdownMenuCheckboxItem>
                                 ))}
-                              </SelectContent>
-                            </Select>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           ) : (
                             <p className="text-xs text-green-700">No teams found — analysis will cover the entire org.</p>
                           )}
@@ -376,9 +412,11 @@ export function RootlyIntegrationForm({
                                 : "No scopes added with this token yet."}
                             </p>
                           )}
-                          {selectedTeam !== 'all' && (
+                          {selectedTeamNames.length > 0 && (
                             <p className="text-xs text-green-700 mt-1">
-                              Analysis will be scoped to incidents and members of <strong>{selectedTeam}</strong>.
+                              {selectedTeamNames.length === 1
+                                ? <>Analysis will be scoped to incidents and members of <strong>{selectedTeamNames[0]}</strong>.</>
+                                : <>Analysis will create scoped integrations for <strong>{selectedTeamNames.length}</strong> teams.</>}
                             </p>
                           )}
                         </div>
@@ -450,7 +488,7 @@ export function RootlyIntegrationForm({
                 ) : (
                   <>
                     <Check className="w-4 h-4 mr-2" />
-                    Save Integration
+                    {selectedTeamNames.length > 1 ? `Save ${selectedTeamNames.length} Integrations` : "Save Integration"}
                   </>
                 )}
               </Button>
