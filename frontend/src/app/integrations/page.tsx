@@ -2549,8 +2549,19 @@ export default function IntegrationsPage() {
                           {selectedOrganization && (() => {
                             const selected = integrations.find(i => i.id.toString() === selectedOrganization)
                             if (selected) {
+                              const selectedDisplayName = (() => {
+                                if (selected.platform !== 'rootly') return selected.name
+
+                                const withoutRootlyPrefix = selected.name.replace(/^Rootly\s*-\s*/i, '').trim()
+                                if (!selected.team_name) return withoutRootlyPrefix
+
+                                const teamSuffix = ` - ${selected.team_name}`
+                                return withoutRootlyPrefix.toLowerCase().endsWith(teamSuffix.toLowerCase())
+                                  ? withoutRootlyPrefix.slice(0, -teamSuffix.length).trim()
+                                  : withoutRootlyPrefix
+                              })()
                               const selectedScopeLabel = selected.platform === 'rootly'
-                                ? (selected.team_name ? `Team: ${selected.team_name}` : 'Team: All users')
+                                ? (selected.team_name || 'All users')
                                 : null
                               return (
                                 <div className="flex w-full items-start gap-2">
@@ -2560,10 +2571,10 @@ export default function IntegrationsPage() {
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-start justify-between gap-2">
                                       <span
-                                        title={selected.name}
+                                        title={selectedDisplayName}
                                         className="block min-w-0 flex-1 font-medium text-sm sm:text-base leading-tight truncate"
                                       >
-                                        {selected.name}
+                                        {selectedDisplayName}
                                       </span>
                                       {selected.is_default && (
                                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0 mt-0.5" />
