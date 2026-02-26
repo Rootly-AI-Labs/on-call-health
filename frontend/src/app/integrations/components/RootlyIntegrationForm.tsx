@@ -392,7 +392,7 @@ export function RootlyIntegrationForm({
                                     className={team.already_added ? "text-amber-700" : undefined}
                                   >
                                     {`${team.name}${team.already_added ? " (already added)" : ""}${
-                                      team.member_count > 0 ? ` (${team.member_count} members)` : ""
+                                      ` (${team.member_count ?? 0} members)`
                                     }${
                                       team.already_added && team.existing_integration_name
                                         ? ` - ${team.existing_integration_name}`
