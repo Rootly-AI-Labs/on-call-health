@@ -340,20 +340,24 @@ export function RootlyIntegrationForm({
                                 <SelectValue placeholder="All teams (entire org)" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="all">
-                                  {`All teams (entire org)${
-                                    allTeamsScope.already_added
-                                      ? ` - already added${allTeamsScope.existing_integration_name ? ` as ${allTeamsScope.existing_integration_name}` : ''}`
+                                <SelectItem value="all" className={allTeamsScope.already_added ? "text-amber-700" : undefined}>
+                                  {`${allTeamsScope.already_added ? "[Already added] " : ""}All teams (entire org)${
+                                    allTeamsScope.already_added && allTeamsScope.existing_integration_name
+                                      ? ` - ${allTeamsScope.existing_integration_name}`
                                       : ''
                                   }`}
                                 </SelectItem>
                                 {teams.map(team => (
-                                  <SelectItem key={team.id} value={team.name}>
-                                    {`${team.name}${
+                                  <SelectItem
+                                    key={team.id}
+                                    value={team.name}
+                                    className={team.already_added ? "text-amber-700" : undefined}
+                                  >
+                                    {`${team.already_added ? "[Already added] " : ""}${team.name}${
                                       team.member_count > 0 ? ` (${team.member_count} members)` : ''
                                     }${
-                                      team.already_added
-                                        ? ` - already added${team.existing_integration_name ? ` as ${team.existing_integration_name}` : ''}`
+                                      team.already_added && team.existing_integration_name
+                                        ? ` - ${team.existing_integration_name}`
                                         : ''
                                     }`}
                                   </SelectItem>
