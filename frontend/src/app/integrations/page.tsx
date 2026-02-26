@@ -2544,7 +2544,7 @@ export default function IntegrationsPage() {
                         }
                       }}
                     >
-                      <SelectTrigger className="w-full sm:flex-1 min-h-12 h-auto py-2 border-neutral-300 hover:border-neutral-400 transition-colors [&>span]:line-clamp-none">
+                      <SelectTrigger className="w-full sm:flex-1 min-h-12 h-auto whitespace-normal py-2 border-neutral-300 hover:border-neutral-400 transition-colors [&>span]:line-clamp-none [&>span]:w-full [&>span]:pr-2 [&>span]:text-left">
                         <SelectValue placeholder="Select organization">
                           {selectedOrganization && (() => {
                             const selected = integrations.find(i => i.id.toString() === selectedOrganization)
@@ -2553,23 +2553,33 @@ export default function IntegrationsPage() {
                                 ? (selected.team_name ? `Team: ${selected.team_name}` : 'Team: All users')
                                 : null
                               return (
-                                <div className="flex items-start justify-between w-full gap-2">
+                                <div className="flex w-full items-start gap-2">
+                                  <div className={`mt-1 h-3 w-3 rounded-full flex-shrink-0 ${
+                                    selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
+                                  }`}></div>
                                   <div className="min-w-0 flex-1">
-                                    <div className="flex items-start gap-2 min-w-0">
-                                      <div className={`w-3 h-3 rounded-full mt-0.5 flex-shrink-0 ${
-                                        selected.platform === 'rootly' ? 'bg-purple-500' : 'bg-green-500'
-                                      }`}></div>
-                                      <span className="font-medium text-sm sm:text-base leading-tight line-clamp-2 break-words">{selected.name}</span>
+                                    <div className="flex items-start justify-between gap-2">
+                                      <span
+                                        title={selected.name}
+                                        className="block min-w-0 flex-1 font-medium text-sm sm:text-base leading-tight truncate"
+                                      >
+                                        {selected.name}
+                                      </span>
+                                      {selected.is_default && (
+                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0 mt-0.5" />
+                                      )}
                                     </div>
                                     {selectedScopeLabel && (
                                       <div className="mt-1">
-                                        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 inline-flex max-w-full break-words">
+                                        <span
+                                          title={selectedScopeLabel}
+                                          className="px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 inline-block max-w-full truncate align-middle"
+                                        >
                                           {selectedScopeLabel}
                                         </span>
                                       </div>
                                     )}
                                   </div>
-                                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 flex-shrink-0 mt-0.5" />
                                 </div>
                               )
                             }
