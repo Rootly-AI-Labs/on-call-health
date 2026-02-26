@@ -289,38 +289,91 @@ export async function addIntegration(
 
     let responseData: any
     let successfulRootlyAdds = 0
+    let firstCreatedIntegrationId: number | null = null
 
     if (platform === 'rootly' && selectedTeamNames.length > 1) {
       const failures: string[] = []
       const successes: any[] = []
+      const createdScopeIds: number[] = []
 
       for (const teamName of selectedTeamNames) {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify(buildRootlyBody(teamName))
-        })
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(buildRootlyBody(teamName))
+          })
 
-        const scopeResponseData = await response.json()
-        if (response.ok) {
-          successes.push(scopeResponseData)
-        } else {
-          failures.push(`${teamName}: ${scopeResponseData.detail?.message || scopeResponseData.message || 'Failed to add scope'}`)
+          let scopeResponseData: any = null
+          try {
+            scopeResponseData = await response.json()
+          } catch {
+            scopeResponseData = null
+          }
+
+          if (response.ok) {
+            const normalizedScopeResponseData =
+              scopeResponseData && typeof scopeResponseData === 'object' ? scopeResponseData : {}
+            successes.push(normalizedScopeResponseData)
+            const createdId = normalizedScopeResponseData.integration?.id || normalizedScopeResponseData.id
+            if (typeof createdId === 'number') {
+              if (firstCreatedIntegrationId === null) {
+                firstCreatedIntegrationId = createdId
+              }
+              createdScopeIds.push(createdId)
+            }
+          } else {
+            const errorMessage =
+              scopeResponseData?.detail?.message ||
+              scopeResponseData?.detail?.user_message ||
+              scopeResponseData?.message ||
+              `Failed to add scope (HTTP ${response.status})`
+            failures.push(`${teamName}: ${errorMessage}`)
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Network request failed'
+          failures.push(`${teamName}: ${errorMessage}`)
         }
+      }
+
+      if (failures.length > 0) {
+        let rollbackFailures = 0
+        if (successes.length > 0) {
+          // If we cannot infer created IDs, rollback is incomplete by definition.
+          rollbackFailures += Math.max(0, successes.length - createdScopeIds.length)
+
+          const rollbackResults = await Promise.allSettled(
+            createdScopeIds.map(async (integrationId) => {
+              const rollbackResponse = await fetch(`${API_BASE}/rootly/integrations/${integrationId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${authToken}`
+                }
+              })
+              if (!rollbackResponse.ok) {
+                throw new Error(`Rollback failed for integration ${integrationId}`)
+              }
+            })
+          )
+
+          rollbackFailures += rollbackResults.filter((result) => result.status === 'rejected').length
+        }
+
+        const failurePreview = failures.slice(0, 2).join(' | ')
+        if (rollbackFailures > 0) {
+          throw new Error(`Failed to add all selected team scopes. Some scopes may require manual cleanup. ${failurePreview}`)
+        }
+        throw new Error(`Failed to add all selected team scopes. No changes were applied. ${failurePreview}`)
       }
 
       successfulRootlyAdds = successes.length
       responseData = successes[0]
 
       if (successes.length === 0) {
-        throw new Error(failures[0] || 'Failed to add selected team scopes')
-      }
-
-      if (failures.length > 0) {
-        toast.warning(`Added ${successes.length}/${selectedTeamNames.length} team scopes. ${failures.slice(0, 2).join(' | ')}`)
+        throw new Error('Failed to add selected team scopes')
       }
     } else {
       const body = platform === 'rootly'
@@ -351,7 +404,11 @@ export async function addIntegration(
       successfulRootlyAdds = platform === 'rootly' ? 1 : 0
     }
 
-    if (responseData) {
+    const hasSuccessfulAdd = platform === 'rootly'
+      ? successfulRootlyAdds > 0
+      : Boolean(responseData)
+
+    if (hasSuccessfulAdd) {
       if (platform === 'rootly' && successfulRootlyAdds > 1) {
         toast.success(`${successfulRootlyAdds} Rootly team-scoped integrations connected.`)
       } else {
@@ -371,7 +428,10 @@ export async function addIntegration(
 
       // Always select the newly added integration for dashboard / sync flow
       try {
-        const newIntegrationId = responseData.integration?.id || responseData.id
+        const newIntegrationId =
+          responseData?.integration?.id ||
+          responseData?.id ||
+          (platform === 'rootly' ? firstCreatedIntegrationId : null)
         if (newIntegrationId) {
           const integrationIdStr = newIntegrationId.toString()
           localStorage.setItem('selected_organization', integrationIdStr)

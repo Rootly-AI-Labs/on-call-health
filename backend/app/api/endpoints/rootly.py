@@ -263,6 +263,10 @@ async def add_rootly_integration(
     # Strip whitespace from token
     token = integration_data.token.strip()
 
+    # Serialize integration creation per user to prevent concurrent duplicate scope creation.
+    # This lock is held for the duration of this transaction and released on commit/rollback.
+    db.query(User).filter(User.id == current_user.id).with_for_update().one_or_none()
+
     # Use organization info from frontend (already validated during test step)
     # This avoids redundant API calls to Rootly
     organization_name = integration_data.organization_name
