@@ -431,6 +431,7 @@ function DashboardContent() {
                 const arPlatform = (autoRefreshAnalysis as any).platform
                 const arColor = getPlatformColor(arPlatform)
                 const isArSelected = currentAnalysis?.id === autoRefreshAnalysis.id
+                const isArRunning = autoRefreshAnalysis.status === 'running' || autoRefreshAnalysis.status === 'pending'
                 return (
                   <div className={`relative group ${isArSelected ? 'bg-neutral-800' : ''} rounded`}>
                     <Button
@@ -449,7 +450,7 @@ function DashboardContent() {
                             const full = await resp.json()
                             setCurrentAnalysis(full)
                             setRedirectingToSuggested(false)
-                            updateURLWithAnalysis(full.uuid || full.id)
+                            updateURLWithAnalysis(String(full.id))
                           }
                         } finally {
                           setLoadingAnalysisId(null)
@@ -470,6 +471,12 @@ function DashboardContent() {
                           <span>{arDateStr}</span>
                           <span>{arTimeStr}</span>
                         </div>
+                        {isArRunning && (
+                          <div className="mt-1 flex items-center gap-1 text-xs text-blue-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                            <span>Refreshing</span>
+                          </div>
+                        )}
                       </div>
                     </Button>
                     <Button
@@ -546,7 +553,7 @@ function DashboardContent() {
                           if (hasCachedAnalysisData && hasCachedMembers) {
                             setCurrentAnalysis(cachedAnalysis)
                             setRedirectingToSuggested(false)
-                            updateURLWithAnalysis(cachedAnalysis.uuid || cachedAnalysis.id)
+                            updateURLWithAnalysis(String(cachedAnalysis.id))
                             setLoadingAnalysisId(null)
                             return
                           }
@@ -563,7 +570,7 @@ function DashboardContent() {
                                 setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
                                 setCurrentAnalysis(fullAnalysis)
                                 setRedirectingToSuggested(false)
-                                updateURLWithAnalysis(fullAnalysis.uuid || fullAnalysis.id)
+                                updateURLWithAnalysis(String(fullAnalysis.id))
                               } else {
                                 setRedirectingToSuggested(false)
                               }
@@ -576,7 +583,7 @@ function DashboardContent() {
                             setAnalysisCache(prev => new Map(prev.set(analysisKey, analysis)))
                             setCurrentAnalysis(analysis)
                             setRedirectingToSuggested(false)
-                            updateURLWithAnalysis(analysis.uuid || analysis.id)
+                            updateURLWithAnalysis(String(analysis.id))
                             setLoadingAnalysisId(null)
                           }
                         }}
@@ -1189,7 +1196,7 @@ function DashboardContent() {
                       updateURLWithAnalysis(null)
                       if (previousAnalyses.length > 0) {
                         setCurrentAnalysis(previousAnalyses[0])
-                        updateURLWithAnalysis(previousAnalyses[0].uuid || previousAnalyses[0].id)
+                        updateURLWithAnalysis(String(previousAnalyses[0].id))
                       }
                     }}
                     className="bg-red-600 hover:bg-red-700"
@@ -1211,8 +1218,8 @@ function DashboardContent() {
           {/* Empty State or Loading State */}
           {!analysisRunning && !currentAnalysis && !searchParams.get('analysis') && (
             <>
-              {/* Show loading state while analyses are loading OR if we have analyses but currentAnalysis isn't set */}
-              {loadingAnalyses || (previousAnalyses.length > 0 && !currentAnalysis) ? (
+              {/* Show loading state while initial data hasn't settled yet, or while a subsequent reload is running */}
+              {(!initialDataLoaded || loadingAnalyses) ? (
                 <Card className="text-center p-8">
                   <div className="w-16 h-16 bg-neutral-200 rounded-full flex items-center justify-center mx-auto mb-4">
                     <div className="w-8 h-8 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin"></div>
