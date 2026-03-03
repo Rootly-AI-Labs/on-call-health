@@ -2239,6 +2239,80 @@ export default function useDashboard() {
     }
   }
 
+  const refreshCurrentAnalysis = async () => {
+    if (!currentAnalysis || analysisRunning) return
+
+    try {
+      const authToken = checkAuthToken()
+      if (!authToken) return
+
+      setAnalysisRunning(true)
+      setAnalysisStage("loading")
+      setAnalysisProgress(0)
+      setTargetProgress(5)
+      setCurrentStageIndex(0)
+
+      const requestData = {
+        integration_id: currentAnalysis.integration_id,
+        time_range: currentAnalysis.time_range || 30,
+        include_weekends: currentAnalysis.config?.include_weekends ?? true,
+        include_github: currentAnalysis.config?.include_github ?? false,
+        include_slack: currentAnalysis.config?.include_slack ?? false,
+        include_jira: currentAnalysis.config?.include_jira ?? false,
+        include_linear: currentAnalysis.config?.include_linear ?? false,
+        enable_ai: false,
+        auto_refresh_enabled: currentAnalysis.is_auto_refresh === true,
+        auto_refresh_interval: currentAnalysis.is_auto_refresh ? (currentAnalysis.auto_refresh_interval || "24h") : null,
+      }
+
+      let response
+      try {
+        response = await fetch(`${API_BASE}/analyses/run`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify(requestData),
+        })
+      } catch (networkError) {
+        throw new Error('Cannot connect to backend server. Please check if the backend is running and try again.')
+      }
+
+      if (!response) {
+        throw new Error('No response from server. Please check if the backend is running.')
+      }
+
+      let responseData
+      try {
+        responseData = await response.json()
+      } catch (parseError) {
+        throw new Error(`Server returned invalid response (${response.status}). The backend may be experiencing issues.`)
+      }
+
+      if (!response.ok) {
+        throw new Error(responseData.detail || responseData.message || `Analysis failed with status ${response.status}`)
+      }
+
+      const { id: analysis_id } = responseData
+      if (!analysis_id) {
+        throw new Error('No analysis ID returned from server')
+      }
+
+      setCurrentRunningAnalysisId(analysis_id)
+      localStorage.setItem('running_analysis_id', analysis_id.toString())
+      localStorage.setItem('running_analysis_start', Date.now().toString())
+      updateURLWithAnalysis(String(analysis_id))
+
+      await loadPreviousAnalyses(false, true)
+      startPollingAnalysis(analysis_id, { showToast: true })
+    } catch (error) {
+      setAnalysisRunning(false)
+      setCurrentRunningAnalysisId(null)
+      toast.error(error instanceof Error ? error.message : "Failed to refresh analysis")
+    }
+  }
+
   const getRiskColor = (riskLevel: string) => {
     switch (riskLevel) {
       // OCH 4-tier system
@@ -2597,6 +2671,7 @@ return {
   // actions
   startAnalysis,
   runAnalysisWithTimeRange,
+  refreshCurrentAnalysis,
   cancelRunningAnalysis,
   openDeleteDialog,
   confirmDeleteAnalysis,

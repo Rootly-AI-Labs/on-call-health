@@ -51,8 +51,12 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
     Cron job: find auto-refresh analyses matching `interval_filter` that are due
     and re-run them.  Pass interval_filter=None to process all intervals.
     """
-    from ..models import SessionLocal, Analysis, RootlyIntegration
+    from ..models import SessionLocal, Analysis, RootlyIntegration, User
     from ..api.endpoints.analyses import run_analysis_task
+    from ..services.integration_validator import IntegrationValidator
+    from ..services.notification_service import NotificationService
+    from ..core.rootly_client import RootlyAPIClient
+    from ..core.pagerduty_client import PagerDutyAPIClient
 
     label = interval_filter or "all"
     logger.info(f"🔄 [AUTO_REFRESH_SCHEDULER] Checking for due auto-refresh analyses (interval={label})...")
@@ -104,6 +108,114 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
 
                 config = old_analysis.config or {}
 
+                # Validate primary integration (Rootly/PagerDuty) before running auto-refresh.
+                primary_ok = True
+                primary_error = None
+                try:
+                    if integration.platform == "rootly":
+                        client = RootlyAPIClient(integration.api_token)
+                        permissions = await client.check_permissions()
+                        primary_ok = permissions.get("incidents", {}).get("access", False)
+                        primary_error = permissions.get("incidents", {}).get("error")
+                    elif integration.platform == "pagerduty":
+                        client = PagerDutyAPIClient(integration.api_token)
+                        permissions = await client.check_permissions()
+                        primary_ok = permissions.get("incidents", {}).get("access", False)
+                        primary_error = permissions.get("incidents", {}).get("error")
+                    else:
+                        primary_ok = False
+                        primary_error = f"Unknown platform: {integration.platform}"
+                except Exception as e:
+                    primary_ok = False
+                    primary_error = str(e)
+
+                if not primary_ok:
+                    logger.warning(
+                        f"ðŸ”„ [AUTO_REFRESH_SCHEDULER] Skipping analysis {old_analysis.id}: "
+                        f"primary integration invalid ({integration.platform}) - {primary_error}"
+                    )
+
+                    # Mark analysis as blocked so UI can show a warning beside last updated
+                    try:
+                        blocked_at = datetime.now(timezone.utc).isoformat()
+                        config["auto_refresh_blocked"] = {
+                            "provider": integration.platform,
+                            "reason": primary_error or "Primary integration token invalid or expired.",
+                            "blocked_at": blocked_at
+                        }
+                        old_analysis.config = config
+                        db.commit()
+                    except Exception as config_error:
+                        logger.error(
+                            f"ðŸ”„ [AUTO_REFRESH_SCHEDULER] Failed to persist auto_refresh_blocked for "
+                            f"analysis {old_analysis.id}: {config_error}"
+                        )
+                        db.rollback()
+
+                    # Emit a warning notification (best-effort)
+                    try:
+                        user = db.query(User).filter(User.id == old_analysis.user_id).first()
+                        if user:
+                            notification_service = NotificationService(db)
+                            notification_service.create_token_validation_failure_notification(
+                                user=user,
+                                provider=integration.platform,
+                                error_type="authentication",
+                                error_message=primary_error or "Primary integration token invalid or expired."
+                            )
+                    except Exception as notify_error:
+                        logger.error(
+                            f"ðŸ”„ [AUTO_REFRESH_SCHEDULER] Failed to create notification for user "
+                            f"{old_analysis.user_id}: {notify_error}"
+                        )
+                    continue
+
+                # Clear any previous blocked state now that primary integration is valid
+                if "auto_refresh_blocked" in config:
+                    config.pop("auto_refresh_blocked", None)
+
+                # Validate secondary integrations and disable invalid ones (GitHub/Jira/Linear)
+                include_github = bool(config.get("include_github", False))
+                include_jira = bool(config.get("include_jira", False))
+                include_linear = bool(config.get("include_linear", False))
+                include_slack = bool(config.get("include_slack", False))
+
+                invalid_secondary = []
+                if include_github or include_jira or include_linear:
+                    validator = IntegrationValidator(db)
+                    validation_results = await validator.validate_all_integrations(
+                        user_id=old_analysis.user_id
+                    )
+
+                    if include_github and not validation_results.get("github", {}).get("valid", False):
+                        include_github = False
+                        invalid_secondary.append("github")
+                    if include_jira and not validation_results.get("jira", {}).get("valid", False):
+                        include_jira = False
+                        invalid_secondary.append("jira")
+                    if include_linear and not validation_results.get("linear", {}).get("valid", False):
+                        include_linear = False
+                        invalid_secondary.append("linear")
+
+                if invalid_secondary:
+                    logger.warning(
+                        f"ðŸ”„ [AUTO_REFRESH_SCHEDULER] Disabling invalid integrations for "
+                        f"user {old_analysis.user_id}: {', '.join(invalid_secondary)}"
+                    )
+                    warnings = config.get("permission_warnings", [])
+                    if not isinstance(warnings, list):
+                        warnings = [str(warnings)]
+                    warnings.append(
+                        f"Auto-refresh disabled invalid integrations: {', '.join(invalid_secondary)}"
+                    )
+                    config["permission_warnings"] = warnings
+
+                # Persist updated include flags in config
+                config["include_github"] = include_github
+                config["include_jira"] = include_jira
+                config["include_linear"] = include_linear
+                config["include_slack"] = include_slack
+
                 # Create new analysis record with same params
                 new_analysis = Analysis(
                     user_id=old_analysis.user_id,
@@ -144,10 +256,10 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                         organization_name=integration.organization_name or integration.name,
                         time_range=old_analysis.time_range,
                         include_weekends=config.get("include_weekends", True),
-                        include_github=config.get("include_github", False),
-                        include_slack=config.get("include_slack", False),
-                        include_jira=config.get("include_jira", False),
-                        include_linear=config.get("include_linear", False),
+                        include_github=include_github,
+                        include_slack=include_slack,
+                        include_jira=include_jira,
+                        include_linear=include_linear,
                         user_id=old_analysis.user_id,
                         enable_ai=False,
                     )

@@ -206,6 +206,7 @@ function DashboardContent() {
   shouldShowInsufficientDataCard,
   hasNoIncidentsInPeriod,
   updateURLWithAnalysis,
+  refreshCurrentAnalysis,
 
   // start-analysis modal
   showTimeRangeDialog,
@@ -724,9 +725,27 @@ function DashboardContent() {
               {currentAnalysis.completed_at && (
                 <>
                   <span className="text-blue-600 ml-auto">|</span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-2">
                     <Clock className="w-3.5 h-3.5" />
                     Last updated {formatDistanceToNow(new Date(currentAnalysis.completed_at))} ago
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={refreshCurrentAnalysis}
+                      disabled={analysisRunning}
+                      className="h-6 px-1.5 text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+                      title="Refresh analysis now"
+                    >
+                      <RefreshCw className={analysisRunning ? "w-3.5 h-3.5 animate-spin" : "w-3.5 h-3.5"} />
+                    </Button>
+                    {currentAnalysis.config?.auto_refresh_blocked && (
+                      <span
+                        className="inline-flex items-center gap-1 text-amber-600"
+                        title={`${(currentAnalysis.config as any).auto_refresh_blocked?.provider || 'Integration'} token expired. Auto-refresh paused.`}
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                      </span>
+                    )}
                   </span>
                 </>
               )}

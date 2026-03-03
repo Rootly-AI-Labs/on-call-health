@@ -1269,6 +1269,37 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "047_seed_auto_refresh_from_latest_real_analysis",
+                "description": "Seed auto-refresh (10m) from each user's latest non-demo analysis with a valid integration",
+                "sql": [
+                    """
+                    WITH latest_real AS (
+                        SELECT DISTINCT ON (a.user_id) a.id
+                        FROM analyses a
+                        JOIN rootly_integrations r ON r.id = a.rootly_integration_id
+                        WHERE a.status = 'completed'
+                          AND a.is_auto_refresh = FALSE
+                          AND a.rootly_integration_id IS NOT NULL
+                          AND r.is_active = TRUE
+                          AND r.api_token IS NOT NULL
+                          AND btrim(r.api_token) <> ''
+                          AND COALESCE((a.config->>'is_demo')::boolean, FALSE) = FALSE
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM analyses ar
+                              WHERE ar.user_id = a.user_id
+                                AND ar.is_auto_refresh = TRUE
+                          )
+                        ORDER BY a.user_id, a.created_at DESC
+                    )
+                    UPDATE analyses
+                    SET is_auto_refresh = TRUE,
+                        auto_refresh_interval = '10m'
+                    WHERE id IN (SELECT id FROM latest_real)
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
         ]
 
