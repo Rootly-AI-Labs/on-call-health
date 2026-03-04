@@ -384,11 +384,8 @@ export function TeamHealthOverview({
           <CardContent className="pb-0 px-2 md:px-4 py-2 md:py-3">
             <div className="text-center mb-2 md:mb-3">
               <div className="text-xl md:text-3xl font-bold text-neutral-900">
-                {(currentAnalysis.analysis_data as any)?.metadata?.total_incidents !== undefined
-                  ? (currentAnalysis.analysis_data as any).metadata.total_incidents
-                  : (currentAnalysis.analysis_data as any)?.team_analysis?.total_incidents !== undefined
-                    ? (currentAnalysis.analysis_data as any).team_analysis.total_incidents
-                    : currentAnalysis.analysis_data?.partial_data?.incidents?.length || 0}
+                {getTeamMembers(currentAnalysis).reduce((sum: number, m: any) => sum + (m.incident_count || 0), 0) ||
+                  currentAnalysis.analysis_data?.partial_data?.incidents?.length || 0}
               </div>
               <p className="text-[9px] md:text-xs text-neutral-500">
                 In the last {currentAnalysis.time_range || 30} days
