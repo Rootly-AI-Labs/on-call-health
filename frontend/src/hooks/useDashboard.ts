@@ -19,7 +19,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 
 export default function useDashboard() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [selectedIntegration, setSelectedIntegration] = useState<string>("")
   const [loadingIntegrations, setLoadingIntegrations] = useState(false)

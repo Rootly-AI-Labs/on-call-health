@@ -356,18 +356,6 @@ function DashboardContent() {
         {/* Unified Sidebar - Works on all screen sizes */}
         <div
           ref={sidebarRef}
-          onMouseEnter={() => {
-            // Only expand on hover on desktop
-            if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-              setSidebarCollapsed(false)
-            }
-          }}
-          onMouseLeave={() => {
-            // Only collapse on mouse leave on desktop
-            if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-              setSidebarCollapsed(true)
-            }
-          }}
           className={`flex ${sidebarCollapsed ? "w-10 sm:w-12 md:w-16" : "w-60"} bg-neutral-900 text-white transition-all duration-300 flex-col overflow-hidden cursor-pointer md:cursor-default relative group md:relative`}
           style={
             mounted && !sidebarCollapsed && typeof window !== 'undefined' && window.innerWidth < 768

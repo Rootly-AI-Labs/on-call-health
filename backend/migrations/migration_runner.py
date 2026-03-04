@@ -1300,6 +1300,39 @@ class MigrationRunner:
                     """
                 ]
             },
+            {
+                "name": "048_create_weekly_digest_logs",
+                "description": "Create weekly_digest_logs table for weekly email idempotency",
+                "sql": [
+                    """
+                    CREATE TABLE IF NOT EXISTS weekly_digest_logs (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        analysis_id INTEGER REFERENCES analyses(id) ON DELETE SET NULL,
+                        week_start_date DATE NOT NULL,
+                        timezone VARCHAR(50),
+                        sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """,
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_weekly_digest_user_week
+                    ON weekly_digest_logs(user_id, week_start_date)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_weekly_digest_user_sent_at
+                    ON weekly_digest_logs(user_id, sent_at DESC)
+                    """
+                ]
+            },
+            {
+                "name": "049_add_weekly_digest_enabled_to_users",
+                "description": "Add weekly_digest_enabled column to users for per-user digest opt-out",
+                "sql": [
+                    """
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly_digest_enabled BOOLEAN NOT NULL DEFAULT TRUE
+                    """
+                ]
+            },
             # Add future migrations here with incrementing numbers
         ]
 
