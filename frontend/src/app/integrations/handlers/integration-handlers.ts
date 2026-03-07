@@ -368,6 +368,7 @@ export async function addIntegration(
         }
         throw new Error(`Failed to add all selected team scopes. No changes were applied. ${failurePreview}`)
       }
+
       successfulRootlyAdds = successes.length
       responseData = successes[0]
 
