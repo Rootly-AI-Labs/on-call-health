@@ -155,15 +155,54 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                 integration = db.query(RootlyIntegration).filter(
                     RootlyIntegration.id == old_analysis.rootly_integration_id
                 ).first()
-
-                if not integration:
+                
+                config = old_analysis.config or {}
+                
+                def _mark_blocked(reason: str, message: str, provider: str = "primary integration") -> None:
                     logger.warning(
-                        f"🔄 [AUTO_REFRESH_SCHEDULER] Integration {old_analysis.rootly_integration_id} "
-                        f"not found for analysis {old_analysis.id}, skipping"
+                        f"[AUTO_REFRESH_SCHEDULER] Skipping analysis {old_analysis.id}: "
+                        f"{reason} ({provider}) - {message}"
+                    )
+                    try:
+                        blocked_at = datetime.now(timezone.utc).isoformat()
+                        config["auto_refresh_blocked"] = {
+                            "provider": provider,
+                            "reason": reason,
+                            "message": message,
+                            "blocked_at": blocked_at,
+                        }
+                        old_analysis.config = config
+                        db.commit()
+                    except Exception as config_error:
+                        logger.error(
+                            f"[AUTO_REFRESH_SCHEDULER] Failed to persist auto_refresh_blocked for "
+                            f"analysis {old_analysis.id}: {config_error}"
+                        )
+                        db.rollback()
+                
+                if not integration:
+                    _mark_blocked(
+                        reason="integration_missing",
+                        message="Primary integration is not connected.",
+                        provider="primary integration",
                     )
                     continue
-
-                config = old_analysis.config or {}
+                
+                if not integration.is_active:
+                    _mark_blocked(
+                        reason="integration_inactive",
+                        message="Primary integration is inactive or disconnected.",
+                        provider=integration.platform,
+                    )
+                    continue
+                
+                if not integration.api_token or not integration.api_token.strip():
+                    _mark_blocked(
+                        reason="token_missing",
+                        message="Primary integration token is missing. Reconnect to resume auto-refresh.",
+                        provider=integration.platform,
+                    )
+                    continue
 
                 # Validate primary integration (Rootly/PagerDuty) before running auto-refresh.
                 primary_ok = True
