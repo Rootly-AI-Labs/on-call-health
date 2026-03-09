@@ -699,6 +699,17 @@ function DashboardContent() {
                   <span>Refreshes every {currentAnalysis.auto_refresh_interval}</span>
                 </>
               )}
+              {currentAnalysis.config?.auto_refresh_blocked && (
+                <>
+                  <span className="text-blue-600">|</span>
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700"
+                    title={`${(currentAnalysis.config as any).auto_refresh_blocked?.provider || 'Integration'} ${(currentAnalysis.config as any).auto_refresh_blocked?.message || 'Token expired or removed.'}`}
+                  >
+                    Token expired or removed
+                  </span>
+                </>
+              )}
               {currentAnalysis.config?.include_github || currentAnalysis.config?.include_jira || currentAnalysis.config?.include_linear ? (
                 <>
                   <span className="text-blue-600">|</span>
@@ -726,14 +737,7 @@ function DashboardContent() {
                     >
                       <RefreshCw className={analysisRunning ? "w-3.5 h-3.5 animate-spin" : "w-3.5 h-3.5"} />
                     </Button>
-                    {currentAnalysis.config?.auto_refresh_blocked && (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700"
-                        title={`${(currentAnalysis.config as any).auto_refresh_blocked?.provider || 'Integration'} token expired. Reconnect to resume auto-refresh.`}
-                      >
-                        Token Expired
-                      </span>
-                    )}
+                    
                   </span>
                 </>
               )}
