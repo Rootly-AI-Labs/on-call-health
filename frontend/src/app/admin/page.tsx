@@ -1,693 +1,341 @@
-"use client"
+"""
+Admin endpoints for database maintenance and fixes.
+"""
+import ipaddress
+import json
+import logging
+import os
+import secrets
+from datetime import datetime, timezone
+from pathlib import Path
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-} from "recharts"
-import { Users, FileText, TrendingUp, Loader2 } from "lucide-react"
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from sqlalchemy import distinct
+from sqlalchemy.orm import Session
 
-interface StatsSummary {
-  total_users: number
-  total_synced_users: number
-  total_organizations: number
-  total_analyses: number
-  total_api_keys: number
-  users_google: number
-  users_github: number
-  new_users_last_30_days: number
-  new_users_last_7_days: number
-  new_users_today: number
-  logins_last_30_days: number
-  logins_last_7_days: number
-  logins_today: number
-  analyses_last_30_days: number
-  analyses_last_7_days: number
-  analyses_today: number
-}
+from ...core.rate_limiting import admin_rate_limit
+from ...models import Analysis, get_db
+from ...models.user import User
+from ...models.user_correlation import UserCorrelation
+from ...models.user_burnout_report import UserBurnoutReport
+from ...services.demo_analysis_service import _get_or_create_demo_organization, _load_health_checkins_for_user
 
-interface TrendDataPoint {
-  date: string
-  count: number
-}
+logger = logging.getLogger(__name__)
 
-interface UserItem {
-  id: number
-  email: string
-  name: string | null
-  organization_name: string | null
-  created_at: string
-  last_login: string | null
-  role: string
-}
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"]
+)
 
-interface IntegrationItem {
-  id: number
-  name: string
-  platform: string
-  user_email: string
-  user_name: string | null
-  organization_name: string | null
-  is_active: boolean
-  created_at: string
-  last_used_at: string | null
-}
+# Security Configuration
+# ----------------------
+# ADMIN_API_KEY: Required for sensitive admin operations.
+# Must be at least 32 characters for security. Store in secrets manager (AWS Secrets Manager,
+# HashiCorp Vault, etc.) rather than plain environment variables in production.
+ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
+MIN_API_KEY_LENGTH = 32
 
-interface RecentSignupItem {
-  id: number
-  email: string
-  name: string | null
-  organization_id: number | null
-  created_at: string
-}
+# ADMIN_IP_WHITELIST: Required comma-separated list of allowed IP addresses or CIDR ranges
+# Example: "10.0.0.1,192.168.1.0/24,203.0.113.50"
+# Must be configured for admin endpoints to function (defense in depth)
+ADMIN_IP_WHITELIST = os.getenv("ADMIN_IP_WHITELIST", "").strip()
 
-interface RecentAnalysisItem {
-  id: number
-  user_email: string
-  user_name: string | null
-  integration_name: string | null
-  status: string
-  created_at: string
-  completed_at: string | null
-}
+def _parse_ip_whitelist() -> set[str]:
+    """Parse the IP whitelist from environment variable."""
+    if not ADMIN_IP_WHITELIST:
+        return set()
+    return {ip.strip() for ip in ADMIN_IP_WHITELIST.split(",") if ip.strip()}
 
-function IntegrationsTable({ integrations }: { integrations: IntegrationItem[] }) {
-  const [sortBy, setSortBy] = useState<keyof IntegrationItem>('created_at')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+def _get_client_ip(request: Request) -> str:
+    """
+    Get the real client IP, handling reverse proxies.
+    Checks X-Forwarded-For header first (set by load balancers/proxies),
+    then falls back to direct client connection.
+    Validates IP format to prevent header injection attacks.
+    """
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+        # The first one is the original client
+        client_ip = forwarded_for.split(",")[0].strip()
+        try:
+            # Validate IP format to prevent header injection
+            ipaddress.ip_address(client_ip)
+            return client_ip
+        except ValueError:
+            # Invalid IP in header, fall back to direct client
+            pass
+    return request.client.host if request.client else "unknown"
 
-  if (!integrations || integrations.length === 0) {
-    return (
-      <Card className="bg-white dark:bg-gray-800">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Integrations</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-500">No integrations found</p>
-        </CardContent>
-      </Card>
-    )
-  }
+def _is_ip_whitelisted(client_ip: str, whitelist: set[str]) -> bool:
+    """Check if client IP is in the whitelist. Supports both exact IPs and CIDR ranges."""
+    if not whitelist:
+        return False
 
-  const handleSort = (column: keyof IntegrationItem) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(column)
-      setSortOrder('desc')
-    }
-  }
+    try:
+        client_addr = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return False
 
-  const sortedIntegrations = [...integrations].sort((a, b) => {
-    const aVal = a[sortBy]
-    const bVal = b[sortBy]
-    if (aVal === null || aVal === undefined) return 1
-    if (bVal === null || bVal === undefined) return -1
-    if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1
-    if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1
-    return 0
-  })
+    for entry in whitelist:
+        try:
+            if '/' in entry:
+                if client_addr in ipaddress.ip_network(entry, strict=False):
+                    return True
+            elif client_addr == ipaddress.ip_address(entry):
+                return True
+        except ValueError:
+            continue
 
-  const SortIcon = ({ column }: { column: keyof IntegrationItem }) => {
-    if (sortBy !== column) return null
-    return sortOrder === 'asc' ? ' ↑' : ' ↓'
-  }
+    return False
 
-  return (
-    <Card className="bg-white dark:bg-gray-800">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold">Integrations ({integrations.length})</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('id')}>ID<SortIcon column="id" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('platform')}>Platform<SortIcon column="platform" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>Name<SortIcon column="name" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('user_email')}>User<SortIcon column="user_email" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('organization_name')}>Organization<SortIcon column="organization_name" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('is_active')}>Status<SortIcon column="is_active" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('created_at')}>Added<SortIcon column="created_at" /></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedIntegrations.map((integration) => (
-                <tr key={integration.id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4 text-sm text-gray-500">{integration.id}</td>
-                  <td className="py-3 px-4">
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {integration.platform}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-sm font-medium">{integration.name}</td>
-                  <td className="py-3 px-4 text-sm">{integration.user_email}</td>
-                  <td className="py-3 px-4 text-sm">{integration.organization_name || "-"}</td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${integration.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                      {integration.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-sm">
-                    {integration.created_at
-                      ? new Date(integration.created_at).toLocaleDateString()
-                      : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+def _validate_admin_api_key() -> bool:
+    """Validate that ADMIN_API_KEY meets security requirements."""
+    if not ADMIN_API_KEY:
+        logger.error(
+            f"SECURITY: ADMIN_API_KEY is not configured. Admin endpoints will be disabled. "
+            f"Set ADMIN_API_KEY env var with at least {MIN_API_KEY_LENGTH} characters."
+        )
+        return False
 
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  trend,
-}: {
-  title: string
-  value: string | number
-  subtitle?: string
-  icon: React.ElementType
-  trend?: string
-}) {
-  return (
-    <Card className="bg-white dark:bg-gray-800">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
-            <p className="text-3xl font-bold mt-1">{value}</p>
-            {subtitle && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
-            )}
-            {trend && (
-              <p className="text-xs text-green-600 mt-1 flex items-center">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                {trend}
-              </p>
-            )}
-          </div>
-          <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
-            <Icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+    if len(ADMIN_API_KEY) < MIN_API_KEY_LENGTH:
+        logger.error(
+            f"SECURITY: ADMIN_API_KEY is too short ({len(ADMIN_API_KEY)} chars). "
+            f"Minimum required: {MIN_API_KEY_LENGTH} chars. Admin endpoints will be disabled."
+        )
+        return False
 
-function TrendChart({
-  title,
-  data,
-  color = "#3b82f6",
-}: {
-  title: string
-  data: TrendDataPoint[]
-  color?: string
-}) {
-  return (
-    <Card className="bg-white dark:bg-gray-800">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[200px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data}>
-              <defs>
-                <linearGradient id={`gradient-${title}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 10 }}
-                tickFormatter={(value) => {
-                  const date = new Date(value)
-                  return `${date.getMonth() + 1}/${date.getDate()}`
-                }}
-              />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "white",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "8px",
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="count"
-                stroke={color}
-                fillOpacity={1}
-                fill={`url(#gradient-${title})`}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+    return True
 
-function UsersTable({ users }: { users: UserItem[] }) {
-  const [sortBy, setSortBy] = useState<keyof UserItem>('created_at')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+# Validate API key at module load time
+_admin_api_key_valid = _validate_admin_api_key()
+_ip_whitelist = _parse_ip_whitelist()
 
-  const handleSort = (column: keyof UserItem) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(column)
-      setSortOrder('desc')
-    }
-  }
+if _ip_whitelist:
+    logger.info(f"SECURITY: Admin IP whitelist enabled with {len(_ip_whitelist)} entries")
+else:
+    logger.error("SECURITY: ADMIN_IP_WHITELIST is not configured. Admin endpoints will be disabled.")
 
-  const sortedUsers = [...users].sort((a, b) => {
-    const aVal = a[sortBy]
-    const bVal = b[sortBy]
-    if (aVal === null || aVal === undefined) return 1
-    if (bVal === null || bVal === undefined) return -1
-    if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1
-    if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1
-    return 0
-  })
 
-  const SortIcon = ({ column }: { column: keyof UserItem }) => {
-    if (sortBy !== column) return null
-    return sortOrder === 'asc' ? ' ↑' : ' ↓'
-  }
+@router.post("/refresh-demo-analyses")
+@admin_rate_limit()
+async def refresh_demo_analyses(
+    request: Request,
+    x_admin_api_key: str = Header(None, alias="X-Admin-API-Key"),
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    Refresh all demo analyses with the latest mock data.
 
-  return (
-    <Card className="bg-white dark:bg-gray-800">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold">All Users ({users.length})</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('id')}>ID< SortIcon column="id" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>Name< SortIcon column="name" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('email')}>Email< SortIcon column="email" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('organization_name')}>Organization< SortIcon column="organization_name" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('role')}>Role< SortIcon column="role" /></th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('created_at')}>Signed Up< SortIcon column="created_at" /></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedUsers.map((user) => (
-                <tr key={user.id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4 text-sm text-gray-500">{user.id}</td>
-                  <td className="py-3 px-4 font-medium">{user.name || "-"}</td>
-                  <td className="py-3 px-4 text-sm">{user.email}</td>
-                  <td className="py-3 px-4 text-sm">{user.organization_name || "-"}</td>
-                  <td className="py-3 px-4 text-sm">{user.role || "user"}</td>
-                  <td className="py-3 px-4 text-sm">
-                    {user.created_at
-                      ? new Date(user.created_at).toLocaleDateString()
-                      : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+    This endpoint updates existing demo analyses and creates new ones for users
+    who don't have a demo analysis. Use this after updating mock_analysis_data.json
+    with new fields or data.
 
-function RecentSignupsTable({ users }: { users: RecentSignupItem[] }) {
-  if (!users || users.length === 0) {
-    return (
-      <Card className="bg-white dark:bg-gray-800">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Recent Signups</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-500">No recent signups found</p>
-        </CardContent>
-      </Card>
-    )
-  }
+    Security Requirements:
+    - ADMIN_API_KEY env var: Must be at least 32 characters (required)
+    - ADMIN_IP_WHITELIST env var: Comma-separated IPs/CIDRs (required)
+    - X-Admin-API-Key header: Must match ADMIN_API_KEY
+    - Rate limited to 5 requests/minute
 
-  return (
-    <Card className="bg-white dark:bg-gray-800">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold">Recent Signups</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">User</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Email</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Signed Up</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4 font-medium">{user.name || "-"}</td>
-                  <td className="py-3 px-4 text-sm">{user.email}</td>
-                  <td className="py-3 px-4 text-sm">
-                    {user.created_at
-                      ? new Date(user.created_at).toLocaleString()
-                      : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+    Returns 503 if ADMIN_API_KEY or ADMIN_IP_WHITELIST is not properly configured.
+    Returns 403 if IP not whitelisted or API key doesn't match.
+    """
+    client_ip = _get_client_ip(request)
 
-function RecentAnalysesTable({ analyses }: { analyses: RecentAnalysisItem[] }) {
-  if (!analyses || analyses.length === 0) {
-    return (
-      <Card className="bg-white dark:bg-gray-800">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Recent Analyses</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-500">No recent analyses found</p>
-        </CardContent>
-      </Card>
-    )
-  }
+    # Security Layer 1: Validate API key is properly configured
+    if not _admin_api_key_valid:
+        logger.warning(f"ADMIN AUDIT: Rejected - API key not configured. IP: {client_ip}")
+        raise HTTPException(status_code=503, detail="Admin endpoint temporarily unavailable")
 
-  return (
-    <Card className="bg-white dark:bg-gray-800">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold">Recent Analyses</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto max-h-96 overflow-y-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">ID</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">User</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Integration</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Status</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Run At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {analyses.map((analysis) => (
-                <tr key={analysis.id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4 text-sm text-gray-500">{analysis.id}</td>
-                  <td className="py-3 px-4 text-sm">{analysis.user_email}</td>
-                  <td className="py-3 px-4 text-sm">{analysis.integration_name || "-"}</td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${analysis.status === 'completed' ? 'bg-green-100 text-green-800' : analysis.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {analysis.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-sm">
-                    {analysis.created_at
-                      ? new Date(analysis.created_at).toLocaleString()
-                      : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+    # Security Layer 2: IP whitelist check (if configured)
+    if not _is_ip_whitelisted(client_ip, _ip_whitelist):
+        logger.warning(f"ADMIN AUDIT: Rejected - IP not whitelisted. IP: {client_ip}")
+        raise HTTPException(status_code=403, detail="Forbidden")
 
-export default function AdminDashboard() {
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<StatsSummary | null>(null)
-  const [userTrends, setUserTrends] = useState<TrendDataPoint[]>([])
-  const [syncedUserTrends, setSyncedUserTrends] = useState<TrendDataPoint[]>([])
-  const [loginTrends, setLoginTrends] = useState<TrendDataPoint[]>([])
-  const [analysisTrends, setAnalysisTrends] = useState<TrendDataPoint[]>([])
-  const [users, setUsers] = useState<UserItem[]>([])
-  const [recentAnalyses, setRecentAnalyses] = useState<RecentAnalysisItem[]>([])
-  const [integrations, setIntegrations] = useState<IntegrationItem[]>([])
-  const [platformCounts, setPlatformCounts] = useState<{[key: string]: number}>({})
-  const [error, setError] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
-  const [authenticated, setAuthenticated] = useState(false)
-  const [password, setPassword] = useState("")
-  const [shake, setShake] = useState(false)
+    # Security Layer 3: Validate API key with constant-time comparison
+    if not secrets.compare_digest(x_admin_api_key or "", ADMIN_API_KEY):
+        logger.warning(f"ADMIN AUDIT: Rejected - Invalid API key. IP: {client_ip}")
+        raise HTTPException(status_code=403, detail="Forbidden")
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    logger.info(f"ADMIN AUDIT: Authorized access to /refresh-demo-analyses. IP: {client_ip}")
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+    try:
+        # Load mock data
+        backend_dir = Path(__file__).parent.parent.parent.parent
+        mock_data_path = backend_dir / "mock_data_helpers" / "mock_analysis_data.json"
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
+        if not mock_data_path.exists():
+            raise HTTPException(
+                status_code=500,
+                detail=f"Mock data file not found: {mock_data_path}"
+            )
 
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-        credentials: 'include'
-      })
+        with open(mock_data_path, 'r', encoding='utf-8') as f:
+            mock_data = json.load(f)
 
-      if (res.ok) {
-        setAuthenticated(true)
-      } else {
-        setError("Invalid password")
-        setShake(true)
-        setTimeout(() => setShake(false), 500)
-      }
-    } catch {
-      setError("Invalid password")
-      setShake(true)
-      setTimeout(() => setShake(false), 500)
-    }
-  }
+        original_analysis = mock_data.get('analysis', {})
+        new_results = original_analysis.get('results')
 
-  // No auth needed
+        if not new_results:
+            raise HTTPException(
+                status_code=500,
+                detail="Mock data file is missing 'analysis.results'"
+            )
 
-  const fetchData = async () => {
-    setLoading(true)
-    setError(null)
+        created_count = 0
+        deleted_count = 0
+        reports_deleted = 0
+        checkins_loaded = 0
+        errors = []
 
-    const headers = {}
+        # Get or create demo organization for health check-ins
+        demo_organization_id = _get_or_create_demo_organization(db)
+        logger.info(f"ADMIN: Using demo organization {demo_organization_id}")
 
-    try {
-      console.log("Fetching admin data from:", API_BASE)
-      console.log("With headers:", headers)
+        # DELETE all existing demo analyses first (clean slate approach)
+        demo_analyses = [
+            a for a in db.query(Analysis).all()
+            if isinstance(a.config, dict) and a.config.get('is_demo') is True
+        ]
 
-      // Use direct fetch to bypass any interceptor issues
-      const makeRequest = async (url: string) => {
-        console.log("Fetching:", url, headers)
-        try {
-          const res = await fetch(url, {
-            headers,
-            mode: 'cors',
-            credentials: 'include'
-          })
-          console.log("Got response:", url, res.status)
-          return res
-        } catch (e) {
-          console.error("Fetch error for", url, e)
-          throw e
+        for analysis in demo_analyses:
+            try:
+                logger.info(f"ADMIN: Deleting old demo analysis #{analysis.id} for user #{analysis.user_id}")
+                db.delete(analysis)
+                deleted_count += 1
+            except Exception as e:
+                logger.error(f"ADMIN: Failed to delete demo #{analysis.id}: {str(e)}")
+                errors.append(f"Failed to delete analysis #{analysis.id}: {str(e)}")
+
+        if deleted_count > 0:
+            db.commit()
+            logger.info(f"ADMIN: Deleted {deleted_count} old demo analyses")
+
+        # DELETE all UserBurnoutReport records for the demo organization (clean slate)
+        # This ensures health check-ins are refreshed with the latest mock data
+        try:
+            reports_to_delete = db.query(UserBurnoutReport).filter(
+                UserBurnoutReport.organization_id == demo_organization_id
+            ).all()
+            for report in reports_to_delete:
+                db.delete(report)
+                reports_deleted += 1
+            if reports_deleted > 0:
+                db.commit()
+                logger.info(f"ADMIN: Deleted {reports_deleted} old UserBurnoutReport records for demo organization")
+        except Exception as e:
+            logger.error(f"ADMIN: Failed to delete UserBurnoutReport records: {e}")
+            db.rollback()
+
+        # Ensure UserCorrelation records exist for all team members with health check-ins
+        # Clear session to get fresh database state after _load_health_checkins_for_user calls
+        db.expire_all()
+
+        # Query directly from database to get emails that exist in user_burnout_reports
+        correlations_created = 0
+        unique_emails = [
+            row[0] for row in db.query(distinct(UserBurnoutReport.email)).filter(
+                UserBurnoutReport.organization_id == demo_organization_id,
+                UserBurnoutReport.email.isnot(None)
+            ).all()
+        ]
+        logger.info(f"ADMIN: Found {len(unique_emails)} unique emails in health check-ins for org {demo_organization_id}")
+
+        for email in unique_emails:
+            try:
+                existing = db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == demo_organization_id,
+                    UserCorrelation.email == email
+                ).first()
+
+                if existing:
+                    logger.info(f"ADMIN: UserCorrelation already exists for {email} (id={existing.id})")
+                else:
+                    logger.info(f"ADMIN: Creating UserCorrelation for {email}")
+                    correlation = UserCorrelation(
+                        organization_id=demo_organization_id,
+                        email=email,
+                        name=email.split('@')[0].replace('.', ' ').title()
+                    )
+                    db.add(correlation)
+                    db.flush()  # Flush immediately to catch errors
+                    correlations_created += 1
+                    logger.info(f"ADMIN: Created UserCorrelation for {email} (id={correlation.id})")
+            except Exception as e:
+                logger.error(f"ADMIN: Failed to create UserCorrelation for {email}: {e}")
+
+        if correlations_created > 0:
+            db.commit()
+            logger.info(f"ADMIN: Created {correlations_created} UserCorrelation records")
+
+        # Create fresh demo analyses for ALL users
+        users = db.query(User).all()
+        logger.info(f"ADMIN: Found {len(users)} total users, creating demos for all")
+
+        for user in users:
+            try:
+                logger.info(f"ADMIN: Creating demo for user #{user.id} ({user.email})")
+                config = original_analysis.get('config', {}).copy()
+                config['is_demo'] = True
+                config['demo_created_at'] = datetime.now().isoformat()
+
+                new_analysis = Analysis(
+                    user_id=user.id,
+                    organization_id=demo_organization_id,
+                    rootly_integration_id=None,
+                    integration_name="Demo Analysis",
+                    platform=original_analysis.get('platform', 'rootly'),
+                    time_range=original_analysis.get('time_range', 30),
+                    status="completed",
+                    config=config,
+                    results=new_results,
+                    error_message=None,
+                    completed_at=datetime.now()
+                )
+                db.add(new_analysis)
+                db.flush()
+                created_count += 1
+                logger.info(f"ADMIN: Successfully created demo for user #{user.id}")
+
+                # Load health check-ins for the user
+                try:
+                    checkins_result = _load_health_checkins_for_user(db, user.id, demo_organization_id, mock_data)
+                    if checkins_result['created'] > 0:
+                        checkins_loaded += checkins_result['created']
+                        logger.info(f"ADMIN: Loaded {checkins_result['created']} health check-ins for user #{user.id}")
+                except Exception as e:
+                    logger.warning(f"ADMIN: Failed to load health check-ins for user #{user.id}: {e}")
+
+            except Exception as e:
+                logger.error(f"ADMIN: Failed to create demo for user #{user.id}: {str(e)}")
+                errors.append(f"Failed to create demo for user #{user.id} ({user.email}): {str(e)}")
+                db.rollback()
+
+        db.commit()
+
+        logger.info(
+            f"ADMIN AUDIT: /refresh-demo-analyses completed. "
+            f"IP: {client_ip}, Deleted: {deleted_count}, Created: {created_count}"
+        )
+
+        return {
+            "status": "success",
+            "message": "Demo analyses refreshed successfully",
+            "deleted_count": deleted_count,
+            "created_count": created_count,
+            "reports_deleted": reports_deleted,
+            "total_demo_analyses": created_count,
+            "health_checkins_loaded": checkins_loaded,
+            "correlations_created": correlations_created,
+            "errors": errors or None
         }
-      }
 
-      const [statsRes, usersRes, recentAnalysesRes, integrationsRes, userTrendsRes, syncedUserTrendsRes, loginTrendsRes, analysisTrendsRes] =
-        await Promise.allSettled([
-          makeRequest(`${API_BASE}/api/admin/stats/summary`),
-          makeRequest(`${API_BASE}/api/admin/stats/users?limit=20`),
-          makeRequest(`${API_BASE}/api/admin/stats/recent-analyses?limit=50`),
-          makeRequest(`${API_BASE}/api/admin/stats/integrations`),
-          makeRequest(`${API_BASE}/api/admin/stats/trends/users?days=30`),
-          makeRequest(`${API_BASE}/api/admin/stats/trends/synced-users?days=30`),
-          makeRequest(`${API_BASE}/api/admin/stats/trends/logins?days=30`),
-          makeRequest(`${API_BASE}/api/admin/stats/trends/analyses?days=30`),
-        ])
-
-      // Check for network errors
-      const errors: string[] = []
-      ;[statsRes, usersRes, recentAnalysesRes].forEach((res, i) => {
-        if (res.status === 'rejected') {
-          errors.push(`Request ${i} failed: ${res.reason}`)
-        }
-      })
-      if (errors.length > 0) {
-        console.error("Network errors:", errors)
-        setError(`Network error: ${errors.join(', ')}`)
-        setLoading(false)
-        return
-      }
-
-      console.log("Admin API responses:", {
-        stats: (statsRes as any).value?.status,
-        users: (usersRes as any).value?.status,
-        recentAnalyses: (recentAnalysesRes as any).value?.status,
-        trendsUsers: (userTrendsRes as any).value?.status,
-        trendsLogins: (loginTrendsRes as any).value?.status,
-        trendsAnalyses: (analysisTrendsRes as any).value?.status,
-        headers
-      })
-
-      const stats = (statsRes as any).value as Response
-      const users = (usersRes as any).value as Response
-      const recentAnalyses = (recentAnalysesRes as any).value as Response
-
-      const statsData = await stats.json()
-      const usersData = await users.json()
-      const recentAnalysesData = await recentAnalyses.json()
-      const integrationsData = await (integrationsRes as any).value.json()
-      const userTrendsData = await (userTrendsRes as any).value.json()
-      const syncedUserTrendsData = await (syncedUserTrendsRes as any).value.json()
-      const loginTrendsData = await (loginTrendsRes as any).value.json()
-      const analysisTrendsData = await (analysisTrendsRes as any).value.json()
-
-      setStats(statsData)
-      setUsers(usersData.users)
-      setRecentAnalyses(recentAnalysesData.analyses || [])
-      setIntegrations(integrationsData.integrations)
-      setPlatformCounts(integrationsData.platform_counts || {})
-      setUserTrends(userTrendsData.trends)
-      setSyncedUserTrends(syncedUserTrendsData.trends)
-      setLoginTrends(loginTrendsData.trends)
-      setAnalysisTrends(analysisTrendsData.trends)
-    } catch (err) {
-      setError(`Failed to load admin data: ${err}`)
-      console.error("Admin fetch error:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-full mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          </div>
-        </div>
-
-        {!authenticated ? (
-          <Card className="max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle>Admin Password Required</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handlePasswordSubmit}>
-                <Input
-                  type="password"
-                  placeholder="Enter admin password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`mb-4 ${shake ? 'animate-shake border-red-500' : ''}`}
-                />
-                <Button type="submit" className="w-full">
-                  Access Admin
-                </Button>
-              </form>
-              {error && <p className="text-red-500 mt-2">{error}</p>}
-            </CardContent>
-          </Card>
-        ) : loading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-          </div>
-        ) : stats ? (
-          <>
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-              <StatCard
-                title="Logged-in Users"
-                value={stats.total_users}
-                subtitle={`Google: ${stats.users_google} | GitHub: ${stats.users_github}`}
-                icon={Users}
-                trend={`+${stats.new_users_today} today`}
-              />
-              <StatCard
-                title="Synced Users"
-                value={stats.total_synced_users}
-                subtitle="Team members via integrations"
-                icon={Users}
-              />
-              <StatCard
-                title="Total Analyses"
-                value={stats.total_analyses}
-                subtitle={`+${stats.analyses_last_30_days} this month`}
-                icon={FileText}
-                trend={`+${stats.analyses_today} today`}
-              />
-              <StatCard
-                title="Organizations"
-                value={stats.total_organizations}
-                subtitle="Total orgs"
-                icon={Users}
-              />
-              <StatCard
-                title="Integrations"
-                value={Object.values(platformCounts).reduce((a, b) => a + b, 0)}
-                subtitle={`Rootly: ${platformCounts.rootly || 0}, PagerDuty: ${platformCounts.pagerduty || 0}`}
-                icon={Users}
-              />
-            </div>
-
-            {/* Trend Charts */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <TrendChart title="User Signups" data={userTrends} color="#3b82f6" />
-              <TrendChart title="Synced Users" data={syncedUserTrends} color="#10b981" />
-              <TrendChart title="Analyses Run" data={analysisTrends} color="#8b5cf6" />
-            </div>
-
-            {/* Tables */}
-            <div className="grid grid-cols-1 gap-6">
-              <UsersTable users={users} />
-            </div>
-
-            {/* Recent Analyses */}
-            <div className="grid grid-cols-1 gap-6 mt-6">
-              <RecentAnalysesTable analyses={recentAnalyses} />
-            </div>
-
-            {/* Integrations Table - full width */}
-            <div className="mt-6">
-              <IntegrationsTable integrations={integrations} />
-            </div>
-          </>
-        ) : null}
-      </div>
-    </div>
-  )
-}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"ADMIN AUDIT: /refresh-demo-analyses failed. IP: {client_ip}, Error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to refresh demo analyses"
+        )
