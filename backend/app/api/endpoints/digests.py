@@ -1,7 +1,7 @@
 """
 Weekly digest API endpoints.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -72,6 +72,7 @@ async def update_weekly_digest_preference(
 @router.get("/weekly/unsubscribe")
 @digest_rate_limit("digest_unsubscribe")
 async def unsubscribe_weekly_digest(
+    request: Request,
     token: str,
     db: Session = Depends(get_db)
 ):
