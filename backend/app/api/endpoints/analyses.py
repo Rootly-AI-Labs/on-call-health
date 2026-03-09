@@ -2956,6 +2956,14 @@ async def run_analysis_task(
         # Log database connection info
         logger.info(f"BACKGROUND_TASK [{node_id}]: Got new database session for analysis {analysis_ref}")
 
+        # Fetch team scope for Rootly integrations (team-scoped analysis)
+        rootly_team_name = None
+        if platform == "rootly" and integration_id:
+            integration_obj = db.query(RootlyIntegration).filter(RootlyIntegration.id == integration_id).first()
+            rootly_team_name = getattr(integration_obj, 'team_name', None) if integration_obj else None
+            if rootly_team_name:
+                logger.info(f"BACKGROUND_TASK [{node_id}]: Rootly integration {integration_id} has team_name={rootly_team_name!r} - analysis will be team-scoped")
+
         # Row-level locking prevents duplicate execution across replicas
         try:
             analysis = db.query(Analysis).filter(
@@ -3273,6 +3281,22 @@ async def run_analysis_task(
         else:
             logger.info("BACKGROUND_TASK: Skipping Team Sync query (missing user_id or integration_id)")
 
+        # Team-scope filter: when a global Rootly key is saved with a team scope, limit
+        # synced_users to only members of that team.
+        if rootly_team_name and synced_users:
+            from ...core.rootly_client import RootlyAPIClient
+            _scope_client = RootlyAPIClient(api_token=effective_api_token)
+            try:
+                team_emails = await _scope_client.get_team_member_emails(rootly_team_name)
+                if team_emails:
+                    before_count = len(synced_users)
+                    synced_users = [u for u in synced_users if (u.get('email') or '').lower() in team_emails]
+                    logger.info(f"BACKGROUND_TASK: Team scope filter '{rootly_team_name}': {before_count} → {len(synced_users)} synced users")
+                else:
+                    logger.warning(f"BACKGROUND_TASK: Team scope filter '{rootly_team_name}': no team member emails returned — keeping all synced users")
+            except Exception as team_filter_err:
+                logger.warning(f"BACKGROUND_TASK: Team scope filter failed: {team_filter_err} — keeping all synced users")
+
         # CRITICAL: Verify user_id hasn't been overwritten before passing to analyzer
         logger.info(f"BACKGROUND_TASK: Creating analyzer with current_user_id={user_id} (should match the logged-in user, NOT a team member ID)")
 
@@ -3288,7 +3312,8 @@ async def run_analysis_task(
             synced_users=synced_users,  # Pass synced users from Team Sync
             current_user_id=user_id,  # Pass the current user ID for Jira integration lookup
             organization_id=user.organization_id if user else None,  # Pass org_id for GitHub pre-filter scoping
-            db=db  # Reuse DB session to prevent connection pool exhaustion
+            db=db,  # Reuse DB session to prevent connection pool exhaustion
+            team_name=rootly_team_name  # Team scope for incident filtering
         )
         logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}, current_user_id={user_id}")
         
