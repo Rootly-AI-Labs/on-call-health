@@ -329,7 +329,7 @@ def _build_email_content(
     blocked_note_html = ""
     if isinstance(blocked, dict):
         provider = blocked.get("provider", "primary integration")
-        reason = blocked.get("reason", "Token expired or invalid.")
+        reason = blocked.get("message") or blocked.get("reason") or "Token expired or invalid."
         blocked_note_text = (
             f"\n\nNote: Auto-refresh is paused because your {provider} token is expired or invalid. "
             f"Reason: {reason}. Please reconnect in Integrations."

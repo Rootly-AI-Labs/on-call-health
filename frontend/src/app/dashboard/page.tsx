@@ -728,10 +728,10 @@ function DashboardContent() {
                     </Button>
                     {currentAnalysis.config?.auto_refresh_blocked && (
                       <span
-                        className="inline-flex items-center gap-1 text-amber-600"
-                        title={`${(currentAnalysis.config as any).auto_refresh_blocked?.provider || 'Integration'} token expired. Auto-refresh paused.`}
+                        className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700"
+                        title={`${(currentAnalysis.config as any).auto_refresh_blocked?.provider || 'Integration'} token expired. Reconnect to resume auto-refresh.`}
                       >
-                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Token Expired
                       </span>
                     )}
                   </span>

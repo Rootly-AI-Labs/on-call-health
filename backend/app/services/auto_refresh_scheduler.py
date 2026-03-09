@@ -192,13 +192,14 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                         f"primary integration invalid ({integration.platform}) - {primary_error}"
                     )
 
-                    # Mark analysis as blocked so UI can show a warning beside last updated
+                    # Mark analysis as blocked so UI can show a clear "Token Expired" badge
                     try:
                         blocked_at = datetime.now(timezone.utc).isoformat()
                         config["auto_refresh_blocked"] = {
                             "provider": integration.platform,
-                            "reason": primary_error or "Primary integration token invalid or expired.",
-                            "blocked_at": blocked_at
+                            "reason": "token_expired",
+                            "message": primary_error or "Primary integration token invalid or expired.",
+                            "blocked_at": blocked_at,
                         }
                         old_analysis.config = config
                         db.commit()
