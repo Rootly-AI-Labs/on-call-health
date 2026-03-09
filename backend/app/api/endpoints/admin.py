@@ -36,7 +36,7 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
 # ADMIN_API_KEY: Legacy - not used anymore
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
-MIN_API_KEY_LENGTH = 1
+MIN_API_KEY_LENGTH = 32
 
 # ADMIN_IP_WHITELIST: Required comma-separated list of allowed IP addresses or CIDR ranges
 # Example: "10.0.0.1,192.168.1.0/24,203.0.113.50"
