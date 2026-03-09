@@ -311,7 +311,9 @@ class AnalysisRequest(BaseValidatedModel):
     include_jira: bool = Field(False, description="Include Jira data")
     include_linear: bool = Field(False, description="Include Linear data")
     enable_ai: bool = Field(False, description="Enable AI insights")
-    
+    auto_refresh_enabled: bool = Field(False, description="Enable auto-refresh mode")
+    auto_refresh_interval: Optional[str] = Field(None, description="Auto-refresh interval: 24h, 3d, or 7d")
+
     @field_validator('integration_id')
     @classmethod
     def validate_integration_id(cls, v):

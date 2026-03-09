@@ -226,6 +226,10 @@ export interface AnalysisResult {
   status: string
   time_range: number
   error_message?: string
+  completed_at?: string
+  is_saved?: boolean
+  is_auto_refresh?: boolean
+  auto_refresh_interval?: string
   config?: {
     is_demo?: boolean
     [key: string]: unknown
