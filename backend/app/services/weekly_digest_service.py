@@ -225,23 +225,59 @@ def _generate_unsubscribe_token(user_id: int) -> str:
     return base64.urlsafe_b64encode(raw.encode()).decode()
 
 
+def _decode_unsubscribe_token(token: str) -> Optional[str]:
+    if not token:
+        return None
+
+    # Basic length guard to reduce brute-force surface and input abuse.
+    # Expected payload is small; allow some slack for future extensions.
+    if len(token) < 20 or len(token) > 512:
+        return None
+
+    try:
+        padded = token + "=" * (-len(token) % 4)
+        raw = base64.b64decode(padded.encode(), altchars=b"-_", validate=True)
+        return raw.decode()
+    except Exception:
+        return None
+
+
 def verify_unsubscribe_token(token: str) -> Optional[int]:
     try:
-        raw = base64.urlsafe_b64decode(token.encode()).decode()
+        raw = _decode_unsubscribe_token(token)
+        if not raw:
+            return None
+
         last_colon = raw.rfind(":")
         if last_colon == -1:
             return None
         payload = raw[:last_colon]
-        sig = raw[last_colon + 1:]
+        sig_hex = raw[last_colon + 1:]
+        if len(sig_hex) != 64:
+            return None
+
+        try:
+            sig = bytes.fromhex(sig_hex)
+        except ValueError:
+            return None
+
         secret = settings.JWT_SECRET_KEY.encode("utf-8")
-        expected = hmac.new(secret, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        expected = hmac.new(secret, payload.encode("utf-8"), hashlib.sha256).digest()
         if not hmac.compare_digest(sig, expected):
             return None
         parts = payload.split(":")
         if len(parts) != 2:
             return None
+        if not parts[0].isdigit() or not parts[1].isdigit():
+            return None
         uid, ts = int(parts[0]), int(parts[1])
-        if int(time.time()) - ts > 90 * 24 * 3600:  # 90-day expiry
+        if uid <= 0:
+            return None
+        now = int(time.time())
+        # Reject tokens far in the future (clock skew guard).
+        if ts > now + 300:
+            return None
+        if now - ts > 90 * 24 * 3600:  # 90-day expiry
             return None
         return uid
     except Exception:

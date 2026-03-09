@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ...auth.dependencies import get_current_active_user
 from ...core.config import settings
+from ...core.rate_limiting import digest_rate_limit
 from ...models import User, WeeklyDigestLog, get_db
 from ...services.weekly_digest_service import (
     _get_latest_auto_refresh_analysis,
@@ -69,10 +70,25 @@ async def update_weekly_digest_preference(
 
 
 @router.get("/weekly/unsubscribe")
+@digest_rate_limit("digest_unsubscribe")
 async def unsubscribe_weekly_digest(
     token: str,
     db: Session = Depends(get_db)
 ):
+    if not token or len(token) < 20 or len(token) > 512:
+        return HTMLResponse(
+            content="<p style='font-family:Arial;text-align:center;padding:40px;'>Invalid or expired unsubscribe link.</p>",
+            status_code=400
+        )
+
+    # Basic character whitelist to avoid non-url-safe input
+    allowed = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=")
+    if any(ch not in allowed for ch in token):
+        return HTMLResponse(
+            content="<p style='font-family:Arial;text-align:center;padding:40px;'>Invalid or expired unsubscribe link.</p>",
+            status_code=400
+        )
+
     user_id = verify_unsubscribe_token(token)
     if not user_id:
         return HTMLResponse(
