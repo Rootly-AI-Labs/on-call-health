@@ -156,7 +156,8 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                     RootlyIntegration.id == old_analysis.rootly_integration_id
                 ).first()
                 
-                config = old_analysis.config or {}
+                # Use a shallow copy so SQLAlchemy detects JSON changes
+                config = dict(old_analysis.config or {})
                 
                 def _mark_blocked(reason: str, message: str, provider: str = "primary integration") -> None:
                     logger.warning(
