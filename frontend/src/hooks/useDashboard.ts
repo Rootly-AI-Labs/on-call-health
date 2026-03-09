@@ -200,11 +200,17 @@ export default function useDashboard() {
     }
   }
 
-  const startPollingAnalysis = (analysisId: number, options: { showToast?: boolean } = {}) => {
+  const startPollingAnalysis = (analysisId: number | string, options: { showToast?: boolean } = {}) => {
     const showToast = options.showToast ?? true
+    const normalizedId = typeof analysisId === 'string' ? parseInt(analysisId, 10) : analysisId
+
+    if (Number.isNaN(normalizedId)) {
+      console.error('Invalid analysis id for polling:', analysisId)
+      return
+    }
 
     setAnalysisRunning(true)
-    setCurrentRunningAnalysisId(analysisId)
+    setCurrentRunningAnalysisId(normalizedId)
     setAnalysisStage("loading")
     setAnalysisProgress(-1) // Use -1 to show indeterminate progress
 

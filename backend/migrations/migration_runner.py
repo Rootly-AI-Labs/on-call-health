@@ -1271,7 +1271,7 @@ class MigrationRunner:
             },
             {
                 "name": "047_seed_auto_refresh_from_latest_real_analysis",
-                "description": "Seed auto-refresh (10m) from each user's latest non-demo analysis with a valid integration",
+                "description": "Seed auto-refresh (24h) from each user's latest non-demo analysis with a valid integration",
                 "sql": [
                     """
                     WITH latest_real AS (
@@ -1295,7 +1295,7 @@ class MigrationRunner:
                     )
                     UPDATE analyses
                     SET is_auto_refresh = TRUE,
-                        auto_refresh_interval = '10m'
+                        auto_refresh_interval = '24h'
                     WHERE id IN (SELECT id FROM latest_real)
                     """
                 ]

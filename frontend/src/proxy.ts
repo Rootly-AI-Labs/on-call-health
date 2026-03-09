@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   // Only protect /api/admin routes (the actual admin API endpoints)
   // The /admin page has its own login form
   if (request.nextUrl.pathname.startsWith('/api/admin')) {
