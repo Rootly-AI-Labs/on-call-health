@@ -814,6 +814,10 @@ function TeamPageContent() {
   const selectedIntegration = selectedOrganization
     ? integrations.find(i => i.id.toString() === selectedOrganization)
     : null
+  const getTeamScopeLabel = (integration: Integration) => {
+    if (integration.platform !== "rootly") return null
+    return `Team: ${integration.team_name || "All users"}`
+  }
 
   // Check if any primary integration (Rootly or PagerDuty) exists
   // Since the integrations array only contains Rootly and PagerDuty entries, length > 0 is sufficient
@@ -1061,13 +1065,33 @@ function TeamPageContent() {
                               onValueChange={setSelectedOrganization}
                               disabled={loadingIntegrations || !hasPrimaryIntegration}
                             >
-                              <SelectTrigger className="w-64">
-                                <SelectValue placeholder="Select an organization..." />
+                              <SelectTrigger className="w-full sm:w-72">
+                                <SelectValue placeholder="Select an organization...">
+                                  {selectedIntegration && (
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${selectedIntegration.platform === "rootly" ? "bg-purple-500" : "bg-green-500"}`}></span>
+                                      <span className="truncate">{selectedIntegration.name || `Integration #${selectedIntegration.id}`}</span>
+                                      {getTeamScopeLabel(selectedIntegration) && (
+                                        <span className="ml-auto inline-flex max-w-[140px] items-center truncate rounded bg-purple-100 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 flex-shrink-0">
+                                          {getTeamScopeLabel(selectedIntegration)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
                                 {integrations.map((integration) => (
                                   <SelectItem key={integration.id} value={integration.id.toString()}>
-                                    {integration.name || `Integration #${integration.id}`}
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${integration.platform === "rootly" ? "bg-purple-500" : "bg-green-500"}`}></span>
+                                      <span className="truncate">{integration.name || `Integration #${integration.id}`}</span>
+                                      {getTeamScopeLabel(integration) && (
+                                        <span className="ml-auto inline-flex max-w-[140px] items-center truncate rounded bg-purple-100 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 flex-shrink-0">
+                                          {getTeamScopeLabel(integration)}
+                                        </span>
+                                      )}
+                                    </div>
                                   </SelectItem>
                                 ))}
                               </SelectContent>

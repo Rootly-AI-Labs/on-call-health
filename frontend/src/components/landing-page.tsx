@@ -58,7 +58,7 @@ export default function LandingPage() {
       img.src = url
     }
 
-    preloadImage('/images/landing/rootly-bg.avif')
+    preloadImage('/images/landing/rootly-bg-hq.webp')
     preloadImage('/images/landing/rootly-bg-gradient.avif')
     preloadImage('/images/landing/cta-background.png')
 
@@ -143,7 +143,7 @@ export default function LandingPage() {
     <div className={`${ppMori.className} min-h-screen bg-white overflow-x-hidden`}>
 
       {/* Hero Section */}
-      <section className="bg-[url(/images/landing/rootly-bg.avif)] bg-cover bg-[position:50%_15%] lg:bg-[size:210%] lg:bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
+      <section className="bg-[url(/images/landing/rootly-bg-hq.webp)] bg-cover bg-[position:50%_15%] lg:bg-[size:210%] lg:bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
         {/* Header */}
         <div className="px-4 pt-6 pb-2 lg:px-16 lg:pt-8">
           <div className="flex items-start justify-between w-full">
