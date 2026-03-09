@@ -1991,6 +1991,24 @@ export default function useDashboard() {
       }
       
       if (!response.ok) {
+        if (response.status === 404) {
+          setCurrentAnalysis(prev => {
+            if (!prev) return prev
+            const prevConfig = (prev.config ?? {}) as Record<string, any>
+            return {
+              ...prev,
+              config: {
+                ...prevConfig,
+                auto_refresh_blocked: {
+                  provider: prev.platform || 'Integration',
+                  reason: 'integration_inactive',
+                  message: responseData.detail || responseData.message || 'Integration not found or not active',
+                  blocked_at: new Date().toISOString()
+                }
+              }
+            }
+          })
+        }
         throw new Error(responseData.detail || responseData.message || `Analysis failed with status ${response.status}`)
       }
 
