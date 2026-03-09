@@ -74,6 +74,7 @@ import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgress
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
 import { TeamRiskFactorsCard, FACTOR_DESCRIPTIONS } from "@/components/dashboard/TeamRiskFactorsCard"
+import { AlertsCountCard } from "@/components/dashboard/AlertsCountCard"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
@@ -1004,6 +1005,8 @@ function DashboardContent() {
                   setShowAllRiskFactorsPopup(false)
                 }}
               />
+
+              <AlertsCountCard currentAnalysis={currentAnalysis} />
 
               <TeamMembersList
                 currentAnalysis={currentAnalysis}

@@ -14,7 +14,7 @@ import asyncio
 import httpx
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Any, Optional, Callable
+from typing import Dict, List, Any, Optional, Callable, Set
 from urllib.parse import urlencode
 
 from .config import settings
@@ -420,6 +420,283 @@ class RootlyAPIClient:
         except Exception as e:
             logger.error(f"Error fetching team user IDs for '{team_name}': {e}")
         return []
+
+    async def get_team_id(self, team_name: str) -> Optional[str]:
+        """Fetch Rootly team ID by team name.
+
+        Uses GET /v1/teams?filter[name]=<team_name> and returns the team's id.
+
+        Returns:
+            Team ID as a string, or None if not found / request fails.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+                response = await client.get(
+                    f"{self.base_url}/v1/teams",
+                    headers=self.headers,
+                    params={"filter[name]": team_name, "page[size]": 10}
+                )
+                if response.status_code != 200:
+                    logger.warning(f"Could not fetch team ID for '{team_name}': HTTP {response.status_code}")
+                    return None
+                data = response.json()
+                for team in data.get("data", []):
+                    name = team.get("attributes", {}).get("name", "")
+                    if name.lower() == team_name.lower():
+                        team_id = team.get("id")
+                        if team_id:
+                            logger.info(f"Team '{team_name}' resolved to ID {team_id}")
+                            return str(team_id)
+                logger.warning(f"Team '{team_name}' not found in teams response when resolving ID")
+        except Exception as e:
+            logger.error(f"Error fetching team ID for '{team_name}': {e}")
+        return None
+
+    async def get_alerts_count(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        team_id: Optional[str] = None,
+        page_size: int = 100,
+        max_pages: int = 200,
+        user_ids: Optional[Set[str]] = None,
+        user_emails: Optional[Set[str]] = None,
+        include: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Fetch alert counts within a date range.
+
+        If team_id is provided, counts only alerts that include that team_id
+        in attributes.group_ids (client-side filter).
+        If user_ids or user_emails are provided, also compute per-user alert counts
+        based on responders/notified_users and relationships.
+        """
+        base_params = {
+            "filter[created_at][gte]": start_date.isoformat(),
+            "filter[created_at][lte]": end_date.isoformat(),
+        }
+        if include:
+            base_params["include"] = include
+
+        user_ids_set = {str(uid) for uid in (user_ids or set()) if uid}
+        user_emails_set = {str(email).lower() for email in (user_emails or set()) if email}
+        wants_user_counts = bool(user_ids_set or user_emails_set)
+
+        related_id_sets: Dict[str, Set[str]] = {}
+        included_id_sets: Dict[str, Set[str]] = {}
+
+        # Fast path: total count only (no team filter, no user counts, no include metrics)
+        if not team_id and not wants_user_counts:
+            try:
+                async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+                    response = await client.get(
+                        f"{self.base_url}/v1/alerts",
+                        headers=self.headers,
+                        params={**base_params, "page[size]": 1, "page[number]": 1}
+                    )
+                    if response.status_code != 200:
+                        return {"error": f"HTTP {response.status_code}"}
+                    data = response.json()
+                    meta = data.get("meta", {}) or {}
+                    total = meta.get("total_count")
+                    if total is None:
+                        total = len(data.get("data", []))
+                    return {
+                        "total_count": total,
+                        "filtered_count": None,
+                        "pages_scanned": 1,
+                        "total_pages": meta.get("total_pages"),
+                        "per_user_id_counts": {},
+                        "per_user_email_counts": {},
+                        "related_counts": {},
+                        "included_counts": {}
+                    }
+            except Exception as e:
+                return {"error": str(e)}
+
+        # Paginate and filter by group_ids if team_id is provided
+        filtered_count = 0
+        total_count = None
+        total_pages = None
+        truncated = False
+        page = 1
+        per_user_id_counts: Dict[str, int] = {}
+        per_user_email_counts: Dict[str, int] = {}
+        per_user_related_by_id: Dict[str, Dict[str, Set[str]]] = {}
+        per_user_related_by_email: Dict[str, Dict[str, Set[str]]] = {}
+
+        def add_related(collector: Dict[str, Set[str]], rel_name: str, rel_id: Optional[str]):
+            if not rel_name or not rel_id:
+                return
+            bucket = collector.setdefault(rel_name, set())
+            bucket.add(str(rel_id))
+
+        def merge_related(target: Dict[str, Dict[str, Set[str]]], key: str, rel_name: str, rel_ids: Set[str]):
+            if not rel_ids:
+                return
+            user_bucket = target.setdefault(key, {})
+            rel_bucket = user_bucket.setdefault(rel_name, set())
+            rel_bucket.update(rel_ids)
+
+        try:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+                while True:
+                    response = await client.get(
+                        f"{self.base_url}/v1/alerts",
+                        headers=self.headers,
+                        params={**base_params, "page[size]": page_size, "page[number]": page}
+                    )
+                    if response.status_code != 200:
+                        return {
+                            "error": f"HTTP {response.status_code}",
+                            "total_count": total_count,
+                            "filtered_count": filtered_count,
+                            "pages_scanned": page - 1,
+                            "total_pages": total_pages,
+                            "truncated": True,
+                            "per_user_id_counts": per_user_id_counts,
+                            "per_user_email_counts": per_user_email_counts,
+                            "related_counts": {k: len(v) for k, v in related_id_sets.items()},
+                            "included_counts": {k: len(v) for k, v in included_id_sets.items()},
+                            "per_user_related_by_id": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_id.items()},
+                            "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()}
+                        }
+
+                    data = response.json()
+                    meta = data.get("meta", {}) or {}
+                    if total_count is None:
+                        total_count = meta.get("total_count")
+                        total_pages = meta.get("total_pages") or 1
+
+                    included = data.get("included") or []
+                    for item in included:
+                        if not isinstance(item, dict):
+                            continue
+                        item_type = item.get("type")
+                        item_id = item.get("id")
+                        if item_type and item_id:
+                            add_related(included_id_sets, item_type, item_id)
+
+                    for alert in data.get("data", []):
+                        attrs = alert.get("attributes", {}) or {}
+                        group_ids = attrs.get("group_ids") or []
+                        if not group_ids:
+                            groups = attrs.get("groups") or []
+                            group_ids = [g.get("id") for g in groups if isinstance(g, dict) and g.get("id")]
+
+                        in_scope = True
+                        if team_id:
+                            in_scope = team_id in group_ids
+
+                        if in_scope:
+                            filtered_count += 1
+
+                        # Build related IDs for this alert from relationships + groups
+                        alert_related: Dict[str, Set[str]] = {}
+                        if group_ids:
+                            alert_related["groups"] = set(str(gid) for gid in group_ids if gid)
+
+                        relationships = alert.get("relationships", {}) or {}
+                        for rel_name, rel_obj in relationships.items():
+                            if not isinstance(rel_obj, dict):
+                                continue
+                            rel_data = rel_obj.get("data")
+                            rel_ids: Set[str] = set()
+                            if isinstance(rel_data, list):
+                                for rel_item in rel_data:
+                                    if isinstance(rel_item, dict) and rel_item.get("id"):
+                                        rel_ids.add(str(rel_item.get("id")))
+                            elif isinstance(rel_data, dict):
+                                if rel_data.get("id"):
+                                    rel_ids.add(str(rel_data.get("id")))
+                            if rel_ids:
+                                alert_related[rel_name] = rel_ids
+
+                        if in_scope:
+                            for rel_name, rel_ids in alert_related.items():
+                                for rel_id in rel_ids:
+                                    add_related(related_id_sets, rel_name, rel_id)
+
+                        if wants_user_counts and in_scope:
+                            alert_user_ids: Set[str] = set()
+                            alert_user_emails: Set[str] = set()
+
+                            responders = attrs.get("responders") or []
+                            notified_users = attrs.get("notified_users") or []
+
+                            for item in responders + notified_users:
+                                if isinstance(item, dict):
+                                    if item.get("id"):
+                                        alert_user_ids.add(str(item.get("id")))
+                                    if item.get("user_id"):
+                                        alert_user_ids.add(str(item.get("user_id")))
+                                    if item.get("email"):
+                                        alert_user_emails.add(str(item.get("email")).lower())
+                                elif isinstance(item, str):
+                                    if "@" in item:
+                                        alert_user_emails.add(item.lower())
+                                    else:
+                                        alert_user_ids.add(item)
+
+                            for rel_name in ("responders", "notified_users"):
+                                rel = relationships.get(rel_name, {}) or {}
+                                rel_data = rel.get("data") or []
+                                if isinstance(rel_data, list):
+                                    for rel_item in rel_data:
+                                        if isinstance(rel_item, dict) and rel_item.get("id"):
+                                            alert_user_ids.add(str(rel_item.get("id")))
+
+                            for uid in alert_user_ids:
+                                if uid in user_ids_set:
+                                    per_user_id_counts[uid] = per_user_id_counts.get(uid, 0) + 1
+                                    for rel_name, rel_ids in alert_related.items():
+                                        merge_related(per_user_related_by_id, uid, rel_name, rel_ids)
+                            for email in alert_user_emails:
+                                if email in user_emails_set:
+                                    per_user_email_counts[email] = per_user_email_counts.get(email, 0) + 1
+                                    for rel_name, rel_ids in alert_related.items():
+                                        merge_related(per_user_related_by_email, email, rel_name, rel_ids)
+
+                    if total_pages is None:
+                        if not data.get("data"):
+                            break
+                    else:
+                        if page >= total_pages:
+                            break
+
+                    if max_pages and page >= max_pages:
+                        truncated = True
+                        break
+
+                    page += 1
+        except Exception as e:
+            return {
+                "error": str(e),
+                "total_count": total_count,
+                "filtered_count": filtered_count,
+                "pages_scanned": page - 1,
+                "total_pages": total_pages,
+                "truncated": True,
+                "per_user_id_counts": per_user_id_counts,
+                "per_user_email_counts": per_user_email_counts,
+                "related_counts": {k: len(v) for k, v in related_id_sets.items()},
+                "included_counts": {k: len(v) for k, v in included_id_sets.items()},
+                "per_user_related_by_id": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_id.items()},
+                "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()}
+            }
+
+        return {
+            "total_count": total_count,
+            "filtered_count": filtered_count,
+            "pages_scanned": page,
+            "total_pages": total_pages,
+            "truncated": truncated,
+            "per_user_id_counts": per_user_id_counts,
+            "per_user_email_counts": per_user_email_counts,
+            "related_counts": {k: len(v) for k, v in related_id_sets.items()},
+            "included_counts": {k: len(v) for k, v in included_id_sets.items()},
+            "per_user_related_by_id": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_id.items()},
+            "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()}
+        }
 
     async def get_team_member_emails(self, team_name: str) -> set:
         """Return the set of lowercase emails for all members of a team.

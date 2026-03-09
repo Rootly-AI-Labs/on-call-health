@@ -3274,6 +3274,125 @@ async def run_analysis_task(
             except Exception as monitoring_error:
                 logger.warning(f"A/B testing monitoring failed: {monitoring_error}")
 
+            # Attach Rootly alerts summary for dashboard card (non-blocking)
+            if platform == "rootly" and isinstance(results, dict):
+                try:
+                    from ...core.rootly_client import RootlyAPIClient
+                    end_dt = analysis.created_at or datetime.now(timezone.utc)
+                    if end_dt.tzinfo is None:
+                        end_dt = end_dt.replace(tzinfo=timezone.utc)
+                    start_dt = end_dt - timedelta(days=time_range)
+
+                    alerts_client = RootlyAPIClient(api_token=effective_api_token)
+                    team_id = None
+                    if rootly_team_name:
+                        team_id = await alerts_client.get_team_id(rootly_team_name)
+                    team_members = []
+                    team_analysis = results.get("team_analysis") if isinstance(results.get("team_analysis"), (dict, list)) else None
+                    if isinstance(team_analysis, dict):
+                        team_members = team_analysis.get("members") or []
+                    elif isinstance(team_analysis, list):
+                        team_members = team_analysis
+
+                    user_ids = set()
+                    user_emails = set()
+                    if isinstance(team_members, list):
+                        for member in team_members:
+                            if not isinstance(member, dict):
+                                continue
+                            if member.get("rootly_user_id"):
+                                user_ids.add(str(member.get("rootly_user_id")))
+                            if member.get("user_id"):
+                                user_ids.add(str(member.get("user_id")))
+                            if member.get("user_email"):
+                                user_emails.add(str(member.get("user_email")).lower())
+                    include_list = ",".join([
+                        "environments",
+                        "services",
+                        "groups",
+                        "responders",
+                        "incidents",
+                        "events",
+                        "alert_urgency",
+                        "heartbeat",
+                        "live_call_router",
+                        "alert_group",
+                        "group_leader_alert",
+                        "group_member_alerts",
+                        "alert_field_values",
+                        "alerting_targets",
+                        "escalation_policies",
+                        "alert_call_recording"
+                    ])
+                    alerts_counts = await alerts_client.get_alerts_count(
+                        start_date=start_dt,
+                        end_date=end_dt,
+                        team_id=team_id,
+                        user_ids=user_ids,
+                        user_emails=user_emails,
+                        include=include_list
+                    )
+                    logger.info(
+                        f"ALERTS_SUMMARY: analysis_id={analysis_id}, "
+                        f"team_name={rootly_team_name}, team_id={team_id}, "
+                        f"start={start_dt.isoformat()}, end={end_dt.isoformat()}, "
+                        f"total={alerts_counts.get('total_count')}, "
+                        f"filtered_total={alerts_counts.get('filtered_count')}, "
+                        f"pages_scanned={alerts_counts.get('pages_scanned')}, "
+                        f"total_pages={alerts_counts.get('total_pages')}, "
+                        f"truncated={alerts_counts.get('truncated', False)}, "
+                        f"error={alerts_counts.get('error')}"
+                    )
+
+                    metadata = results.get("metadata") if isinstance(results.get("metadata"), dict) else {}
+                    metadata["alerts"] = {
+                        "start": start_dt.isoformat(),
+                        "end": end_dt.isoformat(),
+                        "total": alerts_counts.get("total_count"),
+                        "filtered_total": alerts_counts.get("filtered_count"),
+                        "team_name": rootly_team_name,
+                        "team_id": team_id,
+                        "filter_method": "group_ids" if team_id else None,
+                        "include": include_list,
+                        "pages_scanned": alerts_counts.get("pages_scanned"),
+                        "total_pages": alerts_counts.get("total_pages"),
+                        "truncated": alerts_counts.get("truncated", False),
+                        "error": alerts_counts.get("error"),
+                        "related_counts": alerts_counts.get("related_counts") or {},
+                        "included_counts": alerts_counts.get("included_counts") or {}
+                    }
+                    results["metadata"] = metadata
+
+                    # Attach per-user alert counts to team members for the user popup
+                    if not alerts_counts.get("error") and isinstance(team_members, list):
+                        per_user_ids = alerts_counts.get("per_user_id_counts") or {}
+                        per_user_emails = alerts_counts.get("per_user_email_counts") or {}
+                        per_user_related_ids = alerts_counts.get("per_user_related_by_id") or {}
+                        per_user_related_emails = alerts_counts.get("per_user_related_by_email") or {}
+                        for member in team_members:
+                            if not isinstance(member, dict):
+                                continue
+                            count = None
+                            related_counts = {}
+                            member_rootly_id = member.get("rootly_user_id")
+                            member_user_id = member.get("user_id")
+                            member_email = member.get("user_email")
+                            if member_rootly_id and str(member_rootly_id) in per_user_ids:
+                                count = per_user_ids.get(str(member_rootly_id), 0)
+                                related_counts = per_user_related_ids.get(str(member_rootly_id), {})
+                            elif member_user_id and str(member_user_id) in per_user_ids:
+                                count = per_user_ids.get(str(member_user_id), 0)
+                                related_counts = per_user_related_ids.get(str(member_user_id), {})
+                            elif member_email and str(member_email).lower() in per_user_emails:
+                                count = per_user_emails.get(str(member_email).lower(), 0)
+                                related_counts = per_user_related_emails.get(str(member_email).lower(), {})
+                            if count is None:
+                                count = 0
+                            member["alerts_count"] = count
+                            member["alerts_related_counts"] = related_counts
+                except Exception as alerts_err:
+                    logger.warning(f"BACKGROUND_TASK: Failed to attach alert metadata for analysis {analysis_ref}: {alerts_err}")
+
             logger.info(f"🔍 DEBUG: About to save results for analysis {analysis_ref}")
 
             # Update analysis with results
