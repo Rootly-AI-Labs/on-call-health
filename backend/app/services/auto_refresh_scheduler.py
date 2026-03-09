@@ -10,6 +10,9 @@ import uuid as uuid_module
 from datetime import datetime, timedelta, timezone
 
 from apscheduler.triggers.cron import CronTrigger
+from sqlalchemy import text
+
+from ..core.distributed_lock import with_distributed_lock
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +97,60 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
 
         for old_analysis in due_analyses:
             try:
+                lock_key = f"auto_refresh:analysis:{old_analysis.id}"
+
+                # Prefer distributed lock to prevent duplicate refreshes across instances.
+                # Fallback to DB row lock if Redis is unavailable.
+                async with with_distributed_lock(lock_key, ttl_seconds=600, timeout_seconds=2) as lock_acquired:
+                    if not lock_acquired:
+                        # Fallback: attempt to lock the row in the database (skip if locked elsewhere)
+                        try:
+                            db.execute(text("SET LOCAL lock_timeout = :lock_timeout"), {"lock_timeout": "5s"})
+                        except Exception:
+                            # Non-critical: lock_timeout not supported on all DBs
+                            pass
+
+                        locked_analysis = (
+                            db.query(Analysis)
+                            .filter(Analysis.id == old_analysis.id)
+                            .with_for_update(skip_locked=True)
+                            .execution_options(populate_existing=True)
+                            .first()
+                        )
+
+                        if not locked_analysis:
+                            logger.info(
+                                f"🔄 [AUTO_REFRESH_SCHEDULER] Skipping analysis {old_analysis.id}: "
+                                f"locked by another worker"
+                            )
+                            continue
+
+                        old_analysis = locked_analysis
+                    else:
+                        # Refresh state after acquiring distributed lock
+                        refreshed = (
+                            db.query(Analysis)
+                            .filter(Analysis.id == old_analysis.id)
+                            .execution_options(populate_existing=True)
+                            .first()
+                        )
+                        if not refreshed:
+                            continue
+                        old_analysis = refreshed
+
+                    # Re-check due state under lock (avoids TOCTOU duplicates)
+                    if not old_analysis.is_auto_refresh or old_analysis.status != "completed":
+                        continue
+                    if not old_analysis.auto_refresh_interval or not old_analysis.completed_at:
+                        continue
+
+                    interval = _parse_interval(old_analysis.auto_refresh_interval)
+                    completed_at = old_analysis.completed_at
+                    if completed_at.tzinfo is None:
+                        completed_at = completed_at.replace(tzinfo=timezone.utc)
+                    if now < completed_at + interval:
+                        continue
+
                 # Look up integration to get api_token
                 integration = db.query(RootlyIntegration).filter(
                     RootlyIntegration.id == old_analysis.rootly_integration_id
