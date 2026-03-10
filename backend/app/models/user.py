@@ -32,6 +32,7 @@ class User(Base):
     joined_org_at = Column(DateTime(timezone=True), server_default=func.now())
     last_active_at = Column(DateTime(timezone=True))
     status = Column(String(20), default="active")  # 'active', 'suspended', 'pending'
+    weekly_digest_enabled = Column(Boolean, server_default="true", nullable=False)
 
     # Domain-based data sharing
     email_domain = Column(String(255), nullable=True, index=True)  # Extracted from email for grouping users

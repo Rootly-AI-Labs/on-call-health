@@ -361,6 +361,7 @@ def create_demo_analysis_for_new_user(db: Session, user: User) -> bool:
             platform=original_analysis.get('platform', 'pagerduty'),
             time_range=original_analysis.get('time_range', 30),
             status="completed",
+            is_saved=True,  # Must be True to appear in the sidebar saved analyses list
             config=config,
             results=original_analysis.get('results'),
             error_message=None,

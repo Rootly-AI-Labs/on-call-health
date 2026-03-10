@@ -49,6 +49,9 @@ RATE_LIMITS = {
     # General API endpoints
     "api_general": "1000/minute",        # General API calls
     "api_heavy": "100/minute",           # Heavy operations
+
+    # Digest endpoints - strict to deter brute force on tokens
+    "digest_unsubscribe": "5/minute",
 }
 
 def _ensure_redis_db(url: str, db: int = RATE_LIMIT_REDIS_DB) -> str:
@@ -210,6 +213,10 @@ def integration_rate_limit(endpoint_type: str = "integration_get"):
 def mapping_rate_limit(endpoint_type: str = "mapping_create"):
     """Rate limiter for mapping endpoints."""
     return limiter.limit(RATE_LIMITS.get(endpoint_type, "20/minute"))
+
+def digest_rate_limit(endpoint_type: str = "digest_unsubscribe"):
+    """Rate limiter for digest endpoints."""
+    return limiter.limit(RATE_LIMITS.get(endpoint_type, "5/minute"))
 
 def general_rate_limit(endpoint_type: str = "api_general"):
     """Rate limiter for general API endpoints."""
