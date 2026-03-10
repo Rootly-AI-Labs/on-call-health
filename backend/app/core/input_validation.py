@@ -341,6 +341,17 @@ class AnalysisRequest(BaseValidatedModel):
             raise ValueError(f"Time range must be between 1 and 365 days")
         return v
 
+    @field_validator('auto_refresh_interval')
+    @classmethod
+    def validate_auto_refresh_interval(cls, v):
+        """Restrict auto-refresh interval to supported values."""
+        if v is None:
+            return v
+        allowed = {"10m", "24h", "3d", "7d"}
+        if v not in allowed:
+            raise ValueError(f"auto_refresh_interval must be one of: {', '.join(sorted(allowed))}")
+        return v
+
 class AnalysisFilterRequest(BaseValidatedModel):
     """Analysis filtering and pagination."""
     integration_id: Optional[int] = Field(None, gt=0, description="Filter by integration")
