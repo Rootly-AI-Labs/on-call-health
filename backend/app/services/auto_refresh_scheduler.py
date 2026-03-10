@@ -99,44 +99,31 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
             try:
                 lock_key = f"auto_refresh:analysis:{old_analysis.id}"
 
-                # Prefer distributed lock to prevent duplicate refreshes across instances.
-                # Fallback to DB row lock if Redis is unavailable.
+                # Distributed lock prevents cross-instance duplication.
+                # Always take a DB row lock to ensure only one worker mutates the analysis.
                 async with with_distributed_lock(lock_key, ttl_seconds=600, timeout_seconds=2) as lock_acquired:
-                    if not lock_acquired:
-                        # Fallback: attempt to lock the row in the database (skip if locked elsewhere)
-                        try:
-                            db.execute(text("SET LOCAL lock_timeout = :lock_timeout"), {"lock_timeout": "5s"})
-                        except Exception:
-                            # Non-critical: lock_timeout not supported on all DBs
-                            pass
+                    try:
+                        db.execute(text("SET LOCAL lock_timeout = :lock_timeout"), {"lock_timeout": "5s"})
+                    except Exception:
+                        # Non-critical: lock_timeout not supported on all DBs
+                        pass
 
-                        locked_analysis = (
-                            db.query(Analysis)
-                            .filter(Analysis.id == old_analysis.id)
-                            .with_for_update(skip_locked=True)
-                            .execution_options(populate_existing=True)
-                            .first()
+                    locked_analysis = (
+                        db.query(Analysis)
+                        .filter(Analysis.id == old_analysis.id)
+                        .with_for_update(skip_locked=True)
+                        .execution_options(populate_existing=True)
+                        .first()
+                    )
+
+                    if not locked_analysis:
+                        logger.info(
+                            f"🔄 [AUTO_REFRESH_SCHEDULER] Skipping analysis {old_analysis.id}: "
+                            f"locked by another worker"
                         )
+                        continue
 
-                        if not locked_analysis:
-                            logger.info(
-                                f"🔄 [AUTO_REFRESH_SCHEDULER] Skipping analysis {old_analysis.id}: "
-                                f"locked by another worker"
-                            )
-                            continue
-
-                        old_analysis = locked_analysis
-                    else:
-                        # Refresh state after acquiring distributed lock
-                        refreshed = (
-                            db.query(Analysis)
-                            .filter(Analysis.id == old_analysis.id)
-                            .execution_options(populate_existing=True)
-                            .first()
-                        )
-                        if not refreshed:
-                            continue
-                        old_analysis = refreshed
+                    old_analysis = locked_analysis
 
                     # Re-check due state under lock (avoids TOCTOU duplicates)
                     if not old_analysis.is_auto_refresh or old_analysis.status != "completed":
