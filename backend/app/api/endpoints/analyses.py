@@ -3358,6 +3358,7 @@ async def run_analysis_task(
                         "total_pages": alerts_counts.get("total_pages"),
                         "truncated": alerts_counts.get("truncated", False),
                         "error": alerts_counts.get("error"),
+                        "noise_counts": alerts_counts.get("noise_counts") or {},
                         "related_counts": alerts_counts.get("related_counts") or {},
                         "included_counts": alerts_counts.get("included_counts") or {}
                     }
@@ -3369,27 +3370,34 @@ async def run_analysis_task(
                         per_user_emails = alerts_counts.get("per_user_email_counts") or {}
                         per_user_related_ids = alerts_counts.get("per_user_related_by_id") or {}
                         per_user_related_emails = alerts_counts.get("per_user_related_by_email") or {}
+                        per_user_noise_ids = alerts_counts.get("per_user_noise_by_id") or {}
+                        per_user_noise_emails = alerts_counts.get("per_user_noise_by_email") or {}
                         for member in team_members:
                             if not isinstance(member, dict):
                                 continue
                             count = None
                             related_counts = {}
+                            noise_counts = {}
                             member_rootly_id = member.get("rootly_user_id")
                             member_user_id = member.get("user_id")
                             member_email = member.get("user_email")
                             if member_rootly_id and str(member_rootly_id) in per_user_ids:
                                 count = per_user_ids.get(str(member_rootly_id), 0)
                                 related_counts = per_user_related_ids.get(str(member_rootly_id), {})
+                                noise_counts = per_user_noise_ids.get(str(member_rootly_id), {})
                             elif member_user_id and str(member_user_id) in per_user_ids:
                                 count = per_user_ids.get(str(member_user_id), 0)
                                 related_counts = per_user_related_ids.get(str(member_user_id), {})
+                                noise_counts = per_user_noise_ids.get(str(member_user_id), {})
                             elif member_email and str(member_email).lower() in per_user_emails:
                                 count = per_user_emails.get(str(member_email).lower(), 0)
                                 related_counts = per_user_related_emails.get(str(member_email).lower(), {})
+                                noise_counts = per_user_noise_emails.get(str(member_email).lower(), {})
                             if count is None:
                                 count = 0
                             member["alerts_count"] = count
                             member["alerts_related_counts"] = related_counts
+                            member["alerts_noise_counts"] = noise_counts
                 except Exception as alerts_err:
                     logger.warning(f"BACKGROUND_TASK: Failed to attach alert metadata for analysis {analysis_ref}: {alerts_err}")
 

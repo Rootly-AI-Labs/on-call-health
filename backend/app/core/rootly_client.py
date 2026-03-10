@@ -483,6 +483,7 @@ class RootlyAPIClient:
 
         related_id_sets: Dict[str, Set[str]] = {}
         included_id_sets: Dict[str, Set[str]] = {}
+        noise_counts: Dict[str, int] = {"noise": 0, "not_noise": 0, "unknown": 0}
 
         # Fast path: total count only (no team filter, no user counts, no include metrics)
         if not team_id and not wants_user_counts:
@@ -508,7 +509,10 @@ class RootlyAPIClient:
                         "per_user_id_counts": {},
                         "per_user_email_counts": {},
                         "related_counts": {},
-                        "included_counts": {}
+                        "included_counts": {},
+                        "noise_counts": {"noise": 0, "not_noise": 0, "unknown": 0},
+                        "per_user_noise_by_id": {},
+                        "per_user_noise_by_email": {}
                     }
             except Exception as e:
                 return {"error": str(e)}
@@ -521,6 +525,8 @@ class RootlyAPIClient:
         page = 1
         per_user_id_counts: Dict[str, int] = {}
         per_user_email_counts: Dict[str, int] = {}
+        per_user_noise_by_id: Dict[str, Dict[str, int]] = {}
+        per_user_noise_by_email: Dict[str, Dict[str, int]] = {}
         per_user_related_by_id: Dict[str, Dict[str, Set[str]]] = {}
         per_user_related_by_email: Dict[str, Dict[str, Set[str]]] = {}
 
@@ -558,7 +564,10 @@ class RootlyAPIClient:
                             "related_counts": {k: len(v) for k, v in related_id_sets.items()},
                             "included_counts": {k: len(v) for k, v in included_id_sets.items()},
                             "per_user_related_by_id": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_id.items()},
-                            "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()}
+                            "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()},
+                            "noise_counts": noise_counts,
+                            "per_user_noise_by_id": per_user_noise_by_id,
+                            "per_user_noise_by_email": per_user_noise_by_email
                         }
 
                     data = response.json()
@@ -589,6 +598,13 @@ class RootlyAPIClient:
 
                         if in_scope:
                             filtered_count += 1
+                            noise_value = attrs.get("noise")
+                            if noise_value == "noise":
+                                noise_counts["noise"] += 1
+                            elif noise_value == "not_noise":
+                                noise_counts["not_noise"] += 1
+                            else:
+                                noise_counts["unknown"] += 1
 
                         # Build related IDs for this alert from relationships + groups
                         alert_related: Dict[str, Set[str]] = {}
@@ -645,16 +661,32 @@ class RootlyAPIClient:
                                         if isinstance(rel_item, dict) and rel_item.get("id"):
                                             alert_user_ids.add(str(rel_item.get("id")))
 
-                            for uid in alert_user_ids:
-                                if uid in user_ids_set:
-                                    per_user_id_counts[uid] = per_user_id_counts.get(uid, 0) + 1
-                                    for rel_name, rel_ids in alert_related.items():
-                                        merge_related(per_user_related_by_id, uid, rel_name, rel_ids)
-                            for email in alert_user_emails:
-                                if email in user_emails_set:
-                                    per_user_email_counts[email] = per_user_email_counts.get(email, 0) + 1
-                                    for rel_name, rel_ids in alert_related.items():
-                                        merge_related(per_user_related_by_email, email, rel_name, rel_ids)
+                            matched_ids = {uid for uid in alert_user_ids if uid in user_ids_set}
+                            matched_emails = {email for email in alert_user_emails if email in user_emails_set}
+
+                            for uid in matched_ids:
+                                per_user_id_counts[uid] = per_user_id_counts.get(uid, 0) + 1
+                                for rel_name, rel_ids in alert_related.items():
+                                    merge_related(per_user_related_by_id, uid, rel_name, rel_ids)
+                                user_noise = per_user_noise_by_id.setdefault(uid, {"noise": 0, "not_noise": 0, "unknown": 0})
+                                if noise_value == "noise":
+                                    user_noise["noise"] += 1
+                                elif noise_value == "not_noise":
+                                    user_noise["not_noise"] += 1
+                                else:
+                                    user_noise["unknown"] += 1
+
+                            for email in matched_emails:
+                                per_user_email_counts[email] = per_user_email_counts.get(email, 0) + 1
+                                for rel_name, rel_ids in alert_related.items():
+                                    merge_related(per_user_related_by_email, email, rel_name, rel_ids)
+                                user_noise = per_user_noise_by_email.setdefault(email, {"noise": 0, "not_noise": 0, "unknown": 0})
+                                if noise_value == "noise":
+                                    user_noise["noise"] += 1
+                                elif noise_value == "not_noise":
+                                    user_noise["not_noise"] += 1
+                                else:
+                                    user_noise["unknown"] += 1
 
                     if total_pages is None:
                         if not data.get("data"):
@@ -681,7 +713,10 @@ class RootlyAPIClient:
                 "related_counts": {k: len(v) for k, v in related_id_sets.items()},
                 "included_counts": {k: len(v) for k, v in included_id_sets.items()},
                 "per_user_related_by_id": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_id.items()},
-                "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()}
+                "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()},
+                "noise_counts": noise_counts,
+                "per_user_noise_by_id": per_user_noise_by_id,
+                "per_user_noise_by_email": per_user_noise_by_email
             }
 
         return {
@@ -695,7 +730,10 @@ class RootlyAPIClient:
             "related_counts": {k: len(v) for k, v in related_id_sets.items()},
             "included_counts": {k: len(v) for k, v in included_id_sets.items()},
             "per_user_related_by_id": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_id.items()},
-            "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()}
+            "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()},
+            "noise_counts": noise_counts,
+            "per_user_noise_by_id": per_user_noise_by_id,
+            "per_user_noise_by_email": per_user_noise_by_email
         }
 
     async def get_team_member_emails(self, team_name: str) -> set:

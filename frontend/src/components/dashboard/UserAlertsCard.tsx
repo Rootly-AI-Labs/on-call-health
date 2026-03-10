@@ -22,6 +22,10 @@ export function UserAlertsCard({ memberData, alertsMeta }: UserAlertsCardProps):
   const relatedEntries = Object.entries(relatedCounts)
     .filter(([, value]) => typeof value === "number" && value > 0)
     .sort((a, b) => (b[1] as number) - (a[1] as number))
+  const noiseCounts = memberData?.alerts_noise_counts || {}
+  const totalForNoise = typeof count === "number" && count > 0 ? count : null
+  const noisePct = totalForNoise !== null ? Math.round(((noiseCounts.noise || 0) / totalForNoise) * 100) : null
+  const notNoisePct = totalForNoise !== null ? Math.round(((noiseCounts.not_noise || 0) / totalForNoise) * 100) : null
 
   return (
     <Card>
@@ -43,19 +47,9 @@ export function UserAlertsCard({ memberData, alertsMeta }: UserAlertsCardProps):
         <div className="text-sm text-neutral-600 mt-2">
           Date range: {dateRange}
         </div>
-        {relatedEntries.length > 0 && (
-          <div className="pt-3">
-            <div className="text-xs font-medium text-neutral-600 mb-2">Related data (distinct)</div>
-            <div className="flex flex-wrap gap-2">
-              {relatedEntries.map(([key, value]) => (
-                <span
-                  key={key}
-                  className="text-xs px-2 py-1 rounded-full bg-neutral-100 text-neutral-700"
-                >
-                  {key}: {value as number}
-                </span>
-              ))}
-            </div>
+        {(noisePct !== null || notNoisePct !== null) && (
+          <div className="pt-2 text-xs text-neutral-600">
+            Noise: {noisePct !== null ? `${noisePct}%` : "N/A"} · Not noise: {notNoisePct !== null ? `${notNoisePct}%` : "N/A"}
           </div>
         )}
       </CardContent>

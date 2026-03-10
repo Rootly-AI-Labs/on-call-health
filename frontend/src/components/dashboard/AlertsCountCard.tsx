@@ -27,6 +27,10 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
   const relatedEntries = Object.entries(relatedCounts)
     .filter(([, value]) => typeof value === "number" && value > 0)
     .sort((a, b) => (b[1] as number) - (a[1] as number))
+  const noiseCounts = alerts.noise_counts || {}
+  const totalForNoise = typeof total === "number" && total > 0 ? total : null
+  const noisePct = totalForNoise !== null ? Math.round(((noiseCounts.noise || 0) / totalForNoise) * 100) : null
+  const notNoisePct = totalForNoise !== null ? Math.round(((noiseCounts.not_noise || 0) / totalForNoise) * 100) : null
 
   return (
     <Card className="mb-6">
@@ -62,19 +66,9 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
             {alerts.truncated && (
               <div className="text-xs text-yellow-700">Alert count may be partial (page limit reached)</div>
             )}
-            {relatedEntries.length > 0 && (
-              <div className="pt-2">
-                <div className="text-xs font-medium text-neutral-600 mb-2">Related data (distinct)</div>
-                <div className="flex flex-wrap gap-2">
-                  {relatedEntries.map(([key, value]) => (
-                    <span
-                      key={key}
-                      className="text-xs px-2 py-1 rounded-full bg-neutral-100 text-neutral-700"
-                    >
-                      {key}: {value as number}
-                    </span>
-                  ))}
-                </div>
+            {(noisePct !== null || notNoisePct !== null) && (
+              <div className="pt-2 text-xs text-neutral-600">
+                Noise: {noisePct !== null ? `${noisePct}%` : "N/A"} · Not noise: {notNoisePct !== null ? `${notNoisePct}%` : "N/A"}
               </div>
             )}
           </div>
