@@ -23,14 +23,18 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
   const isScoped = alerts.filtered_total !== null && alerts.filtered_total !== undefined
   const scopeLabel = alerts.team_name ? `Scoped to ${alerts.team_name}` : "All users"
   const dateRange = `${formatDate(alerts.start)} - ${formatDate(alerts.end)}`
-  const relatedCounts = alerts.related_counts || alerts.included_counts || {}
-  const relatedEntries = Object.entries(relatedCounts)
-    .filter(([, value]) => typeof value === "number" && value > 0)
-    .sort((a, b) => (b[1] as number) - (a[1] as number))
   const noiseCounts = alerts.noise_counts || {}
   const totalForNoise = typeof total === "number" && total > 0 ? total : null
   const noisePct = totalForNoise !== null ? Math.round(((noiseCounts.noise || 0) / totalForNoise) * 100) : null
   const notNoisePct = totalForNoise !== null ? Math.round(((noiseCounts.not_noise || 0) / totalForNoise) * 100) : null
+  const afterHoursCount = typeof alerts.after_hours_count === "number" ? alerts.after_hours_count : null
+  const afterHoursPct = totalForNoise !== null && afterHoursCount !== null
+    ? Math.round((afterHoursCount / totalForNoise) * 100)
+    : null
+  const urgencyCounts = alerts.urgency_counts || {}
+  const urgencyEntries = Object.entries(urgencyCounts)
+    .filter(([, value]) => typeof value === "number" && value > 0)
+    .sort((a, b) => (b[1] as number) - (a[1] as number))
 
   return (
     <Card className="mb-6">
@@ -69,6 +73,17 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
             {(noisePct !== null || notNoisePct !== null) && (
               <div className="pt-2 text-xs text-neutral-600">
                 Noise: {noisePct !== null ? `${noisePct}%` : "N/A"} · Not noise: {notNoisePct !== null ? `${notNoisePct}%` : "N/A"}
+              </div>
+            )}
+            {(afterHoursCount !== null || afterHoursPct !== null) && (
+              <div className="pt-1 text-xs text-neutral-600">
+                After-hours alerts: {afterHoursCount !== null ? afterHoursCount : "N/A"}
+                {afterHoursPct !== null ? ` (${afterHoursPct}%)` : ""}
+              </div>
+            )}
+            {urgencyEntries.length > 0 && (
+              <div className="pt-2 text-xs text-neutral-600">
+                Urgency: {urgencyEntries.map(([key, value]) => `${key}: ${value as number}`).join(" · ")}
               </div>
             )}
           </div>

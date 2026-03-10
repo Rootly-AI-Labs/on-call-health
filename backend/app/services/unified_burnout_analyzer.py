@@ -1647,6 +1647,7 @@ class UnifiedBurnoutAnalyzer:
         rootly_user_id = user.get("rootly_user_id")
         pagerduty_user_id = user.get("pagerduty_user_id")
         avatar_url = user.get("avatar_url")  # Profile image from PagerDuty/Rootly
+        user_tz = self.user_tz_by_id.get(str(user_id), "UTC")
 
         # DEBUG: Log integration mappings for this user
         if jira_account_id:
@@ -1695,6 +1696,7 @@ class UnifiedBurnoutAnalyzer:
                 "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
                 "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
                 "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
+                "user_timezone": user_tz,
                 "health_score": 0,
                 "och_score": round(min(100, composite_och['composite_score']), 2),  # Cap display at 100 for UI
                 "risk_level": "low",
@@ -1728,7 +1730,6 @@ class UnifiedBurnoutAnalyzer:
 
         # Calculate base metrics from incidents and GitHub data
         days_analyzed = metadata.get("days_analyzed") or 30
-        user_tz = self.user_tz_by_id.get(str(user_id), "UTC")
         base_metrics = self._calculate_member_metrics(
             incidents,
             days_analyzed,
@@ -1974,6 +1975,7 @@ class UnifiedBurnoutAnalyzer:
             "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
             "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
             "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
+            "user_timezone": user_tz,
             "health_score": round(health_score, 2),
             "och_score": round(min(100, composite_och['composite_score']), 2),  # Cap display at 100 for UI
             "risk_level": risk_level,

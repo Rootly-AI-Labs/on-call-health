@@ -13,6 +13,7 @@ Recommended settings:
 import asyncio
 import httpx
 import logging
+import pytz
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional, Callable, Set
 from urllib.parse import urlencode
@@ -461,7 +462,9 @@ class RootlyAPIClient:
         max_pages: int = 200,
         user_ids: Optional[Set[str]] = None,
         user_emails: Optional[Set[str]] = None,
-        include: Optional[str] = None
+        include: Optional[str] = None,
+        user_timezones_by_id: Optional[Dict[str, str]] = None,
+        user_timezones_by_email: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """Fetch alert counts within a date range.
 
@@ -479,11 +482,37 @@ class RootlyAPIClient:
 
         user_ids_set = {str(uid) for uid in (user_ids or set()) if uid}
         user_emails_set = {str(email).lower() for email in (user_emails or set()) if email}
+        user_tz_by_id = {str(k): v for k, v in (user_timezones_by_id or {}).items() if k}
+        user_tz_by_email = {str(k).lower(): v for k, v in (user_timezones_by_email or {}).items() if k}
         wants_user_counts = bool(user_ids_set or user_emails_set)
 
         related_id_sets: Dict[str, Set[str]] = {}
         included_id_sets: Dict[str, Set[str]] = {}
         noise_counts: Dict[str, int] = {"noise": 0, "not_noise": 0, "unknown": 0}
+        after_hours_count = 0
+        urgency_counts: Dict[str, int] = {}
+
+        def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+            if not value:
+                return None
+            try:
+                v = value
+                if v.endswith("Z"):
+                    v = v[:-1] + "+00:00"
+                return datetime.fromisoformat(v)
+            except Exception:
+                return None
+
+        def _is_after_hours(dt_value: datetime, tz_name: Optional[str]) -> bool:
+            try:
+                tz = pytz.timezone(tz_name or "UTC")
+                dt_local = dt_value.astimezone(tz)
+            except Exception:
+                dt_local = dt_value.astimezone(timezone.utc)
+            # Weekend counts as after-hours
+            if dt_local.weekday() >= 5:
+                return True
+            return dt_local.hour < settings.BUSINESS_HOURS_START or dt_local.hour >= settings.BUSINESS_HOURS_END
 
         # Fast path: total count only (no team filter, no user counts, no include metrics)
         if not team_id and not wants_user_counts:
@@ -512,7 +541,13 @@ class RootlyAPIClient:
                         "included_counts": {},
                         "noise_counts": {"noise": 0, "not_noise": 0, "unknown": 0},
                         "per_user_noise_by_id": {},
-                        "per_user_noise_by_email": {}
+                        "per_user_noise_by_email": {},
+                        "after_hours_count": 0,
+                        "per_user_after_hours_by_id": {},
+                        "per_user_after_hours_by_email": {},
+                        "urgency_counts": {},
+                        "per_user_urgency_by_id": {},
+                        "per_user_urgency_by_email": {}
                     }
             except Exception as e:
                 return {"error": str(e)}
@@ -527,6 +562,10 @@ class RootlyAPIClient:
         per_user_email_counts: Dict[str, int] = {}
         per_user_noise_by_id: Dict[str, Dict[str, int]] = {}
         per_user_noise_by_email: Dict[str, Dict[str, int]] = {}
+        per_user_after_hours_by_id: Dict[str, int] = {}
+        per_user_after_hours_by_email: Dict[str, int] = {}
+        per_user_urgency_by_id: Dict[str, Dict[str, int]] = {}
+        per_user_urgency_by_email: Dict[str, Dict[str, int]] = {}
         per_user_related_by_id: Dict[str, Dict[str, Set[str]]] = {}
         per_user_related_by_email: Dict[str, Dict[str, Set[str]]] = {}
 
@@ -567,7 +606,13 @@ class RootlyAPIClient:
                             "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()},
                             "noise_counts": noise_counts,
                             "per_user_noise_by_id": per_user_noise_by_id,
-                            "per_user_noise_by_email": per_user_noise_by_email
+                            "per_user_noise_by_email": per_user_noise_by_email,
+                            "after_hours_count": after_hours_count,
+                            "per_user_after_hours_by_id": per_user_after_hours_by_id,
+                            "per_user_after_hours_by_email": per_user_after_hours_by_email,
+                            "urgency_counts": urgency_counts,
+                            "per_user_urgency_by_id": per_user_urgency_by_id,
+                            "per_user_urgency_by_email": per_user_urgency_by_email
                         }
 
                     data = response.json()
@@ -587,6 +632,7 @@ class RootlyAPIClient:
 
                     for alert in data.get("data", []):
                         attrs = alert.get("attributes", {}) or {}
+                        alert_dt = _parse_dt(attrs.get("created_at") or attrs.get("started_at") or attrs.get("updated_at"))
                         group_ids = attrs.get("group_ids") or []
                         if not group_ids:
                             groups = attrs.get("groups") or []
@@ -605,6 +651,17 @@ class RootlyAPIClient:
                                 noise_counts["not_noise"] += 1
                             else:
                                 noise_counts["unknown"] += 1
+                            alert_after_hours_any = False
+
+                            urgency_key = "unknown"
+                            urgency_obj = attrs.get("alert_urgency")
+                            if isinstance(urgency_obj, dict):
+                                urgency_key = urgency_obj.get("urgency") or urgency_obj.get("name") or urgency_obj.get("id") or "unknown"
+                            elif isinstance(urgency_obj, str):
+                                urgency_key = urgency_obj
+                            elif attrs.get("alert_urgency_id"):
+                                urgency_key = str(attrs.get("alert_urgency_id"))
+                            urgency_counts[urgency_key] = urgency_counts.get(urgency_key, 0) + 1
 
                         # Build related IDs for this alert from relationships + groups
                         alert_related: Dict[str, Set[str]] = {}
@@ -675,6 +732,13 @@ class RootlyAPIClient:
                                     user_noise["not_noise"] += 1
                                 else:
                                     user_noise["unknown"] += 1
+                                if alert_dt is not None:
+                                    tz_name = user_tz_by_id.get(uid)
+                                    if _is_after_hours(alert_dt, tz_name):
+                                        per_user_after_hours_by_id[uid] = per_user_after_hours_by_id.get(uid, 0) + 1
+                                        alert_after_hours_any = True
+                                per_user_urgency = per_user_urgency_by_id.setdefault(uid, {})
+                                per_user_urgency[urgency_key] = per_user_urgency.get(urgency_key, 0) + 1
 
                             for email in matched_emails:
                                 per_user_email_counts[email] = per_user_email_counts.get(email, 0) + 1
@@ -687,6 +751,16 @@ class RootlyAPIClient:
                                     user_noise["not_noise"] += 1
                                 else:
                                     user_noise["unknown"] += 1
+                                if alert_dt is not None:
+                                    tz_name = user_tz_by_email.get(email)
+                                    if _is_after_hours(alert_dt, tz_name):
+                                        per_user_after_hours_by_email[email] = per_user_after_hours_by_email.get(email, 0) + 1
+                                        alert_after_hours_any = True
+                                per_user_urgency = per_user_urgency_by_email.setdefault(email, {})
+                                per_user_urgency[urgency_key] = per_user_urgency.get(urgency_key, 0) + 1
+
+                            if alert_after_hours_any:
+                                after_hours_count += 1
 
                     if total_pages is None:
                         if not data.get("data"):
@@ -716,7 +790,13 @@ class RootlyAPIClient:
                 "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()},
                 "noise_counts": noise_counts,
                 "per_user_noise_by_id": per_user_noise_by_id,
-                "per_user_noise_by_email": per_user_noise_by_email
+                "per_user_noise_by_email": per_user_noise_by_email,
+                "after_hours_count": after_hours_count,
+                "per_user_after_hours_by_id": per_user_after_hours_by_id,
+                "per_user_after_hours_by_email": per_user_after_hours_by_email,
+                "urgency_counts": urgency_counts,
+                "per_user_urgency_by_id": per_user_urgency_by_id,
+                "per_user_urgency_by_email": per_user_urgency_by_email
             }
 
         return {
@@ -733,7 +813,13 @@ class RootlyAPIClient:
             "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()},
             "noise_counts": noise_counts,
             "per_user_noise_by_id": per_user_noise_by_id,
-            "per_user_noise_by_email": per_user_noise_by_email
+            "per_user_noise_by_email": per_user_noise_by_email,
+            "after_hours_count": after_hours_count,
+            "per_user_after_hours_by_id": per_user_after_hours_by_id,
+            "per_user_after_hours_by_email": per_user_after_hours_by_email,
+            "urgency_counts": urgency_counts,
+            "per_user_urgency_by_id": per_user_urgency_by_id,
+            "per_user_urgency_by_email": per_user_urgency_by_email
         }
 
     async def get_team_member_emails(self, team_name: str) -> set:
