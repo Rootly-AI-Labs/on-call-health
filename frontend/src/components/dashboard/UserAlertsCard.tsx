@@ -18,14 +18,18 @@ function formatDate(value?: string): string {
 export function UserAlertsCard({ memberData, alertsMeta }: UserAlertsCardProps): React.ReactElement {
   const count = memberData?.alerts_count
   const dateRange = alertsMeta ? `${formatDate(alertsMeta.start)} - ${formatDate(alertsMeta.end)}` : "unknown"
-  const relatedCounts = memberData?.alerts_related_counts || {}
-  const relatedEntries = Object.entries(relatedCounts)
-    .filter(([, value]) => typeof value === "number" && value > 0)
-    .sort((a, b) => (b[1] as number) - (a[1] as number))
   const noiseCounts = memberData?.alerts_noise_counts || {}
   const totalForNoise = typeof count === "number" && count > 0 ? count : null
   const noisePct = totalForNoise !== null ? Math.round(((noiseCounts.noise || 0) / totalForNoise) * 100) : null
   const notNoisePct = totalForNoise !== null ? Math.round(((noiseCounts.not_noise || 0) / totalForNoise) * 100) : null
+  const afterHoursCount = typeof memberData?.alerts_after_hours_count === "number" ? memberData.alerts_after_hours_count : null
+  const afterHoursPct = totalForNoise !== null && afterHoursCount !== null
+    ? Math.round((afterHoursCount / totalForNoise) * 100)
+    : null
+  const urgencyCounts = memberData?.alerts_urgency_counts || {}
+  const urgencyEntries = Object.entries(urgencyCounts)
+    .filter(([, value]) => typeof value === "number" && value > 0)
+    .sort((a, b) => (b[1] as number) - (a[1] as number))
 
   return (
     <Card>
@@ -50,6 +54,17 @@ export function UserAlertsCard({ memberData, alertsMeta }: UserAlertsCardProps):
         {(noisePct !== null || notNoisePct !== null) && (
           <div className="pt-2 text-xs text-neutral-600">
             Noise: {noisePct !== null ? `${noisePct}%` : "N/A"} · Not noise: {notNoisePct !== null ? `${notNoisePct}%` : "N/A"}
+          </div>
+        )}
+        {(afterHoursCount !== null || afterHoursPct !== null) && (
+          <div className="pt-1 text-xs text-neutral-600">
+            After-hours alerts: {afterHoursCount !== null ? afterHoursCount : "N/A"}
+            {afterHoursPct !== null ? ` (${afterHoursPct}%)` : ""}
+          </div>
+        )}
+        {urgencyEntries.length > 0 && (
+          <div className="pt-2 text-xs text-neutral-600">
+            Urgency: {urgencyEntries.map(([key, value]) => `${key}: ${value as number}`).join(" · ")}
           </div>
         )}
       </CardContent>

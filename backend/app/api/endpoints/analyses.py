@@ -3296,16 +3296,24 @@ async def run_analysis_task(
 
                     user_ids = set()
                     user_emails = set()
+                    user_timezones_by_id = {}
+                    user_timezones_by_email = {}
                     if isinstance(team_members, list):
                         for member in team_members:
                             if not isinstance(member, dict):
                                 continue
                             if member.get("rootly_user_id"):
                                 user_ids.add(str(member.get("rootly_user_id")))
+                                if member.get("user_timezone"):
+                                    user_timezones_by_id[str(member.get("rootly_user_id"))] = member.get("user_timezone")
                             if member.get("user_id"):
                                 user_ids.add(str(member.get("user_id")))
+                                if member.get("user_timezone"):
+                                    user_timezones_by_id[str(member.get("user_id"))] = member.get("user_timezone")
                             if member.get("user_email"):
                                 user_emails.add(str(member.get("user_email")).lower())
+                                if member.get("user_timezone"):
+                                    user_timezones_by_email[str(member.get("user_email")).lower()] = member.get("user_timezone")
                     include_list = ",".join([
                         "environments",
                         "services",
@@ -3330,7 +3338,9 @@ async def run_analysis_task(
                         team_id=team_id,
                         user_ids=user_ids,
                         user_emails=user_emails,
-                        include=include_list
+                        include=include_list,
+                        user_timezones_by_id=user_timezones_by_id,
+                        user_timezones_by_email=user_timezones_by_email
                     )
                     logger.info(
                         f"ALERTS_SUMMARY: analysis_id={analysis_id}, "
@@ -3359,6 +3369,8 @@ async def run_analysis_task(
                         "truncated": alerts_counts.get("truncated", False),
                         "error": alerts_counts.get("error"),
                         "noise_counts": alerts_counts.get("noise_counts") or {},
+                        "after_hours_count": alerts_counts.get("after_hours_count", 0),
+                        "urgency_counts": alerts_counts.get("urgency_counts") or {},
                         "related_counts": alerts_counts.get("related_counts") or {},
                         "included_counts": alerts_counts.get("included_counts") or {}
                     }
@@ -3372,12 +3384,18 @@ async def run_analysis_task(
                         per_user_related_emails = alerts_counts.get("per_user_related_by_email") or {}
                         per_user_noise_ids = alerts_counts.get("per_user_noise_by_id") or {}
                         per_user_noise_emails = alerts_counts.get("per_user_noise_by_email") or {}
+                        per_user_after_hours_ids = alerts_counts.get("per_user_after_hours_by_id") or {}
+                        per_user_after_hours_emails = alerts_counts.get("per_user_after_hours_by_email") or {}
+                        per_user_urgency_ids = alerts_counts.get("per_user_urgency_by_id") or {}
+                        per_user_urgency_emails = alerts_counts.get("per_user_urgency_by_email") or {}
                         for member in team_members:
                             if not isinstance(member, dict):
                                 continue
                             count = None
                             related_counts = {}
                             noise_counts = {}
+                            after_hours_count = 0
+                            urgency_counts = {}
                             member_rootly_id = member.get("rootly_user_id")
                             member_user_id = member.get("user_id")
                             member_email = member.get("user_email")
@@ -3385,19 +3403,27 @@ async def run_analysis_task(
                                 count = per_user_ids.get(str(member_rootly_id), 0)
                                 related_counts = per_user_related_ids.get(str(member_rootly_id), {})
                                 noise_counts = per_user_noise_ids.get(str(member_rootly_id), {})
+                                after_hours_count = per_user_after_hours_ids.get(str(member_rootly_id), 0)
+                                urgency_counts = per_user_urgency_ids.get(str(member_rootly_id), {})
                             elif member_user_id and str(member_user_id) in per_user_ids:
                                 count = per_user_ids.get(str(member_user_id), 0)
                                 related_counts = per_user_related_ids.get(str(member_user_id), {})
                                 noise_counts = per_user_noise_ids.get(str(member_user_id), {})
+                                after_hours_count = per_user_after_hours_ids.get(str(member_user_id), 0)
+                                urgency_counts = per_user_urgency_ids.get(str(member_user_id), {})
                             elif member_email and str(member_email).lower() in per_user_emails:
                                 count = per_user_emails.get(str(member_email).lower(), 0)
                                 related_counts = per_user_related_emails.get(str(member_email).lower(), {})
                                 noise_counts = per_user_noise_emails.get(str(member_email).lower(), {})
+                                after_hours_count = per_user_after_hours_emails.get(str(member_email).lower(), 0)
+                                urgency_counts = per_user_urgency_emails.get(str(member_email).lower(), {})
                             if count is None:
                                 count = 0
                             member["alerts_count"] = count
                             member["alerts_related_counts"] = related_counts
                             member["alerts_noise_counts"] = noise_counts
+                            member["alerts_after_hours_count"] = after_hours_count
+                            member["alerts_urgency_counts"] = urgency_counts
                 except Exception as alerts_err:
                     logger.warning(f"BACKGROUND_TASK: Failed to attach alert metadata for analysis {analysis_ref}: {alerts_err}")
 
