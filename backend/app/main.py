@@ -15,7 +15,7 @@ from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
 from .middleware.security import security_middleware
 from .middleware.user_logging import user_logging_middleware
 from .middleware.logging_context import UserContextFilter
-from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, jira, linear, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations, surveys, api_keys
+from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, jira, linear, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations, surveys, api_keys, digests
 
 # Configure logging based on environment variable
 LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
@@ -214,6 +214,33 @@ async def startup_event():
     mcp_cleanup_scheduler.start()
     print("MCP connection cleanup scheduler started (every 5 minutes)")
 
+    # Start auto-refresh analysis scheduler — one cron job per interval cadence
+    from apscheduler.triggers.cron import CronTrigger
+    from app.services.auto_refresh_scheduler import (
+        check_and_run_auto_refresh_analyses,
+        _make_cron_trigger,
+    )
+
+    auto_refresh_scheduler = AsyncIOScheduler()
+    for interval in ["10m", "24h", "3d", "7d"]:
+        auto_refresh_scheduler.add_job(
+            check_and_run_auto_refresh_analyses,
+            trigger=_make_cron_trigger(interval),
+            id=f"auto_refresh_{interval}",
+            replace_existing=True,
+            kwargs={"interval_filter": interval},
+        )
+    auto_refresh_scheduler.start()
+    print("Auto-refresh analysis scheduler started (10m: every 10 min | 24h: daily | 3d: every 3 days | 7d: every 7 days)")
+
+    # Start weekly digest email scheduler (Monday 10am local time, checked every 10 min)
+    from app.services.weekly_digest_service import weekly_digest_scheduler
+    if settings.WEEKLY_DIGEST_ENABLED:
+        weekly_digest_scheduler.start()
+        print("Weekly digest scheduler started (every 10 minutes)")
+    else:
+        print("Weekly digest scheduler disabled (WEEKLY_DIGEST_ENABLED=false)")
+
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
@@ -231,6 +258,7 @@ app.include_router(debug_mappings.router, prefix="/api", tags=["debug"])
 app.include_router(migrate.router, prefix="/api/migrate", tags=["migration"])
 app.include_router(admin.router, prefix="/api", tags=["admin"])
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
+app.include_router(digests.router, prefix="/api", tags=["digests"])
 app.include_router(invitations.router, prefix="/api", tags=["invitations"])
 app.include_router(api_keys.router, prefix="/api", tags=["api-keys"])
 app.include_router(surveys.router, prefix="/api/surveys", tags=["surveys"])
