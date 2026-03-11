@@ -1226,6 +1226,80 @@ class UnifiedBurnoutAnalyzer:
                 else:
                     incidents = raw_incidents
 
+                # Apply team scope to incidents for Rootly team-scoped integrations
+                if self.platform == "rootly" and self.team_name:
+                    team_member_ids = set()
+                    team_member_emails = set()
+
+                    for user in self.synced_users:
+                        if not isinstance(user, dict):
+                            continue
+                        email = user.get("email")
+                        if email:
+                            team_member_emails.add(str(email).lower())
+                        rootly_id = user.get("rootly_user_id") or user.get("id")
+                        if rootly_id is not None:
+                            team_member_ids.add(str(rootly_id))
+
+                    # Build ID-to-email map from API users so we can match by email if needed
+                    id_to_email = {}
+                    if api_users and isinstance(api_users, list):
+                        for api_user in api_users:
+                            if not isinstance(api_user, dict):
+                                continue
+                            api_id = api_user.get("id")
+                            attrs = api_user.get("attributes", {}) if "attributes" in api_user else {}
+                            api_email = attrs.get("email") if isinstance(attrs, dict) else api_user.get("email")
+                            if api_id and api_email:
+                                api_email_lower = str(api_email).lower()
+                                id_to_email[str(api_id)] = api_email_lower
+                                if api_email_lower in team_member_emails:
+                                    team_member_ids.add(str(api_id))
+
+                    if incidents:
+                        before_count = len(incidents)
+                        filtered_incidents = []
+
+                        for incident in incidents:
+                            if not incident or not isinstance(incident, dict):
+                                continue
+                            attrs = incident.get("attributes") if isinstance(incident.get("attributes"), dict) else {}
+                            incident_user_ids = set()
+
+                            for role_field in ("user", "started_by", "resolved_by", "mitigated_by"):
+                                role_info = attrs.get(role_field) if isinstance(attrs, dict) else None
+                                if isinstance(role_info, dict):
+                                    role_data = role_info.get("data")
+                                    if isinstance(role_data, dict):
+                                        rid = role_data.get("id")
+                                        if rid:
+                                            incident_user_ids.add(str(rid))
+
+                            if not incident_user_ids:
+                                continue
+
+                            # Direct ID match
+                            if incident_user_ids & team_member_ids:
+                                filtered_incidents.append(incident)
+                                continue
+
+                            # Email match via ID mapping
+                            if team_member_emails and id_to_email:
+                                matched = False
+                                for rid in incident_user_ids:
+                                    rid_email = id_to_email.get(rid)
+                                    if rid_email and rid_email in team_member_emails:
+                                        matched = True
+                                        break
+                                if matched:
+                                    filtered_incidents.append(incident)
+
+                        incidents = filtered_incidents
+                        logger.info(
+                            f"TEAM SCOPE: Filtered incidents for team '{self.team_name}': "
+                            f"{before_count} -> {len(incidents)}"
+                        )
+
                 # Calculate severity breakdown
                 severity_counts = calculate_severity_breakdown(incidents)
 
