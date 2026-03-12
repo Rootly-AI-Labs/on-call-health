@@ -489,7 +489,11 @@ class RootlyAPIClient:
         related_id_sets: Dict[str, Set[str]] = {}
         included_id_sets: Dict[str, Set[str]] = {}
         noise_counts: Dict[str, int] = {"noise": 0, "not_noise": 0, "unknown": 0}
+        source_counts: Dict[str, int] = {}
+        derived_source_counts: Dict[str, int] = {}
+        alerts_with_incidents_count = 0
         after_hours_count = 0
+        night_time_count = 0
         urgency_counts: Dict[str, int] = {}
 
         def _parse_dt(value: Optional[str]) -> Optional[datetime]:
@@ -514,6 +518,182 @@ class RootlyAPIClient:
                 return True
             return dt_local.hour < settings.BUSINESS_HOURS_START or dt_local.hour >= settings.BUSINESS_HOURS_END
 
+        def _is_night_time(dt_value: datetime, tz_name: Optional[str]) -> bool:
+            try:
+                tz = pytz.timezone(tz_name or "UTC")
+                dt_local = dt_value.astimezone(tz)
+            except Exception:
+                dt_local = dt_value.astimezone(timezone.utc)
+            # Night: LATE_NIGHT_START (22) to LATE_NIGHT_END (6) wraps midnight
+            h = dt_local.hour
+            return h >= settings.LATE_NIGHT_START or h < settings.LATE_NIGHT_END
+
+        generic_sources = {"generic_webhook", "workflow", "web", "manual", "slack", "rootly", "unknown"}
+        vendor_patterns = {
+            "chronosphere": ["chronosphere"],
+            "datadog": ["datadog"],
+            "prometheus": ["prometheus"],
+            "alertmanager": ["alertmanager"],
+            "grafana": ["grafana"],
+            "pagerduty": ["pagerduty", "pager duty"],
+            "opsgenie": ["opsgenie"],
+            "victorops": ["victorops", "victor ops"],
+            "newrelic": ["newrelic", "new relic"],
+            "sentry": ["sentry"],
+            "bugsnag": ["bugsnag"],
+            "splunk": ["splunk"],
+            "sumologic": ["sumologic", "sumo logic"],
+            "cloudwatch": ["cloudwatch", "aws cloudwatch"],
+            "stackdriver": ["stackdriver", "google cloud monitoring"],
+            "elastic": ["elasticsearch", "elastic", "kibana"],
+            "honeycomb": ["honeycomb"],
+            "signalfx": ["signalfx", "signal fx"],
+            "dynatrace": ["dynatrace"],
+            "appdynamics": ["appdynamics", "app dynamics"],
+            "zabbix": ["zabbix"],
+            "nagios": ["nagios"],
+            "pingdom": ["pingdom"]
+        }
+
+        vendor_domains = {
+            "datadog": ["datadoghq.com", "datadog.com"],
+            "grafana": ["grafana.com", "/grafana/"],
+            "cloudwatch": ["console.aws.amazon.com/cloudwatch", "amazonaws.com"],
+            "newrelic": ["newrelic.com", "one.newrelic.com"],
+            "sentry": ["sentry.io"],
+            "pagerduty": ["pagerduty.com"],
+            "opsgenie": ["opsgenie.com", "atlassian.com"],
+            "prometheus": ["prometheus.io"],
+            "splunk": ["splunk.com"],
+            "dynatrace": ["dynatrace.com", "live.dynatrace.com"],
+            "honeycomb": ["honeycomb.io"],
+            "pingdom": ["pingdom.com"],
+        }
+
+        def _map_vendor(value: str) -> Optional[str]:
+            lower_value = value.lower()
+            for vendor, patterns in vendor_patterns.items():
+                for pattern in patterns:
+                    if pattern in lower_value:
+                        return vendor
+            return None
+
+        def _iter_strings(payload: Any, limit: int = 200):
+            stack = [payload]
+            seen = 0
+            while stack and seen < limit:
+                current = stack.pop()
+                if isinstance(current, dict):
+                    for item in current.values():
+                        stack.append(item)
+                elif isinstance(current, list):
+                    for item in current:
+                        stack.append(item)
+                elif isinstance(current, str):
+                    value = current.strip()
+                    if value:
+                        yield value
+                        seen += 1
+
+        def _derive_origin(attrs: Dict[str, Any]) -> str:
+            source_value = (attrs.get("source") or "").strip().lower()
+            if source_value and source_value not in generic_sources:
+                return source_value
+
+            # Step 1: Check external_url domain
+            external_url = attrs.get("external_url") or ""
+            if external_url:
+                for vendor, domains in vendor_domains.items():
+                    if any(d in external_url for d in domains):
+                        return vendor
+
+            # Step 2: Check alert_field_values for source/tool field
+            field_values = attrs.get("alert_field_values") or []
+            if isinstance(field_values, list):
+                for fv in field_values:
+                    if isinstance(fv, dict):
+                        name = str(fv.get("name") or fv.get("slug") or "").lower()
+                        val = str(fv.get("value") or "").lower()
+                        if name in ("source", "tool", "integration", "origin", "provider"):
+                            mapped = _map_vendor(val)
+                            return mapped or val
+
+            # Step 3: Check labels keys for vendor-specific patterns
+            labels = attrs.get("labels") or []
+            if isinstance(labels, list):
+                label_keys = {str(l.get("key", "")).lower() for l in labels if isinstance(l, dict)}
+                label_vals = {str(l.get("value", "")).lower() for l in labels if isinstance(l, dict)}
+                if "alertname" in label_keys or "job" in label_keys or "severity" in label_keys:
+                    return "prometheus"
+                for v in label_vals:
+                    mapped = _map_vendor(v)
+                    if mapped:
+                        return mapped
+
+            # Step 4: Check summary/description bracket prefixes and vendor name scan
+            for text_field in ("summary", "description"):
+                text = (attrs.get(text_field) or "").strip()
+                if text:
+                    if text.startswith("["):
+                        bracket_end = text.find("]")
+                        if bracket_end > 0:
+                            prefix = text[1:bracket_end]
+                            mapped = _map_vendor(prefix)
+                            if mapped:
+                                return mapped
+                    mapped = _map_vendor(text[:200])
+                    if mapped:
+                        return mapped
+
+            data = attrs.get("data")
+            if isinstance(data, dict):
+                # Step 5: Check named keys in data
+                for key in ("source", "integration", "provider", "vendor", "tool", "origin", "service"):
+                    val = data.get(key)
+                    if isinstance(val, str) and val.strip():
+                        mapped = _map_vendor(val)
+                        return mapped or val.strip().lower()
+
+                # Step 6: Check payload shape patterns
+                if any(k in data for k in ("AlarmName", "AlarmArn", "AWSAccountId", "Trigger", "NewStateReason")):
+                    return "cloudwatch"
+
+                if any(k in data for k in ("ruleName", "ruleUrl", "orgId", "dashboardId", "panelId")):
+                    return "grafana"
+
+                if any(k in data for k in ("event_type", "alert_type", "alert_metric", "last_updated", "scopes")):
+                    return "datadog"
+
+                if any(k in data for k in ("nrqlQuery", "nrqlConditionName", "policyName", "incidentId")):
+                    return "newrelic"
+
+                if any(k in data for k in ("project", "culprit", "event", "sentry_dsn")):
+                    return "sentry"
+
+                if any(k in data for k in ("action", "alert", "integrationName", "integrationId")):
+                    if isinstance(data.get("alert"), dict):
+                        return "opsgenie"
+
+                # Step 7: Check Alertmanager keys
+                if any(key in data for key in ("commonLabels", "groupLabels", "receiver", "alerts", "groupKey", "externalURL")):
+                    return "alertmanager"
+
+                # Step 8: Deep string iteration (fallback)
+                for value in _iter_strings(data):
+                    mapped = _map_vendor(value)
+                    if mapped:
+                        return mapped
+
+            # Step 9: Check deduplication_key / external_id for vendor prefixes
+            for key_field in ("deduplication_key", "external_id"):
+                key_val = attrs.get(key_field) or ""
+                if key_val:
+                    mapped = _map_vendor(str(key_val))
+                    if mapped:
+                        return mapped
+
+            return source_value or "unknown"
+
         # Fast path: total count only (no team filter, no user counts, no include metrics)
         if not team_id and not wants_user_counts:
             try:
@@ -537,17 +717,51 @@ class RootlyAPIClient:
                         "total_pages": meta.get("total_pages"),
                         "per_user_id_counts": {},
                         "per_user_email_counts": {},
+                        "per_user_notified_by_id": {},
+                        "per_user_notified_by_email": {},
+                        "per_user_responded_by_id": {},
+                        "per_user_responded_by_email": {},
+                        "per_user_alerts_with_incidents_by_id": {},
+                        "per_user_alerts_with_incidents_by_email": {},
+                        "per_user_source_by_id": {},
+                        "per_user_source_by_email": {},
+                        "per_user_derived_source_by_id": {},
+                        "per_user_derived_source_by_email": {},
                         "related_counts": {},
                         "included_counts": {},
                         "noise_counts": {"noise": 0, "not_noise": 0, "unknown": 0},
+                        "source_counts": {},
+                        "derived_source_counts": {},
                         "per_user_noise_by_id": {},
                         "per_user_noise_by_email": {},
                         "after_hours_count": 0,
                         "per_user_after_hours_by_id": {},
                         "per_user_after_hours_by_email": {},
+                        "night_time_count": 0,
+                        "per_user_night_time_by_id": {},
+                        "per_user_night_time_by_email": {},
                         "urgency_counts": {},
                         "per_user_urgency_by_id": {},
-                        "per_user_urgency_by_email": {}
+                        "per_user_urgency_by_email": {},
+                        "alerts_with_incidents_count": 0,
+                        "avg_mtta_seconds": None,
+                        "mtta_count": 0,
+                        "avg_mttr_seconds": None,
+                        "mttr_count": 0,
+                        "escalated_count": 0,
+                        "retrigger_count": 0,
+                        "per_user_acked_by_id": {},
+                        "per_user_acked_by_email": {},
+                        "per_user_resolved_by_id": {},
+                        "per_user_resolved_by_email": {},
+                        "per_user_escalated_by_id": {},
+                        "per_user_escalated_by_email": {},
+                        "per_user_retriggered_by_id": {},
+                        "per_user_retriggered_by_email": {},
+                        "per_user_mtta_avg_by_id": {},
+                        "per_user_mtta_avg_by_email": {},
+                        "per_user_mttr_avg_by_id": {},
+                        "per_user_mttr_avg_by_email": {},
                     }
             except Exception as e:
                 return {"error": str(e)}
@@ -560,14 +774,50 @@ class RootlyAPIClient:
         page = 1
         per_user_id_counts: Dict[str, int] = {}
         per_user_email_counts: Dict[str, int] = {}
+        per_user_notified_by_id: Dict[str, int] = {}
+        per_user_notified_by_email: Dict[str, int] = {}
+        per_user_responded_by_id: Dict[str, int] = {}
+        per_user_responded_by_email: Dict[str, int] = {}
+        per_user_alerts_with_incidents_by_id: Dict[str, int] = {}
+        per_user_alerts_with_incidents_by_email: Dict[str, int] = {}
+        per_user_source_by_id: Dict[str, Dict[str, int]] = {}
+        per_user_source_by_email: Dict[str, Dict[str, int]] = {}
+        per_user_derived_source_by_id: Dict[str, Dict[str, int]] = {}
+        per_user_derived_source_by_email: Dict[str, Dict[str, int]] = {}
         per_user_noise_by_id: Dict[str, Dict[str, int]] = {}
         per_user_noise_by_email: Dict[str, Dict[str, int]] = {}
         per_user_after_hours_by_id: Dict[str, int] = {}
         per_user_after_hours_by_email: Dict[str, int] = {}
+        per_user_night_time_by_id: Dict[str, int] = {}
+        per_user_night_time_by_email: Dict[str, int] = {}
         per_user_urgency_by_id: Dict[str, Dict[str, int]] = {}
         per_user_urgency_by_email: Dict[str, Dict[str, int]] = {}
         per_user_related_by_id: Dict[str, Dict[str, Set[str]]] = {}
         per_user_related_by_email: Dict[str, Dict[str, Set[str]]] = {}
+
+        # New: event-derived metrics
+        mtta_sum: float = 0.0
+        mtta_count: int = 0
+        escalated_count: int = 0
+        retrigger_count: int = 0
+        per_user_acked_by_id: Dict[str, int] = {}
+        per_user_acked_by_email: Dict[str, int] = {}
+        per_user_resolved_by_id: Dict[str, int] = {}
+        per_user_resolved_by_email: Dict[str, int] = {}
+        per_user_escalated_by_id: Dict[str, int] = {}
+        per_user_escalated_by_email: Dict[str, int] = {}
+        per_user_retriggered_by_id: Dict[str, int] = {}
+        per_user_retriggered_by_email: Dict[str, int] = {}
+        per_user_mtta_sum_by_id: Dict[str, float] = {}
+        per_user_mtta_count_by_id: Dict[str, int] = {}
+        per_user_mtta_sum_by_email: Dict[str, float] = {}
+        per_user_mtta_count_by_email: Dict[str, int] = {}
+        mttr_sum: float = 0.0
+        mttr_count: int = 0
+        per_user_mttr_sum_by_id: Dict[str, float] = {}
+        per_user_mttr_count_by_id: Dict[str, int] = {}
+        per_user_mttr_sum_by_email: Dict[str, float] = {}
+        per_user_mttr_count_by_email: Dict[str, int] = {}
 
         def add_related(collector: Dict[str, Set[str]], rel_name: str, rel_id: Optional[str]):
             if not rel_name or not rel_id:
@@ -600,19 +850,35 @@ class RootlyAPIClient:
                             "truncated": True,
                             "per_user_id_counts": per_user_id_counts,
                             "per_user_email_counts": per_user_email_counts,
+                            "per_user_notified_by_id": per_user_notified_by_id,
+                            "per_user_notified_by_email": per_user_notified_by_email,
+                            "per_user_responded_by_id": per_user_responded_by_id,
+                            "per_user_responded_by_email": per_user_responded_by_email,
+                            "per_user_alerts_with_incidents_by_id": per_user_alerts_with_incidents_by_id,
+                            "per_user_alerts_with_incidents_by_email": per_user_alerts_with_incidents_by_email,
+                            "per_user_source_by_id": per_user_source_by_id,
+                            "per_user_source_by_email": per_user_source_by_email,
+                            "per_user_derived_source_by_id": per_user_derived_source_by_id,
+                            "per_user_derived_source_by_email": per_user_derived_source_by_email,
                             "related_counts": {k: len(v) for k, v in related_id_sets.items()},
                             "included_counts": {k: len(v) for k, v in included_id_sets.items()},
                             "per_user_related_by_id": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_id.items()},
                             "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()},
                             "noise_counts": noise_counts,
+                            "source_counts": source_counts,
+                            "derived_source_counts": derived_source_counts,
                             "per_user_noise_by_id": per_user_noise_by_id,
                             "per_user_noise_by_email": per_user_noise_by_email,
                             "after_hours_count": after_hours_count,
                             "per_user_after_hours_by_id": per_user_after_hours_by_id,
                             "per_user_after_hours_by_email": per_user_after_hours_by_email,
+                            "night_time_count": night_time_count,
+                            "per_user_night_time_by_id": per_user_night_time_by_id,
+                            "per_user_night_time_by_email": per_user_night_time_by_email,
                             "urgency_counts": urgency_counts,
                             "per_user_urgency_by_id": per_user_urgency_by_id,
-                            "per_user_urgency_by_email": per_user_urgency_by_email
+                            "per_user_urgency_by_email": per_user_urgency_by_email,
+                            "alerts_with_incidents_count": alerts_with_incidents_count
                         }
 
                     data = response.json()
@@ -622,6 +888,7 @@ class RootlyAPIClient:
                         total_pages = meta.get("total_pages") or 1
 
                     included = data.get("included") or []
+                    event_lookup: Dict[str, Dict] = {}
                     for item in included:
                         if not isinstance(item, dict):
                             continue
@@ -629,6 +896,8 @@ class RootlyAPIClient:
                         item_id = item.get("id")
                         if item_type and item_id:
                             add_related(included_id_sets, item_type, item_id)
+                        if item_type == "alert_events" and item_id:
+                            event_lookup[item_id] = item.get("attributes", {}) or {}
 
                     for alert in data.get("data", []):
                         attrs = alert.get("attributes", {}) or {}
@@ -651,7 +920,12 @@ class RootlyAPIClient:
                                 noise_counts["not_noise"] += 1
                             else:
                                 noise_counts["unknown"] += 1
+                            source_value = attrs.get("source") or "unknown"
+                            source_counts[source_value] = source_counts.get(source_value, 0) + 1
+                            derived_source = _derive_origin(attrs)
+                            derived_source_counts[derived_source] = derived_source_counts.get(derived_source, 0) + 1
                             alert_after_hours_any = False
+                            alert_night_time_any = False
 
                             urgency_key = "unknown"
                             urgency_obj = attrs.get("alert_urgency")
@@ -662,6 +936,101 @@ class RootlyAPIClient:
                             elif attrs.get("alert_urgency_id"):
                                 urgency_key = str(attrs.get("alert_urgency_id"))
                             urgency_counts[urgency_key] = urgency_counts.get(urgency_key, 0) + 1
+
+                            has_incident = False
+                            incident_ids = attrs.get("incident_ids")
+                            if isinstance(incident_ids, list) and len(incident_ids) > 0:
+                                has_incident = True
+                            incidents_attr = attrs.get("incidents")
+                            if isinstance(incidents_attr, list) and len(incidents_attr) > 0:
+                                has_incident = True
+                            rel_incidents = (alert.get("relationships", {}) or {}).get("incidents", {})
+                            rel_data = rel_incidents.get("data") if isinstance(rel_incidents, dict) else None
+                            if isinstance(rel_data, list) and len(rel_data) > 0:
+                                has_incident = True
+                            if isinstance(rel_data, dict) and rel_data.get("id"):
+                                has_incident = True
+                            if has_incident:
+                                alerts_with_incidents_count += 1
+
+                            # --- Event-derived metrics (MTTA, escalation, retrigger, ack/resolve) ---
+                            rel_events_data = (alert.get("relationships", {}) or {}).get("events", {})
+                            event_rel_items = rel_events_data.get("data") if isinstance(rel_events_data, dict) else None
+                            alert_event_list: list = []
+                            if isinstance(event_rel_items, list):
+                                for ev_ref in event_rel_items:
+                                    if isinstance(ev_ref, dict) and ev_ref.get("id") in event_lookup:
+                                        alert_event_list.append(event_lookup[ev_ref["id"]])
+                            alert_event_list.sort(key=lambda e: e.get("created_at") or "")
+
+                            # MTTA: alert start → first acknowledged event
+                            alert_started_at = _parse_dt(attrs.get("started_at") or attrs.get("created_at"))
+                            mtta_seconds = None
+                            first_ack_event = next((e for e in alert_event_list if e.get("action") == "acknowledged"), None)
+                            if first_ack_event and alert_started_at:
+                                ack_dt = _parse_dt(first_ack_event.get("created_at"))
+                                if ack_dt and ack_dt > alert_started_at:
+                                    mtta_seconds = (ack_dt - alert_started_at).total_seconds()
+                                    mtta_sum += mtta_seconds
+                                    mtta_count += 1
+
+                            # MTTR: alert start → ended_at (resolved)
+                            mttr_seconds = None
+                            ended_at_dt = _parse_dt(attrs.get("ended_at"))
+                            if ended_at_dt and alert_started_at and ended_at_dt > alert_started_at:
+                                mttr_seconds = (ended_at_dt - alert_started_at).total_seconds()
+                                mttr_sum += mttr_seconds
+                                mttr_count += 1
+
+                            # Escalation: any event with escalation_level position >= 2
+                            is_escalated = False
+                            for ev in alert_event_list:
+                                el = ev.get("escalation_level")
+                                if isinstance(el, dict):
+                                    try:
+                                        if int(el.get("position", 1)) >= 2:
+                                            is_escalated = True
+                                            break
+                                    except (ValueError, TypeError):
+                                        pass
+                                elif isinstance(el, int) and el >= 2:
+                                    is_escalated = True
+                                    break
+                            if is_escalated:
+                                escalated_count += 1
+
+                            # Retrigger: any event with action == "retriggered"
+                            is_retriggered = any(e.get("action") == "retriggered" for e in alert_event_list)
+                            if is_retriggered:
+                                retrigger_count += 1
+
+                            # Who acknowledged and who resolved (from event user fields)
+                            def _extract_user_ids_emails(ev: dict):
+                                uids: Set[str] = set()
+                                uemails: Set[str] = set()
+                                u = ev.get("user")
+                                uid = ev.get("user_id")
+                                if isinstance(u, dict):
+                                    if u.get("id"):
+                                        uids.add(str(u["id"]))
+                                    if u.get("email"):
+                                        uemails.add(str(u["email"]).lower())
+                                if uid:
+                                    uids.add(str(uid))
+                                return uids, uemails
+
+                            acker_ids: Set[str] = set()
+                            acker_emails: Set[str] = set()
+                            if first_ack_event:
+                                acker_ids, acker_emails = _extract_user_ids_emails(first_ack_event)
+
+                            resolver_ids: Set[str] = set()
+                            resolver_emails: Set[str] = set()
+                            for ev in alert_event_list:
+                                if ev.get("action") == "resolved":
+                                    rids, remails = _extract_user_ids_emails(ev)
+                                    resolver_ids |= rids
+                                    resolver_emails |= remails
 
                         # Build related IDs for this alert from relationships + groups
                         alert_related: Dict[str, Set[str]] = {}
@@ -696,19 +1065,38 @@ class RootlyAPIClient:
                             responders = attrs.get("responders") or []
                             notified_users = attrs.get("notified_users") or []
 
-                            for item in responders + notified_users:
+                            responded_user_ids: Set[str] = set()
+                            responded_user_emails: Set[str] = set()
+                            notified_user_ids: Set[str] = set()
+                            notified_user_emails: Set[str] = set()
+
+                            for item in responders:
                                 if isinstance(item, dict):
                                     if item.get("id"):
-                                        alert_user_ids.add(str(item.get("id")))
+                                        responded_user_ids.add(str(item.get("id")))
                                     if item.get("user_id"):
-                                        alert_user_ids.add(str(item.get("user_id")))
+                                        responded_user_ids.add(str(item.get("user_id")))
                                     if item.get("email"):
-                                        alert_user_emails.add(str(item.get("email")).lower())
+                                        responded_user_emails.add(str(item.get("email")).lower())
                                 elif isinstance(item, str):
                                     if "@" in item:
-                                        alert_user_emails.add(item.lower())
+                                        responded_user_emails.add(item.lower())
                                     else:
-                                        alert_user_ids.add(item)
+                                        responded_user_ids.add(item)
+
+                            for item in notified_users:
+                                if isinstance(item, dict):
+                                    if item.get("id"):
+                                        notified_user_ids.add(str(item.get("id")))
+                                    if item.get("user_id"):
+                                        notified_user_ids.add(str(item.get("user_id")))
+                                    if item.get("email"):
+                                        notified_user_emails.add(str(item.get("email")).lower())
+                                elif isinstance(item, str):
+                                    if "@" in item:
+                                        notified_user_emails.add(item.lower())
+                                    else:
+                                        notified_user_ids.add(item)
 
                             for rel_name in ("responders", "notified_users"):
                                 rel = relationships.get(rel_name, {}) or {}
@@ -716,10 +1104,20 @@ class RootlyAPIClient:
                                 if isinstance(rel_data, list):
                                     for rel_item in rel_data:
                                         if isinstance(rel_item, dict) and rel_item.get("id"):
-                                            alert_user_ids.add(str(rel_item.get("id")))
+                                            if rel_name == "responders":
+                                                responded_user_ids.add(str(rel_item.get("id")))
+                                            else:
+                                                notified_user_ids.add(str(rel_item.get("id")))
+
+                            alert_user_ids = responded_user_ids | notified_user_ids
+                            alert_user_emails = responded_user_emails | notified_user_emails
 
                             matched_ids = {uid for uid in alert_user_ids if uid in user_ids_set}
                             matched_emails = {email for email in alert_user_emails if email in user_emails_set}
+                            matched_responded_ids = {uid for uid in responded_user_ids if uid in user_ids_set}
+                            matched_responded_emails = {email for email in responded_user_emails if email in user_emails_set}
+                            matched_notified_ids = {uid for uid in notified_user_ids if uid in user_ids_set}
+                            matched_notified_emails = {email for email in notified_user_emails if email in user_emails_set}
 
                             for uid in matched_ids:
                                 per_user_id_counts[uid] = per_user_id_counts.get(uid, 0) + 1
@@ -737,8 +1135,17 @@ class RootlyAPIClient:
                                     if _is_after_hours(alert_dt, tz_name):
                                         per_user_after_hours_by_id[uid] = per_user_after_hours_by_id.get(uid, 0) + 1
                                         alert_after_hours_any = True
+                                    if _is_night_time(alert_dt, tz_name):
+                                        per_user_night_time_by_id[uid] = per_user_night_time_by_id.get(uid, 0) + 1
+                                        alert_night_time_any = True
                                 per_user_urgency = per_user_urgency_by_id.setdefault(uid, {})
                                 per_user_urgency[urgency_key] = per_user_urgency.get(urgency_key, 0) + 1
+                                if has_incident:
+                                    per_user_alerts_with_incidents_by_id[uid] = per_user_alerts_with_incidents_by_id.get(uid, 0) + 1
+                                per_user_source = per_user_source_by_id.setdefault(uid, {})
+                                per_user_source[source_value] = per_user_source.get(source_value, 0) + 1
+                                per_user_derived_source = per_user_derived_source_by_id.setdefault(uid, {})
+                                per_user_derived_source[derived_source] = per_user_derived_source.get(derived_source, 0) + 1
 
                             for email in matched_emails:
                                 per_user_email_counts[email] = per_user_email_counts.get(email, 0) + 1
@@ -756,11 +1163,70 @@ class RootlyAPIClient:
                                     if _is_after_hours(alert_dt, tz_name):
                                         per_user_after_hours_by_email[email] = per_user_after_hours_by_email.get(email, 0) + 1
                                         alert_after_hours_any = True
+                                    if _is_night_time(alert_dt, tz_name):
+                                        per_user_night_time_by_email[email] = per_user_night_time_by_email.get(email, 0) + 1
+                                        alert_night_time_any = True
                                 per_user_urgency = per_user_urgency_by_email.setdefault(email, {})
                                 per_user_urgency[urgency_key] = per_user_urgency.get(urgency_key, 0) + 1
+                                if has_incident:
+                                    per_user_alerts_with_incidents_by_email[email] = per_user_alerts_with_incidents_by_email.get(email, 0) + 1
+                                per_user_source = per_user_source_by_email.setdefault(email, {})
+                                per_user_source[source_value] = per_user_source.get(source_value, 0) + 1
+                                per_user_derived_source = per_user_derived_source_by_email.setdefault(email, {})
+                                per_user_derived_source[derived_source] = per_user_derived_source.get(derived_source, 0) + 1
+
+                            for uid in matched_responded_ids:
+                                per_user_responded_by_id[uid] = per_user_responded_by_id.get(uid, 0) + 1
+
+                            for email in matched_responded_emails:
+                                per_user_responded_by_email[email] = per_user_responded_by_email.get(email, 0) + 1
+
+                            for uid in matched_notified_ids:
+                                per_user_notified_by_id[uid] = per_user_notified_by_id.get(uid, 0) + 1
+
+                            for email in matched_notified_emails:
+                                per_user_notified_by_email[email] = per_user_notified_by_email.get(email, 0) + 1
+
+                            # Per-user event-derived metrics (uses alert_event_list etc. from in_scope block above)
+                            for uid in acker_ids:
+                                if uid in user_ids_set:
+                                    per_user_acked_by_id[uid] = per_user_acked_by_id.get(uid, 0) + 1
+                                    if mtta_seconds is not None:
+                                        per_user_mtta_sum_by_id[uid] = per_user_mtta_sum_by_id.get(uid, 0.0) + mtta_seconds
+                                        per_user_mtta_count_by_id[uid] = per_user_mtta_count_by_id.get(uid, 0) + 1
+                            for email in acker_emails:
+                                if email in user_emails_set:
+                                    per_user_acked_by_email[email] = per_user_acked_by_email.get(email, 0) + 1
+                                    if mtta_seconds is not None:
+                                        per_user_mtta_sum_by_email[email] = per_user_mtta_sum_by_email.get(email, 0.0) + mtta_seconds
+                                        per_user_mtta_count_by_email[email] = per_user_mtta_count_by_email.get(email, 0) + 1
+                            for uid in resolver_ids:
+                                if uid in user_ids_set:
+                                    per_user_resolved_by_id[uid] = per_user_resolved_by_id.get(uid, 0) + 1
+                                    if mttr_seconds is not None:
+                                        per_user_mttr_sum_by_id[uid] = per_user_mttr_sum_by_id.get(uid, 0.0) + mttr_seconds
+                                        per_user_mttr_count_by_id[uid] = per_user_mttr_count_by_id.get(uid, 0) + 1
+                            for email in resolver_emails:
+                                if email in user_emails_set:
+                                    per_user_resolved_by_email[email] = per_user_resolved_by_email.get(email, 0) + 1
+                                    if mttr_seconds is not None:
+                                        per_user_mttr_sum_by_email[email] = per_user_mttr_sum_by_email.get(email, 0.0) + mttr_seconds
+                                        per_user_mttr_count_by_email[email] = per_user_mttr_count_by_email.get(email, 0) + 1
+                            for uid in matched_ids:
+                                if is_escalated:
+                                    per_user_escalated_by_id[uid] = per_user_escalated_by_id.get(uid, 0) + 1
+                                if is_retriggered:
+                                    per_user_retriggered_by_id[uid] = per_user_retriggered_by_id.get(uid, 0) + 1
+                            for email in matched_emails:
+                                if is_escalated:
+                                    per_user_escalated_by_email[email] = per_user_escalated_by_email.get(email, 0) + 1
+                                if is_retriggered:
+                                    per_user_retriggered_by_email[email] = per_user_retriggered_by_email.get(email, 0) + 1
 
                             if alert_after_hours_any:
                                 after_hours_count += 1
+                            if alert_night_time_any:
+                                night_time_count += 1
 
                     if total_pages is None:
                         if not data.get("data"):
@@ -784,19 +1250,53 @@ class RootlyAPIClient:
                 "truncated": True,
                 "per_user_id_counts": per_user_id_counts,
                 "per_user_email_counts": per_user_email_counts,
+                "per_user_notified_by_id": per_user_notified_by_id,
+                "per_user_notified_by_email": per_user_notified_by_email,
+                "per_user_responded_by_id": per_user_responded_by_id,
+                "per_user_responded_by_email": per_user_responded_by_email,
+                "per_user_alerts_with_incidents_by_id": per_user_alerts_with_incidents_by_id,
+                "per_user_alerts_with_incidents_by_email": per_user_alerts_with_incidents_by_email,
+                "per_user_source_by_id": per_user_source_by_id,
+                "per_user_source_by_email": per_user_source_by_email,
+                "per_user_derived_source_by_id": per_user_derived_source_by_id,
+                "per_user_derived_source_by_email": per_user_derived_source_by_email,
                 "related_counts": {k: len(v) for k, v in related_id_sets.items()},
                 "included_counts": {k: len(v) for k, v in included_id_sets.items()},
                 "per_user_related_by_id": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_id.items()},
                 "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()},
                 "noise_counts": noise_counts,
+                "source_counts": source_counts,
+                "derived_source_counts": derived_source_counts,
                 "per_user_noise_by_id": per_user_noise_by_id,
                 "per_user_noise_by_email": per_user_noise_by_email,
                 "after_hours_count": after_hours_count,
                 "per_user_after_hours_by_id": per_user_after_hours_by_id,
                 "per_user_after_hours_by_email": per_user_after_hours_by_email,
+                "night_time_count": night_time_count,
+                "per_user_night_time_by_id": per_user_night_time_by_id,
+                "per_user_night_time_by_email": per_user_night_time_by_email,
                 "urgency_counts": urgency_counts,
                 "per_user_urgency_by_id": per_user_urgency_by_id,
-                "per_user_urgency_by_email": per_user_urgency_by_email
+                "per_user_urgency_by_email": per_user_urgency_by_email,
+                "alerts_with_incidents_count": alerts_with_incidents_count,
+                "avg_mtta_seconds": mtta_sum / mtta_count if mtta_count > 0 else None,
+                "mtta_count": mtta_count,
+                "avg_mttr_seconds": mttr_sum / mttr_count if mttr_count > 0 else None,
+                "mttr_count": mttr_count,
+                "escalated_count": escalated_count,
+                "retrigger_count": retrigger_count,
+                "per_user_acked_by_id": per_user_acked_by_id,
+                "per_user_acked_by_email": per_user_acked_by_email,
+                "per_user_resolved_by_id": per_user_resolved_by_id,
+                "per_user_resolved_by_email": per_user_resolved_by_email,
+                "per_user_escalated_by_id": per_user_escalated_by_id,
+                "per_user_escalated_by_email": per_user_escalated_by_email,
+                "per_user_retriggered_by_id": per_user_retriggered_by_id,
+                "per_user_retriggered_by_email": per_user_retriggered_by_email,
+                "per_user_mtta_avg_by_id": {k: per_user_mtta_sum_by_id[k] / per_user_mtta_count_by_id[k] for k in per_user_mtta_sum_by_id if per_user_mtta_count_by_id.get(k, 0) > 0},
+                "per_user_mtta_avg_by_email": {k: per_user_mtta_sum_by_email[k] / per_user_mtta_count_by_email[k] for k in per_user_mtta_sum_by_email if per_user_mtta_count_by_email.get(k, 0) > 0},
+                "per_user_mttr_avg_by_id": {k: per_user_mttr_sum_by_id[k] / per_user_mttr_count_by_id[k] for k in per_user_mttr_sum_by_id if per_user_mttr_count_by_id.get(k, 0) > 0},
+                "per_user_mttr_avg_by_email": {k: per_user_mttr_sum_by_email[k] / per_user_mttr_count_by_email[k] for k in per_user_mttr_sum_by_email if per_user_mttr_count_by_email.get(k, 0) > 0},
             }
 
         return {
@@ -807,19 +1307,53 @@ class RootlyAPIClient:
             "truncated": truncated,
             "per_user_id_counts": per_user_id_counts,
             "per_user_email_counts": per_user_email_counts,
+            "per_user_notified_by_id": per_user_notified_by_id,
+            "per_user_notified_by_email": per_user_notified_by_email,
+            "per_user_responded_by_id": per_user_responded_by_id,
+            "per_user_responded_by_email": per_user_responded_by_email,
+            "per_user_alerts_with_incidents_by_id": per_user_alerts_with_incidents_by_id,
+            "per_user_alerts_with_incidents_by_email": per_user_alerts_with_incidents_by_email,
+            "per_user_source_by_id": per_user_source_by_id,
+            "per_user_source_by_email": per_user_source_by_email,
+            "per_user_derived_source_by_id": per_user_derived_source_by_id,
+            "per_user_derived_source_by_email": per_user_derived_source_by_email,
             "related_counts": {k: len(v) for k, v in related_id_sets.items()},
             "included_counts": {k: len(v) for k, v in included_id_sets.items()},
             "per_user_related_by_id": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_id.items()},
             "per_user_related_by_email": {k: {rk: len(rv) for rk, rv in v.items()} for k, v in per_user_related_by_email.items()},
             "noise_counts": noise_counts,
+            "source_counts": source_counts,
+            "derived_source_counts": derived_source_counts,
             "per_user_noise_by_id": per_user_noise_by_id,
             "per_user_noise_by_email": per_user_noise_by_email,
             "after_hours_count": after_hours_count,
             "per_user_after_hours_by_id": per_user_after_hours_by_id,
             "per_user_after_hours_by_email": per_user_after_hours_by_email,
+            "night_time_count": night_time_count,
+            "per_user_night_time_by_id": per_user_night_time_by_id,
+            "per_user_night_time_by_email": per_user_night_time_by_email,
             "urgency_counts": urgency_counts,
             "per_user_urgency_by_id": per_user_urgency_by_id,
-            "per_user_urgency_by_email": per_user_urgency_by_email
+            "per_user_urgency_by_email": per_user_urgency_by_email,
+            "alerts_with_incidents_count": alerts_with_incidents_count,
+            "avg_mtta_seconds": mtta_sum / mtta_count if mtta_count > 0 else None,
+            "mtta_count": mtta_count,
+            "avg_mttr_seconds": mttr_sum / mttr_count if mttr_count > 0 else None,
+            "mttr_count": mttr_count,
+            "escalated_count": escalated_count,
+            "retrigger_count": retrigger_count,
+            "per_user_acked_by_id": per_user_acked_by_id,
+            "per_user_acked_by_email": per_user_acked_by_email,
+            "per_user_resolved_by_id": per_user_resolved_by_id,
+            "per_user_resolved_by_email": per_user_resolved_by_email,
+            "per_user_escalated_by_id": per_user_escalated_by_id,
+            "per_user_escalated_by_email": per_user_escalated_by_email,
+            "per_user_retriggered_by_id": per_user_retriggered_by_id,
+            "per_user_retriggered_by_email": per_user_retriggered_by_email,
+            "per_user_mtta_avg_by_id": {k: per_user_mtta_sum_by_id[k] / per_user_mtta_count_by_id[k] for k in per_user_mtta_sum_by_id if per_user_mtta_count_by_id.get(k, 0) > 0},
+            "per_user_mtta_avg_by_email": {k: per_user_mtta_sum_by_email[k] / per_user_mtta_count_by_email[k] for k in per_user_mtta_sum_by_email if per_user_mtta_count_by_email.get(k, 0) > 0},
+            "per_user_mttr_avg_by_id": {k: per_user_mttr_sum_by_id[k] / per_user_mttr_count_by_id[k] for k in per_user_mttr_sum_by_id if per_user_mttr_count_by_id.get(k, 0) > 0},
+            "per_user_mttr_avg_by_email": {k: per_user_mttr_sum_by_email[k] / per_user_mttr_count_by_email[k] for k in per_user_mttr_sum_by_email if per_user_mttr_count_by_email.get(k, 0) > 0},
         }
 
     async def get_team_member_emails(self, team_name: str) -> set:

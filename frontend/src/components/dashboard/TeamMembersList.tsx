@@ -171,7 +171,7 @@ export function TeamMembersList({
   connectedIntegrations = new Set()
 }: TeamMembersListProps) {
   const [showMembersWithoutIncidents, setShowMembersWithoutIncidents] = useState(false);
-  const [sortBy, setSortBy] = useState<'risk' | 'trend'>('risk');
+  const [sortBy, setSortBy] = useState<'risk' | 'trend' | 'incidents' | 'alerts'>('risk');
   const dataSources = currentAnalysis?.analysis_data?.data_sources;
   const analysisConfig = currentAnalysis?.config;
   const individualDailyData = currentAnalysis?.analysis_data?.individual_daily_data;
@@ -335,6 +335,11 @@ export function TeamMembersList({
           <span className="text-sm font-semibold tabular-nums text-neutral-700">{member.incident_count || 0}</span>
         </td>
 
+        {/* Alerts Responded */}
+        <td className="py-2 px-2 sm:py-3 sm:px-4 md:py-3 md:px-4 hidden md:table-cell">
+          <span className="text-sm font-semibold tabular-nums text-neutral-700">{member.alerts_responded_count || 0}</span>
+        </td>
+
         {/* On-Call Status */}
         <td className="py-2 px-2 sm:py-3 sm:px-4 md:py-3 md:px-4 hidden md:table-cell">
           {member.is_oncall && (
@@ -446,6 +451,7 @@ export function TeamMembersList({
           </th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Trend ({currentAnalysis?.time_range || 30}d)</th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Incidents</th>
+          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Alerts Responded</th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Status</th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Data Sources</th>
         </tr>
@@ -491,6 +497,26 @@ export function TeamMembersList({
               >
                 Trend
               </button>
+              <button
+                onClick={() => setSortBy('incidents')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  sortBy === 'incidents'
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                Incidents
+              </button>
+              <button
+                onClick={() => setSortBy('alerts')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  sortBy === 'alerts'
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                Alerts
+              </button>
             </div>
           </div>
         </CardHeader>
@@ -527,29 +553,37 @@ export function TeamMembersList({
               if (sortBy === 'risk') {
                 // Sort by OCH risk level (higher score = higher risk)
                 return [...members].sort((a, b) => (b.och_score || 0) - (a.och_score || 0));
-              } else {
-                // Sort by trend (worsening first, then stable, then improving)
-                // For same trend level, sort by risk level (higher risk first)
-                const trendOrder: Record<string, number> = {
-                  'significantly_worsening': 0,
-                  'worsening': 1,
-                  'stable': 2,
-                  'improving': 3,
-                  'significantly_improving': 4
-                };
-
-                return [...members].sort((a, b) => {
-                  const trendA = calculateUserTrend(a.user_email, individualDailyData);
-                  const trendB = calculateUserTrend(b.user_email, individualDailyData);
-                  // Use ?? instead of || because 0 is a valid order value (significantly_worsening)
-                  const trendComparison = (trendOrder[trendA.trend] ?? 2) - (trendOrder[trendB.trend] ?? 2);
-                  // If same trend level, sort by risk level (higher risk first)
-                  if (trendComparison === 0) {
-                    return (b.och_score || 0) - (a.och_score || 0);
-                  }
-                  return trendComparison;
-                });
               }
+
+              if (sortBy === 'incidents') {
+                return [...members].sort((a, b) => (b.incident_count || 0) - (a.incident_count || 0));
+              }
+
+              if (sortBy === 'alerts') {
+                return [...members].sort((a, b) => (b.alerts_responded_count || 0) - (a.alerts_responded_count || 0));
+              }
+
+              // Sort by trend (worsening first, then stable, then improving)
+              // For same trend level, sort by risk level (higher risk first)
+              const trendOrder: Record<string, number> = {
+                'significantly_worsening': 0,
+                'worsening': 1,
+                'stable': 2,
+                'improving': 3,
+                'significantly_improving': 4
+              };
+
+              return [...members].sort((a, b) => {
+                const trendA = calculateUserTrend(a.user_email, individualDailyData);
+                const trendB = calculateUserTrend(b.user_email, individualDailyData);
+                // Use ?? instead of || because 0 is a valid order value (significantly_worsening)
+                const trendComparison = (trendOrder[trendA.trend] ?? 2) - (trendOrder[trendB.trend] ?? 2);
+                // If same trend level, sort by risk level (higher risk first)
+                if (trendComparison === 0) {
+                  return (b.och_score || 0) - (a.och_score || 0);
+                }
+                return trendComparison;
+              });
             }
 
             // Sort members alphabetically by name
