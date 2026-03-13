@@ -9,7 +9,7 @@ from typing import List, Dict, Tuple, Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func, or_
 import pytz
 
 from ..models.survey_schedule import SurveySchedule, UserSurveyPreference
@@ -23,6 +23,7 @@ from ..core.distributed_lock import with_distributed_lock
 from .slack_dm_sender import SlackDMSender
 from .notification_service import NotificationService
 from .survey_recipient_service import get_saved_recipient_ids_for_org
+from .survey_response_service import get_utc_day_bounds, normalize_survey_email
 from .slack_token_service import get_slack_token_for_organization, SlackTokenService
 from ..utils import mask_email
 
@@ -58,6 +59,62 @@ class SurveyScheduler:
             return datetime.now(tz).date()
         except Exception:
             return date.today()
+
+    def _get_recipient_delivery_lock_key(self, email: str) -> str:
+        """Build a cross-schedule lock key for one recipient."""
+        return f"survey_delivery:recipient:{normalize_survey_email(email)}"
+
+    def _has_survey_touchpoint_today(
+        self,
+        db: Session,
+        email: str,
+        day_start_utc: datetime,
+        day_end_utc: datetime,
+        exclude_organization_id: Optional[int] = None
+    ) -> bool:
+        """
+        Check whether a recipient already got a survey ping or submitted today.
+
+        This prevents duplicate scheduled DMs across overlapping org/account/token
+        paths while still letting one response count everywhere the member belongs.
+        Reminder paths can exclude the current org so a valid same-org reminder is
+        not blocked by that org's own initial send.
+        """
+        normalized_email = normalize_survey_email(email)
+        if not normalized_email:
+            return False
+
+        existing_report = db.query(UserBurnoutReport.id).filter(
+            func.lower(UserBurnoutReport.email) == normalized_email,
+            UserBurnoutReport.submitted_at >= day_start_utc,
+            UserBurnoutReport.submitted_at <= day_end_utc
+        ).first()
+        if existing_report:
+            return True
+
+        touchpoint_query = db.query(SurveyPeriod.id).filter(
+            func.lower(SurveyPeriod.email) == normalized_email
+        )
+        if exclude_organization_id is not None:
+            touchpoint_query = touchpoint_query.filter(
+                SurveyPeriod.organization_id != exclude_organization_id
+            )
+
+        existing_touchpoint = touchpoint_query.filter(
+            or_(
+                and_(
+                    SurveyPeriod.initial_sent_at.isnot(None),
+                    SurveyPeriod.initial_sent_at >= day_start_utc,
+                    SurveyPeriod.initial_sent_at <= day_end_utc
+                ),
+                and_(
+                    SurveyPeriod.last_reminder_sent_at.isnot(None),
+                    SurveyPeriod.last_reminder_sent_at >= day_start_utc,
+                    SurveyPeriod.last_reminder_sent_at <= day_end_utc
+                )
+            )
+        ).first()
+        return existing_touchpoint is not None
 
     def _calculate_period_bounds(
         self,
@@ -403,30 +460,60 @@ class SurveyScheduler:
                             if preference:
                                 if not preference.receive_daily_surveys or not preference.receive_reminders:
                                     continue
+                        normalized_email = normalize_survey_email(period.email)
+                        recipient_lock_key = self._get_recipient_delivery_lock_key(normalized_email)
+                        async with with_distributed_lock(
+                            recipient_lock_key,
+                            ttl_seconds=60,
+                            timeout_seconds=0.25
+                        ) as recipient_lock_acquired:
+                            if not recipient_lock_acquired:
+                                skipped_already_sent += 1
+                                logger.info(
+                                    "Skipping follow-up for %s - recipient already being processed elsewhere",
+                                    mask_email(normalized_email),
+                                )
+                                continue
 
-                        message = self._build_follow_up_message(schedule, period)
+                            if self._has_survey_touchpoint_today(
+                                db,
+                                normalized_email,
+                                today_start_utc,
+                                today_end_utc,
+                                exclude_organization_id=organization_id,
+                            ):
+                                skipped_already_sent += 1
+                                logger.debug(
+                                    "Skipping follow-up for %s - already contacted or responded today",
+                                    mask_email(normalized_email),
+                                )
+                                continue
 
-                        await self.dm_sender.send_survey_dm(
-                            slack_token=slack_token,
-                            slack_user_id=correlation.slack_user_id,
-                            user_id=period.user_id,
-                            organization_id=organization_id,
-                            message=message,
-                            user_email=correlation.email
-                        )
+                            message = self._build_follow_up_message(schedule, period)
 
-                        # Lock and update the period
-                        locked_period = db.query(SurveyPeriod).filter(
-                            SurveyPeriod.id == period.id
-                        ).with_for_update().first()
-                        if locked_period:
-                            locked_period.record_reminder_sent()
-                        sent_count += 1
+                            await self.dm_sender.send_survey_dm(
+                                slack_token=slack_token,
+                                slack_user_id=correlation.slack_user_id,
+                                user_id=period.user_id,
+                                organization_id=organization_id,
+                                message=message,
+                                user_email=normalized_email
+                            )
 
-                        logger.debug(f"Sent follow-up reminder #{period.reminder_count + 1} for period {period.id}")
+                            # Lock and update the period
+                            locked_period = db.query(SurveyPeriod).filter(
+                                SurveyPeriod.id == period.id
+                            ).with_for_update().first()
+                            if locked_period:
+                                locked_period.record_reminder_sent()
+                            db.commit()
+                            sent_count += 1
+
+                            logger.debug(f"Sent follow-up reminder #{period.reminder_count + 1} for period {period.id}")
 
                     except Exception as e:
                         logger.error(f"Failed to send follow-up for period {period.id}: {str(e)}")
+                        db.rollback()
                         failed_count += 1
 
                 db.commit()
@@ -631,6 +718,7 @@ class SurveyScheduler:
                 sent_count = 0
                 failed_count = 0
                 skipped_count = 0
+                today_start_utc, today_end_utc = get_utc_day_bounds()
 
                 for user in users:
                     try:
@@ -639,71 +727,101 @@ class SurveyScheduler:
                             skipped_count += 1
                             logger.warning(f"Skipping DM for {user.get('email')} - no User record found (user_id is None)")
                             continue
+                        normalized_email = normalize_survey_email(user.get('email'))
+                        if not normalized_email:
+                            skipped_count += 1
+                            logger.warning("Skipping DM for user with missing email")
+                            continue
 
-                        # If reminder, check if user already completed survey today
-                        # Check is scoped by user only - one survey per user per day regardless of org
-                        if is_reminder:
-                            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-
-                            already_completed = db.query(UserBurnoutReport).filter(
-                                UserBurnoutReport.user_id == user['user_id'],
-                                UserBurnoutReport.submitted_at >= today_start
-                            ).first()
-
-                            if already_completed:
+                        recipient_lock_key = self._get_recipient_delivery_lock_key(normalized_email)
+                        async with with_distributed_lock(
+                            recipient_lock_key,
+                            ttl_seconds=60,
+                            timeout_seconds=0.25
+                        ) as recipient_lock_acquired:
+                            if not recipient_lock_acquired:
                                 skipped_count += 1
-                                logger.debug(f"Skipping reminder for user {user['user_id']} - already completed")
+                                logger.info(
+                                    "Skipping %s delivery for %s - recipient already being processed elsewhere",
+                                    message_type,
+                                    mask_email(normalized_email),
+                                )
                                 continue
 
-                        await self.dm_sender.send_survey_dm(
-                            slack_token=slack_token,
-                            slack_user_id=user['slack_user_id'],
-                            user_id=user['user_id'],
-                            organization_id=organization_id,
-                            message=message_template,
-                            user_email=user['email']
-                        )
-                        sent_count += 1
+                            if self._has_survey_touchpoint_today(db, normalized_email, today_start_utc, today_end_utc):
+                                skipped_count += 1
+                                logger.debug(
+                                    "Skipping %s delivery for %s - already contacted or responded today",
+                                    message_type,
+                                    mask_email(normalized_email),
+                                )
+                                continue
 
-                        # Create notification for the user who received the survey
-                        try:
-                            notification_service = NotificationService(db)
-                            notification_service.create_survey_received_notification(
+                            # If reminder, check if user already completed survey today
+                            # Check is scoped by user only - one survey per user per day regardless of org
+                            if is_reminder:
+                                already_completed = db.query(UserBurnoutReport).filter(
+                                    UserBurnoutReport.user_id == user['user_id'],
+                                    UserBurnoutReport.submitted_at >= today_start_utc
+                                ).first()
+
+                                if already_completed:
+                                    skipped_count += 1
+                                    logger.debug(f"Skipping reminder for user {user['user_id']} - already completed")
+                                    continue
+
+                            await self.dm_sender.send_survey_dm(
+                                slack_token=slack_token,
+                                slack_user_id=user['slack_user_id'],
                                 user_id=user['user_id'],
                                 organization_id=organization_id,
-                                is_reminder=is_reminder,
-                                commit=False
+                                message=message_template,
+                                user_email=normalized_email
                             )
-                        except Exception as notif_error:
-                            logger.error(f"Failed to create notification for user {user['user_id']}: {str(notif_error)}")
+                            sent_count += 1
 
-                        # Create survey period for follow-up tracking (only for initial sends)
-                        if not is_reminder and schedule and user.get('correlation'):
+                            # Create notification for the user who received the survey
                             try:
-                                frequency_type = schedule.frequency_type or 'weekday'
-                                period_start, period_end = self._calculate_period_bounds(
-                                    frequency_type,
-                                    self._get_org_date(org_timezone),
-                                    schedule.day_of_week
-                                )
-
-                                self._create_or_update_survey_period(
-                                    db=db,
-                                    organization_id=organization_id,
-                                    user_correlation=user['correlation'],
+                                notification_service = NotificationService(db)
+                                notification_service.create_survey_received_notification(
                                     user_id=user['user_id'],
-                                    email=user['email'],
-                                    frequency_type=frequency_type,
-                                    period_start=period_start,
-                                    period_end=period_end,
-                                    sent_at=datetime.now(timezone.utc),
-                                    org_timezone=org_timezone
+                                    organization_id=organization_id,
+                                    is_reminder=is_reminder,
+                                    commit=False
                                 )
-                            except Exception as period_error:
-                                logger.error(f"Failed to create survey period: {str(period_error)}")
+                            except Exception as notif_error:
+                                logger.error(f"Failed to create notification for user {user['user_id']}: {str(notif_error)}")
+
+                            # Create survey period for follow-up tracking (only for initial sends)
+                            if not is_reminder and schedule and user.get('correlation'):
+                                try:
+                                    frequency_type = schedule.frequency_type or 'weekday'
+                                    period_start, period_end = self._calculate_period_bounds(
+                                        frequency_type,
+                                        self._get_org_date(org_timezone),
+                                        schedule.day_of_week
+                                    )
+
+                                    self._create_or_update_survey_period(
+                                        db=db,
+                                        organization_id=organization_id,
+                                        user_correlation=user['correlation'],
+                                        user_id=user['user_id'],
+                                        email=normalized_email,
+                                        frequency_type=frequency_type,
+                                        period_start=period_start,
+                                        period_end=period_end,
+                                        sent_at=datetime.now(timezone.utc),
+                                        org_timezone=org_timezone
+                                    )
+                                except Exception as period_error:
+                                    logger.error(f"Failed to create survey period: {str(period_error)}")
+
+                            db.commit()
 
                     except Exception as e:
                         logger.error(f"Failed to send DM to user {user['user_id']}: {str(e)}")
+                        db.rollback()
                         failed_count += 1
 
                 if is_reminder:
@@ -790,8 +908,13 @@ class SurveyScheduler:
                 )
                 continue
 
+            normalized_email = normalize_survey_email(correlation.email)
+            if not normalized_email:
+                logger.warning("Skipping correlation %s - missing email", correlation.id)
+                continue
+
             # Skip if we already processed this email (keep most recent correlation)
-            if correlation.email in recipients_dict:
+            if normalized_email in recipients_dict:
                 logger.debug(f"Duplicate email {correlation.email}, keeping first correlation (most recent)")
                 continue
 
@@ -810,10 +933,10 @@ class SurveyScheduler:
             if is_reminder and user and preference and not preference.receive_reminders:
                 continue
 
-            recipients_dict[correlation.email] = {
+            recipients_dict[normalized_email] = {
                 'user_id': user.id if user else None,
                 'slack_user_id': correlation.slack_user_id,
-                'email': correlation.email,
+                'email': normalized_email,
                 'name': (user.name if user else None) or correlation.name,
                 'correlation': correlation
             }

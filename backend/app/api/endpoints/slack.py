@@ -3,6 +3,7 @@ Slack integration API endpoints for OAuth and data collection.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
 from typing import Dict, Any
 import secrets
 import json
@@ -19,6 +20,11 @@ from ...auth.dependencies import get_current_user
 from ...auth.integration_oauth import slack_integration_oauth
 from ...core.config import settings
 from ...services.notification_service import NotificationService
+from ...services.survey_response_service import (
+    extract_analysis_member_emails,
+    get_utc_day_bounds,
+    normalize_survey_email,
+)
 from ...utils import mask_email
 
 # Set up logger
@@ -1511,14 +1517,16 @@ async def handle_slack_interactions(
                     # If no user account but we have email, check for existing report by email
                     existing_report = None
                     if user and user.email:
+                        normalized_email = normalize_survey_email(user.email)
                         existing_report = db.query(UserBurnoutReport).filter(
-                            UserBurnoutReport.email == user.email,
+                            func.lower(UserBurnoutReport.email) == normalized_email,
                             UserBurnoutReport.submitted_at >= today_start
                         ).first()
                     elif user_email:
+                        normalized_email = normalize_survey_email(user_email)
                         # Synced member without user account - check by email
                         existing_report = db.query(UserBurnoutReport).filter(
-                            UserBurnoutReport.email == user_email,
+                            func.lower(UserBurnoutReport.email) == normalized_email,
                             UserBurnoutReport.submitted_at >= today_start
                         ).first()
 
@@ -1636,21 +1644,21 @@ async def handle_slack_interactions(
                 # Determine email to use for report
                 report_email = None
                 if user and user.email:
-                    report_email = user.email
+                    report_email = normalize_survey_email(user.email)
                 elif user_email:
                     # Synced member without user account
                     # Validate email format
                     if '@' not in user_email or len(user_email) < 3:
                         logging.error(f"Invalid email format: '{user_email}'")
                         return {"response_action": "errors", "errors": {"comments_block": "Invalid email format"}}
-                    report_email = user_email
+                    report_email = normalize_survey_email(user_email)
                 else:
                     return {"response_action": "errors", "errors": {"comments_block": "Unable to identify user email"}}
 
                 # Check if user already submitted today (match by email)
                 # This allows only 1 survey per user per day, regardless of organization
                 existing_report = db.query(UserBurnoutReport).filter(
-                    UserBurnoutReport.email == report_email,
+                    func.lower(UserBurnoutReport.email) == report_email,
                     UserBurnoutReport.submitted_at >= today_start
                 ).order_by(UserBurnoutReport.submitted_at.desc()).first()
 
@@ -1666,7 +1674,10 @@ async def handle_slack_interactions(
                     existing_report.personal_circumstances = personal_circumstances
                     existing_report.additional_comments = comments
                     existing_report.submitted_via = 'slack'
-                    existing_report.analysis_id = analysis_id  # Update linked analysis if provided
+                    if analysis_id is not None:
+                        existing_report.analysis_id = analysis_id
+                    if organization_id is not None:
+                        existing_report.organization_id = organization_id
                     existing_report.email = report_email  # Refresh email in case it changed
                     existing_report.email_domain = email_domain  # Refresh email_domain
                     existing_report.user_id = user_id  # Update user_id if they created an account
@@ -1772,8 +1783,9 @@ async def submit_slack_burnout_survey(
     """
     try:
         # Find the user by email
+        report_email = normalize_survey_email(submission.user_email)
         user_correlation = db.query(UserCorrelation).filter(
-            UserCorrelation.email == submission.user_email.lower()
+            func.lower(UserCorrelation.email) == report_email
         ).first()
 
         if not user_correlation:
@@ -1793,46 +1805,61 @@ async def submit_slack_burnout_survey(
                 detail="Analysis not found"
             )
 
-        # Check for duplicate submission (match by email)
-        existing_report = db.query(UserBurnoutReport).filter(
-            UserBurnoutReport.email == submission.user_email.lower(),
-            UserBurnoutReport.analysis_id == submission.analysis_id
-        ).first()
+        today_start, _ = get_utc_day_bounds()
 
-        if existing_report:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Survey already submitted for this analysis"
-            )
+        # One Slack survey response per person per day, regardless of which
+        # analysis/token/org path they came from.
+        existing_report = db.query(UserBurnoutReport).filter(
+            func.lower(UserBurnoutReport.email) == report_email,
+            UserBurnoutReport.submitted_at >= today_start
+        ).order_by(UserBurnoutReport.submitted_at.desc()).first()
 
         # Get user for email_domain
         user = db.query(User).filter(User.id == user_correlation.user_id).first()
+        email_domain = user.email_domain if user else None
 
-        # Create new burnout report
-        new_report = UserBurnoutReport(
-            user_id=user_correlation.user_id,
-            email=submission.user_email.lower(),  # Save email for team member identification
-            organization_id=None,  # No org_id for this endpoint
-            email_domain=user.email_domain if user else None,
-            analysis_id=submission.analysis_id,
-            feeling_score=submission.feeling_score,
-            workload_score=submission.workload_score,
-            stress_factors=submission.stress_factors,
-            personal_circumstances=submission.personal_circumstances,
-            additional_comments=submission.additional_comments,
-            submitted_via='slack',
-            is_anonymous=submission.is_anonymous
-        )
+        if existing_report:
+            existing_report.user_id = user_correlation.user_id
+            existing_report.email = report_email
+            existing_report.organization_id = analysis.organization_id
+            existing_report.email_domain = email_domain
+            if submission.analysis_id is not None:
+                existing_report.analysis_id = submission.analysis_id
+            existing_report.feeling_score = submission.feeling_score
+            existing_report.workload_score = submission.workload_score
+            existing_report.stress_factors = submission.stress_factors
+            existing_report.personal_circumstances = submission.personal_circumstances
+            existing_report.additional_comments = submission.additional_comments
+            existing_report.submitted_via = 'slack'
+            existing_report.is_anonymous = submission.is_anonymous
+            db.commit()
+            db.refresh(existing_report)
+            report = existing_report
+        else:
+            report = UserBurnoutReport(
+                user_id=user_correlation.user_id,
+                email=report_email,
+                organization_id=analysis.organization_id,
+                email_domain=email_domain,
+                analysis_id=submission.analysis_id,
+                feeling_score=submission.feeling_score,
+                workload_score=submission.workload_score,
+                stress_factors=submission.stress_factors,
+                personal_circumstances=submission.personal_circumstances,
+                additional_comments=submission.additional_comments,
+                submitted_via='slack',
+                is_anonymous=submission.is_anonymous
+            )
 
-        db.add(new_report)
-        db.commit()
-        db.refresh(new_report)
+            db.add(report)
+            db.commit()
+            db.refresh(report)
 
         return {
             "success": True,
             "message": "Survey submitted successfully!",
-            "report_id": new_report.id,
-            "submitted_at": new_report.submitted_at.isoformat()
+            "report_id": report.id,
+            "submitted_at": report.submitted_at.isoformat()
         }
 
     except HTTPException:
@@ -1868,17 +1895,33 @@ async def get_team_survey_status(
                 detail="Analysis not found"
             )
 
-        # Get all survey responses for this analysis
-        survey_responses = db.query(UserBurnoutReport).filter(
-            UserBurnoutReport.analysis_id == analysis_id
-        ).all()
+        # Get team members from the analysis results. A scheduled survey response
+        # should count anywhere this member appears, not only on a single
+        # analysis_id-linked report row.
+        team_members = extract_analysis_member_emails(analysis.results)
+        today_start, _ = get_utc_day_bounds()
 
-        # Get team members from the analysis results
-        team_members = []
-        if analysis.results and isinstance(analysis.results, dict):
-            team_analysis = analysis.results.get('team_analysis', {})
-            members = team_analysis.get('members', [])
-            team_members = [member.get('user_email', '').lower() for member in members if member.get('user_email')]
+        survey_responses = []
+        if team_members:
+            raw_responses = db.query(UserBurnoutReport).filter(
+                or_(
+                    UserBurnoutReport.analysis_id == analysis_id,
+                    (
+                        func.lower(UserBurnoutReport.email).in_(team_members) &
+                        (UserBurnoutReport.submitted_at >= today_start)
+                    )
+                )
+            ).order_by(
+                UserBurnoutReport.email.asc(),
+                UserBurnoutReport.submitted_at.desc()
+            ).all()
+
+            responses_by_email = {}
+            for response in raw_responses:
+                normalized_email = normalize_survey_email(response.email)
+                if normalized_email and normalized_email not in responses_by_email:
+                    responses_by_email[normalized_email] = response
+            survey_responses = list(responses_by_email.values())
 
         # Calculate response statistics
         total_members = len(team_members)
@@ -1887,7 +1930,7 @@ async def get_team_survey_status(
 
         # Identify non-responders (use email from survey response directly)
         responded_emails = {
-            response.email.lower()
+            normalize_survey_email(response.email)
             for response in survey_responses
             if response.email
         }

@@ -588,6 +588,9 @@ export function SlackSurveyTabs({
                 <p className="text-xs text-neutral-500 mt-1">
                   Send surveys every weekday at a specific time
                 </p>
+                <p className="text-xs text-neutral-500 mt-1">
+                  This schedule is shared across your org and appears the same under any connected token.
+                </p>
                 {scheduleEnabled && (
                   <p className="text-xs font-medium text-purple-600 mt-1.5">
                     {Math.max(0, selectedRecipients.size)} {selectedRecipients.size === 1 ? 'user' : 'users'} selected
