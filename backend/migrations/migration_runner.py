@@ -1242,10 +1242,101 @@ class MigrationRunner:
                 "sql_file": "2026_02_06_add_organization_id_to_slack_integrations.sql"
             },
             {
+                "name": "046_add_analysis_save_and_autorefresh",
+                "description": "Add is_saved, is_auto_refresh, and auto_refresh_interval columns to analyses table",
+                "sql": [
+                    """
+                    ALTER TABLE analyses ADD COLUMN IF NOT EXISTS is_saved BOOLEAN NOT NULL DEFAULT FALSE
+                    """,
+                    """
+                    ALTER TABLE analyses ADD COLUMN IF NOT EXISTS is_auto_refresh BOOLEAN NOT NULL DEFAULT FALSE
+                    """,
+                    """
+                    ALTER TABLE analyses ADD COLUMN IF NOT EXISTS auto_refresh_interval VARCHAR(20)
+                    """,
+                    """
+                    UPDATE analyses SET is_saved = TRUE WHERE is_saved = FALSE
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_analyses_user_auto_refresh
+                    ON analyses(user_id, organization_id, is_auto_refresh)
+                    WHERE is_auto_refresh = TRUE
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_analyses_user_saved
+                    ON analyses(user_id, organization_id, is_saved)
+                    WHERE is_saved = TRUE
+                    """
+                ]
+            },
+            {
+                "name": "047_seed_auto_refresh_from_latest_real_analysis",
+                "description": "Seed auto-refresh (24h) from each user's latest non-demo analysis with a valid integration",
+                "sql": [
+                    """
+                    WITH latest_real AS (
+                        SELECT DISTINCT ON (a.user_id) a.id
+                        FROM analyses a
+                        JOIN rootly_integrations r ON r.id = a.rootly_integration_id
+                        WHERE a.status = 'completed'
+                          AND a.is_auto_refresh = FALSE
+                          AND a.rootly_integration_id IS NOT NULL
+                          AND r.is_active = TRUE
+                          AND r.api_token IS NOT NULL
+                          AND btrim(r.api_token) <> ''
+                          AND COALESCE((a.config->>'is_demo')::boolean, FALSE) = FALSE
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM analyses ar
+                              WHERE ar.user_id = a.user_id
+                                AND ar.is_auto_refresh = TRUE
+                          )
+                        ORDER BY a.user_id, a.created_at DESC
+                    )
+                    UPDATE analyses
+                    SET is_auto_refresh = TRUE,
+                        auto_refresh_interval = '24h'
+                    WHERE id IN (SELECT id FROM latest_real)
+                    """
+                ]
+            },
+            {
+                "name": "048_create_weekly_digest_logs",
+                "description": "Create weekly_digest_logs table for weekly email idempotency",
+                "sql": [
+                    """
+                    CREATE TABLE IF NOT EXISTS weekly_digest_logs (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        analysis_id INTEGER REFERENCES analyses(id) ON DELETE SET NULL,
+                        week_start_date DATE NOT NULL,
+                        timezone VARCHAR(50),
+                        sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """,
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_weekly_digest_user_week
+                    ON weekly_digest_logs(user_id, week_start_date)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_weekly_digest_user_sent_at
+                    ON weekly_digest_logs(user_id, sent_at DESC)
+                    """
+                ]
+            },
+            {
+                "name": "049_add_weekly_digest_enabled_to_users",
+                "description": "Add weekly_digest_enabled column to users for per-user digest opt-out",
+                "sql": [
+                    """
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly_digest_enabled BOOLEAN NOT NULL DEFAULT TRUE
+                    """
+                ]
+            },
+          {
                 "name": "046_add_team_scoped_key_to_rootly_integrations",
                 "description": "Add key_type and team_name columns to rootly_integrations for team-scoped API key support",
-                "sql_file": "2026_02_24_add_team_scoped_key_to_rootly_integrations.sql"
-            },
+                "sql_file": "2026_02_24_add_team_scoped_key_to_rootly_integrations.sql"},
             # Add future migrations here with incrementing numbers
         ]
 

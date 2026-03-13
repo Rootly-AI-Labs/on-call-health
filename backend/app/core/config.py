@@ -30,6 +30,8 @@ class Settings:
 
     # Frontend URL for survey links
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    # Backend API URL (used for email links like unsubscribe)
+    API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:8000")
     
     # OAuth - Google
     GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
@@ -63,6 +65,12 @@ class Settings:
 
     # Rootly API
     ROOTLY_API_BASE_URL: str = os.getenv("ROOTLY_API_BASE_URL", "https://api.rootly.com")
+
+    # Weekly digest emails
+    WEEKLY_DIGEST_ENABLED: bool = os.getenv("WEEKLY_DIGEST_ENABLED", "false").lower() == "true"
+    RESEND_API_KEY: Optional[str] = os.getenv("RESEND_API_KEY")
+    RESEND_FROM_EMAIL: Optional[str] = os.getenv("RESEND_FROM_EMAIL")
+    RESEND_FROM_NAME: str = os.getenv("RESEND_FROM_NAME", "On-Call Health")
 
     # Working Hours Configuration
     # These define what is considered "business hours" for burnout analysis
