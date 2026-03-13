@@ -21,6 +21,10 @@ from ..models import Analysis, SessionLocal, User, UserCorrelation, WeeklyDigest
 
 logger = logging.getLogger(__name__)
 
+# Tracks scheduler start time for FORCE_SEND countdown logging
+_scheduler_start_time: Optional[datetime] = None
+_DIGEST_INTERVAL_MINUTES = 10
+
 
 def _ensure_dict(value: Any) -> Dict[str, Any]:
     if value is None:
@@ -347,8 +351,8 @@ def _build_email_content(
     is_pagerduty = "pagerduty" in platform
     rootly_promo_text = (
         "\n\nConsidering a switch?\n"
-        "You're currently using PagerDuty for incident response. "
-        "Using Rootly unlocks Slack-native workflows and deeper On-Call Health insights.\n"
+        "PagerDuty charges extra for what Rootly includes. "
+        "Slack bot integration, alert grouping, and automated workflows — all built in, no add-ons. Teams switch in minutes.\n"
         "Try Rootly for free or book a demo: https://rootly.com/demo"
         if is_pagerduty else ""
     )
@@ -357,9 +361,7 @@ def _build_email_content(
   <div style="margin-top: 24px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 14px 16px;">
     <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #5b21b6;">Considering a switch?</p>
     <p style="margin: 0 0 10px; font-size: 13px; color: #6b7280; line-height: 1.6;">
-      You&rsquo;re currently using PagerDuty for incident response. Using
-      <a href="https://rootly.com" style="color: #7c3aed; text-decoration: underline;">Rootly</a>
-      unlocks Slack-native workflows and deeper On-Call Health insights.
+      PagerDuty charges extra for what Rootly includes. Slack bot integration, alert grouping, and automated workflows &mdash; all built in, no add-ons. Teams switch in minutes.
     </p>
     <a href="https://rootly.com/demo" style="display: inline-block; font-size: 12px; font-weight: 600; color: #7c3aed; text-decoration: underline;">Try Rootly for free or book a demo &rarr;</a>
   </div>"""
@@ -662,6 +664,19 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
     }
 
 
+async def _log_digest_countdown() -> None:
+    """Runs every 2 minutes when WEEKLY_DIGEST_FORCE_SEND=true to show time until next send."""
+    if not settings.WEEKLY_DIGEST_FORCE_SEND or _scheduler_start_time is None:
+        return
+    elapsed = (datetime.now() - _scheduler_start_time).total_seconds() / 60
+    next_tick = _DIGEST_INTERVAL_MINUTES - (elapsed % _DIGEST_INTERVAL_MINUTES)
+    logger.info(
+        f"⏳ [WEEKLY_DIGEST] Force-send mode active — "
+        f"next digest check in ~{next_tick:.0f} min "
+        f"(elapsed: {elapsed:.1f} min since scheduler start)"
+    )
+
+
 async def check_and_send_weekly_digests() -> None:
     if not settings.WEEKLY_DIGEST_ENABLED:
         logger.debug("Weekly digest scheduler disabled (WEEKLY_DIGEST_ENABLED=false)")
@@ -687,6 +702,8 @@ async def check_and_send_weekly_digests() -> None:
             )
         ).all()
 
+        logger.info(f"📬 [WEEKLY_DIGEST] Found {len(analyses)} auto-refresh analyses to process")
+
         for analysis in analyses:
             try:
                 user = db.query(User).filter(
@@ -695,45 +712,58 @@ async def check_and_send_weekly_digests() -> None:
                 ).first()
 
                 if not user or not user.email:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP analysis={analysis.id}: user not found or no email (user_id={analysis.user_id})")
                     continue
 
+                logger.info(f"📬 [WEEKLY_DIGEST] Processing analysis={analysis.id} for user={user.email}")
+
                 if not analysis.organization_id or not user.organization_id:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: missing organization_id (analysis={analysis.organization_id}, user={user.organization_id})")
                     continue
 
                 if analysis.organization_id != user.organization_id:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: org mismatch (analysis={analysis.organization_id}, user={user.organization_id})")
                     continue
 
-                # Skip users who have opted out
                 if not user.weekly_digest_enabled:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: weekly_digest_enabled=False")
                     continue
 
                 config = _ensure_dict(analysis.config)
                 if config.get("is_demo") is True:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: demo analysis")
                     continue
 
                 tz_name = _get_user_timezone(db, user.id)
                 tz = pytz.timezone(tz_name)
                 local_now = datetime.now(tz)
 
-                # Monday at 10am local time
-                if local_now.weekday() != 0:
-                    continue
-                if local_now.hour != 10:
-                    continue
+                # Monday at 10am local time (skipped when WEEKLY_DIGEST_FORCE_SEND=true)
+                if not settings.WEEKLY_DIGEST_FORCE_SEND:
+                    if local_now.weekday() != 0:
+                        continue
+                    if local_now.hour != 10:
+                        continue
 
                 week_start_date = _get_week_start_date(local_now)
 
-                existing_log = db.query(WeeklyDigestLog).filter(
-                    WeeklyDigestLog.user_id == user.id,
-                    WeeklyDigestLog.week_start_date == week_start_date
-                ).first()
+                # Skip dedup check when force-sending locally
+                if not settings.WEEKLY_DIGEST_FORCE_SEND:
+                    existing_log = db.query(WeeklyDigestLog).filter(
+                        WeeklyDigestLog.user_id == user.id,
+                        WeeklyDigestLog.week_start_date == week_start_date
+                    ).first()
 
-                if existing_log:
-                    continue
+                    if existing_log:
+                        logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: already sent this week ({week_start_date})")
+                        continue
 
                 results = _ensure_dict(analysis.results)
                 if not results:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: analysis results are empty")
                     continue
+
+                logger.info(f"📬 [WEEKLY_DIGEST] Sending digest to {user.email} (analysis={analysis.id})...")
 
                 unsubscribe_token = _generate_unsubscribe_token(user.id)
                 unsubscribe_url = f"{settings.API_BASE_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
@@ -757,6 +787,11 @@ async def check_and_send_weekly_digests() -> None:
 
                 if not sent:
                     continue
+
+                logger.info(
+                    f"📧 [WEEKLY_DIGEST] Digest sent to {user.email} "
+                    f"(user_id={user.id}, integration={integration_name}, week_of={week_of})"
+                )
 
                 log_entry = WeeklyDigestLog(
                     user_id=user.id,
@@ -789,14 +824,27 @@ class WeeklyDigestScheduler:
         self.scheduler = AsyncIOScheduler()
 
     def start(self) -> None:
+        global _scheduler_start_time
         if self.scheduler.running:
             return
+        _scheduler_start_time = datetime.now()
         self.scheduler.add_job(
             check_and_send_weekly_digests,
             trigger=CronTrigger(minute="*/10"),
             id="weekly_digest",
             replace_existing=True
         )
+        if settings.WEEKLY_DIGEST_FORCE_SEND:
+            self.scheduler.add_job(
+                _log_digest_countdown,
+                trigger=CronTrigger(minute="*/2"),
+                id="weekly_digest_countdown",
+                replace_existing=True
+            )
+            logger.info(
+                "⚡ [WEEKLY_DIGEST] FORCE_SEND mode enabled — "
+                "digest will send on next 10-min tick, countdown logged every 2 min"
+            )
         self.scheduler.start()
         logger.info("Weekly digest scheduler started (every 10 minutes)")
 
