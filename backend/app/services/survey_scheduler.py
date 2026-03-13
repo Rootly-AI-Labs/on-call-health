@@ -9,6 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from sqlalchemy.exc import OperationalError
 import pytz
 
 from ..models.survey_schedule import SurveySchedule, UserSurveyPreference
@@ -17,6 +18,7 @@ from ..models.slack_integration import SlackIntegration
 from ..models.slack_workspace_mapping import SlackWorkspaceMapping
 from ..models.user_burnout_report import UserBurnoutReport
 from ..models.survey_period import SurveyPeriod
+from ..models import SessionLocal
 from .slack_dm_sender import SlackDMSender
 from .notification_service import NotificationService
 from .slack_token_service import get_slack_token_for_organization, SlackTokenService
@@ -229,6 +231,59 @@ class SurveyScheduler:
             period_name=period.period_name
         )
 
+    def _lock_schedule_for_job(
+        self,
+        db: Session,
+        organization_id: int,
+        job_name: str
+    ) -> Optional[SurveySchedule]:
+        """
+        Lock the organization's schedule row so only one worker processes the job.
+
+        Each production replica starts its own APScheduler. A row-level lock on the
+        single survey_schedule row keeps duplicate workers from delivering the same
+        survey batch concurrently.
+        """
+        try:
+            schedule = db.query(SurveySchedule).filter(
+                SurveySchedule.organization_id == organization_id,
+                SurveySchedule.enabled == True
+            ).with_for_update(nowait=True).first()
+
+            if not schedule:
+                logger.debug(f"No enabled survey schedule found for org {organization_id}, skipping {job_name}")
+                return None
+
+            return schedule
+        except OperationalError as e:
+            error_message = str(e).lower()
+            db.rollback()
+
+            if "could not obtain lock" in error_message or "lock not available" in error_message:
+                logger.info(
+                    f"Skipping {job_name} for org {organization_id} - "
+                    "another worker is already processing it"
+                )
+                return None
+
+            raise
+
+    async def _run_survey_job(self, organization_id: int, is_reminder: bool = False):
+        """Open a fresh DB session for each scheduled survey job execution."""
+        db = SessionLocal()
+        try:
+            await self._send_organization_surveys(organization_id, db, is_reminder)
+        finally:
+            db.close()
+
+    async def _run_follow_up_job(self, organization_id: int):
+        """Open a fresh DB session for each scheduled follow-up job execution."""
+        db = SessionLocal()
+        try:
+            await self._send_follow_up_reminders(organization_id, db)
+        finally:
+            db.close()
+
     async def _send_follow_up_reminders(self, organization_id: int, db: Session):
         """
         Send follow-up reminders to users with pending survey periods.
@@ -237,12 +292,8 @@ class SurveyScheduler:
         try:
             logger.debug(f"Starting follow-up reminder delivery for organization {organization_id}")
 
-            schedule = db.query(SurveySchedule).filter(
-                SurveySchedule.organization_id == organization_id
-            ).first()
-
-            if not schedule or not schedule.enabled:
-                logger.debug(f"Surveys not enabled for org {organization_id}, skipping follow-up reminders")
+            schedule = self._lock_schedule_for_job(db, organization_id, "follow-up reminders")
+            if not schedule:
                 return
 
             if not schedule.follow_up_reminders_enabled:
@@ -397,11 +448,11 @@ class SurveyScheduler:
         ).all()
 
         for schedule in schedules:
-            self._add_schedule_job(schedule, db)
+            self._add_schedule_job(schedule)
 
         logger.debug(f"Scheduled surveys for {len(schedules)} organizations")
 
-    def _add_schedule_job(self, schedule: SurveySchedule, db: Session):
+    def _add_schedule_job(self, schedule: SurveySchedule):
         """
         Add a cron job for a specific organization's survey schedule.
         Supports daily, weekday, and weekly frequencies.
@@ -441,9 +492,9 @@ class SurveyScheduler:
         # Add initial survey job
         job_id = f"survey_org_{schedule.organization_id}"
         self.scheduler.add_job(
-            self._send_organization_surveys,
+            self._run_survey_job,
             trigger=trigger,
-            args=[schedule.organization_id, db, False],  # False = not a reminder
+            args=[schedule.organization_id, False],  # False = not a reminder
             id=job_id,
             replace_existing=True
         )
@@ -474,9 +525,9 @@ class SurveyScheduler:
 
             reminder_job_id = f"reminder_org_{schedule.organization_id}"
             self.scheduler.add_job(
-                self._send_organization_surveys,
+                self._run_survey_job,
                 trigger=reminder_trigger,
-                args=[schedule.organization_id, db, True],
+                args=[schedule.organization_id, True],
                 id=reminder_job_id,
                 replace_existing=True
             )
@@ -496,9 +547,9 @@ class SurveyScheduler:
 
             followup_job_id = f"followup_org_{schedule.organization_id}"
             self.scheduler.add_job(
-                self._send_follow_up_reminders,
+                self._run_follow_up_job,
                 trigger=followup_trigger,
-                args=[schedule.organization_id, db],
+                args=[schedule.organization_id],
                 id=followup_job_id,
                 replace_existing=True
             )
@@ -521,12 +572,11 @@ class SurveyScheduler:
             message_type = "reminder" if is_reminder else "initial survey"
             logger.debug(f"Starting {message_type} delivery for organization {organization_id}")
 
-            # Get schedule for org timezone
-            schedule = db.query(SurveySchedule).filter(
-                SurveySchedule.organization_id == organization_id
-            ).first()
+            schedule = self._lock_schedule_for_job(db, organization_id, message_type)
+            if not schedule:
+                return
 
-            org_timezone = schedule.timezone if schedule else 'UTC'
+            org_timezone = schedule.timezone
 
             # Expire any overdue periods before processing
             self._expire_overdue_periods(db, organization_id, org_timezone)
@@ -658,8 +708,11 @@ class SurveyScheduler:
                     except Exception as e:
                         logger.error(f"Failed to create delivery notification: {str(e)}")
 
+            db.commit()
+
         except Exception as e:
             logger.error(f"Error in daily survey delivery for org {organization_id}: {str(e)}")
+            db.rollback()
 
     def _get_survey_recipients(self, organization_id: int, db: Session, is_reminder: bool = False, apply_saved_recipients: bool = True) -> List[Dict]:
         """
