@@ -262,6 +262,48 @@ class SurveyScheduler:
         """
         return f"survey_delivery:org:{organization_id}"
 
+    def _get_saved_recipient_ids_for_org(self, organization_id: int, db: Session) -> Optional[set[int]]:
+        """
+        Resolve the saved automated-survey recipient list for an organization.
+
+        Recipient selections are currently stored on RootlyIntegration rows, but
+        scheduled delivery runs at the organization level. We therefore pick the
+        most recently active integration in the org that actually has a saved
+        recipient list, instead of relying on an arbitrary org user.
+        """
+        from app.models.user import User
+        from app.models.rootly_integration import RootlyIntegration
+
+        integrations = (
+            db.query(RootlyIntegration)
+            .join(User, User.id == RootlyIntegration.user_id)
+            .filter(
+                User.organization_id == organization_id,
+                RootlyIntegration.platform == "rootly",
+                RootlyIntegration.is_active == True,
+                RootlyIntegration.survey_recipients.isnot(None)
+            )
+            .order_by(
+                RootlyIntegration.last_synced_at.desc().nullslast(),
+                RootlyIntegration.last_used_at.desc().nullslast(),
+                RootlyIntegration.created_at.desc(),
+                RootlyIntegration.id.desc()
+            )
+            .all()
+        )
+
+        if not integrations:
+            return None
+
+        if len(integrations) > 1:
+            logger.info(
+                f"Found {len(integrations)} active integrations with saved survey recipients "
+                f"for org {organization_id}; using integration {integrations[0].id}"
+            )
+
+        recipient_ids = integrations[0].survey_recipients or []
+        return set(recipient_ids) if recipient_ids else None
+
     async def _run_survey_job(self, organization_id: int, is_reminder: bool = False):
         """Open a fresh DB session for each scheduled survey job execution."""
         db = SessionLocal()
@@ -748,35 +790,15 @@ class SurveyScheduler:
             is_reminder: If True, also check reminder preferences
             apply_saved_recipients: If True, apply saved recipient filter (for automated surveys). If False, return all eligible users (for manual sends).
         """
-        from app.models.user import User
-        from app.models.rootly_integration import RootlyIntegration
-
         # Get saved recipient selections for this organization (only if apply_saved_recipients is True)
-        # SIMPLE APPROACH: Find any integration owned by a user in this organization
-        # that has survey_recipients configured
         saved_recipient_ids = None
 
         if apply_saved_recipients:
-            # First, get any user from this organization
-            org_user = db.query(User).filter(
-                User.organization_id == organization_id
-            ).first()
-
-            if org_user:
-                # Find their integration with saved recipients
-                integration = db.query(RootlyIntegration).filter(
-                    RootlyIntegration.user_id == org_user.id,
-                    RootlyIntegration.is_active == True,
-                    RootlyIntegration.survey_recipients.isnot(None)
-                ).first()
-
-                if integration and integration.survey_recipients:
-                    saved_recipient_ids = set(integration.survey_recipients)
-                    logger.info(f"Using saved recipient list for org {organization_id}: {len(saved_recipient_ids)} users selected")
-                else:
-                    logger.debug(f"No saved recipient list found for org {organization_id}, using default (all users)")
+            saved_recipient_ids = self._get_saved_recipient_ids_for_org(organization_id, db)
+            if saved_recipient_ids is not None:
+                logger.info(f"Using saved recipient list for org {organization_id}: {len(saved_recipient_ids)} users selected")
             else:
-                logger.warning(f"No users found for organization {organization_id}")
+                logger.debug(f"No saved recipient list found for org {organization_id}, using default (all users)")
         else:
             logger.debug(f"Skipping saved recipient filter for org {organization_id} (manual send)")
 
