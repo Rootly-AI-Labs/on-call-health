@@ -782,7 +782,8 @@ async def check_and_send_weekly_digests() -> None:
                     to_name=user.name,
                     subject=content["subject"],
                     text_body=content["text"],
-                    html_body=content["html"]
+                    html_body=content["html"],
+                    unsubscribe_url=unsubscribe_url
                 )
 
                 if not sent:
@@ -790,7 +791,7 @@ async def check_and_send_weekly_digests() -> None:
 
                 logger.info(
                     f"📧 [WEEKLY_DIGEST] Digest sent to {user.email} "
-                    f"(user_id={user.id}, integration={integration_name}, week_of={week_of})"
+                    f"(user_id={user.id}, subject={content['subject']})"
                 )
 
                 log_entry = WeeklyDigestLog(
