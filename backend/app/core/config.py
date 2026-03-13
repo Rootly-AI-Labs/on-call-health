@@ -75,7 +75,7 @@ class Settings:
     RESEND_FROM_EMAIL: Optional[str] = os.getenv("RESEND_FROM_EMAIL")
     RESEND_FROM_NAME: str = os.getenv("RESEND_FROM_NAME", "On-Call Health")
     #todo
-    API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:8000")
+    # API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:8000")
 
     # Working Hours Configuration
     # These define what is considered "business hours" for burnout analysis
