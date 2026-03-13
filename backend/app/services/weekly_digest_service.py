@@ -21,6 +21,10 @@ from ..models import Analysis, SessionLocal, User, UserCorrelation, WeeklyDigest
 
 logger = logging.getLogger(__name__)
 
+# Tracks scheduler start time for FORCE_SEND countdown logging
+_scheduler_start_time: Optional[datetime] = None
+_DIGEST_INTERVAL_MINUTES = 10
+
 
 def _ensure_dict(value: Any) -> Dict[str, Any]:
     if value is None:
@@ -323,6 +327,46 @@ def _build_email_content(
     integration_name = analysis.integration_name or analysis.platform or "your integration"
     time_range = analysis.time_range or 30
     dashboard_url = f"{settings.FRONTEND_URL}/dashboard"
+    platform = (analysis.platform or "").lower()
+
+    # Team risk level label based on avg OCH score (higher = more risk)
+    avg = risk["avg_score"]
+    if avg is None:
+        team_risk_label = "N/A"
+        team_risk_color = "#6b7280"
+    elif avg >= 75:
+        team_risk_label = "Critical"
+        team_risk_color = "#ef4444"
+    elif avg >= 50:
+        team_risk_label = "High"
+        team_risk_color = "#f97316"
+    elif avg >= 25:
+        team_risk_label = "Moderate"
+        team_risk_color = "#f59e0b"
+    else:
+        team_risk_label = "Low"
+        team_risk_color = "#22c55e"
+
+    # PagerDuty → Rootly soft promotion
+    is_pagerduty = "pagerduty" in platform
+    rootly_promo_text = (
+        "\n\nConsidering a switch?\n"
+        "PagerDuty charges extra for what Rootly includes. "
+        "Slack bot integration, alert grouping, and automated workflows — all built in, no add-ons. Teams switch in minutes.\n"
+        "Try Rootly for free or book a demo: https://rootly.com/demo"
+        if is_pagerduty else ""
+    )
+    rootly_promo_html = (
+        f"""
+  <div style="margin-top: 24px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 14px 16px;">
+    <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #5b21b6;">Considering a switch?</p>
+    <p style="margin: 0 0 10px; font-size: 13px; color: #6b7280; line-height: 1.6;">
+      PagerDuty charges extra for what Rootly includes. Slack bot integration, alert grouping, and automated workflows &mdash; all built in, no add-ons. Teams switch in minutes.
+    </p>
+    <a href="https://rootly.com/demo" style="display: inline-block; font-size: 12px; font-weight: 600; color: #7c3aed; text-decoration: underline;">Try Rootly for free or book a demo &rarr;</a>
+  </div>"""
+        if is_pagerduty else ""
+    )
 
     blocked = _ensure_dict(analysis.config).get("auto_refresh_blocked") if analysis.config else None
     blocked_note_text = ""
@@ -391,23 +435,23 @@ def _build_email_content(
             )
         return "\n".join(rows)
 
-    subject = "On-Call Health Weekly Digest"
+    week_of = local_now.strftime("%B %d, %Y")
+    subject = f"On-Call Health Weekly Digest – Week of {week_of}"
 
     # ── Plain-text body ──────────────────────────────────────────────────────
     text_lines = [
-        "On-Call Health Weekly Digest",
+        f"On-Call Health Weekly Digest – Week of {week_of}",
         "",
         f"Integration: {integration_name} ({time_range}-day window)",
         f"Last updated: {last_updated_relative} ({last_updated_absolute})",
         f"Timezone: {tz_name}",
         "",
         "Team Overview",
-        f"  Total members:   {risk['total']}",
+        f"  Team Risk Level: {team_risk_label}",
         f"  At risk:         {risk['at_risk']}",
-        f"  Worsening trend: {len(worsening_trend) + len(critical_trend)}",
+        f"  Critical trend:  {len(critical_trend)}",
+        f"  Worsening trend: {len(worsening_trend)}",
     ]
-    if risk["avg_score"] is not None:
-        text_lines.append(f"  Avg OCH score:   {risk['avg_score']}")
     text_lines += [
         "",
         "Critical Trend",
@@ -418,33 +462,37 @@ def _build_email_content(
         "",
         f"View full report: {dashboard_url}",
     ]
+    if rootly_promo_text:
+        text_lines.append(rootly_promo_text)
     if blocked_note_text:
         text_lines.append(blocked_note_text)
     if unsubscribe_url:
-        text_lines += ["", f"Unsubscribe: {unsubscribe_url}"]
+        text_lines += ["", "--", f"No longer want these emails? Unsubscribe: {unsubscribe_url}"]
     text_body = "\n".join(text_lines)
 
     # ── Metrics table HTML ───────────────────────────────────────────────────
-    avg_td = ""
-    if risk["avg_score"] is not None:
-        avg_td = f"""
-        <td style="padding: 16px; text-align: center; border-left: 1px solid #e5e7eb;">
-          <div style="font-size: 26px; font-weight: 700; color: #111827; line-height: 1;">{risk['avg_score']}</div>
-          <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Avg OCH Score</div>
-        </td>"""
 
     unsubscribe_html = (
-        f'<a href="{unsubscribe_url}" style="color: #9ca3af; text-decoration: underline; font-size: 12px;">'
-        f'Unsubscribe from weekly digests</a>'
+        f'<p style="margin: 10px 0 0; font-size: 12px; color: #9ca3af;">'
+        f'No longer want these emails? '
+        f'<a href="{unsubscribe_url}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe from weekly digests</a>'
+        f'</p>'
         if unsubscribe_url else ""
     )
 
-    html_body = f"""
+    html_body = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Digest</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #ffffff;">
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #111827;">
 
   <div style="border-left: 4px solid #7c3aed; padding-left: 16px; margin-bottom: 20px;">
     <h2 style="margin: 0 0 4px; font-size: 22px; color: #111827;">Weekly Digest</h2>
-    <p style="margin: 0; color: #6b7280; font-size: 14px;">{integration_name} &middot; {time_range}-day window</p>
+    <p style="margin: 0; color: #6b7280; font-size: 14px;">{integration_name} &middot; {time_range}-day window &middot; Week of {week_of}</p>
   </div>
 
   <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px;">
@@ -454,18 +502,21 @@ def _build_email_content(
   <table style="width: 100%; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; border-collapse: collapse; margin-bottom: 24px;">
     <tr>
       <td style="padding: 16px; text-align: center;">
-        <div style="font-size: 26px; font-weight: 700; color: #111827; line-height: 1;">{risk['total']}</div>
-        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Total Members</div>
+        <div style="font-size: 22px; font-weight: 700; color: {team_risk_color}; line-height: 1;">{team_risk_label}</div>
+        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Team Risk Level</div>
       </td>
       <td style="padding: 16px; text-align: center; border-left: 1px solid #e5e7eb;">
         <div style="font-size: 26px; font-weight: 700; color: #ef4444; line-height: 1;">{risk['at_risk']}</div>
         <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">At Risk</div>
       </td>
       <td style="padding: 16px; text-align: center; border-left: 1px solid #e5e7eb;">
-        <div style="font-size: 26px; font-weight: 700; color: #f59e0b; line-height: 1;">{len(worsening_trend) + len(critical_trend)}</div>
+        <div style="font-size: 26px; font-weight: 700; color: #ef4444; line-height: 1;">{len(critical_trend)}</div>
+        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Critical Trend</div>
+      </td>
+      <td style="padding: 16px; text-align: center; border-left: 1px solid #e5e7eb;">
+        <div style="font-size: 26px; font-weight: 700; color: #f59e0b; line-height: 1;">{len(worsening_trend)}</div>
         <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Worsening Trend</div>
       </td>
-      {avg_td}
     </tr>
   </table>
 
@@ -485,13 +536,14 @@ def _build_email_content(
     View Full Report &rarr;
   </a>
 
+{rootly_promo_html}
+
 {blocked_note_html}
+{unsubscribe_html}
 
-  <div style="border-top: 1px solid #e5e7eb; margin-top: 32px; padding-top: 16px; color: #9ca3af;">
-    {unsubscribe_html}
-  </div>
-
-</div>"""
+</div>
+</body>
+</html>"""
 
     return {"subject": subject, "text": text_body, "html": html_body}
 
@@ -501,7 +553,8 @@ async def _send_resend_email(
     to_name: Optional[str],
     subject: str,
     text_body: str,
-    html_body: str
+    html_body: str,
+    unsubscribe_url: Optional[str] = None
 ) -> bool:
     if not settings.RESEND_API_KEY or not settings.RESEND_FROM_EMAIL:
         logger.warning("Weekly digest disabled: missing RESEND_API_KEY or RESEND_FROM_EMAIL")
@@ -516,7 +569,11 @@ async def _send_resend_email(
         "to": [to_email],
         "subject": subject,
         "text": text_body,
-        "html": html_body
+        "html": html_body,
+        **({"headers": {
+            "List-Unsubscribe": f"<{unsubscribe_url}>",
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+        }} if unsubscribe_url else {})
     }
 
     headers = {
@@ -592,7 +649,8 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
         to_name=user.name,
         subject=content["subject"],
         text_body=content["text"],
-        html_body=content["html"]
+        html_body=content["html"],
+        unsubscribe_url=unsubscribe_url
     )
 
     if not sent:
@@ -604,6 +662,19 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
         "analysis_id": analysis.id,
         "last_updated_at": analysis.completed_at.isoformat() if analysis.completed_at else None
     }
+
+
+async def _log_digest_countdown() -> None:
+    """Runs every 2 minutes when WEEKLY_DIGEST_FORCE_SEND=true to show time until next send."""
+    if not settings.WEEKLY_DIGEST_FORCE_SEND or _scheduler_start_time is None:
+        return
+    elapsed = (datetime.now() - _scheduler_start_time).total_seconds() / 60
+    next_tick = _DIGEST_INTERVAL_MINUTES - (elapsed % _DIGEST_INTERVAL_MINUTES)
+    logger.info(
+        f"⏳ [WEEKLY_DIGEST] Force-send mode active — "
+        f"next digest check in ~{next_tick:.0f} min "
+        f"(elapsed: {elapsed:.1f} min since scheduler start)"
+    )
 
 
 async def check_and_send_weekly_digests() -> None:
@@ -631,6 +702,8 @@ async def check_and_send_weekly_digests() -> None:
             )
         ).all()
 
+        logger.info(f"📬 [WEEKLY_DIGEST] Found {len(analyses)} auto-refresh analyses to process")
+
         for analysis in analyses:
             try:
                 user = db.query(User).filter(
@@ -639,45 +712,58 @@ async def check_and_send_weekly_digests() -> None:
                 ).first()
 
                 if not user or not user.email:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP analysis={analysis.id}: user not found or no email (user_id={analysis.user_id})")
                     continue
 
+                logger.info(f"📬 [WEEKLY_DIGEST] Processing analysis={analysis.id} for user={user.email}")
+
                 if not analysis.organization_id or not user.organization_id:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: missing organization_id (analysis={analysis.organization_id}, user={user.organization_id})")
                     continue
 
                 if analysis.organization_id != user.organization_id:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: org mismatch (analysis={analysis.organization_id}, user={user.organization_id})")
                     continue
 
-                # Skip users who have opted out
                 if not user.weekly_digest_enabled:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: weekly_digest_enabled=False")
                     continue
 
                 config = _ensure_dict(analysis.config)
                 if config.get("is_demo") is True:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: demo analysis")
                     continue
 
                 tz_name = _get_user_timezone(db, user.id)
                 tz = pytz.timezone(tz_name)
                 local_now = datetime.now(tz)
 
-                # Monday at 10am local time
-                if local_now.weekday() != 0:
-                    continue
-                if local_now.hour != 10:
-                    continue
+                # Monday at 10am local time (skipped when WEEKLY_DIGEST_FORCE_SEND=true)
+                if not settings.WEEKLY_DIGEST_FORCE_SEND:
+                    if local_now.weekday() != 0:
+                        continue
+                    if local_now.hour != 10:
+                        continue
 
                 week_start_date = _get_week_start_date(local_now)
 
-                existing_log = db.query(WeeklyDigestLog).filter(
-                    WeeklyDigestLog.user_id == user.id,
-                    WeeklyDigestLog.week_start_date == week_start_date
-                ).first()
+                # Skip dedup check when force-sending locally
+                if not settings.WEEKLY_DIGEST_FORCE_SEND:
+                    existing_log = db.query(WeeklyDigestLog).filter(
+                        WeeklyDigestLog.user_id == user.id,
+                        WeeklyDigestLog.week_start_date == week_start_date
+                    ).first()
 
-                if existing_log:
-                    continue
+                    if existing_log:
+                        logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: already sent this week ({week_start_date})")
+                        continue
 
                 results = _ensure_dict(analysis.results)
                 if not results:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: analysis results are empty")
                     continue
+
+                logger.info(f"📬 [WEEKLY_DIGEST] Sending digest to {user.email} (analysis={analysis.id})...")
 
                 unsubscribe_token = _generate_unsubscribe_token(user.id)
                 unsubscribe_url = f"{settings.API_BASE_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
@@ -696,11 +782,17 @@ async def check_and_send_weekly_digests() -> None:
                     to_name=user.name,
                     subject=content["subject"],
                     text_body=content["text"],
-                    html_body=content["html"]
+                    html_body=content["html"],
+                    unsubscribe_url=unsubscribe_url
                 )
 
                 if not sent:
                     continue
+
+                logger.info(
+                    f"📧 [WEEKLY_DIGEST] Digest sent to {user.email} "
+                    f"(user_id={user.id}, subject={content['subject']})"
+                )
 
                 log_entry = WeeklyDigestLog(
                     user_id=user.id,
@@ -733,14 +825,27 @@ class WeeklyDigestScheduler:
         self.scheduler = AsyncIOScheduler()
 
     def start(self) -> None:
+        global _scheduler_start_time
         if self.scheduler.running:
             return
+        _scheduler_start_time = datetime.now()
         self.scheduler.add_job(
             check_and_send_weekly_digests,
             trigger=CronTrigger(minute="*/10"),
             id="weekly_digest",
             replace_existing=True
         )
+        if settings.WEEKLY_DIGEST_FORCE_SEND:
+            self.scheduler.add_job(
+                _log_digest_countdown,
+                trigger=CronTrigger(minute="*/2"),
+                id="weekly_digest_countdown",
+                replace_existing=True
+            )
+            logger.info(
+                "⚡ [WEEKLY_DIGEST] FORCE_SEND mode enabled — "
+                "digest will send on next 10-min tick, countdown logged every 2 min"
+            )
         self.scheduler.start()
         logger.info("Weekly digest scheduler started (every 10 minutes)")
 
