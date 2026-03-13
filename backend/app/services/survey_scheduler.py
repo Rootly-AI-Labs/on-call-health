@@ -650,7 +650,8 @@ class SurveyScheduler:
                         notification_service.create_survey_received_notification(
                             user_id=user['user_id'],
                             organization_id=organization_id,
-                            is_reminder=is_reminder
+                            is_reminder=is_reminder,
+                            commit=False
                         )
                     except Exception as notif_error:
                         logger.error(f"Failed to create notification for user {user['user_id']}: {str(notif_error)}")
@@ -703,7 +704,8 @@ class SurveyScheduler:
                             organization_id=organization_id,
                             triggered_by=None,  # Scheduled delivery
                             recipient_count=sent_count,
-                            is_manual=False
+                            is_manual=False,
+                            commit=False
                         )
                     except Exception as e:
                         logger.error(f"Failed to create delivery notification: {str(e)}")
