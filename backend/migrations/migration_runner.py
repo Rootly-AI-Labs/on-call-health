@@ -1333,10 +1333,16 @@ class MigrationRunner:
                     """
                 ]
             },
-          {
+            {
                 "name": "046_add_team_scoped_key_to_rootly_integrations",
                 "description": "Add key_type and team_name columns to rootly_integrations for team-scoped API key support",
-                "sql_file": "2026_02_24_add_team_scoped_key_to_rootly_integrations.sql"},
+                "sql_file": "2026_02_24_add_team_scoped_key_to_rootly_integrations.sql"
+            },
+            {
+                "name": "050_add_survey_recipients_to_slack_workspace_mappings",
+                "description": "Store scheduled Slack survey recipients on the org's active Slack workspace mapping",
+                "sql_file": "2026_03_13_add_survey_recipients_to_slack_workspace_mappings.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 

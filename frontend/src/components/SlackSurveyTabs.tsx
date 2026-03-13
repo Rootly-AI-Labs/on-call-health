@@ -386,6 +386,9 @@ export function SlackSurveyTabs({
             <p className="text-sm text-neutral-700 mb-3">
               Select which team members should receive automated survey DMs. Only users with Slack accounts can be selected.
             </p>
+            <p className="text-xs text-neutral-500">
+              This recipient list is shared across admins and is the same list used for scheduled Slack surveys.
+            </p>
           </div>
 
           {/* Synced Users List with Checkboxes */}

@@ -22,6 +22,7 @@ from ..models import SessionLocal
 from ..core.distributed_lock import with_distributed_lock
 from .slack_dm_sender import SlackDMSender
 from .notification_service import NotificationService
+from .survey_recipient_service import get_saved_recipient_ids_for_org
 from .slack_token_service import get_slack_token_for_organization, SlackTokenService
 from ..utils import mask_email
 
@@ -261,48 +262,6 @@ class SurveyScheduler:
         reminders for an organization to avoid overlapping Slack DMs.
         """
         return f"survey_delivery:org:{organization_id}"
-
-    def _get_saved_recipient_ids_for_org(self, organization_id: int, db: Session) -> Optional[set[int]]:
-        """
-        Resolve the saved automated-survey recipient list for an organization.
-
-        Recipient selections are currently stored on RootlyIntegration rows, but
-        scheduled delivery runs at the organization level. We therefore pick the
-        most recently active integration in the org that actually has a saved
-        recipient list, instead of relying on an arbitrary org user.
-        """
-        from app.models.user import User
-        from app.models.rootly_integration import RootlyIntegration
-
-        integrations = (
-            db.query(RootlyIntegration)
-            .join(User, User.id == RootlyIntegration.user_id)
-            .filter(
-                User.organization_id == organization_id,
-                RootlyIntegration.platform == "rootly",
-                RootlyIntegration.is_active == True,
-                RootlyIntegration.survey_recipients.isnot(None)
-            )
-            .order_by(
-                RootlyIntegration.last_synced_at.desc().nullslast(),
-                RootlyIntegration.last_used_at.desc().nullslast(),
-                RootlyIntegration.created_at.desc(),
-                RootlyIntegration.id.desc()
-            )
-            .all()
-        )
-
-        if not integrations:
-            return None
-
-        if len(integrations) > 1:
-            logger.info(
-                f"Found {len(integrations)} active integrations with saved survey recipients "
-                f"for org {organization_id}; using integration {integrations[0].id}"
-            )
-
-        recipient_ids = integrations[0].survey_recipients or []
-        return set(recipient_ids) if recipient_ids else None
 
     async def _run_survey_job(self, organization_id: int, is_reminder: bool = False):
         """Open a fresh DB session for each scheduled survey job execution."""
@@ -794,7 +753,7 @@ class SurveyScheduler:
         saved_recipient_ids = None
 
         if apply_saved_recipients:
-            saved_recipient_ids = self._get_saved_recipient_ids_for_org(organization_id, db)
+            saved_recipient_ids = get_saved_recipient_ids_for_org(db, organization_id)
             if saved_recipient_ids is not None:
                 logger.info(f"Using saved recipient list for org {organization_id}: {len(saved_recipient_ids)} users selected")
             else:
