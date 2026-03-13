@@ -68,6 +68,8 @@ class Settings:
 
     # Weekly digest emails
     WEEKLY_DIGEST_ENABLED: bool = os.getenv("WEEKLY_DIGEST_ENABLED", "false").lower() == "true"
+    # Set to true locally to bypass Monday-10AM check and dedup log (for testing)
+    WEEKLY_DIGEST_FORCE_SEND: bool = os.getenv("WEEKLY_DIGEST_FORCE_SEND", "false").lower() == "true"
     RESEND_API_KEY: Optional[str] = os.getenv("RESEND_API_KEY")
     RESEND_FROM_EMAIL: Optional[str] = os.getenv("RESEND_FROM_EMAIL")
     RESEND_FROM_NAME: str = os.getenv("RESEND_FROM_NAME", "On-Call Health")
