@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
 from ..core.rootly_client import RootlyAPIClient
 from ..core.pagerduty_client import PagerDutyAPIClient, PagerDutyDataCollector
-from ..core.och_config import calculate_composite_och_score, calculate_personal_burnout, calculate_work_related_burnout, generate_och_score_reasoning, get_structured_och_factors
+from ..core.och_config import calculate_composite_och_score, calculate_personal_burnout, calculate_work_related_burnout, generate_och_score_reasoning, get_structured_och_factors, OCHConfig
+from ..core.alert_health_calculator import calculate_alert_health_score
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
 from .github_correlation_service import GitHubCorrelationService
 from ..utils.incident_utils import slim_incidents, calculate_severity_breakdown
@@ -1679,7 +1680,8 @@ class UnifiedBurnoutAnalyzer:
         include_weekends: bool,
         github_data: Dict[str, Any] = None,
         slack_data: Dict[str, Any] = None,
-        jira_data: Dict[str, Any] = None
+        jira_data: Dict[str, Any] = None,
+        alerts_data: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Analyze burnout for a single team member."""
         # Extract user info based on platform
@@ -1721,6 +1723,7 @@ class UnifiedBurnoutAnalyzer:
         rootly_user_id = user.get("rootly_user_id")
         pagerduty_user_id = user.get("pagerduty_user_id")
         avatar_url = user.get("avatar_url")  # Profile image from PagerDuty/Rootly
+        user_tz = self.user_tz_by_id.get(str(user_id), "UTC")
 
         # DEBUG: Log integration mappings for this user
         if jira_account_id:
@@ -1769,6 +1772,7 @@ class UnifiedBurnoutAnalyzer:
                 "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
                 "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
                 "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
+                "user_timezone": user_tz,
                 "health_score": 0,
                 "och_score": round(min(100, composite_och['composite_score']), 2),  # Cap display at 100 for UI
                 "risk_level": "low",
@@ -1802,7 +1806,6 @@ class UnifiedBurnoutAnalyzer:
 
         # Calculate base metrics from incidents and GitHub data
         days_analyzed = metadata.get("days_analyzed") or 30
-        user_tz = self.user_tz_by_id.get(str(user_id), "UTC")
         base_metrics = self._calculate_member_metrics(
             incidents,
             days_analyzed,
@@ -1984,9 +1987,28 @@ class UnifiedBurnoutAnalyzer:
         scaled_after_hours = after_hours_percentage * volume_scale
         scaled_oncall_burden = apply_rootly_incident_tiers(severity_weighted_per_week) * 10 * volume_scale
 
+        # Calculate alert health score if alert data is available
+        alert_health_metric = 0.0
+        alert_health_result = None
+        if alerts_data:
+            alert_health_result = calculate_alert_health_score(
+                total_alerts=alerts_data.get('total_alerts', 0),
+                night_time_alerts=alerts_data.get('night_time_alerts', 0),
+                escalated_alerts=alerts_data.get('escalated_alerts', 0),
+                retriggered_alerts=alerts_data.get('retriggered_alerts', 0),
+                alerts_with_incidents=alerts_data.get('alerts_with_incidents', 0),
+                after_hours_alerts=alerts_data.get('after_hours_alerts', 0),
+                signal_quality_pct=alerts_data.get('signal_quality_pct', 100.0)
+            )
+            # Apply configurable multiplier to alert health score
+            alert_health_metric = alert_health_result['score'] * OCHConfig.ALERT_HEALTH_MULTIPLIER
+
         logger.debug(f"🔢 VOLUME SCALING: {user_name} incidents_per_week={incidents_per_week:.2f}, volume_scale={volume_scale:.2f}")
         logger.debug(f"   after_hours: {after_hours_percentage:.1f}% → {scaled_after_hours:.1f}% (scaled)")
         logger.debug(f"   oncall_burden: {apply_rootly_incident_tiers(severity_weighted_per_week) * 10:.1f} → {scaled_oncall_burden:.1f} (scaled)")
+
+        if alert_health_metric > 0 and alert_health_result:
+            logger.debug(f"🚨 ALERT HEALTH: {user_name} base_score={alert_health_result['score']:.1f} × multiplier={OCHConfig.ALERT_HEALTH_MULTIPLIER} = {alert_health_metric:.1f}")
 
         och_metrics = {
             # Personal burnout factors (65% of total)
@@ -1996,9 +2018,14 @@ class UnifiedBurnoutAnalyzer:
             'sleep_quality_proxy': severity_weighted_per_week,                      # High-severity: 25% (raw weekly rate, scale_max=30)
 
             # Work-related burnout factors (35% of total)
-            # OCH scale_max values: sprint_completion=7, oncall_burden=100
-            'sprint_completion': consecutive_days_data['max_consecutive_days'],     # Consecutive days: 15% (raw days 0-7+)
-            'oncall_burden': scaled_oncall_burden  # On-call load: 20% (volume-scaled)
+            # OCH scale_max values: sprint_completion=7, oncall_burden=100, alert_health=100
+            'sprint_completion': consecutive_days_data['max_consecutive_days'],     # Consecutive days: 7.5% (raw days 0-7+)
+            'oncall_burden': scaled_oncall_burden,                                  # On-call load: 12.5% (volume-scaled)
+            # alert_health is intentionally omitted here when alerts_data is None.
+            # Including it as 0.0 would inflate total_weight to 1.0 and deflate the
+            # work-related score by ~43%. The post-processor apply_alert_health_to_och
+            # in analyses.py blends it in afterward once alert data is available.
+            **({'alert_health': alert_health_metric} if alerts_data else {})
         }
 
         # Check if all OCH metrics are 0
@@ -2048,6 +2075,7 @@ class UnifiedBurnoutAnalyzer:
             "rootly_user_id": rootly_user_id,  # Include Rootly mapping for logo display
             "pagerduty_user_id": pagerduty_user_id,  # Include PagerDuty mapping for logo display
             "avatar_url": avatar_url,  # Profile image URL from PagerDuty/Rootly
+            "user_timezone": user_tz,
             "health_score": round(health_score, 2),
             "och_score": round(min(100, composite_och['composite_score']), 2),  # Cap display at 100 for UI
             "risk_level": risk_level,

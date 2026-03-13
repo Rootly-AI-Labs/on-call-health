@@ -18,6 +18,8 @@ from ...auth.dependencies import get_current_active_user, get_current_user_flexi
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
+from ...core.alert_health_calculator import calculate_alert_health_score
+from ...core.och_config import apply_alert_health_to_och, OCHConfig
 from ...utils.visual_logger import log_task_start, log_task_complete
 
 logger = logging.getLogger(__name__)
@@ -771,6 +773,9 @@ _ANALYSIS_DATA_KEYS = [
 ]
 
 # Build the SQL once: SELECT results->'key1', results->'key2', ... FROM analyses WHERE id = :id
+# _ANALYSIS_DATA_KEYS is a hardcoded tuple of string literals defined above — not user input —
+# so the f-string interpolation here is safe from SQL injection. The :id parameter is
+# bound at execution time via SQLAlchemy's parameterized query interface.
 _RESULTS_SELECT_COLS = ", ".join(f"results->'{k}'" for k in _ANALYSIS_DATA_KEYS)
 _RESULTS_EXTRACT_SQL = f"SELECT {_RESULTS_SELECT_COLS} FROM analyses WHERE id = :id"
 
@@ -1062,11 +1067,12 @@ async def delete_analysis(
     db: Session = Depends(get_db)
 ):
     """Delete a specific analysis."""
-    # Filter by user_id to be consistent with list_analyses endpoint
-    # This ensures users can delete analyses they own, regardless of organization changes
+    # Filter by both user_id AND organization_id to prevent cross-org deletion.
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.user_id == current_user.id
+        Analysis.user_id == current_user.id,
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
 
     if not analysis:
@@ -3386,6 +3392,280 @@ async def run_analysis_task(
                     
             except Exception as monitoring_error:
                 logger.warning(f"A/B testing monitoring failed: {monitoring_error}")
+
+            # Attach Rootly alerts summary for dashboard card (non-blocking)
+            if platform == "rootly" and isinstance(results, dict):
+                try:
+                    from ...core.rootly_client import RootlyAPIClient
+                    end_dt = analysis.created_at or datetime.now(timezone.utc)
+                    if end_dt.tzinfo is None:
+                        end_dt = end_dt.replace(tzinfo=timezone.utc)
+                    start_dt = end_dt - timedelta(days=time_range)
+
+                    alerts_client = RootlyAPIClient(api_token=effective_api_token)
+                    team_id = None
+                    if rootly_team_name:
+                        team_id = await alerts_client.get_team_id(rootly_team_name)
+                    team_members = []
+                    team_analysis = results.get("team_analysis") if isinstance(results.get("team_analysis"), (dict, list)) else None
+                    if isinstance(team_analysis, dict):
+                        team_members = team_analysis.get("members") or []
+                    elif isinstance(team_analysis, list):
+                        team_members = team_analysis
+
+                    user_ids = set()
+                    user_emails = set()
+                    user_timezones_by_id = {}
+                    user_timezones_by_email = {}
+                    if isinstance(team_members, list):
+                        for member in team_members:
+                            if not isinstance(member, dict):
+                                continue
+                            if member.get("rootly_user_id"):
+                                user_ids.add(str(member.get("rootly_user_id")))
+                                if member.get("user_timezone"):
+                                    user_timezones_by_id[str(member.get("rootly_user_id"))] = member.get("user_timezone")
+                            if member.get("user_id"):
+                                user_ids.add(str(member.get("user_id")))
+                                if member.get("user_timezone"):
+                                    user_timezones_by_id[str(member.get("user_id"))] = member.get("user_timezone")
+                            if member.get("user_email"):
+                                user_emails.add(str(member.get("user_email")).lower())
+                                if member.get("user_timezone"):
+                                    user_timezones_by_email[str(member.get("user_email")).lower()] = member.get("user_timezone")
+                    include_list = ",".join([
+                        "environments",
+                        "services",
+                        "groups",
+                        "responders",
+                        "incidents",
+                        "events",
+                        "alert_urgency",
+                        "heartbeat",
+                        "live_call_router",
+                        "alert_group",
+                        "group_leader_alert",
+                        "group_member_alerts",
+                        "alert_field_values",
+                        "alerting_targets",
+                        "escalation_policies",
+                        "alert_call_recording"
+                    ])
+                    alerts_counts = await alerts_client.get_alerts_count(
+                        start_date=start_dt,
+                        end_date=end_dt,
+                        team_id=team_id,
+                        user_ids=user_ids,
+                        user_emails=user_emails,
+                        include=include_list,
+                        user_timezones_by_id=user_timezones_by_id,
+                        user_timezones_by_email=user_timezones_by_email
+                    )
+                    logger.info(
+                        f"ALERTS_SUMMARY: analysis_id={analysis_id}, "
+                        f"team_name={rootly_team_name}, team_id={team_id}, "
+                        f"start={start_dt.isoformat()}, end={end_dt.isoformat()}, "
+                        f"total={alerts_counts.get('total_count')}, "
+                        f"filtered_total={alerts_counts.get('filtered_count')}, "
+                        f"pages_scanned={alerts_counts.get('pages_scanned')}, "
+                        f"total_pages={alerts_counts.get('total_pages')}, "
+                        f"truncated={alerts_counts.get('truncated', False)}, "
+                        f"error={alerts_counts.get('error')}"
+                    )
+
+                    metadata = results.get("metadata") if isinstance(results.get("metadata"), dict) else {}
+                    metadata["alerts"] = {
+                        "start": start_dt.isoformat(),
+                        "end": end_dt.isoformat(),
+                        "total": alerts_counts.get("total_count"),
+                        "filtered_total": alerts_counts.get("filtered_count"),
+                        "team_name": rootly_team_name,
+                        "team_id": team_id,
+                        "filter_method": "group_ids" if team_id else None,
+                        "include": include_list,
+                        "pages_scanned": alerts_counts.get("pages_scanned"),
+                        "total_pages": alerts_counts.get("total_pages"),
+                        "truncated": alerts_counts.get("truncated", False),
+                        "error": alerts_counts.get("error"),
+                        "noise_counts": alerts_counts.get("noise_counts") or {},
+                        "source_counts": alerts_counts.get("source_counts") or {},
+                        "derived_source_counts": alerts_counts.get("derived_source_counts") or {},
+                        "after_hours_count": alerts_counts.get("after_hours_count", 0),
+                        "night_time_count": alerts_counts.get("night_time_count", 0),
+                        "urgency_counts": alerts_counts.get("urgency_counts") or {},
+                        "alerts_with_incidents_count": alerts_counts.get("alerts_with_incidents_count", 0),
+                        "related_counts": alerts_counts.get("related_counts") or {},
+                        "included_counts": alerts_counts.get("included_counts") or {},
+                        "avg_mtta_seconds": alerts_counts.get("avg_mtta_seconds"),
+                        "mtta_count": alerts_counts.get("mtta_count", 0),
+                        "avg_mttr_seconds": alerts_counts.get("avg_mttr_seconds"),
+                        "mttr_count": alerts_counts.get("mttr_count", 0),
+                        "escalated_count": alerts_counts.get("escalated_count", 0),
+                        "retrigger_count": alerts_counts.get("retrigger_count", 0),
+                    }
+                    results["metadata"] = metadata
+
+                    # Attach per-user alert counts to team members for the user popup
+                    if not alerts_counts.get("error") and isinstance(team_members, list):
+                        per_user_ids = alerts_counts.get("per_user_id_counts") or {}
+                        per_user_emails = alerts_counts.get("per_user_email_counts") or {}
+                        per_user_notified_ids = alerts_counts.get("per_user_notified_by_id") or {}
+                        per_user_notified_emails = alerts_counts.get("per_user_notified_by_email") or {}
+                        per_user_responded_ids = alerts_counts.get("per_user_responded_by_id") or {}
+                        per_user_responded_emails = alerts_counts.get("per_user_responded_by_email") or {}
+                        per_user_alerts_with_incidents_ids = alerts_counts.get("per_user_alerts_with_incidents_by_id") or {}
+                        per_user_alerts_with_incidents_emails = alerts_counts.get("per_user_alerts_with_incidents_by_email") or {}
+                        per_user_source_ids = alerts_counts.get("per_user_source_by_id") or {}
+                        per_user_source_emails = alerts_counts.get("per_user_source_by_email") or {}
+                        per_user_derived_source_ids = alerts_counts.get("per_user_derived_source_by_id") or {}
+                        per_user_derived_source_emails = alerts_counts.get("per_user_derived_source_by_email") or {}
+                        per_user_related_ids = alerts_counts.get("per_user_related_by_id") or {}
+                        per_user_related_emails = alerts_counts.get("per_user_related_by_email") or {}
+                        per_user_noise_ids = alerts_counts.get("per_user_noise_by_id") or {}
+                        per_user_noise_emails = alerts_counts.get("per_user_noise_by_email") or {}
+                        per_user_after_hours_ids = alerts_counts.get("per_user_after_hours_by_id") or {}
+                        per_user_after_hours_emails = alerts_counts.get("per_user_after_hours_by_email") or {}
+                        per_user_night_time_ids = alerts_counts.get("per_user_night_time_by_id") or {}
+                        per_user_night_time_emails = alerts_counts.get("per_user_night_time_by_email") or {}
+                        per_user_urgency_ids = alerts_counts.get("per_user_urgency_by_id") or {}
+                        per_user_urgency_emails = alerts_counts.get("per_user_urgency_by_email") or {}
+                        per_user_acked_ids = alerts_counts.get("per_user_acked_by_id") or {}
+                        per_user_acked_emails = alerts_counts.get("per_user_acked_by_email") or {}
+                        per_user_resolved_ids = alerts_counts.get("per_user_resolved_by_id") or {}
+                        per_user_resolved_emails = alerts_counts.get("per_user_resolved_by_email") or {}
+                        per_user_escalated_ids = alerts_counts.get("per_user_escalated_by_id") or {}
+                        per_user_escalated_emails = alerts_counts.get("per_user_escalated_by_email") or {}
+                        per_user_retriggered_ids = alerts_counts.get("per_user_retriggered_by_id") or {}
+                        per_user_retriggered_emails = alerts_counts.get("per_user_retriggered_by_email") or {}
+                        per_user_mtta_avg_ids = alerts_counts.get("per_user_mtta_avg_by_id") or {}
+                        per_user_mtta_avg_emails = alerts_counts.get("per_user_mtta_avg_by_email") or {}
+                        per_user_mttr_avg_ids = alerts_counts.get("per_user_mttr_avg_by_id") or {}
+                        per_user_mttr_avg_emails = alerts_counts.get("per_user_mttr_avg_by_email") or {}
+                        for member in team_members:
+                            if not isinstance(member, dict):
+                                continue
+                            count = None
+                            related_counts = {}
+                            noise_counts = {}
+                            after_hours_count = 0
+                            night_time_count = 0
+                            urgency_counts = {}
+                            notified_count = 0
+                            responded_count = 0
+                            alerts_with_incidents_count = 0
+                            source_counts = {}
+                            derived_source_counts = {}
+                            acked_count = 0
+                            resolved_count = 0
+                            escalated_count = 0
+                            retriggered_count = 0
+                            avg_mtta_seconds = None
+                            avg_mttr_seconds = None
+                            member_rootly_id = member.get("rootly_user_id")
+                            member_user_id = member.get("user_id")
+                            member_email = member.get("user_email")
+                            if member_rootly_id and str(member_rootly_id) in per_user_ids:
+                                k = str(member_rootly_id)
+                                count = per_user_ids.get(k, 0)
+                                related_counts = per_user_related_ids.get(k, {})
+                                noise_counts = per_user_noise_ids.get(k, {})
+                                after_hours_count = per_user_after_hours_ids.get(k, 0)
+                                night_time_count = per_user_night_time_ids.get(k, 0)
+                                urgency_counts = per_user_urgency_ids.get(k, {})
+                                notified_count = per_user_notified_ids.get(k, 0)
+                                responded_count = per_user_responded_ids.get(k, 0)
+                                alerts_with_incidents_count = per_user_alerts_with_incidents_ids.get(k, 0)
+                                source_counts = per_user_source_ids.get(k, {})
+                                derived_source_counts = per_user_derived_source_ids.get(k, {})
+                                acked_count = per_user_acked_ids.get(k, 0)
+                                resolved_count = per_user_resolved_ids.get(k, 0)
+                                escalated_count = per_user_escalated_ids.get(k, 0)
+                                retriggered_count = per_user_retriggered_ids.get(k, 0)
+                                avg_mtta_seconds = per_user_mtta_avg_ids.get(k)
+                                avg_mttr_seconds = per_user_mttr_avg_ids.get(k)
+                            elif member_user_id and str(member_user_id) in per_user_ids:
+                                k = str(member_user_id)
+                                count = per_user_ids.get(k, 0)
+                                related_counts = per_user_related_ids.get(k, {})
+                                noise_counts = per_user_noise_ids.get(k, {})
+                                after_hours_count = per_user_after_hours_ids.get(k, 0)
+                                night_time_count = per_user_night_time_ids.get(k, 0)
+                                urgency_counts = per_user_urgency_ids.get(k, {})
+                                notified_count = per_user_notified_ids.get(k, 0)
+                                responded_count = per_user_responded_ids.get(k, 0)
+                                alerts_with_incidents_count = per_user_alerts_with_incidents_ids.get(k, 0)
+                                source_counts = per_user_source_ids.get(k, {})
+                                derived_source_counts = per_user_derived_source_ids.get(k, {})
+                                acked_count = per_user_acked_ids.get(k, 0)
+                                resolved_count = per_user_resolved_ids.get(k, 0)
+                                escalated_count = per_user_escalated_ids.get(k, 0)
+                                retriggered_count = per_user_retriggered_ids.get(k, 0)
+                                avg_mtta_seconds = per_user_mtta_avg_ids.get(k)
+                                avg_mttr_seconds = per_user_mttr_avg_ids.get(k)
+                            elif member_email and str(member_email).lower() in per_user_emails:
+                                k = str(member_email).lower()
+                                count = per_user_emails.get(k, 0)
+                                related_counts = per_user_related_emails.get(k, {})
+                                noise_counts = per_user_noise_emails.get(k, {})
+                                after_hours_count = per_user_after_hours_emails.get(k, 0)
+                                night_time_count = per_user_night_time_emails.get(k, 0)
+                                urgency_counts = per_user_urgency_emails.get(k, {})
+                                notified_count = per_user_notified_emails.get(k, 0)
+                                responded_count = per_user_responded_emails.get(k, 0)
+                                alerts_with_incidents_count = per_user_alerts_with_incidents_emails.get(k, 0)
+                                source_counts = per_user_source_emails.get(k, {})
+                                derived_source_counts = per_user_derived_source_emails.get(k, {})
+                                acked_count = per_user_acked_emails.get(k, 0)
+                                resolved_count = per_user_resolved_emails.get(k, 0)
+                                escalated_count = per_user_escalated_emails.get(k, 0)
+                                retriggered_count = per_user_retriggered_emails.get(k, 0)
+                                avg_mtta_seconds = per_user_mtta_avg_emails.get(k)
+                                avg_mttr_seconds = per_user_mttr_avg_emails.get(k)
+                            if count is None:
+                                count = 0
+                            member["alerts_count"] = count
+                            member["alerts_related_counts"] = related_counts
+                            member["alerts_noise_counts"] = noise_counts
+                            member["alerts_after_hours_count"] = after_hours_count
+                            member["alerts_night_time_count"] = night_time_count
+                            member["alerts_urgency_counts"] = urgency_counts
+                            member["alerts_notified_count"] = notified_count
+                            member["alerts_responded_count"] = responded_count
+                            member["alerts_with_incidents_count"] = alerts_with_incidents_count
+                            member["alerts_source_counts"] = source_counts
+                            member["alerts_derived_source_counts"] = derived_source_counts
+                            member["alerts_acked_count"] = acked_count
+                            member["alerts_resolved_count"] = resolved_count
+                            member["alerts_escalated_count"] = escalated_count
+                            member["alerts_retriggered_count"] = retriggered_count
+                            member["alerts_avg_mtta_seconds"] = avg_mtta_seconds
+                            member["alerts_avg_mttr_seconds"] = avg_mttr_seconds
+
+                            # Calculate alert health score (0-100) for OCH integration
+                            signal_quality_pct = 100.0
+                            if noise_counts and (noise_counts.get('not_noise', 0) + noise_counts.get('noise', 0)) > 0:
+                                not_noise = noise_counts.get('not_noise', 0)
+                                total_noise_checked = not_noise + noise_counts.get('noise', 0)
+                                signal_quality_pct = (not_noise / total_noise_checked * 100) if total_noise_checked > 0 else 100.0
+
+                            alert_health_result = calculate_alert_health_score(
+                                total_alerts=count or 0,
+                                night_time_alerts=night_time_count or 0,
+                                escalated_alerts=escalated_count or 0,
+                                retriggered_alerts=retriggered_count or 0,
+                                alerts_with_incidents=alerts_with_incidents_count or 0,
+                                after_hours_alerts=after_hours_count or 0,
+                                signal_quality_pct=signal_quality_pct
+                            )
+                            member["alerts_health_score"] = alert_health_result['score']
+                            member["alerts_health_interpretation"] = alert_health_result['interpretation']
+
+                            # Apply alert health to OCH score (post-process since alert data
+                            # is fetched after the analyzer runs)
+                            adjusted_score = alert_health_result['score'] * OCHConfig.ALERT_HEALTH_MULTIPLIER
+                            apply_alert_health_to_och(member, adjusted_score)
+                except Exception as alerts_err:
+                    logger.warning(f"BACKGROUND_TASK: Failed to attach alert metadata for analysis {analysis_ref}: {alerts_err}")
 
             logger.info(f"🔍 DEBUG: About to save results for analysis {analysis_ref}")
 

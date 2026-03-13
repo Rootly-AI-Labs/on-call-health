@@ -26,6 +26,15 @@ class OCHDimension(Enum):
 class OCHConfig:
     """On-Call Health Configuration"""
 
+    # Alert Health Score Multiplier
+    # Adjust the weight/impact of alert metrics on OCH score.
+    # Set to 5.0 intentionally: alert_health raw scores tend to be low (10-20/100)
+    # because the formula averages weighted percentages across 6 factors.
+    # The multiplier amplifies these signals to a meaningful range before blending.
+    # < 1.0: reduce impact (e.g., 0.5 = 50% weight)
+    # > 1.0: increase impact (e.g., 2.0 = double, 5.0 = 5x amplification)
+    ALERT_HEALTH_MULTIPLIER = 5.0
+
     # OCH Dimension Weights (must sum to 1.0)
     # Research-informed: Personal factors (work-life balance) contribute more to burnout
     DIMENSION_WEIGHTS = {
@@ -56,26 +65,32 @@ class OCHConfig:
             'calculation': 'jira_linear_task_load',
             'scale_max': 100
         }
-    }
+    }  # Total Personal Burnout: 30 + 25 + 10 = 65 points
 
     # Work-Related Burnout Factor Mappings
     # Maps current metrics to OCH Work-Related Burnout items (0-100 scale)
-    # Research-informed weighting: On-call burden and sustained stress
+    # Research-informed weighting: On-call burden, sustained stress, and alert health
     # Weights must sum to 1.0 within this dimension
     WORK_RELATED_BURNOUT_FACTORS = {
         'oncall_burden': {
-            'weight': 0.571,  # 0.571 * 0.35 = 20% of total (on-call responsibility load)
+            'weight': 0.357,  # 0.357 * 0.35 = 12.5% of total (on-call responsibility load)
             'description': 'Work-related stress from on-call incident response (severity-weighted)',
             'calculation': 'incident_response_frequency_with_severity',
             'scale_max': 100  # >100 severity-weighted incidents/week = 100% baseline
         },
         'sprint_completion': {
-            'weight': 0.429,  # 0.429 * 0.35 = 15% of total (consecutive incident days)
+            'weight': 0.215,  # 0.215 * 0.35 = 7.5% of total (consecutive incident days)
             'description': 'Sustained stress from consecutive incident days without recovery',
             'calculation': 'consecutive_incident_days',
             'scale_max': 7  # 7+ consecutive days = 100 burnout
+        },
+        'alert_health': {
+            'weight': 0.428,  # 0.428 * 0.35 = 15% of total (alert quality and burden)
+            'description': 'Alert burden and quality impact: night-time disruption, escalation rate, retriggered issues',
+            'calculation': 'alert_health_score_normalized',
+            'scale_max': 100  # 0-100 normalized alert health score
         }
-    }
+    }  # Total Work-Related Burnout: 12.5 + 7.5 + 15 = 35 points
 
     # OCH Score Interpretation Ranges (0-100 scale, sum of Personal + Work-Related points capped at 100)
     OCH_SCORE_RANGES = {
@@ -200,6 +215,62 @@ def calculate_work_related_burnout(metrics: Dict[str, float], config: OCHConfig 
         'interpretation': get_och_interpretation(final_score, config),
         'data_completeness': total_weight
     }
+
+
+def apply_alert_health_to_och(member: dict, alert_health_score: float) -> dict:
+    """
+    Post-process: blend alert health score into an already-computed OCH result.
+
+    Called after alert data is attached to members (analyses.py), since alert
+    data is not available at the time _analyze_member_burnout runs.
+
+    The work-related score was originally calculated with only oncall_burden (0.357)
+    and sprint_completion (0.215), totalling weight 0.572. We now re-normalize
+    by including alert_health (0.428) to get total weight 1.0.
+
+    Args:
+        member: Member dict with existing och_score, och_breakdown, risk_level
+        alert_health_score: Normalized 0-100 alert health score (already multiplied)
+
+    Returns:
+        Updated member dict with recalculated och_score, risk_level, och_breakdown
+    """
+    config = OCHConfig()
+
+    # Weights without alert_health (what was used when the analyzer ran)
+    existing_weight = sum(
+        v['weight'] for k, v in config.WORK_RELATED_BURNOUT_FACTORS.items()
+        if k != 'alert_health'
+    )  # 0.357 + 0.215 = 0.572
+    alert_weight = config.WORK_RELATED_BURNOUT_FACTORS['alert_health']['weight']  # 0.428
+    work_dim_weight = config.DIMENSION_WEIGHTS[OCHDimension.WORK_RELATED]         # 0.35
+    personal_dim_weight = config.DIMENSION_WEIGHTS[OCHDimension.PERSONAL]         # 0.65
+
+    existing_work = member.get('och_breakdown', {}).get('work_related', 0.0)
+    existing_personal = member.get('och_breakdown', {}).get('personal', 0.0)
+
+    # Reconstruct weighted sum from existing score, then add alert contribution:
+    # existing_work = weighted_sum / existing_weight
+    # new_work_score = (existing_work * existing_weight + alert_health_score * alert_weight) / 1.0
+    normalized_alert = min(150.0, alert_health_score)
+    new_work_score = (existing_work * existing_weight) + (normalized_alert * alert_weight)
+
+    # Recalculate composite
+    new_composite = (existing_personal * personal_dim_weight) + (new_work_score * work_dim_weight)
+    new_composite_capped = round(min(100.0, new_composite), 2)
+
+    # Recalculate interpretation and risk level
+    interpretation = get_och_interpretation(new_composite_capped)
+    risk_level = config.RISK_LEVEL_MAPPING[interpretation]
+
+    member['och_score'] = new_composite_capped
+    member['risk_level'] = risk_level
+    member['och_breakdown'] = {
+        **member.get('och_breakdown', {}),
+        'work_related': round(new_work_score, 2),
+        'interpretation': interpretation
+    }
+    return member
 
 
 def calculate_composite_och_score(personal_score: float, work_related_score: float,
@@ -449,6 +520,9 @@ def generate_och_score_reasoning(
                 elif factor_name == 'sprint_completion':
                     work_factors.append(f"Consecutive days with incidents ({display_score:.1f} points)")
 
+                elif factor_name == 'alert_health':
+                    work_factors.append(f"Alert health score - night-time, escalations, retriggered issues ({display_score:.1f} points)")
+
                 elif factor_name == 'meeting_load':
                     work_factors.append(f"Incident response meeting load ({display_score:.1f} points)")
 
@@ -500,6 +574,7 @@ def get_structured_och_factors(
         'work_hours_trend': 'Task load',
         'after_hours_activity': 'After-hours activity',
         'oncall_burden': 'On-call load',
+        'alert_health': 'Alert health & burden',
         'deployment_frequency': 'Incident frequency',
         'pr_frequency': 'Severity-weighted workload',
         'sprint_completion': 'Consecutive incident days',
