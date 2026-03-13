@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { getValidToken, clearAuthData, redirectToLogin } from "@/lib/auth"
@@ -19,7 +19,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 
 export default function useDashboard() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [selectedIntegration, setSelectedIntegration] = useState<string>("")
   const [loadingIntegrations, setLoadingIntegrations] = useState(false)
@@ -29,8 +29,10 @@ export default function useDashboard() {
   const [analysisProgress, setAnalysisProgress] = useState(0)
   const [currentRunningAnalysisId, setCurrentRunningAnalysisId] = useState<number | null>(null)
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
+  const defaultSelectionInFlight = useRef(false)
   const [targetProgress, setTargetProgress] = useState(0)
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null)
+  const [autoRefreshAnalysis, setAutoRefreshAnalysis] = useState<AnalysisResult | null>(null)
   const [previousAnalyses, setPreviousAnalyses] = useState<AnalysisResult[]>([])
   const [hasMoreAnalyses, setHasMoreAnalyses] = useState(true)
   const [loadingMoreAnalyses, setLoadingMoreAnalyses] = useState(false)
@@ -133,6 +135,31 @@ export default function useDashboard() {
     localStorage.removeItem('running_analysis_start')
   }
 
+  const getValidRunningAnalysisId = (): number | null => {
+    const savedAnalysisId = localStorage.getItem('running_analysis_id')
+    const savedStartTime = localStorage.getItem('running_analysis_start')
+
+    if (!savedAnalysisId || !savedStartTime) return null
+
+    const startTime = parseInt(savedStartTime, 10)
+    const analysisId = parseInt(savedAnalysisId, 10)
+
+    if (isNaN(startTime) || isNaN(analysisId)) {
+      clearRunningAnalysisState()
+      return null
+    }
+
+    const elapsedMs = Date.now() - startTime
+    const maxAnalysisTime = 30 * 60 * 1000 // 30 minutes max
+
+    if (elapsedMs >= maxAnalysisTime) {
+      clearRunningAnalysisState()
+      return null
+    }
+
+    return analysisId
+  }
+
   const cancelRunningAnalysis = async () => {
     try {
       // If there's a running analysis, delete it
@@ -173,12 +200,135 @@ export default function useDashboard() {
     }
   }
 
+  const startPollingAnalysis = (analysisId: number | string, options: { showToast?: boolean } = {}) => {
+    const showToast = options.showToast ?? true
+    const normalizedId = typeof analysisId === 'string' ? parseInt(analysisId, 10) : analysisId
+
+    if (Number.isNaN(normalizedId)) {
+      console.error('Invalid analysis id for polling:', analysisId)
+      return
+    }
+
+    setAnalysisRunning(true)
+    setCurrentRunningAnalysisId(normalizedId)
+    setAnalysisStage("loading")
+    setAnalysisProgress(-1) // Use -1 to show indeterminate progress
+
+    if (showToast) {
+      toast.info("Analysis still running...")
+    }
+
+    // Polling state
+    let pollCount = 0
+    const maxPollAttempts = 360 // 30 minutes at 5s intervals
+    let errorCount = 0
+    const maxErrors = 3
+    let timeoutIdRef: NodeJS.Timeout | null = null
+
+    const pollAnalysis = async () => {
+      try {
+        pollCount++
+
+        // Stop polling after max attempts
+        if (pollCount > maxPollAttempts) {
+          clearRunningAnalysisState()
+          if (showToast) {
+            toast.warning("Analysis is taking longer than expected. Please check back later.")
+          }
+          selectDefaultAnalysis({ force: true })
+          return
+        }
+
+        const authToken = getValidToken()
+        if (!authToken) {
+          clearRunningAnalysisState()
+          return
+        }
+
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+
+        try {
+          const pollResponse = await fetch(`${API_BASE}/analyses/${analysisId}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            signal: controller.signal
+          })
+          clearTimeout(timeoutId)
+
+          if (pollResponse.ok) {
+            const analysisData = await pollResponse.json()
+            errorCount = 0 // Reset error count on success
+
+            if (analysisData.status === 'completed') {
+              clearRunningAnalysisState()
+              setCurrentAnalysis(analysisData)
+              updateURLWithAnalysis(String(analysisData.id))
+              if (analysisData.is_auto_refresh) {
+                await loadAutoRefreshAnalysis()
+              }
+              if (showToast) {
+                toast.success("Analysis completed!")
+              }
+            } else if (analysisData.status === 'running' || analysisData.status === 'pending') {
+              // Continue polling
+              timeoutIdRef = setTimeout(pollAnalysis, 5000)
+            } else if (analysisData.status === 'failed') {
+              clearRunningAnalysisState()
+              if (showToast) {
+                toast.error("Analysis failed")
+              }
+            }
+          } else if (pollResponse.status === 404) {
+            // Analysis not found
+            clearRunningAnalysisState()
+            if (showToast) {
+              toast.error("Analysis no longer exists")
+            }
+            selectDefaultAnalysis({ force: true })
+          } else {
+            // Other HTTP errors - retry with backoff
+            throw new Error(`HTTP ${pollResponse.status}`)
+          }
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          throw fetchError
+        }
+      } catch (error) {
+        console.error('Error polling restored analysis:', error)
+        errorCount++
+
+        if (errorCount >= maxErrors) {
+          clearRunningAnalysisState()
+          if (showToast) {
+            toast.error("Unable to check analysis status. Please refresh the page.")
+          }
+          selectDefaultAnalysis({ force: true })
+        } else {
+          // Retry with exponential backoff
+          const backoffMs = 5000 * Math.pow(2, errorCount - 1)
+          timeoutIdRef = setTimeout(pollAnalysis, backoffMs)
+        }
+      }
+    }
+
+    pollAnalysis()
+
+    // Cleanup on unmount
+    return () => {
+      if (timeoutIdRef) {
+        clearTimeout(timeoutIdRef)
+      }
+    }
+  }
+
   // Helper to extract members from team_analysis (handles both array and object formats)
   function getTeamMembers(analysisData: AnalysisResult['analysis_data']): unknown[] | undefined {
     const teamAnalysis = analysisData?.team_analysis
     if (Array.isArray(teamAnalysis)) return teamAnalysis
     return teamAnalysis?.members
   }
+
+  const isNumericId = (value: string) => /^[0-9]+$/.test(value)
 
   // Helper function to check if analysis has no incidents in time period
   function hasNoIncidentsInPeriod(): boolean {
@@ -337,26 +487,63 @@ export default function useDashboard() {
 
     const loadInitialData = async () => {
       try {
-        // Load data with individual error handling to prevent blocking
+        // Load list + auto-refresh + integrations in parallel.
+        // Pass skipAutoSelect=true so loadPreviousAnalyses only populates the sidebar list
+        // without trying to set currentAnalysis itself — we do that here with proper priority.
         const results = await Promise.allSettled([
-          loadPreviousAnalyses(),
-          loadIntegrations(false, false) // Don't force refresh, don't show global loading
+          loadPreviousAnalyses(false, false, true),
+          loadAutoRefreshAnalysis(),
+          loadIntegrations(false, false)
         ])
 
-        // Log any failures but don't block the UI
-        results.forEach((result, index) => {
-          const functionNames = ['loadPreviousAnalyses', 'loadIntegrations']
-          if (result.status === 'rejected') {
-            }
-        })
+        const urlParams = new URLSearchParams(window.location.search)
+        const hasUrlAnalysis = !!urlParams.get('analysis')
+        const runningAnalysisId = getValidRunningAnalysisId()
+        const hasRunningAnalysis = runningAnalysisId !== null
 
-        // Mark as loaded - the data is ready even if currentAnalysis isn't set yet
-        // The UI will update when currentAnalysis is set in the next render
+        if (!hasUrlAnalysis && !hasRunningAnalysis) {
+          const savedAnalyses = results[0].status === 'fulfilled' ? results[0].value : []
+          const autoRefresh = results[1].status === 'fulfilled' ? results[1].value : null
+          let didSelect = false
+
+          // Priority 1: Auto-refresh analysis (completed or running)
+          // Priority 2: Most recent saved analysis
+          // Priority 3: Nothing — show empty / run-analysis state
+          if (autoRefresh) {
+            const autoRefreshId = String(autoRefresh.id)
+
+            if (autoRefresh.status === 'completed') {
+              const fullAnalysis = await fetchFullAnalysisById(autoRefreshId)
+              if (fullAnalysis) {
+                updateURLWithAnalysis(String(fullAnalysis.id))
+                didSelect = true
+              }
+            }
+
+            if (!didSelect && (autoRefresh.status === 'running' || autoRefresh.status === 'pending')) {
+              // Persist running state so navigation restores correctly
+              localStorage.setItem('running_analysis_id', autoRefresh.id.toString())
+              localStorage.setItem('running_analysis_start', Date.now().toString())
+              updateURLWithAnalysis(String(autoRefresh.id))
+              startPollingAnalysis(autoRefresh.id, { showToast: false })
+              didSelect = true
+            }
+          }
+
+          if (!didSelect && savedAnalyses[0]) {
+            const id = String(savedAnalyses[0].id)
+            const fullAnalysis = await fetchFullAnalysisById(id)
+            if (fullAnalysis) {
+              updateURLWithAnalysis(String(fullAnalysis.id))
+              didSelect = true
+            }
+          }
+        }
+
         if (isMounted) {
           setInitialDataLoaded(true)
         }
       } catch (error) {
-        // Always set to true to prevent endless loading, even if some data fails
         if (isMounted) {
           setInitialDataLoaded(true)
         }
@@ -420,140 +607,48 @@ export default function useDashboard() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const analysisId = urlParams.get('analysis')
-    
-    if (analysisId && previousAnalyses.length > 0 && !redirectingToSuggested) {
-      // Check if this analysis ID exists in our current analyses list
-      const analysisExists = previousAnalyses.some(analysis => 
-        analysis.id.toString() === analysisId || 
-        (analysis.uuid && analysis.uuid === analysisId)
-      )
-      
-      // If this ID doesn't exist, show loader immediately
-      if (!analysisExists) {
-        setRedirectingToSuggested(true)
+
+    if (!analysisId) {
+      if (redirectingToSuggested) {
+        setRedirectingToSuggested(false)
       }
+      return
     }
-  }, [previousAnalyses, redirectingToSuggested])
+
+    if (!initialDataLoaded || loadingAnalyses) return
+
+    const matchesCurrent = currentAnalysis && (
+      currentAnalysis.id.toString() === analysisId ||
+      (currentAnalysis.uuid && currentAnalysis.uuid === analysisId)
+    )
+
+    const matchesAutoRefresh = autoRefreshAnalysis && (
+      autoRefreshAnalysis.id.toString() === analysisId ||
+      (autoRefreshAnalysis.uuid && autoRefreshAnalysis.uuid === analysisId)
+    )
+
+    const matchesSaved = previousAnalyses.some(analysis =>
+      analysis.id.toString() === analysisId ||
+      (analysis.uuid && analysis.uuid === analysisId)
+    )
+
+    if (matchesCurrent || matchesAutoRefresh || matchesSaved) {
+      if (redirectingToSuggested) {
+        setRedirectingToSuggested(false)
+      }
+      return
+    }
+
+    if (!redirectingToSuggested) {
+      setRedirectingToSuggested(true)
+    }
+  }, [previousAnalyses, redirectingToSuggested, currentAnalysis, autoRefreshAnalysis, initialDataLoaded, loadingAnalyses])
 
   // Restore running analysis state on mount (if user navigated away during analysis)
   useEffect(() => {
-    const savedAnalysisId = localStorage.getItem('running_analysis_id')
-    const savedStartTime = localStorage.getItem('running_analysis_start')
-
-    if (savedAnalysisId && savedStartTime) {
-      // Validate saved values with explicit radix
-      // Note: currentRunningAnalysisId is typed as number | null
-      // Backend only returns numeric IDs for running analyses
-      const startTime = parseInt(savedStartTime, 10)
-      const analysisId = parseInt(savedAnalysisId, 10)
-
-      if (isNaN(startTime) || isNaN(analysisId)) {
-        // Invalid or corrupted data
-        clearRunningAnalysisState()
-        return
-      }
-
-      const elapsedMs = Date.now() - startTime
-      const maxAnalysisTime = 30 * 60 * 1000 // 30 minutes max
-
-      // If less than 30 minutes elapsed, assume analysis might still be running
-      if (elapsedMs < maxAnalysisTime) {
-        setAnalysisRunning(true)
-        setCurrentRunningAnalysisId(analysisId)
-        setAnalysisStage("loading")
-        setAnalysisProgress(-1) // Use -1 to show indeterminate progress (navigated away, unknown state)
-        toast.info("Analysis still running...")
-
-        // Polling state
-        let pollCount = 0
-        const maxPollAttempts = 360 // 30 minutes at 5s intervals
-        let errorCount = 0
-        const maxErrors = 3
-        let timeoutIdRef: NodeJS.Timeout | null = null
-
-        // Start polling this analysis
-        const pollAnalysis = async () => {
-          try {
-            pollCount++
-
-            // Stop polling after max attempts
-            if (pollCount > maxPollAttempts) {
-              clearRunningAnalysisState()
-              toast.warning("Analysis is taking longer than expected. Please check back later.")
-              return
-            }
-
-            const authToken = getValidToken()
-            if (!authToken) {
-              clearRunningAnalysisState()
-              return
-            }
-
-            const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
-
-            try {
-              const pollResponse = await fetch(`${API_BASE}/analyses/${analysisId}`, {
-                headers: { 'Authorization': `Bearer ${authToken}` },
-                signal: controller.signal
-              })
-              clearTimeout(timeoutId)
-
-              if (pollResponse.ok) {
-                const analysisData = await pollResponse.json()
-                errorCount = 0 // Reset error count on success
-
-                if (analysisData.status === 'completed') {
-                  clearRunningAnalysisState()
-                  setCurrentAnalysis(analysisData)
-                  updateURLWithAnalysis(analysisData.uuid || analysisData.id)
-                  toast.success("Analysis completed!")
-                } else if (analysisData.status === 'running' || analysisData.status === 'pending') {
-                  // Continue polling
-                  timeoutIdRef = setTimeout(pollAnalysis, 5000)
-                } else if (analysisData.status === 'failed') {
-                  clearRunningAnalysisState()
-                  toast.error("Analysis failed")
-                }
-              } else if (pollResponse.status === 404) {
-                // Analysis not found
-                clearRunningAnalysisState()
-                toast.error("Analysis no longer exists")
-              } else {
-                // Other HTTP errors - retry with backoff
-                throw new Error(`HTTP ${pollResponse.status}`)
-              }
-            } catch (fetchError) {
-              clearTimeout(timeoutId)
-              throw fetchError
-            }
-          } catch (error) {
-            console.error('Error polling restored analysis:', error)
-            errorCount++
-
-            if (errorCount >= maxErrors) {
-              clearRunningAnalysisState()
-              toast.error("Unable to check analysis status. Please refresh the page.")
-            } else {
-              // Retry with exponential backoff
-              const backoffMs = 5000 * Math.pow(2, errorCount - 1)
-              timeoutIdRef = setTimeout(pollAnalysis, backoffMs)
-            }
-          }
-        }
-
-        pollAnalysis()
-
-        // Cleanup on unmount
-        return () => {
-          if (timeoutIdRef) {
-            clearTimeout(timeoutIdRef)
-          }
-        }
-      } else {
-        // Too much time has passed, clear stale state
-        clearRunningAnalysisState()
-      }
+    const analysisId = getValidRunningAnalysisId()
+    if (analysisId) {
+      return startPollingAnalysis(analysisId, { showToast: true })
     }
   }, []) // Run only once on mount
 
@@ -639,7 +734,7 @@ export default function useDashboard() {
     }
   }, [integrations, selectedIntegration])
 
-  const loadPreviousAnalyses = async (append = false, silent = false): Promise<boolean> => {
+  const loadPreviousAnalyses = async (append = false, silent = false, skipAutoSelect = false): Promise<AnalysisResult[]> => {
     // CRITICAL: Set loading state FIRST before any async operations
     if (append) {
       setLoadingMoreAnalyses(true)
@@ -651,7 +746,7 @@ export default function useDashboard() {
       const authToken = checkAuthToken()
       if (!authToken) {
         setLoadingAnalyses(false)
-        return false
+        return []
       }
 
       let response
@@ -705,68 +800,41 @@ export default function useDashboard() {
         setTotalAnalysesCount(data.total || newAnalyses.length)
         setHasMoreAnalyses(newAnalyses.length === 3 && (!data.total || previousAnalyses.length + newAnalyses.length < data.total))
 
-        // If no specific analysis is loaded and we have analyses, load the most recent one (only for initial load)
-        if (!append) {
+        // Auto-select logic runs only when not explicitly skipped (skipAutoSelect=true is used
+        // by loadInitialData which handles selection itself with proper priority ordering).
+        if (!append && !skipAutoSelect) {
           const urlParams = new URLSearchParams(window.location.search)
           const analysisId = urlParams.get('analysis')
 
-          // Always load the most recent analysis if no analysis is specified in URL
           if (!analysisId && data.analyses && data.analyses.length > 0) {
-            const mostRecentAnalysis = data.analyses[0] // Analyses should be ordered by created_at desc
+            const mostRecentAnalysis = data.analyses[0]
 
-            // Validate the analysis has required data
-            // Skip error if analysis is still running (pending/running/started status)
-            if (!mostRecentAnalysis.analysis_data) {
-              const isStillRunning = ['pending', 'running', 'started'].includes(mostRecentAnalysis.status)
-              if (isStillRunning) {
-                // Analysis is in progress, don't show error - just wait
-                setLoadingAnalyses(false)
-                return false
-              }
-              console.error('Most recent analysis is missing analysis_data')
-              toast.error('Latest analysis data is incomplete. Please run a new analysis.')
-              setLoadingAnalyses(false)
-              return false
-            }
-
-            // Check if the analysis has full member data
             const teamAnalysis = mostRecentAnalysis.analysis_data?.team_analysis
             const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
 
             if (members && Array.isArray(members) && members.length > 0) {
-              // Has full data, use it directly
               setCurrentAnalysis(mostRecentAnalysis)
             } else {
-              // Summary only, fetch the full analysis
+              // Summary only — fetch full data
               const analysisKey = mostRecentAnalysis.uuid || mostRecentAnalysis.id.toString()
               try {
-                const response = await fetch(`${API_BASE}/analyses/${mostRecentAnalysis.id}`, {
-                  headers: {
-                    'Authorization': `Bearer ${authToken}`
-                  }
+                const fullResp = await fetch(`${API_BASE}/analyses/by-id/${analysisKey}`, {
+                  headers: { 'Authorization': `Bearer ${authToken}` }
                 })
-
-                if (response.ok) {
-                  const fullAnalysis = await response.json()
+                if (fullResp.ok) {
+                  const fullAnalysis = await fullResp.json()
                   setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
                   setCurrentAnalysis(fullAnalysis)
-                } else {
-                  // API error - show error to user
-                  const errorText = await response.text().catch(() => 'Unknown error')
-                  console.error(`Failed to load most recent analysis (${response.status}):`, errorText)
-                  toast.error(`Failed to load analysis: ${response.status === 404 ? 'Analysis not found' : 'Server error'}`)
                 }
-              } catch (error) {
-                console.error('Error fetching most recent analysis:', error)
-                toast.error('Failed to load most recent analysis. Please try refreshing the page.')
+              } catch {
+                // Non-critical: loadInitialData's priority selection is the primary path
               }
             }
-            // Platform mappings will be fetched by the dedicated useEffect
           }
         }
 
         setLoadingAnalyses(false)
-        return newAnalyses.length > 0
+        return newAnalyses
       } else {
         // Handle API errors (401, 404, 500, etc.)
         let errorText = 'Unknown error'
@@ -786,7 +854,7 @@ export default function useDashboard() {
           toast.error("Failed to load analyses")
         }
         setLoadingAnalyses(false)
-        return false
+        return []
       }
     } catch (error) {
       // Check if this is a network connectivity issue (expected during Railway startup)
@@ -810,7 +878,7 @@ export default function useDashboard() {
           toast.error("Error loading analyses")
         }
       }
-      return false
+      return []
     } finally {
       // CRITICAL: ALWAYS reset loading state in finally block
       if (append) {
@@ -818,6 +886,51 @@ export default function useDashboard() {
       } else {
         setLoadingAnalyses(false)
       }
+    }
+  }
+
+  const loadAutoRefreshAnalysis = async (): Promise<AnalysisResult | null> => {
+    try {
+      const authToken = checkAuthToken()
+      if (!authToken) return null
+
+      const response = await fetch(`${API_BASE}/analyses/auto-refresh`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAutoRefreshAnalysis(data) // null if no auto-refresh analysis exists
+        return data
+      }
+    } catch (error) {
+      // Non-critical: don't show toast
+    }
+    return null
+  }
+
+  const saveCurrentAnalysis = async () => {
+    if (!currentAnalysis || currentAnalysis.is_saved || currentAnalysis.is_auto_refresh) return
+
+    try {
+      const authToken = checkAuthToken()
+      if (!authToken) return
+
+      const response = await fetch(`${API_BASE}/analyses/${currentAnalysis.id}/save`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+
+      if (response.ok) {
+        setCurrentAnalysis({ ...currentAnalysis, is_saved: true })
+        // Reload saved analyses list
+        await loadPreviousAnalyses()
+        toast.success("Analysis saved")
+      } else {
+        toast.error("Failed to save analysis")
+      }
+    } catch (error) {
+      toast.error("Failed to save analysis")
     }
   }
 
@@ -841,11 +954,9 @@ export default function useDashboard() {
           return
         }
       }
-      // Check if analysisId is a UUID (contains hyphens) or integer ID
-      const isUuid = analysisId.includes('-')
-
-      // Use the unified endpoint that handles both UUIDs and integer IDs
-      const endpoint = `${API_BASE}/analyses/by-id/${analysisId}`
+      const endpoint = isNumericId(analysisId)
+        ? `${API_BASE}/analyses/${analysisId}`
+        : `${API_BASE}/analyses/by-id/${analysisId}`
       
       const response = await fetch(endpoint, {
         headers: {
@@ -862,10 +973,8 @@ export default function useDashboard() {
         // Platform mappings will be fetched by the dedicated useEffect
         // Turn off redirect loader since we successfully loaded the analysis
         setRedirectingToSuggested(false)
-        // Update URL to use UUID if we loaded by integer ID
-        if (!isUuid && analysis.uuid) {
-          updateURLWithAnalysis(analysis.uuid || analysis.id)
-        }
+        // Keep URL in numeric form for consistency and to avoid org-mismatch issues
+        updateURLWithAnalysis(String(analysis.id))
       } else {
         
         // Show user-friendly error message and handle suggested redirect
@@ -899,8 +1008,89 @@ export default function useDashboard() {
         setHistoricalTrends(null)
         // Remove invalid analysis ID from URL
         updateURLWithAnalysis(null)
+        // Fall back to default selection (auto-refresh -> saved -> empty)
+        selectDefaultAnalysis({ force: true })
       }
     } catch (error) {
+    }
+  }
+
+  const fetchFullAnalysisById = async (analysisId: string): Promise<AnalysisResult | null> => {
+    try {
+      const authToken = checkAuthToken()
+      if (!authToken) return null
+
+      const endpoint = isNumericId(analysisId)
+        ? `${API_BASE}/analyses/${analysisId}`
+        : `${API_BASE}/analyses/by-id/${analysisId}`
+
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (response.ok) {
+        const analysis = await response.json()
+        const cacheKey = analysis.uuid || analysis.id.toString()
+        setAnalysisCache(prev => new Map(prev.set(cacheKey, analysis)))
+        setCurrentAnalysis(analysis)
+        return analysis
+      }
+    } catch (error) {
+      // Non-critical: return null to allow fallback
+    }
+    return null
+  }
+
+  const selectDefaultAnalysis = async (options: { force?: boolean } = {}) => {
+    if (defaultSelectionInFlight.current) return
+    if (!options.force) {
+      const urlParams = new URLSearchParams(window.location.search)
+      if (urlParams.get('analysis')) return
+    }
+    if (currentAnalysis) return
+
+    defaultSelectionInFlight.current = true
+    try {
+      const autoRefresh = autoRefreshAnalysis ?? await loadAutoRefreshAnalysis()
+      const savedAnalyses = previousAnalyses.length > 0
+        ? previousAnalyses
+        : await loadPreviousAnalyses(false, true, true)
+
+      if (autoRefresh) {
+        const autoRefreshId = String(autoRefresh.id)
+
+        if (autoRefresh.status === 'completed') {
+          const fullAnalysis = await fetchFullAnalysisById(autoRefreshId)
+          if (fullAnalysis) {
+            setRedirectingToSuggested(false)
+            updateURLWithAnalysis(String(fullAnalysis.id))
+            return
+          }
+        }
+
+        if (autoRefresh.status === 'running' || autoRefresh.status === 'pending') {
+          localStorage.setItem('running_analysis_id', autoRefresh.id.toString())
+          localStorage.setItem('running_analysis_start', Date.now().toString())
+          setRedirectingToSuggested(false)
+          updateURLWithAnalysis(String(autoRefresh.id))
+          startPollingAnalysis(autoRefresh.id, { showToast: false })
+          return
+        }
+      }
+
+      if (savedAnalyses[0]) {
+        const id = String(savedAnalyses[0].id)
+        const fullAnalysis = await fetchFullAnalysisById(id)
+        if (fullAnalysis) {
+          setRedirectingToSuggested(false)
+          updateURLWithAnalysis(String(fullAnalysis.id))
+          return
+        }
+      }
+    } finally {
+      defaultSelectionInFlight.current = false
     }
   }
 
@@ -1002,6 +1192,11 @@ export default function useDashboard() {
           newCache.delete(analysisId)
           return newCache
         })
+
+        // Clear auto-refresh state if this was the auto-refresh analysis
+        if (autoRefreshAnalysis && String(autoRefreshAnalysis.id) === analysisId) {
+          setAutoRefreshAnalysis(null)
+        }
 
         // Clear selection if this analysis was selected
         if (currentAnalysis?.id === analysisToDelete.id) {
@@ -1458,6 +1653,8 @@ export default function useDashboard() {
   const [isCustomRange, setIsCustomRange] = useState(false)
   const [dialogSelectedIntegration, setDialogSelectedIntegration] = useState<string>("")
   const [noIntegrationsFound, setNoIntegrationsFound] = useState(false)
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false)
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState("24h")
   
   // GitHub/Slack integration states
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null)
@@ -1735,6 +1932,24 @@ export default function useDashboard() {
         console.warn('Integration validation failed, continuing anyway:', validationError)
       }
       
+      // Discard unsaved non-auto-refresh analysis before running a new one
+      if (currentAnalysis &&
+          currentAnalysis.status === 'completed' &&
+          currentAnalysis.is_saved !== true &&
+          currentAnalysis.is_auto_refresh !== true) {
+        try {
+          const discardToken = getValidToken()
+          if (discardToken) {
+            await fetch(`${API_BASE}/analyses/${currentAnalysis.id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${discardToken}` }
+            })
+          }
+        } catch (_) {
+          // Non-critical: continue even if discard fails
+        }
+      }
+
       const requestData = {
         integration_id: integrationId,
         time_range: parseInt(selectedTimeRange),
@@ -1743,7 +1958,9 @@ export default function useDashboard() {
         include_slack: slackIntegration ? includeSlack : false,
         include_jira: jiraIntegration ? includeJira : false,
         include_linear: linearIntegration ? includeLinear : false,
-        enable_ai: enableAI  // User can toggle, uses Railway token when enabled
+        enable_ai: enableAI,  // User can toggle, uses Railway token when enabled
+        auto_refresh_enabled: autoRefreshEnabled,
+        auto_refresh_interval: autoRefreshEnabled ? autoRefreshInterval : null,
       }
       
 
@@ -1774,6 +1991,24 @@ export default function useDashboard() {
       }
       
       if (!response.ok) {
+        if (response.status === 404) {
+          setCurrentAnalysis(prev => {
+            if (!prev) return prev
+            const prevConfig = (prev.config ?? {}) as Record<string, any>
+            return {
+              ...prev,
+              config: {
+                ...prevConfig,
+                auto_refresh_blocked: {
+                  provider: prev.platform || 'Integration',
+                  reason: 'integration_inactive',
+                  message: responseData.detail || responseData.message || 'Integration not found or not active',
+                  blocked_at: new Date().toISOString()
+                }
+              }
+            }
+          })
+        }
         throw new Error(responseData.detail || responseData.message || `Analysis failed with status ${response.status}`)
       }
 
@@ -1894,13 +2129,17 @@ export default function useDashboard() {
                   clearRunningAnalysisState()
                   setCurrentAnalysis(analysisData)
                   setRedirectingToSuggested(false) // Turn off redirect loader
-                  updateURLWithAnalysis(analysisData.uuid || analysisData.id)
+                  updateURLWithAnalysis(String(analysisData.id))
                 }, 500) // Show 100% for just 0.5 seconds before showing data
               }, 800) // Wait 0.8 seconds to reach 95%
               
               // Reload previous analyses from API to ensure sidebar is up-to-date
               await loadPreviousAnalyses()
-              
+              // Reload auto-refresh analysis if this was an auto-refresh run
+              if (autoRefreshEnabled) {
+                await loadAutoRefreshAnalysis()
+              }
+
               toast.success("Analysis completed!")
               return
             } else if (analysisData.status === 'failed') {
@@ -1910,7 +2149,7 @@ export default function useDashboard() {
               // Check if we have partial data to display
               if (analysisData.analysis_data?.partial_data) {
                 setCurrentAnalysis(analysisData)
-                updateURLWithAnalysis(analysisData.uuid)
+                updateURLWithAnalysis(String(analysisData.id))
                 toast("Analysis completed with partial data")
                 await loadPreviousAnalyses()
               } else {
@@ -2021,6 +2260,80 @@ export default function useDashboard() {
       setAnalysisRunning(false)
       setCurrentRunningAnalysisId(null)
       toast.error(error instanceof Error ? error.message : "Failed to run analysis")
+    }
+  }
+
+  const refreshCurrentAnalysis = async () => {
+    if (!currentAnalysis || analysisRunning) return
+
+    try {
+      const authToken = checkAuthToken()
+      if (!authToken) return
+
+      setAnalysisRunning(true)
+      setAnalysisStage("loading")
+      setAnalysisProgress(0)
+      setTargetProgress(5)
+      setCurrentStageIndex(0)
+
+      const requestData = {
+        integration_id: currentAnalysis.integration_id,
+        time_range: currentAnalysis.time_range || 30,
+        include_weekends: currentAnalysis.config?.include_weekends ?? true,
+        include_github: currentAnalysis.config?.include_github ?? false,
+        include_slack: currentAnalysis.config?.include_slack ?? false,
+        include_jira: currentAnalysis.config?.include_jira ?? false,
+        include_linear: currentAnalysis.config?.include_linear ?? false,
+        enable_ai: false,
+        auto_refresh_enabled: currentAnalysis.is_auto_refresh === true,
+        auto_refresh_interval: currentAnalysis.is_auto_refresh ? (currentAnalysis.auto_refresh_interval || "24h") : null,
+      }
+
+      let response
+      try {
+        response = await fetch(`${API_BASE}/analyses/run`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify(requestData),
+        })
+      } catch (networkError) {
+        throw new Error('Cannot connect to backend server. Please check if the backend is running and try again.')
+      }
+
+      if (!response) {
+        throw new Error('No response from server. Please check if the backend is running.')
+      }
+
+      let responseData
+      try {
+        responseData = await response.json()
+      } catch (parseError) {
+        throw new Error(`Server returned invalid response (${response.status}). The backend may be experiencing issues.`)
+      }
+
+      if (!response.ok) {
+        throw new Error(responseData.detail || responseData.message || `Analysis failed with status ${response.status}`)
+      }
+
+      const { id: analysis_id } = responseData
+      if (!analysis_id) {
+        throw new Error('No analysis ID returned from server')
+      }
+
+      setCurrentRunningAnalysisId(analysis_id)
+      localStorage.setItem('running_analysis_id', analysis_id.toString())
+      localStorage.setItem('running_analysis_start', Date.now().toString())
+      updateURLWithAnalysis(String(analysis_id))
+
+      await loadPreviousAnalyses(false, true)
+      startPollingAnalysis(analysis_id, { showToast: true })
+    } catch (error) {
+      setAnalysisRunning(false)
+      setCurrentRunningAnalysisId(null)
+      toast.error(error instanceof Error ? error.message : "Failed to refresh analysis")
     }
   }
 
@@ -2322,6 +2635,7 @@ return {
   // core data
   integrations,
   currentAnalysis,
+  autoRefreshAnalysis,
   previousAnalyses,
   totalAnalysesCount,
   historicalTrends,
@@ -2381,10 +2695,13 @@ return {
   // actions
   startAnalysis,
   runAnalysisWithTimeRange,
+  refreshCurrentAnalysis,
   cancelRunningAnalysis,
   openDeleteDialog,
   confirmDeleteAnalysis,
   loadPreviousAnalyses,
+  loadAutoRefreshAnalysis,
+  saveCurrentAnalysis,
   loadSpecificAnalysis,
   loadHistoricalTrends,
   fetchPlatformMappings,
@@ -2412,6 +2729,10 @@ return {
   setDialogSelectedIntegration,
   noIntegrationsFound,
   setNoIntegrationsFound,
+  autoRefreshEnabled,
+  setAutoRefreshEnabled,
+  autoRefreshInterval,
+  setAutoRefreshInterval,
 
   // delete modal
   deleteDialogOpen,

@@ -308,6 +308,79 @@ export default function IntegrationsPage() {
   // Manual survey delivery modal state
   const [showManualSurveyModal, setShowManualSurveyModal] = useState(false)
 
+  // Slack survey recipient state
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
+  const [, setTeamMembersError] = useState<string | null>(null)
+  const [syncedUsers, setSyncedUsers] = useState<any[]>([])
+  const [loadingSyncedUsers, setLoadingSyncedUsers] = useState(false)
+  const [, setShowSyncedUsers] = useState(false)
+  const [, setTeamMembersDrawerOpen] = useState(false)
+  const syncedUsersCacheRef = useRef<Map<string, any[]>>(new Map())
+
+  const getActiveOrganizationId = () =>
+    selectedOrganization || integrations.find(i => i.is_default)?.id?.toString() || ''
+
+  async function fetchTeamMembers(suppressToast = false): Promise<void> {
+    const organizationId = getActiveOrganizationId()
+    if (!organizationId) return
+
+    await TeamHandlers.fetchTeamMembers(
+      organizationId,
+      setLoadingTeamMembers,
+      setTeamMembersError,
+      setTeamMembers,
+      setTeamMembersDrawerOpen,
+      suppressToast
+    )
+  }
+
+  async function fetchSyncedUsers(
+    showToast = true,
+    autoSync = true,
+    forceRefresh = false,
+    openDrawer = false
+  ): Promise<void> {
+    const organizationId = getActiveOrganizationId()
+    if (!organizationId) return
+
+    await TeamHandlers.fetchSyncedUsers(
+      organizationId,
+      setLoadingSyncedUsers,
+      setSyncedUsers,
+      setShowSyncedUsers,
+      setTeamMembersDrawerOpen,
+      () => syncUsersToCorrelation(false),
+      showToast,
+      autoSync,
+      undefined,
+      undefined,
+      syncedUsersCacheRef.current,
+      forceRefresh,
+      undefined,
+      openDrawer
+    )
+  }
+
+  async function syncUsersToCorrelation(suppressToast = false): Promise<void> {
+    const organizationId = getActiveOrganizationId()
+    if (!organizationId) return
+
+    syncedUsersCacheRef.current.delete(organizationId)
+
+    await TeamHandlers.syncUsersToCorrelation(
+      organizationId,
+      setLoadingTeamMembers,
+      setTeamMembersError,
+      fetchTeamMembers,
+      async (showToast = true, autoSync = true) => {
+        await fetchSyncedUsers(showToast, autoSync, true, false)
+      },
+      undefined,
+      suppressToast
+    )
+  }
+
 
   // GitHub org members handlers
   const fetchGitHubOrgMembers = async () => {
@@ -848,6 +921,11 @@ export default function IntegrationsPage() {
       }, 500)
     }
   }, [integrations, selectedOrganization])
+
+  useEffect(() => {
+    setTeamMembers([])
+    setSyncedUsers([])
+  }, [selectedOrganization])
 
 
   // Handle Slack/Jira/Linear OAuth success redirect
@@ -3207,13 +3285,13 @@ export default function IntegrationsPage() {
                 userInfo={userInfo}
                 selectedOrganization={selectedOrganization}
                 integrations={integrations}
-                teamMembers={[]}
-                loadingTeamMembers={false}
-                loadingSyncedUsers={false}
-                syncedUsers={[]}
-                fetchTeamMembers={() => {}}
-                syncUsersToCorrelation={() => {}}
-                fetchSyncedUsers={() => {}}
+                teamMembers={teamMembers}
+                loadingTeamMembers={loadingTeamMembers}
+                loadingSyncedUsers={loadingSyncedUsers}
+                syncedUsers={syncedUsers}
+                fetchTeamMembers={fetchTeamMembers}
+                syncUsersToCorrelation={syncUsersToCorrelation}
+                fetchSyncedUsers={fetchSyncedUsers}
                 setShowManualSurveyModal={setShowManualSurveyModal}
                 loadSlackPermissions={loadSlackPermissions}
                 loadSlackStatus={loadSlackIntegration}

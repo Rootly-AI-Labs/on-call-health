@@ -171,7 +171,7 @@ export function TeamMembersList({
   connectedIntegrations = new Set()
 }: TeamMembersListProps) {
   const [showMembersWithoutIncidents, setShowMembersWithoutIncidents] = useState(false);
-  const [sortBy, setSortBy] = useState<'risk' | 'trend'>('risk');
+  const [sortBy, setSortBy] = useState<'risk' | 'trend' | 'incidents'>('risk');
   const dataSources = currentAnalysis?.analysis_data?.data_sources;
   const analysisConfig = currentAnalysis?.config;
   const individualDailyData = currentAnalysis?.analysis_data?.individual_daily_data;
@@ -491,6 +491,16 @@ export function TeamMembersList({
               >
                 Trend
               </button>
+              <button
+                onClick={() => setSortBy('incidents')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  sortBy === 'incidents'
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                Incidents
+              </button>
             </div>
           </div>
         </CardHeader>
@@ -527,29 +537,33 @@ export function TeamMembersList({
               if (sortBy === 'risk') {
                 // Sort by OCH risk level (higher score = higher risk)
                 return [...members].sort((a, b) => (b.och_score || 0) - (a.och_score || 0));
-              } else {
-                // Sort by trend (worsening first, then stable, then improving)
-                // For same trend level, sort by risk level (higher risk first)
-                const trendOrder: Record<string, number> = {
-                  'significantly_worsening': 0,
-                  'worsening': 1,
-                  'stable': 2,
-                  'improving': 3,
-                  'significantly_improving': 4
-                };
-
-                return [...members].sort((a, b) => {
-                  const trendA = calculateUserTrend(a.user_email, individualDailyData);
-                  const trendB = calculateUserTrend(b.user_email, individualDailyData);
-                  // Use ?? instead of || because 0 is a valid order value (significantly_worsening)
-                  const trendComparison = (trendOrder[trendA.trend] ?? 2) - (trendOrder[trendB.trend] ?? 2);
-                  // If same trend level, sort by risk level (higher risk first)
-                  if (trendComparison === 0) {
-                    return (b.och_score || 0) - (a.och_score || 0);
-                  }
-                  return trendComparison;
-                });
               }
+
+              if (sortBy === 'incidents') {
+                return [...members].sort((a, b) => (b.incident_count || 0) - (a.incident_count || 0));
+              }
+
+              // Sort by trend (worsening first, then stable, then improving)
+              // For same trend level, sort by risk level (higher risk first)
+              const trendOrder: Record<string, number> = {
+                'significantly_worsening': 0,
+                'worsening': 1,
+                'stable': 2,
+                'improving': 3,
+                'significantly_improving': 4
+              };
+
+              return [...members].sort((a, b) => {
+                const trendA = calculateUserTrend(a.user_email, individualDailyData);
+                const trendB = calculateUserTrend(b.user_email, individualDailyData);
+                // Use ?? instead of || because 0 is a valid order value (significantly_worsening)
+                const trendComparison = (trendOrder[trendA.trend] ?? 2) - (trendOrder[trendB.trend] ?? 2);
+                // If same trend level, sort by risk level (higher risk first)
+                if (trendComparison === 0) {
+                  return (b.och_score || 0) - (a.och_score || 0);
+                }
+                return trendComparison;
+              });
             }
 
             // Sort members alphabetically by name
