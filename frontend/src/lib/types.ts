@@ -222,6 +222,7 @@ export interface AnalysisResult {
   id: string
   uuid?: string
   integration_id: number
+  platform?: string
   created_at: string
   status: string
   time_range: number
