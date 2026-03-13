@@ -15,6 +15,10 @@ from ...core.rootly_client import RootlyAPIClient
 from ...core.rate_limiting import integration_rate_limit
 from ...core.input_validation import RootlyTokenRequest, RootlyIntegrationRequest
 from ...services.integration_validator import decrypt_token
+from ...services.survey_recipient_service import (
+    get_saved_recipient_ids_for_org,
+    save_survey_recipient_ids_for_org,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1689,18 +1693,21 @@ async def get_synced_users(
 
         # Get saved recipient IDs if configured
         saved_recipient_ids = None
-        if integration_id and surveys_enabled:
-            try:
-                numeric_id = int(integration_id)
-                # SECURITY: Verify user owns this integration
-                integration = db.query(RootlyIntegration).filter(
-                    RootlyIntegration.id == numeric_id,
-                    RootlyIntegration.user_id == current_user.id
-                ).first()
-                if integration and integration.survey_recipients:
-                    saved_recipient_ids = set(integration.survey_recipients)
-            except (ValueError, AttributeError):
-                pass
+        if surveys_enabled:
+            if current_user.organization_id:
+                saved_recipient_ids = get_saved_recipient_ids_for_org(db, current_user.organization_id)
+            elif integration_id:
+                try:
+                    numeric_id = int(integration_id)
+                    # SECURITY: Verify user owns this integration
+                    integration = db.query(RootlyIntegration).filter(
+                        RootlyIntegration.id == numeric_id,
+                        RootlyIntegration.user_id == current_user.id
+                    ).first()
+                    if integration and integration.survey_recipients:
+                        saved_recipient_ids = set(integration.survey_recipients)
+                except (ValueError, AttributeError):
+                    pass
 
         # Format the response
         synced_users = []
@@ -1833,7 +1840,7 @@ async def update_survey_recipients(
     db: Session = Depends(get_db)
 ):
     """
-    Save selected survey recipients for an integration.
+    Save selected survey recipients for automated Slack surveys.
     These users will receive automated burnout survey invitations via Slack.
 
     If recipient_ids is empty, this will RESET to default behavior (send to all users).
@@ -1867,9 +1874,13 @@ async def update_survey_recipients(
                 detail="Integration not found"
             )
 
+        normalized_recipient_ids = [int(recipient_id) for recipient_id in recipient_ids]
+
         # If empty list, set to None to revert to default behavior
-        if len(recipient_ids) == 0:
+        if len(normalized_recipient_ids) == 0:
             integration.survey_recipients = None
+            if current_user.organization_id:
+                save_survey_recipient_ids_for_org(db, current_user.organization_id, None)
             db.commit()
             logger.info(
                 f"User {current_user.id} cleared survey recipients for integration {integration_id} - "
@@ -1889,31 +1900,35 @@ async def update_survey_recipients(
         valid_ids = db.query(UserCorrelation.id).filter(
             UserCorrelation.organization_id.isnot(None),
             UserCorrelation.organization_id == current_user.organization_id,
-            UserCorrelation.id.in_(recipient_ids)
+            UserCorrelation.id.in_(normalized_recipient_ids)
         ).all()
         valid_id_set = {row[0] for row in valid_ids}
 
-        invalid_ids = [rid for rid in recipient_ids if rid not in valid_id_set]
+        invalid_ids = [rid for rid in normalized_recipient_ids if rid not in valid_id_set]
         if invalid_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid recipient IDs: {invalid_ids}"
             )
 
-        # Update the integration with new recipients
-        integration.survey_recipients = recipient_ids
+        # Save the org-wide selection first, then mirror it on the integration for
+        # legacy compatibility with any older readers that still inspect the row.
+        if current_user.organization_id:
+            save_survey_recipient_ids_for_org(db, current_user.organization_id, normalized_recipient_ids)
+
+        integration.survey_recipients = normalized_recipient_ids
         db.commit()
 
         logger.info(
             f"User {current_user.id} updated survey recipients for integration {integration_id}: "
-            f"{len(recipient_ids)} recipients selected"
+            f"{len(normalized_recipient_ids)} recipients selected"
         )
 
         return {
             "success": True,
-            "message": f"Survey recipients updated: {len(recipient_ids)} users selected",
+            "message": f"Survey recipients updated: {len(normalized_recipient_ids)} users selected",
             "integration_id": integration_id,
-            "recipient_count": len(recipient_ids),
+            "recipient_count": len(normalized_recipient_ids),
             "is_default": False
         }
 
@@ -1935,8 +1950,8 @@ async def get_survey_recipients(
     db: Session = Depends(get_db)
 ):
     """
-    Get saved survey recipients for an integration.
-    Returns list of UserCorrelation IDs that should receive surveys.
+    Get saved survey recipients for automated Slack surveys.
+    Returns list of UserCorrelation IDs that should receive scheduled surveys.
     """
     try:
         # Handle beta integrations
@@ -1971,6 +1986,9 @@ async def get_survey_recipients(
             )
 
         recipient_ids = integration.survey_recipients or []
+        if current_user.organization_id:
+            saved_recipient_ids = get_saved_recipient_ids_for_org(db, current_user.organization_id)
+            recipient_ids = sorted(saved_recipient_ids) if saved_recipient_ids is not None else []
 
         return {
             "integration_id": integration_id,
