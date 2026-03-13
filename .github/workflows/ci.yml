@@ -12,6 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Build frontend base image
+        run: docker build -t rootlyio/on-call-health:frontend-base ./frontend -f ./frontend/Dockerfile.base
+
       - name: Build frontend Docker image
         run: docker build -t frontend-test ./frontend -f ./frontend/Dockerfile.dev
 
@@ -43,6 +46,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Build frontend base image
+        run: docker build -t rootlyio/on-call-health:frontend-base ./frontend -f ./frontend/Dockerfile.base
 
       - name: Start services
         run: docker compose up -d --build
