@@ -20,6 +20,7 @@ from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
 from ...core.alert_health_calculator import calculate_alert_health_score
 from ...core.och_config import apply_alert_health_to_och, OCHConfig
+from ...services.survey_response_service import extract_analysis_member_emails, normalize_survey_email
 from ...utils.visual_logger import log_task_start, log_task_complete
 
 logger = logging.getLogger(__name__)
@@ -887,8 +888,6 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     from datetime import timedelta, datetime
     from collections import defaultdict
     from ...models.user_burnout_report import UserBurnoutReport
-    from ...models.user_correlation import UserCorrelation
-
     if not analysis.organization_id:
         return {}
 
@@ -896,21 +895,14 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     analysis_end_date = datetime.now(timezone.utc)
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
 
-    # Query 1: Get all team member emails (select only email column to avoid loading full objects)
-    # SECURITY: Explicitly check IS NOT NULL for defense-in-depth
-    member_emails = [
-        row[0] for row in db.query(UserCorrelation.email).filter(
-            UserCorrelation.organization_id == analysis.organization_id,
-            UserCorrelation.organization_id.isnot(None),
-            UserCorrelation.email.isnot(None)
-        ).all()
-    ]
+    # Only use the emails that are actually present in this analysis roster.
+    member_emails = extract_analysis_member_emails(analysis.results)
     if not member_emails:
         return {}
 
     # Query 2: Bulk fetch all surveys for all members (instead of N queries)
     all_surveys = db.query(UserBurnoutReport).filter(
-        UserBurnoutReport.email.in_(member_emails),
+        func.lower(UserBurnoutReport.email).in_(member_emails),
         UserBurnoutReport.submitted_at >= analysis_start_date,
         UserBurnoutReport.submitted_at <= analysis_end_date
     ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
@@ -918,7 +910,9 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     # Group surveys by email
     surveys_by_email = defaultdict(list)
     for survey in all_surveys:
-        surveys_by_email[survey.email].append(survey)
+        normalized_email = normalize_survey_email(survey.email)
+        if normalized_email:
+            surveys_by_email[normalized_email].append(survey)
 
     # Process each member's surveys
     member_surveys = {}
