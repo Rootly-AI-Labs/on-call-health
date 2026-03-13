@@ -18,6 +18,8 @@ from ...auth.dependencies import get_current_active_user, get_current_user_flexi
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
+from ...core.alert_health_calculator import calculate_alert_health_score
+from ...core.och_config import apply_alert_health_to_och, OCHConfig
 from ...utils.visual_logger import log_task_start, log_task_complete
 
 logger = logging.getLogger(__name__)
@@ -3521,6 +3523,30 @@ async def run_analysis_task(
                             member["alerts_retriggered_count"] = retriggered_count
                             member["alerts_avg_mtta_seconds"] = avg_mtta_seconds
                             member["alerts_avg_mttr_seconds"] = avg_mttr_seconds
+
+                            # Calculate alert health score (0-100) for OCH integration
+                            signal_quality_pct = 100.0
+                            if noise_counts and (noise_counts.get('not_noise', 0) + noise_counts.get('noise', 0)) > 0:
+                                not_noise = noise_counts.get('not_noise', 0)
+                                total_noise_checked = not_noise + noise_counts.get('noise', 0)
+                                signal_quality_pct = (not_noise / total_noise_checked * 100) if total_noise_checked > 0 else 100.0
+
+                            alert_health_result = calculate_alert_health_score(
+                                total_alerts=count or 0,
+                                night_time_alerts=night_time_count or 0,
+                                escalated_alerts=escalated_count or 0,
+                                retriggered_alerts=retriggered_count or 0,
+                                alerts_with_incidents=alerts_with_incidents_count or 0,
+                                after_hours_alerts=after_hours_count or 0,
+                                signal_quality_pct=signal_quality_pct
+                            )
+                            member["alerts_health_score"] = alert_health_result['score']
+                            member["alerts_health_interpretation"] = alert_health_result['interpretation']
+
+                            # Apply alert health to OCH score (post-process since alert data
+                            # is fetched after the analyzer runs)
+                            adjusted_score = alert_health_result['score'] * OCHConfig.ALERT_HEALTH_MULTIPLIER
+                            apply_alert_health_to_och(member, adjusted_score)
                 except Exception as alerts_err:
                     logger.warning(f"BACKGROUND_TASK: Failed to attach alert metadata for analysis {analysis_ref}: {alerts_err}")
 

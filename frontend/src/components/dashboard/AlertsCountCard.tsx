@@ -108,19 +108,14 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
   const sourceMax = sourceEntries.length > 0 ? (sourceEntries[0][1] as number) : 1
 
   return (
-    <Card className="bg-white h-fit">
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-neutral-900">Team Alerts</CardTitle>
-            <CardDescription>Rootly alert count for this analysis window</CardDescription>
-          </div>
-          <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center">
-            <Bell className="w-4 h-4 text-red-500" />
-          </div>
+    <Card className="bg-white flex flex-col">
+      <CardHeader className="pb-2 shrink-0">
+        <div className="space-y-1">
+          <CardTitle className="text-neutral-900">Team Alerts</CardTitle>
+          <CardDescription>Rootly alert count for this analysis window</CardDescription>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 flex flex-col min-h-0 overflow-y-auto">
         {hasError ? (
           <div className="flex items-start gap-2 text-sm text-red-700">
             <AlertTriangle className="w-4 h-4 mt-0.5" />
@@ -129,61 +124,65 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
         ) : (
           <div className="space-y-4">
             {/* Count + date */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-1">
               <span className="text-4xl font-bold text-neutral-900">
                 {typeof total === "number" ? total : "N/A"}
               </span>
-              <div className="flex items-center gap-1 text-sm text-neutral-500">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>{dateRange}</span>
-              </div>
+              <span className="text-sm text-neutral-500">{dateRange}</span>
             </div>
 
             {alerts.truncated && (
               <div className="text-xs text-yellow-700">Alert count may be partial (page limit reached)</div>
             )}
 
-            {/* Urgency Distribution */}
-            {urgencyEntries.length > 0 && (
-              <div>
-                <div className="text-sm font-semibold text-neutral-800 mb-2">Urgency</div>
-                <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-neutral-100 mb-2">
-                  {urgencyEntries.map(([key, value]) => {
-                    const pct = urgencyTotal > 0 ? ((value as number) / urgencyTotal) * 100 : 0
-                    return (
-                      <div
-                        key={key}
-                        className={`h-full ${URGENCY_COLORS[key] ?? "bg-gray-400"}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    )
-                  })}
-                </div>
-                <div className="flex items-center gap-4 text-xs text-neutral-600">
-                  {urgencyEntries.map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-1">
-                      <span className={`w-2 h-2 rounded-full inline-block ${URGENCY_DOT_COLORS[key] ?? "bg-gray-400"}`} />
-                      <span className="capitalize">{key}</span>
-                      <span className="font-semibold text-neutral-800 ml-0.5">{value as number}</span>
+            {/* Urgency Distribution + Signal Quality - Side by side */}
+            {(urgencyEntries.length > 0 || notNoisePct !== null) && (
+              <div className="grid grid-cols-2 gap-4">
+                {/* Urgency Distribution */}
+                {urgencyEntries.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-neutral-700 font-medium">Urgency</span>
+                      <div className="flex items-center gap-2 text-xs text-neutral-600">
+                        {urgencyEntries.map(([key, value]) => (
+                          <div key={key} className="flex items-center gap-1">
+                            <span className={`w-2 h-2 rounded-full inline-block ${URGENCY_DOT_COLORS[key] ?? "bg-gray-400"}`} />
+                            <span className="capitalize font-medium">{key}</span>
+                            <span className="font-semibold text-neutral-800">{value as number}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                    <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-neutral-100 mb-2">
+                      {urgencyEntries.map(([key, value]) => {
+                        const pct = urgencyTotal > 0 ? ((value as number) / urgencyTotal) * 100 : 0
+                        return (
+                          <div
+                            key={key}
+                            className={`h-full ${URGENCY_COLORS[key] ?? "bg-gray-400"}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
-            {/* Signal Quality */}
-            {notNoisePct !== null && (
-              <div>
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-neutral-700 font-medium">Signal Quality</span>
-                  <span className="text-green-600 font-medium">{notNoisePct}% actionable</span>
-                </div>
-                <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-green-500 rounded-full"
-                    style={{ width: `${notNoisePct}%` }}
-                  />
-                </div>
+                {/* Signal Quality */}
+                {notNoisePct !== null && (
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-neutral-700 font-medium">Signal Quality</span>
+                      <span className="text-green-600 font-medium">{notNoisePct}% actionable</span>
+                    </div>
+                    <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 rounded-full"
+                        style={{ width: `${notNoisePct}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -211,83 +210,47 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
               </div>
             )}
 
-            {/* Alerts with incidents */}
-            {alertsWithIncidentsCount !== null && (
-              <div className="flex items-center justify-between text-sm text-neutral-700">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-neutral-400" />
-                  <span>Alerts with incidents</span>
-                </div>
-                <span className="font-medium">
-                  {alertsWithIncidentsCount}
-                  {alertsWithIncidentsPct !== null && (
-                    <span className="text-neutral-400 font-normal ml-1">({alertsWithIncidentsPct}%)</span>
+            {/* Alert Breakdown */}
+            {(alertsWithIncidentsCount !== null || afterHoursCount !== null || nightTimeCount !== null || escalatedCount !== null || retriggerCount !== null) && (
+              <div>
+                <div className="text-sm font-semibold text-neutral-800 mb-3">Alert Breakdown</div>
+                <div className="grid grid-cols-5 gap-2">
+                  {alertsWithIncidentsCount !== null && (
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg border border-neutral-200 bg-neutral-50">
+                      <AlertTriangle className="w-5 h-5 text-neutral-600 mb-2" />
+                      <span className="text-xl font-bold text-neutral-900">{alertsWithIncidentsCount}</span>
+                      <span className="text-xs text-neutral-500 mt-1">With incidents</span>
+                    </div>
                   )}
-                </span>
-              </div>
-            )}
-
-            {/* After-hours */}
-            {afterHoursCount !== null && (
-              <div className="flex items-center justify-between text-sm text-neutral-700">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-neutral-400" />
-                  <span>After-hours alerts</span>
-                </div>
-                <span className="font-medium">
-                  {afterHoursCount}
-                  {afterHoursPct !== null && (
-                    <span className="text-neutral-400 font-normal ml-1">({afterHoursPct}%)</span>
+                  {afterHoursCount !== null && (
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg border border-neutral-200 bg-neutral-50">
+                      <Clock className="w-5 h-5 text-neutral-600 mb-2" />
+                      <span className="text-xl font-bold text-neutral-900">{afterHoursCount}</span>
+                      <span className="text-xs text-neutral-500 mt-1">After-hours</span>
+                    </div>
                   )}
-                </span>
-              </div>
-            )}
-
-            {/* Night-time */}
-            {nightTimeCount !== null && (
-              <div className="flex items-center justify-between text-sm text-neutral-700">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-neutral-400" />
-                  <span>Night-time alerts <span className="text-neutral-400 font-normal">(10pm–6am)</span></span>
-                </div>
-                <span className="font-medium">
-                  {nightTimeCount}
-                  {nightTimePct !== null && (
-                    <span className="text-neutral-400 font-normal ml-1">({nightTimePct}%)</span>
+                  {nightTimeCount !== null && (
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg border border-neutral-200 bg-neutral-50">
+                      <Clock className="w-5 h-5 text-neutral-600 mb-2" />
+                      <span className="text-xl font-bold text-neutral-900">{nightTimeCount}</span>
+                      <span className="text-xs text-neutral-500 mt-1">Night-time</span>
+                    </div>
                   )}
-                </span>
-              </div>
-            )}
-
-            {/* Escalated */}
-            {escalatedCount !== null && escalatedCount > 0 && (
-              <div className="flex items-center justify-between text-sm text-neutral-700">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-orange-400" />
-                  <span>Escalated alerts</span>
-                </div>
-                <span className="font-medium">
-                  {escalatedCount}
-                  {escalatedPct !== null && (
-                    <span className="text-neutral-400 font-normal ml-1">({escalatedPct}%)</span>
+                  {escalatedCount !== null && escalatedCount > 0 && (
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg border border-neutral-200 bg-neutral-50">
+                      <TrendingUp className="w-5 h-5 text-neutral-600 mb-2" />
+                      <span className="text-xl font-bold text-neutral-900">{escalatedCount}</span>
+                      <span className="text-xs text-neutral-500 mt-1">Escalated</span>
+                    </div>
                   )}
-                </span>
-              </div>
-            )}
-
-            {/* Retriggered */}
-            {retriggerCount !== null && retriggerCount > 0 && (
-              <div className="flex items-center justify-between text-sm text-neutral-700">
-                <div className="flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4 text-red-400" />
-                  <span>Retriggered alerts</span>
-                </div>
-                <span className="font-medium">
-                  {retriggerCount}
-                  {retriggerPct !== null && (
-                    <span className="text-neutral-400 font-normal ml-1">({retriggerPct}%)</span>
+                  {retriggerCount !== null && retriggerCount > 0 && (
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg border border-neutral-200 bg-neutral-50">
+                      <RefreshCw className="w-5 h-5 text-neutral-600 mb-2" />
+                      <span className="text-xl font-bold text-neutral-900">{retriggerCount}</span>
+                      <span className="text-xs text-neutral-500 mt-1">Retriggered</span>
+                    </div>
                   )}
-                </span>
+                </div>
               </div>
             )}
 

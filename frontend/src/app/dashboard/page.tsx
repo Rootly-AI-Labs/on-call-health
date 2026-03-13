@@ -75,6 +75,7 @@ import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
 import { TeamRiskFactorsCard, FACTOR_DESCRIPTIONS } from "@/components/dashboard/TeamRiskFactorsCard"
 import { AlertsCountCard } from "@/components/dashboard/AlertsCountCard"
+import { AlertsLeaderboard } from "@/components/dashboard/AlertsLeaderboard"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
@@ -87,6 +88,34 @@ import useDashboard from "@/hooks/useDashboard"
 import { TopPanel } from "@/components/TopPanel"
 import { useOnboarding } from "@/hooks/useOnboarding"
 import IntroGuide from "@/components/IntroGuide"
+
+/** Measures Team Alerts' natural height and locks Alerts Leaderboard to that same height. */
+function AlertsCardsRow({ currentAnalysis }: { currentAnalysis: any }) {
+  const teamAlertsRef = useRef<HTMLDivElement>(null)
+  const [teamAlertsHeight, setTeamAlertsHeight] = useState<number | null>(null)
+
+  useEffect(() => {
+    const el = teamAlertsRef.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      setTeamAlertsHeight(el.offsetHeight)
+    })
+    observer.observe(el)
+    setTeamAlertsHeight(el.offsetHeight)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
+      <div ref={teamAlertsRef}>
+        <AlertsCountCard currentAnalysis={currentAnalysis} />
+      </div>
+      <div style={teamAlertsHeight ? { height: teamAlertsHeight } : undefined} className="flex flex-col">
+        <AlertsLeaderboard currentAnalysis={currentAnalysis} />
+      </div>
+    </div>
+  )
+}
 
 function DashboardContent() {
   const {
@@ -1006,9 +1035,10 @@ function DashboardContent() {
                 }}
               />
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <AlertsCountCard currentAnalysis={currentAnalysis} />
-              </div>
+              {/* Show Alerts cards only for Rootly (not implemented for PagerDuty) */}
+              {currentAnalysis?.platform === 'rootly' && (
+                <AlertsCardsRow currentAnalysis={currentAnalysis} />
+              )}
 
               <TeamMembersList
                 currentAnalysis={currentAnalysis}
@@ -1790,6 +1820,7 @@ function DashboardContent() {
         analysisId={currentAnalysis?.id || currentAnalysis?.uuid}
         currentAnalysis={currentAnalysis}
         timeRange={currentAnalysis?.time_range || timeRange}
+        integrations={integrations}
       />
 
       {/* Delete Analysis Dialog */}

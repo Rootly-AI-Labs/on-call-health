@@ -277,6 +277,7 @@ interface MemberDetailModalProps {
   analysisId?: number | string
   currentAnalysis?: any
   timeRange?: number | string
+  integrations?: any[]
 }
 
 export function MemberDetailModal({
@@ -285,6 +286,7 @@ export function MemberDetailModal({
   members,
   analysisId,
   currentAnalysis,
+  integrations = [],
   timeRange
 }: MemberDetailModalProps) {
   const [dailyCommitsData, setDailyCommitsData] = useState<any[]>([]);
@@ -450,6 +452,7 @@ export function MemberDetailModal({
                 {/* Dynamic tile ordering - tiles with data appear first */}
                 {(() => {
                   // Define all tiles with their data availability checks
+                  const isRootly = currentAnalysis?.platform === 'rootly'
                   const tiles = [
                     {
                       id: 'userTrends',
@@ -465,7 +468,7 @@ export function MemberDetailModal({
                         />
                       )
                     },
-                    {
+                    ...(isRootly ? [{
                       id: 'userAlerts',
                       order: 2,
                       hasData: true,
@@ -476,7 +479,7 @@ export function MemberDetailModal({
                           alertsMeta={currentAnalysis?.analysis_data?.metadata?.alerts}
                         />
                       )
-                    },
+                    }] : []),
                     {
                       id: 'riskFactors',
                       order: 3,

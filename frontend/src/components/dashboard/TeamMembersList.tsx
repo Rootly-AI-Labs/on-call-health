@@ -171,7 +171,7 @@ export function TeamMembersList({
   connectedIntegrations = new Set()
 }: TeamMembersListProps) {
   const [showMembersWithoutIncidents, setShowMembersWithoutIncidents] = useState(false);
-  const [sortBy, setSortBy] = useState<'risk' | 'trend' | 'incidents' | 'alerts'>('risk');
+  const [sortBy, setSortBy] = useState<'risk' | 'trend' | 'incidents'>('risk');
   const dataSources = currentAnalysis?.analysis_data?.data_sources;
   const analysisConfig = currentAnalysis?.config;
   const individualDailyData = currentAnalysis?.analysis_data?.individual_daily_data;
@@ -335,11 +335,6 @@ export function TeamMembersList({
           <span className="text-sm font-semibold tabular-nums text-neutral-700">{member.incident_count || 0}</span>
         </td>
 
-        {/* Alerts Responded */}
-        <td className="py-2 px-2 sm:py-3 sm:px-4 md:py-3 md:px-4 hidden md:table-cell">
-          <span className="text-sm font-semibold tabular-nums text-neutral-700">{member.alerts_responded_count || 0}</span>
-        </td>
-
         {/* On-Call Status */}
         <td className="py-2 px-2 sm:py-3 sm:px-4 md:py-3 md:px-4 hidden md:table-cell">
           {member.is_oncall && (
@@ -451,7 +446,6 @@ export function TeamMembersList({
           </th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Trend ({currentAnalysis?.time_range || 30}d)</th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Incidents</th>
-          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Alerts Responded</th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Status</th>
           <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Data Sources</th>
         </tr>
@@ -507,16 +501,6 @@ export function TeamMembersList({
               >
                 Incidents
               </button>
-              <button
-                onClick={() => setSortBy('alerts')}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  sortBy === 'alerts'
-                    ? 'bg-white text-neutral-900 shadow-sm'
-                    : 'text-neutral-500 hover:text-neutral-700'
-                }`}
-              >
-                Alerts
-              </button>
             </div>
           </div>
         </CardHeader>
@@ -557,10 +541,6 @@ export function TeamMembersList({
 
               if (sortBy === 'incidents') {
                 return [...members].sort((a, b) => (b.incident_count || 0) - (a.incident_count || 0));
-              }
-
-              if (sortBy === 'alerts') {
-                return [...members].sort((a, b) => (b.alerts_responded_count || 0) - (a.alerts_responded_count || 0));
               }
 
               // Sort by trend (worsening first, then stable, then improving)
