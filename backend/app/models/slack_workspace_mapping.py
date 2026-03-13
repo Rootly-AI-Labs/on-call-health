@@ -1,7 +1,7 @@
 """
 Slack workspace mapping model for correlating Slack workspaces to organizations.
 """
-from sqlalchemy import Column, Index, Integer, String, DateTime, ForeignKey, UniqueConstraint, Boolean
+from sqlalchemy import Column, Index, Integer, String, DateTime, ForeignKey, UniqueConstraint, Boolean, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -34,6 +34,7 @@ class SlackWorkspaceMapping(Base):
 
     # Feature flags - what capabilities are enabled for this workspace
     survey_enabled = Column(Boolean, default=False)  # Slash command surveys via /burnout
+    survey_recipients = Column(JSON, nullable=True)  # Org-wide selected UserCorrelation IDs for scheduled surveys
     granted_scopes = Column(String(500), nullable=True)  # Comma-separated list of OAuth scopes
 
     # Relationships
@@ -58,6 +59,7 @@ class SlackWorkspaceMapping(Base):
             'registered_at': self.registered_at.isoformat() if self.registered_at else None,
             'status': self.status,
             'survey_enabled': self.survey_enabled,
+            'survey_recipients': self.survey_recipients,
             'granted_scopes': self.granted_scopes
         }
 
