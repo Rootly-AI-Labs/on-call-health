@@ -660,6 +660,9 @@ _ANALYSIS_DATA_KEYS = [
 ]
 
 # Build the SQL once: SELECT results->'key1', results->'key2', ... FROM analyses WHERE id = :id
+# _ANALYSIS_DATA_KEYS is a hardcoded tuple of string literals defined above — not user input —
+# so the f-string interpolation here is safe from SQL injection. The :id parameter is
+# bound at execution time via SQLAlchemy's parameterized query interface.
 _RESULTS_SELECT_COLS = ", ".join(f"results->'{k}'" for k in _ANALYSIS_DATA_KEYS)
 _RESULTS_EXTRACT_SQL = f"SELECT {_RESULTS_SELECT_COLS} FROM analyses WHERE id = :id"
 
@@ -951,11 +954,12 @@ async def delete_analysis(
     db: Session = Depends(get_db)
 ):
     """Delete a specific analysis."""
-    # Filter by user_id to be consistent with list_analyses endpoint
-    # This ensures users can delete analyses they own, regardless of organization changes
+    # Filter by both user_id AND organization_id to prevent cross-org deletion.
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.user_id == current_user.id
+        Analysis.user_id == current_user.id,
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
 
     if not analysis:

@@ -1228,6 +1228,16 @@ class RootlyAPIClient:
                             if alert_night_time_any:
                                 night_time_count += 1
 
+                        # Team-level after-hours/night-time counters: computed for all
+                        # in-scope alerts regardless of whether user filtering is active.
+                        # When wants_user_counts is True these are also tracked per-user
+                        # above; here we ensure the team totals are never silently zeroed.
+                        elif in_scope and alert_dt is not None:
+                            if _is_after_hours(alert_dt, None):
+                                after_hours_count += 1
+                            if _is_night_time(alert_dt, None):
+                                night_time_count += 1
+
                     if total_pages is None:
                         if not data.get("data"):
                             break

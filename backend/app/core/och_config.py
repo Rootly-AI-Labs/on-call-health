@@ -27,10 +27,12 @@ class OCHConfig:
     """On-Call Health Configuration"""
 
     # Alert Health Score Multiplier
-    # Adjust the weight/impact of alert metrics on OCH score
-    # Default: 1.0 (normal impact)
+    # Adjust the weight/impact of alert metrics on OCH score.
+    # Set to 5.0 intentionally: alert_health raw scores tend to be low (10-20/100)
+    # because the formula averages weighted percentages across 6 factors.
+    # The multiplier amplifies these signals to a meaningful range before blending.
     # < 1.0: reduce impact (e.g., 0.5 = 50% weight)
-    # > 1.0: increase impact (e.g., 2.0 = 200% weight)
+    # > 1.0: increase impact (e.g., 2.0 = double, 5.0 = 5x amplification)
     ALERT_HEALTH_MULTIPLIER = 5.0
 
     # OCH Dimension Weights (must sum to 1.0)

@@ -1947,7 +1947,11 @@ class UnifiedBurnoutAnalyzer:
             # OCH scale_max values: sprint_completion=7, oncall_burden=100, alert_health=100
             'sprint_completion': consecutive_days_data['max_consecutive_days'],     # Consecutive days: 7.5% (raw days 0-7+)
             'oncall_burden': scaled_oncall_burden,                                  # On-call load: 12.5% (volume-scaled)
-            'alert_health': alert_health_metric                                     # Alert health: 15% (normalized 0-100 score)
+            # alert_health is intentionally omitted here when alerts_data is None.
+            # Including it as 0.0 would inflate total_weight to 1.0 and deflate the
+            # work-related score by ~43%. The post-processor apply_alert_health_to_och
+            # in analyses.py blends it in afterward once alert data is available.
+            **({'alert_health': alert_health_metric} if alerts_data else {})
         }
 
         # Check if all OCH metrics are 0

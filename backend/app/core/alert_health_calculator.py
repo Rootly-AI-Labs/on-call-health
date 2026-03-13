@@ -43,6 +43,15 @@ def calculate_alert_health_score(
             - interpretation: Risk level interpretation
     """
 
+    # Sanitize inputs: clamp to non-negative and ensure sub-counts don't exceed total
+    total_alerts = max(0, int(total_alerts))
+    night_time_alerts = max(0, min(int(night_time_alerts), total_alerts))
+    escalated_alerts = max(0, min(int(escalated_alerts), total_alerts))
+    retriggered_alerts = max(0, min(int(retriggered_alerts), total_alerts))
+    alerts_with_incidents = max(0, min(int(alerts_with_incidents), total_alerts))
+    after_hours_alerts = max(0, min(int(after_hours_alerts), total_alerts))
+    signal_quality_pct = max(0.0, min(float(signal_quality_pct), 100.0))
+
     # Avoid division by zero
     if total_alerts == 0:
         return {
@@ -59,7 +68,7 @@ def calculate_alert_health_score(
             'reasoning': 'No alerts in period'
         }
 
-    # Calculate each metric as a percentage/ratio
+    # Calculate each metric as a percentage/ratio (all 0-100 after clamping above)
     night_time_pct = (night_time_alerts / total_alerts) * 100
     escalation_rate = (escalated_alerts / total_alerts) * 100
     retriggered_rate = (retriggered_alerts / total_alerts) * 100
