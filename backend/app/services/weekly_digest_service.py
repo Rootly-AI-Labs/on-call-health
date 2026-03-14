@@ -557,7 +557,12 @@ async def _send_resend_email(
     unsubscribe_url: Optional[str] = None
 ) -> bool:
     if not settings.RESEND_API_KEY or not settings.RESEND_FROM_EMAIL:
-        logger.warning("Weekly digest disabled: missing RESEND_API_KEY or RESEND_FROM_EMAIL")
+        missing = []
+        if not settings.RESEND_API_KEY:
+            missing.append("RESEND_API_KEY")
+        if not settings.RESEND_FROM_EMAIL:
+            missing.append("RESEND_FROM_EMAIL")
+        logger.warning(f"Weekly digest disabled: missing env var(s): {', '.join(missing)}")
         return False
 
     from_name = settings.RESEND_FROM_NAME.strip() if settings.RESEND_FROM_NAME else ""
