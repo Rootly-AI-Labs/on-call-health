@@ -1967,9 +1967,7 @@ function DashboardContent() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="10m">Every 10 minutes (testing)</SelectItem>
                         <SelectItem value="24h">Every 24 hours</SelectItem>
-                        <SelectItem value="3d">Every 3 days</SelectItem>
                         <SelectItem value="7d">Every 7 days</SelectItem>
                       </SelectContent>
                     </Select>

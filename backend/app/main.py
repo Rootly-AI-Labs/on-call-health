@@ -222,7 +222,7 @@ async def startup_event():
     )
 
     auto_refresh_scheduler = AsyncIOScheduler()
-    for interval in ["10m", "24h", "3d", "7d"]:
+    for interval in ["24h", "7d"]:
         auto_refresh_scheduler.add_job(
             check_and_run_auto_refresh_analyses,
             trigger=_make_cron_trigger(interval),
@@ -231,7 +231,7 @@ async def startup_event():
             kwargs={"interval_filter": interval},
         )
     auto_refresh_scheduler.start()
-    print("Auto-refresh analysis scheduler started (10m: every 10 min | 24h: daily | 3d: every 3 days | 7d: every 7 days)")
+    print("Auto-refresh analysis scheduler started (24h: daily | 7d: every 7 days)")
 
     # Start weekly digest email scheduler (Monday 10am local time, checked every 10 min)
     from app.services.weekly_digest_service import weekly_digest_scheduler
