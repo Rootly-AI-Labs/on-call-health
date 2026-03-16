@@ -14,6 +14,7 @@ import { UserRiskFactorsCard } from "@/components/dashboard/UserRiskFactorsCard"
 import { UserIncidentCard } from "@/components/dashboard/UserIncidentCard"
 import { SurveyResultsCard } from "@/components/dashboard/SurveyResultsCard"
 import { TicketingCard } from "@/components/dashboard/TicketingCard"
+import { UserAlertsCard } from "@/components/dashboard/UserAlertsCard"
 
 // OCH risk level helpers
 function getOCHRiskInfo(score: number | undefined | null): { level: string; label: string } {
@@ -276,6 +277,7 @@ interface MemberDetailModalProps {
   analysisId?: number | string
   currentAnalysis?: any
   timeRange?: number | string
+  integrations?: any[]
 }
 
 export function MemberDetailModal({
@@ -284,6 +286,7 @@ export function MemberDetailModal({
   members,
   analysisId,
   currentAnalysis,
+  integrations = [],
   timeRange
 }: MemberDetailModalProps) {
   const [dailyCommitsData, setDailyCommitsData] = useState<any[]>([]);
@@ -449,9 +452,11 @@ export function MemberDetailModal({
                 {/* Dynamic tile ordering - tiles with data appear first */}
                 {(() => {
                   // Define all tiles with their data availability checks
+                  const isRootly = currentAnalysis?.platform === 'rootly'
                   const tiles = [
                     {
                       id: 'userTrends',
+                      order: 1,
                       hasData: memberData?.incident_count > 0, // User trends has data if there are incidents
                       component: (
                         <UserObjectiveDataCard
@@ -463,8 +468,21 @@ export function MemberDetailModal({
                         />
                       )
                     },
+                    ...(isRootly ? [{
+                      id: 'userAlerts',
+                      order: 2,
+                      hasData: true,
+                      component: (
+                        <UserAlertsCard
+                          key="userAlerts"
+                          memberData={memberData || selectedMember}
+                          alertsMeta={currentAnalysis?.analysis_data?.metadata?.alerts}
+                        />
+                      )
+                    }] : []),
                     {
                       id: 'riskFactors',
+                      order: 3,
                       hasData: (memberData?.och_factors?.all?.length || 0) > 0,
                       component: (
                         <UserRiskFactorsCard key="riskFactors" selectedMember={memberData || selectedMember} />
@@ -472,6 +490,7 @@ export function MemberDetailModal({
                     },
                     {
                       id: 'incidents',
+                      order: 4,
                       hasData: (memberData?.incident_count || 0) > 0,
                       component: (
                         <UserIncidentCard
@@ -485,6 +504,7 @@ export function MemberDetailModal({
                     },
                     {
                       id: 'survey',
+                      order: 5,
                       hasData: (currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email || selectedMember.email]?.survey_count_in_period || 0) > 0,
                       component: (
                         <SurveyResultsCard
@@ -495,6 +515,7 @@ export function MemberDetailModal({
                     },
                     {
                       id: 'githubSlack',
+                      order: 6,
                       hasData: true,
                       component: (() => {
                         const hasGitHubData = !!selectedMember.github_activity
@@ -707,6 +728,7 @@ export function MemberDetailModal({
                     },
                     {
                       id: 'ticketing',
+                      order: 7,
                       hasData: (memberData?.jira_tickets?.length || 0) > 0 || (memberData?.linear_issues?.length || 0) > 0,
                       component: <TicketingCard key="ticketing" memberData={memberData} />
                     }
@@ -716,7 +738,7 @@ export function MemberDetailModal({
                   const sortedTiles = [...tiles].sort((a, b) => {
                     if (a.hasData && !b.hasData) return -1
                     if (!a.hasData && b.hasData) return 1
-                    return 0
+                    return (a.order ?? 0) - (b.order ?? 0)
                   })
 
                   // Render sorted tiles (filter out null components)

@@ -311,7 +311,9 @@ class AnalysisRequest(BaseValidatedModel):
     include_jira: bool = Field(False, description="Include Jira data")
     include_linear: bool = Field(False, description="Include Linear data")
     enable_ai: bool = Field(False, description="Enable AI insights")
-    
+    auto_refresh_enabled: bool = Field(False, description="Enable auto-refresh mode")
+    auto_refresh_interval: Optional[str] = Field(None, description="Auto-refresh interval: 24h, 3d, or 7d")
+
     @field_validator('integration_id')
     @classmethod
     def validate_integration_id(cls, v):
@@ -337,6 +339,17 @@ class AnalysisRequest(BaseValidatedModel):
         # Allow any value between 1 and 365 days (preset or custom ranges)
         if v < 1 or v > 365:
             raise ValueError(f"Time range must be between 1 and 365 days")
+        return v
+
+    @field_validator('auto_refresh_interval')
+    @classmethod
+    def validate_auto_refresh_interval(cls, v):
+        """Restrict auto-refresh interval to supported values."""
+        if v is None:
+            return v
+        allowed = {"10m", "24h", "3d", "7d"}
+        if v not in allowed:
+            raise ValueError(f"auto_refresh_interval must be one of: {', '.join(sorted(allowed))}")
         return v
 
 class AnalysisFilterRequest(BaseValidatedModel):
