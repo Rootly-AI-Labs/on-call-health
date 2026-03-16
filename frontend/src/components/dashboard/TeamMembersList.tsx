@@ -142,7 +142,7 @@ function getTrendConfig(trend: UserTrend) {
       return {
         label: 'Worsening',
         icon: <TrendingDown className="w-4 h-4" />,
-        className: 'bg-red-50 text-red-600 border-red-100',
+        className: 'bg-yellow-50 text-yellow-700 border-yellow-100',
         tooltip: 'Workload trending up'
       }
     case 'significantly_worsening':

@@ -532,14 +532,14 @@ def _build_email_content(
     if blocked_note_text:
         text_lines.append(blocked_note_text)
     if unsubscribe_url:
-        text_lines += ["", "--", f"No longer want these emails? Unsubscribe: {unsubscribe_url}"]
+        text_lines += ["", "--", f"Unsubscribe from weekly digests: {unsubscribe_url}"]
     text_body = "\n".join(text_lines)
 
     # ── Metrics table HTML ───────────────────────────────────────────────────
 
     unsubscribe_html = (
         f'<p style="margin: 10px 0 0; font-size: 12px; color: #9ca3af;">'
-        f'No longer want these emails? '
+        f''
         f'<a href="{unsubscribe_url}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe from weekly digests</a>'
         f'</p>'
         if unsubscribe_url else ""
