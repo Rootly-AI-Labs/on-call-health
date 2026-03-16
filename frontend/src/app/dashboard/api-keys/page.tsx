@@ -77,7 +77,7 @@ export default function ApiKeysPage() {
                 API Keys
               </h1>
               <p className="text-sm text-neutral-600 mt-1">
-                Manage API keys for programmatic access to REST API and MCP endpoints
+                Manage API keys for programmatic access to the REST API
               </p>
             </div>
             <Button
@@ -105,7 +105,7 @@ export default function ApiKeysPage() {
                 <Key className="w-12 h-12 mx-auto mb-4 text-neutral-400" />
                 <h3 className="text-lg font-medium text-neutral-900 mb-2">No API keys yet</h3>
                 <p className="text-neutral-600 mb-4">
-                  Create your first API key to access MCP endpoints programmatically.
+                  Create your first API key to access the API programmatically.
                 </p>
                 <Button
                   onClick={() => setShowCreateDialog(true)}

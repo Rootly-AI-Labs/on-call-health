@@ -89,7 +89,7 @@ async def get_current_user_flexible(
     Flexible authentication: accepts both API keys and JWT tokens.
 
     This dependency enables endpoints to accept authentication from:
-    1. X-API-Key header (for MCP and programmatic access)
+    1. X-API-Key header (for programmatic access)
     2. Authorization: Bearer header (for web app with JWT)
     3. auth_token cookie (for web app with httpOnly cookie)
 

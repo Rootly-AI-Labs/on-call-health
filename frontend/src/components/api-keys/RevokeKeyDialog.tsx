@@ -47,7 +47,7 @@ export function RevokeKeyDialog({
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
             <p className="text-sm text-red-800">
               <strong>This action cannot be undone.</strong> Any applications using this key will
-              immediately lose access to MCP endpoints.
+              immediately lose access to the API.
             </p>
           </div>
 

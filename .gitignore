@@ -43,6 +43,13 @@ backend/.env
 !README.md
 !frontend/README.md
 !DATABASE_MIGRATION_COMPARISON.md
+
+# Word documents
+*.docx
+
+# External API specs
+swagger.json
+
 # IDEs
 .vscode/
 .idea/

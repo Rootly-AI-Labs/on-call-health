@@ -116,7 +116,7 @@ export function CreateKeyDialog({
             Create API Key
           </DialogTitle>
           <DialogDescription>
-            Create a new API key for programmatic access to REST API and MCP endpoints.
+            Create a new API key for programmatic access to the REST API.
           </DialogDescription>
         </DialogHeader>
 
