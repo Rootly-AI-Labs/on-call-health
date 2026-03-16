@@ -1,7 +1,7 @@
 """
 Rootly integration API endpoints.
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
 import logging
 import os
@@ -14,10 +14,27 @@ from ...auth.dependencies import get_current_active_user
 from ...core.rootly_client import RootlyAPIClient
 from ...core.rate_limiting import integration_rate_limit
 from ...core.input_validation import RootlyTokenRequest, RootlyIntegrationRequest
+from ...services.integration_validator import decrypt_token
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _tokens_match(stored_token: Optional[str], candidate_token: str) -> bool:
+    """Match candidate token against plaintext or legacy-encrypted stored tokens."""
+    if not stored_token:
+        return False
+
+    normalized_candidate = candidate_token.strip()
+    normalized_stored = stored_token.strip()
+    if normalized_stored == normalized_candidate:
+        return True
+
+    try:
+        return decrypt_token(stored_token).strip() == normalized_candidate
+    except Exception:
+        return False
 
 class RootlyTokenUpdate(BaseModel):
     token: str
@@ -28,6 +45,8 @@ class RootlyIntegrationAdd(BaseModel):
     organization_name: str = None
     total_users: int = 0
     permissions: Dict[str, Any] = None
+    key_type: str = "global"
+    team_name: Optional[str] = None
 
 class RootlyIntegrationUpdate(BaseModel):
     name: str = None
@@ -115,23 +134,36 @@ async def test_rootly_token_preview(
         # No organization name found in Rootly - use generic name
         base_name = "Rootly"
     
-    # Check if user already has this exact token (only active integrations)
-    existing_token = db.query(RootlyIntegration).filter(
-        RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.api_token == token,  # Use stripped token
-        RootlyIntegration.is_active == True
-    ).first()
-    
-    if existing_token:
-        return {
-            "status": "duplicate_token",
-            "message": f"This token is already connected as '{existing_token.name}'",
-            "existing_integration": {
-                "id": existing_token.id,
-                "name": existing_token.name,
-                "organization_name": existing_token.organization_name
+    # Extract team-scoped key metadata
+    key_type = account_info.get("key_type", "global")
+    team_name = account_info.get("team_name")
+
+    # For team-scoped keys, we can fully validate duplicate scope at test time.
+    # For global keys, users may select a team scope after this step, so we defer
+    # exact duplicate checking to /token/add.
+    if key_type == "team":
+        existing_scope_candidates = db.query(RootlyIntegration).filter(
+            RootlyIntegration.user_id == current_user.id,
+            RootlyIntegration.platform == "rootly",
+            RootlyIntegration.team_name == team_name,
+            RootlyIntegration.is_active == True
+        ).all()
+
+        existing_token = next(
+            (integration for integration in existing_scope_candidates if _tokens_match(integration.api_token, token)),
+            None
+        )
+
+        if existing_token:
+            return {
+                "status": "duplicate_token",
+                "message": f"This token is already connected as '{existing_token.name}'",
+                "existing_integration": {
+                    "id": existing_token.id,
+                    "name": existing_token.name,
+                    "organization_name": existing_token.organization_name
+                }
             }
-        }
     
     # Generate a unique name if team name already exists
     existing_names = [
@@ -148,9 +180,9 @@ async def test_rootly_token_preview(
         suggested_name = f"{base_name} #{counter}"
         counter += 1
     
-    # Check permissions for the token
-    permissions = await client.check_permissions()
-    
+    # Reuse permissions already fetched inside test_connection() — no extra API call needed
+    permissions = account_info.get("permissions", {})
+
     return {
         "status": "success",
         "message": "Token is valid and ready to add",
@@ -158,13 +190,68 @@ async def test_rootly_token_preview(
             "organization_name": organization_name,
             "suggested_name": suggested_name,
             "total_users": total_users,
-            "can_add": True
+            "can_add": True,
+            "key_type": key_type,
+            "team_name": team_name,
         },
         "account_info": {
             **account_info,
             "permissions": permissions
         }
     }
+
+@router.post("/token/teams")
+async def get_rootly_teams(
+    token_request: RootlyTokenRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Fetch available teams and existing scopes for a Rootly global API token."""
+    token = token_request.token.strip()
+    client = RootlyAPIClient(token)
+    teams = await client.get_teams()
+
+    existing_scope_candidates = db.query(RootlyIntegration).filter(
+        RootlyIntegration.user_id == current_user.id,
+        RootlyIntegration.platform == "rootly",
+        RootlyIntegration.is_active == True
+    ).order_by(RootlyIntegration.created_at.desc()).all()
+
+    existing_integrations = [
+        integration for integration in existing_scope_candidates
+        if _tokens_match(integration.api_token, token)
+    ]
+
+    existing_team_scopes = {}
+    existing_org_scope = None
+
+    for integration in existing_integrations:
+        if integration.team_name:
+            team_key = integration.team_name.strip().lower()
+            existing_team_scopes.setdefault(team_key, integration)
+        elif existing_org_scope is None:
+            existing_org_scope = integration
+
+    teams_with_scope = []
+    for team in teams:
+        team_name = (team.get("name") or "").strip()
+        existing_scope = existing_team_scopes.get(team_name.lower())
+        teams_with_scope.append({
+            **team,
+            "already_added": bool(existing_scope),
+            "existing_integration_name": existing_scope.name if existing_scope else None,
+            "existing_integration_id": existing_scope.id if existing_scope else None,
+        })
+
+    return {
+        "teams": teams_with_scope,
+        "all_teams_scope": {
+            "already_added": bool(existing_org_scope),
+            "existing_integration_name": existing_org_scope.name if existing_org_scope else None,
+            "existing_integration_id": existing_org_scope.id if existing_org_scope else None,
+        }
+    }
+
 
 @router.post("/token/add")
 async def add_rootly_integration(
@@ -176,23 +263,39 @@ async def add_rootly_integration(
     # Strip whitespace from token
     token = integration_data.token.strip()
 
+    # Serialize integration creation per user to prevent concurrent duplicate scope creation.
+    # This lock is held for the duration of this transaction and released on commit/rollback.
+    db.query(User).filter(User.id == current_user.id).with_for_update().one_or_none()
+
     # Use organization info from frontend (already validated during test step)
     # This avoids redundant API calls to Rootly
     organization_name = integration_data.organization_name
     total_users = integration_data.total_users
 
-    # Check if user already has this exact token (prevent duplicates, only active integrations)
-    existing_token = db.query(RootlyIntegration).filter(
+    # Allow same token across multiple team scopes, but prevent exact duplicate scope.
+    # scope=None means org-wide ("all teams").
+    scope_filter = (
+        RootlyIntegration.team_name.is_(None)
+        if integration_data.team_name is None
+        else RootlyIntegration.team_name == integration_data.team_name
+    )
+    existing_scope_candidates = db.query(RootlyIntegration).filter(
         RootlyIntegration.user_id == current_user.id,
-        RootlyIntegration.api_token == token,  # Use stripped token
+        RootlyIntegration.platform == "rootly",
+        scope_filter,
         RootlyIntegration.is_active == True
-    ).first()
+    ).all()
+
+    existing_token = next(
+        (integration for integration in existing_scope_candidates if _tokens_match(integration.api_token, token)),
+        None
+    )
 
     if existing_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "message": f"This token is already connected as '{existing_token.name}'",
+                "message": f"This token is already connected for this scope as '{existing_token.name}'",
                 "existing_integration": {
                     "id": existing_token.id,
                     "name": existing_token.name,
@@ -225,7 +328,9 @@ async def add_rootly_integration(
         created_at=datetime.now(timezone.utc),
         last_used_at=datetime.now(timezone.utc),
         cached_permissions=permissions,  # Cache permissions from preview
-        permissions_checked_at=datetime.now(timezone.utc)  # Set cache timestamp
+        permissions_checked_at=datetime.now(timezone.utc),  # Set cache timestamp
+        key_type=integration_data.key_type,
+        team_name=integration_data.team_name,
     )
     
     try:
@@ -295,7 +400,9 @@ async def list_integrations(
             "is_default": integration.is_default,
             "created_at": integration.created_at.isoformat(),
             "last_used_at": integration.last_used_at.isoformat() if integration.last_used_at else None,
-            "token_suffix": f"****{integration.api_token[-4:]}" if integration.api_token and len(integration.api_token) >= 4 else "****"
+            "token_suffix": f"****{integration.api_token[-4:]}" if integration.api_token and len(integration.api_token) >= 4 else "****",
+            "key_type": integration.key_type,
+            "team_name": integration.team_name,
         }
         result_integrations.append(integration_data)
 

@@ -49,9 +49,10 @@ class UserSyncService:
             if not integration:
                 raise ValueError(f"Integration {integration_id} not found")
 
-            # Fetch users from the platform
+            # Fetch users from the platform (respecting team scope if set)
             if integration.platform == "rootly":
-                users = await self._fetch_rootly_users(integration.api_token)
+                team_name = getattr(integration, 'team_name', None)
+                users = await self._fetch_rootly_users(integration.api_token, team_name=team_name)
             elif integration.platform == "pagerduty":
                 users = await self._fetch_pagerduty_users(integration.api_token)
             else:
@@ -208,8 +209,11 @@ class UserSyncService:
             logger.error(f"Error syncing integration users: {e}")
             raise
 
-    async def _fetch_rootly_users(self, api_token: str) -> List[Dict[str, Any]]:
-        """Fetch incident responders from Rootly API (IR role holders only)."""
+    async def _fetch_rootly_users(self, api_token: str, team_name: str = None) -> List[Dict[str, Any]]:
+        """Fetch incident responders from Rootly API (IR role holders only).
+
+        If team_name is provided, only users who are members of that team are returned.
+        """
         client = RootlyAPIClient(api_token)
 
         # Fetch users with IR role data
@@ -218,6 +222,21 @@ class UserSyncService:
         # Filter to only incident responders (exclude observers/no_access)
         filtered_users = client.filter_incident_responders(raw_users, included_roles)
         logger.info(f"Rootly: Filtered {len(raw_users)} total users → {len(filtered_users)} incident responders")
+
+        # If a team scope is set, further filter to only team members
+        if team_name:
+            team_user_ids = await client.get_team_user_ids(team_name)
+            if team_user_ids:
+                team_user_ids_set = set(team_user_ids)
+                before = len(filtered_users)
+                filtered_users = [u for u in filtered_users if str(u.get("id")) in team_user_ids_set]
+                logger.info(
+                    f"Rootly sync: team scope '{team_name}' → {before} IR responders → {len(filtered_users)} team members"
+                )
+            else:
+                logger.warning(
+                    f"Rootly sync: could not fetch member IDs for team '{team_name}', syncing all IR responders"
+                )
 
         # Extract from JSONAPI format
         users = []

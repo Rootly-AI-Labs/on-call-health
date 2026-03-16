@@ -69,6 +69,8 @@ export async function testConnection(
           total_users: data.preview?.total_users || data.account_info?.total_users,
           suggested_name: data.preview?.suggested_name || data.account_info?.suggested_name,
           can_add: data.preview?.can_add || data.account_info?.can_add,
+          key_type: data.preview?.key_type || data.account_info?.key_type,
+          team_name: data.preview?.team_name || data.account_info?.team_name,
           permissions: data.account_info?.permissions
         })
       } else {
@@ -258,44 +260,163 @@ export async function addIntegration(
     const values = form.getValues()
     const token = platform === 'rootly' ? (values as any).rootlyToken : (values as any).pagerdutyToken
     const nickname = values.nickname
+    const baseName = nickname || previewData.suggested_name || previewData.organization_name
+
+    const selectedTeamNames: string[] = platform === 'rootly'
+      ? (Array.isArray(previewData.team_names)
+          ? previewData.team_names
+          : (previewData.team_name ? [previewData.team_name] : []))
+      : []
+    const selectedTeamScopeCounts = new Map<string, number>(
+      platform === 'rootly' && Array.isArray(previewData.team_scopes)
+        ? previewData.team_scopes.map((scope: { name: string; member_count: number }) => [scope.name, scope.member_count])
+        : []
+    )
 
     const endpoint = platform === 'rootly'
       ? `${API_BASE}/rootly/token/add`
       : `${API_BASE}/pagerduty/integrations`
 
-    const body = platform === 'rootly'
-      ? {
-          token: token,
-          name: nickname || previewData.suggested_name || previewData.organization_name,
-          organization_name: previewData.organization_name,
-          total_users: previewData.total_users || 0,
-          permissions: previewData.permissions || {},
-        }
-      : {
-          token: token,
-          name: nickname || previewData.suggested_name || previewData.organization_name,
-          platform: 'pagerduty',
-          organization_name: previewData.organization_name,
-          total_users: previewData.total_users || 0,
-          total_services: previewData.total_services || 0,
-        }
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify(body)
+    const buildRootlyBody = (teamName: string | null) => ({
+      token: token,
+      name: teamName && selectedTeamNames.length > 1 ? `${baseName} - ${teamName}` : baseName,
+      organization_name: previewData.organization_name,
+      total_users: teamName ? (selectedTeamScopeCounts.get(teamName) ?? previewData.total_users ?? 0) : (previewData.total_users || 0),
+      permissions: previewData.permissions || {},
+      key_type: previewData.key_type || 'global',
+      team_name: teamName,
     })
 
-    const responseData = await response.json()
+    let responseData: any
+    let successfulRootlyAdds = 0
+    let firstCreatedIntegrationId: number | null = null
 
-    if (response.ok) {
-      toast.success(`Your ${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} account has been connected successfully.`)
+    if (platform === 'rootly' && selectedTeamNames.length > 1) {
+      const failures: string[] = []
+      const successes: any[] = []
+      const createdScopeIds: number[] = []
+
+      for (const teamName of selectedTeamNames) {
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(buildRootlyBody(teamName))
+          })
+
+          let scopeResponseData: any = null
+          try {
+            scopeResponseData = await response.json()
+          } catch {
+            scopeResponseData = null
+          }
+
+          if (response.ok) {
+            const normalizedScopeResponseData =
+              scopeResponseData && typeof scopeResponseData === 'object' ? scopeResponseData : {}
+            successes.push(normalizedScopeResponseData)
+            const createdId = normalizedScopeResponseData.integration?.id || normalizedScopeResponseData.id
+            if (typeof createdId === 'number') {
+              if (firstCreatedIntegrationId === null) {
+                firstCreatedIntegrationId = createdId
+              }
+              createdScopeIds.push(createdId)
+            }
+          } else {
+            const errorMessage =
+              scopeResponseData?.detail?.message ||
+              scopeResponseData?.detail?.user_message ||
+              scopeResponseData?.message ||
+              `Failed to add scope (HTTP ${response.status})`
+            failures.push(`${teamName}: ${errorMessage}`)
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Network request failed'
+          failures.push(`${teamName}: ${errorMessage}`)
+        }
+      }
+
+      if (failures.length > 0) {
+        let rollbackFailures = 0
+        if (successes.length > 0) {
+          // If we cannot infer created IDs, rollback is incomplete by definition.
+          rollbackFailures += Math.max(0, successes.length - createdScopeIds.length)
+
+          const rollbackResults = await Promise.allSettled(
+            createdScopeIds.map(async (integrationId) => {
+              const rollbackResponse = await fetch(`${API_BASE}/rootly/integrations/${integrationId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${authToken}`
+                }
+              })
+              if (!rollbackResponse.ok) {
+                throw new Error(`Rollback failed for integration ${integrationId}`)
+              }
+            })
+          )
+
+          rollbackFailures += rollbackResults.filter((result) => result.status === 'rejected').length
+        }
+
+        const failurePreview = failures.slice(0, 2).join(' | ')
+        if (rollbackFailures > 0) {
+          throw new Error(`Failed to add all selected team scopes. Some scopes may require manual cleanup. ${failurePreview}`)
+        }
+        throw new Error(`Failed to add all selected team scopes. No changes were applied. ${failurePreview}`)
+      }
+
+      successfulRootlyAdds = successes.length
+      responseData = successes[0]
+
+      if (successes.length === 0) {
+        throw new Error('Failed to add selected team scopes')
+      }
+    } else {
+      const body = platform === 'rootly'
+        ? buildRootlyBody(selectedTeamNames[0] || previewData.team_name || null)
+        : {
+            token: token,
+            name: baseName,
+            platform: 'pagerduty',
+            organization_name: previewData.organization_name,
+            total_users: previewData.total_users || 0,
+            total_services: previewData.total_services || 0,
+          }
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify(body)
+      })
+
+      responseData = await response.json()
+
+      if (!response.ok) {
+        throw new Error(responseData.detail?.message || responseData.message || 'Failed to add integration')
+      }
+      successfulRootlyAdds = platform === 'rootly' ? 1 : 0
+    }
+
+    const hasSuccessfulAdd = platform === 'rootly'
+      ? successfulRootlyAdds > 0
+      : Boolean(responseData)
+
+    if (hasSuccessfulAdd) {
+      if (platform === 'rootly' && successfulRootlyAdds > 1) {
+        toast.success(`${successfulRootlyAdds} Rootly team-scoped integrations connected.`)
+      } else {
+        toast.success(`Your ${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} account has been connected successfully.`)
+      }
 
       // Show loading toast for the reload process
-      const loadingToastId = toast.loading(`Adding ${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} integration to your dashboard...`, {
+      const loadingToastId = toast.loading(`Adding ${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} integration${platform === 'rootly' && successfulRootlyAdds > 1 ? 's' : ''} to your dashboard...`, {
         duration: 0 // Persistent until dismissed
       })
 
@@ -305,10 +426,13 @@ export async function addIntegration(
       localStorage.removeItem('all_integrations')
       localStorage.removeItem('all_integrations_timestamp')
 
-      // If this is the first integration, set it as selected for dashboard
+      // Always select the newly added integration for dashboard / sync flow
       try {
-        const newIntegrationId = responseData.integration?.id || responseData.id
-        if (newIntegrationId && integrations.length === 0) {
+        const newIntegrationId =
+          responseData?.integration?.id ||
+          responseData?.id ||
+          (platform === 'rootly' ? firstCreatedIntegrationId : null)
+        if (newIntegrationId) {
           const integrationIdStr = newIntegrationId.toString()
           localStorage.setItem('selected_organization', integrationIdStr)
           // Update React state to reflect the selection in UI
@@ -341,7 +465,11 @@ export async function addIntegration(
 
         // Dismiss loading toast and show success
         toast.dismiss(loadingToastId)
-        toast.success(`${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} integration added to dashboard!`)
+        if (platform === 'rootly' && successfulRootlyAdds > 1) {
+          toast.success(`${successfulRootlyAdds} Rootly integrations added to dashboard!`)
+        } else {
+          toast.success(`${platform === 'rootly' ? 'Rootly' : 'PagerDuty'} integration added to dashboard!`)
+        }
       } catch (reloadError) {
         console.error('Error reloading integrations:', reloadError)
         toast.dismiss(loadingToastId)
@@ -349,8 +477,6 @@ export async function addIntegration(
       } finally {
         setReloadingIntegrations(false)
       }
-    } else {
-      throw new Error(responseData.detail?.message || responseData.message || 'Failed to add integration')
     }
   } catch (error) {
     console.error('Add integration error:', error)

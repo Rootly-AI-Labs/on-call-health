@@ -2,7 +2,7 @@
 Analysis model for storing burnout analysis results.
 """
 import uuid as uuid_module
-from sqlalchemy import Column, Index, Integer, String, DateTime, Text, ForeignKey, JSON
+from sqlalchemy import Boolean, Column, Index, Integer, String, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -27,6 +27,11 @@ class Analysis(Base):
     error_message = Column(Text, nullable=True)  # Error details if failed
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Save and auto-refresh support
+    is_saved = Column(Boolean, default=False, nullable=False)
+    is_auto_refresh = Column(Boolean, default=False, nullable=False)
+    auto_refresh_interval = Column(String(20), nullable=True)  # "24h", "3d", "7d"
     
     __table_args__ = (
         Index('idx_analyses_user_created', 'user_id', created_at.desc()),

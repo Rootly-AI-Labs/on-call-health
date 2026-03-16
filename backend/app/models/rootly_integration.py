@@ -23,6 +23,8 @@ class RootlyIntegration(Base):
     permissions_checked_at = Column(DateTime(timezone=True), nullable=True)  # When permissions were last checked
     last_synced_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)  # User who last synced
     last_synced_at = Column(DateTime(timezone=True), nullable=True)  # When last synced
+    key_type = Column(String(50), nullable=True)   # "global" or "team"
+    team_name = Column(String(255), nullable=True)  # team name for team-scoped keys
 
     # Relationships
     user = relationship("User", foreign_keys=[user_id], back_populates="rootly_integrations")
