@@ -21,6 +21,10 @@ from ..models import Analysis, SessionLocal, User, UserCorrelation, WeeklyDigest
 
 logger = logging.getLogger(__name__)
 
+# Tracks scheduler start time for FORCE_SEND countdown logging
+_scheduler_start_time: Optional[datetime] = None
+_DIGEST_INTERVAL_MINUTES = 10
+
 
 def _ensure_dict(value: Any) -> Dict[str, Any]:
     if value is None:
@@ -188,6 +192,8 @@ def _build_member_lists(
         elif trend == "worsening":
             worsening_trend.append(member)
 
+    critical_trend.sort(key=lambda m: m.get("och_score") or 0, reverse=True)
+    worsening_trend.sort(key=lambda m: m.get("och_score") or 0, reverse=True)
     return critical_trend, worsening_trend
 
 
@@ -312,6 +318,22 @@ def _build_email_content(
     critical_trend, worsening_trend = _build_member_lists(members, individual_daily_data)
     risk = _get_risk_summary(members)
 
+    # ─ Combine and sort trends by severity, then by risk level ─
+    risk_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
+    combined_trends = []
+    for member in critical_trend:
+        combined_trends.append({**member, "trend_type": "significantly_worsening", "trend_priority": 0})
+    for member in worsening_trend:
+        combined_trends.append({**member, "trend_type": "worsening", "trend_priority": 1})
+
+    combined_trends.sort(
+        key=lambda m: (
+            m.get("trend_priority", 999),
+            risk_order.get((m.get("risk_level") or "unknown").lower(), 999)
+        )
+    )
+    combined_trends = combined_trends[:6]  # Top 6
+
     completed_at = analysis.completed_at
     if completed_at and completed_at.tzinfo is None:
         completed_at = completed_at.replace(tzinfo=timezone.utc)
@@ -323,6 +345,45 @@ def _build_email_content(
     integration_name = analysis.integration_name or analysis.platform or "your integration"
     time_range = analysis.time_range or 30
     dashboard_url = f"{settings.FRONTEND_URL}/dashboard"
+    platform = (analysis.platform or "").lower()
+
+    # Team risk level label based on avg OCH score (higher = more risk)
+    avg = risk["avg_score"]
+    if avg is None:
+        team_risk_label = "N/A"
+        team_risk_color = "#6b7280"
+    elif avg >= 75:
+        team_risk_label = "Critical"
+        team_risk_color = "#ef4444"
+    elif avg >= 50:
+        team_risk_label = "High"
+        team_risk_color = "#f97316"
+    elif avg >= 25:
+        team_risk_label = "Moderate"
+        team_risk_color = "#f59e0b"
+    else:
+        team_risk_label = "Low"
+        team_risk_color = "#22c55e"
+
+    # PagerDuty → Rootly soft promotion
+    is_pagerduty = "pagerduty" in platform
+    rootly_promo_text = (
+        "\n\nPagerDuty charges extra for what Rootly includes.\n"
+        "Slack bot integration, alert grouping, and automated workflows — all built in, no add-ons. Teams switch in minutes.\n"
+        "Try Rootly for free or book a demo: https://rootly.com/demo"
+        if is_pagerduty else ""
+    )
+    rootly_promo_html = (
+        f"""
+  <div style="margin-top: 24px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 14px 16px;">
+    <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #5b21b6;">PagerDuty charges extra for what Rootly includes.</p>
+    <p style="margin: 0 0 10px; font-size: 13px; color: #6b7280; line-height: 1.6;">
+      Slack bot integration, alert grouping, and automated workflows &mdash; all built in, no add-ons. Teams switch in minutes.
+    </p>
+    <a href="https://rootly.com/demo" style="display: inline-block; font-size: 12px; font-weight: 600; color: #7c3aed; text-decoration: underline;">Try Rootly for free or book a demo &rarr;</a>
+  </div>"""
+        if is_pagerduty else ""
+    )
 
     blocked = _ensure_dict(analysis.config).get("auto_refresh_blocked") if analysis.config else None
     blocked_note_text = ""
@@ -343,18 +404,72 @@ def _build_email_content(
     def format_list_text(items: List[Dict[str, Any]]) -> str:
         if not items:
             return "  None"
-        return "\n".join([f"  - {_format_member_item(item)}" for item in items])
+        return "\n".join([f"  - {_format_member_item(item)}" for item in items[:3]])
 
     _risk_colors = {
-        "critical": "#ef4444",
-        "high": "#f97316",
-        "medium": "#eab308",
-        "low": "#22c55e",
+        "critical": ("#fee2e2", "#b91c1c"),  # light red bg, dark red text
+        "high":     ("#ffedd5", "#c2410c"),  # light orange bg, dark orange text
+        "medium":   ("#fef9c3", "#92400e"),  # light yellow bg, dark amber text
+        "low":      ("#dcfce7", "#15803d"),  # light green bg, dark green text
+    }
+    _bar_colors = {
+        "critical": "#f87171",  # bright red (matches UI card)
+        "high":     "#fb923c",  # bright orange
+        "medium":   "#eab308",  # bright yellow (matches UI card)
+        "low":      "#22c55e",  # bright green (matches UI card)
     }
     _trend_badges = {
-        "significantly_worsening": ("&#8600;&#8600; Critical", "#fee2e2", "#ef4444"),
-        "worsening":               ("&#8600; Worsening",       "#fff7ed", "#f97316"),
+        "significantly_worsening": ("&#8600;&#xFE0E;&#8600;&#xFE0E; Critical", "#fee2e2", "#ef4444"),
+        "worsening":               ("&#8600;&#xFE0E; Worsening",               "#fff7ed", "#f97316"),
     }
+
+    def _render_combined_trends_table(items: List[Dict[str, Any]], risk_colors: Dict, trend_badges: Dict) -> str:
+        if not items:
+            return '<tr><td colspan="3" style="padding: 12px 14px; color: #6b7280; text-align: center;">No trends</td></tr>'
+        rows = []
+        for item in items:
+            name = item.get("user_name") or item.get("user_email") or "Unknown"
+            risk_level_raw = (item.get("risk_level") or "unknown").lower()
+            trend_type = item.get("trend_type", "worsening")
+
+            risk_level_score = item.get("och_score") or 0
+            trend_badge_text, _, _ = trend_badges.get(trend_type, ("↘ Worsening", "#fff7ed", "#f97316"))
+
+            # Bright bar fill color matching the UI card
+            bar_fill = _bar_colors.get(risk_level_raw, "#9ca3af")
+
+            # Trend badge styling
+            trend_bg = "#fee2e2" if trend_type == "significantly_worsening" else "#fef9c3"
+            trend_color = "#dc2626" if trend_type == "significantly_worsening" else "#b45309"
+
+            # Bar width percentage based on score (0-100)
+            bar_width_percent = min(max(risk_level_score, 0), 100)
+
+            rows.append(
+                f'<tr style="border-bottom: 1px solid #f3f4f6;">'
+                f'<td style="padding: 12px 14px; font-size: 14px; color: #111827;">{name}</td>'
+                f'<td style="padding: 12px 14px; text-align: center; vertical-align: middle;">'
+                f'<table style="display: inline-table; border-collapse: collapse; margin: 0 auto;">'
+                f'<tr>'
+                f'<td style="vertical-align: middle; padding: 0;">'
+                f'<div style="width: 50px; height: 6px; border-radius: 3px; background: #e5e7eb; overflow: hidden;">'
+                f'<div style="width: {bar_width_percent}%; height: 6px; background: {bar_fill}; border-radius: 3px;"></div>'
+                f'</div>'
+                f'</td>'
+                f'<td style="vertical-align: middle; padding: 0 0 0 8px;">'
+                f'<span style="font-size: 12px; color: #6b7280;">{int(risk_level_score)}</span>'
+                f'</td>'
+                f'</tr>'
+                f'</table>'
+                f'</td>'
+                f'<td style="padding: 12px 14px; font-size: 13px; text-align: right;">'
+                f'<span style="display: inline-block; padding: 2px 8px; border-radius: 99px;'
+                f' background: {trend_bg}; color: {trend_color}; font-weight: 600; font-size: 11px; white-space: nowrap;">'
+                f'{trend_badge_text}</span>'
+                f'</td>'
+                f'</tr>'
+            )
+        return "\n".join(rows)
 
     def format_list_html(items: List[Dict[str, Any]], trend: str) -> str:
         if not items:
@@ -363,51 +478,45 @@ def _build_email_content(
             trend, ("&#8600; Worsening", "#fff7ed", "#f97316")
         )
         rows = []
-        for item in items:
+        for item in items[:3]:
             name = item.get("user_name") or item.get("user_email") or "Unknown"
-            email = item.get("user_email") or ""
             risk_level_raw = (item.get("risk_level") or "unknown").lower()
-            risk_color = _risk_colors.get(risk_level_raw, "#6b7280")
-            score = item.get("och_score")
-            score_str = f"{round(score)}" if isinstance(score, (int, float)) else "n/a"
-            email_part = (
-                f' <span style="color: #9ca3af; font-size: 12px;">({email})</span>'
-                if email and email != name else ""
-            )
+            risk_bg, risk_text_color = _risk_colors.get(risk_level_raw, ("#f3f4f6", "#6b7280"))
             rows.append(
-                f'<li style="margin-bottom: 10px; list-style: none; padding: 8px 10px;'
-                f' background: #fafafa; border-radius: 6px; border: 1px solid #f3f4f6;">'
-                f'<div style="font-size: 14px; margin-bottom: 5px;">'
-                f'<strong style="color: #111827;">{name}</strong>{email_part}'
-                f'</div>'
-                f'<span style="display: inline-block; padding: 2px 10px; border-radius: 99px;'
-                f' background: {badge_bg}; color: {badge_color}; font-size: 12px; font-weight: 700;'
-                f' margin-right: 8px;">{badge_text}</span>'
-                f'<span style="display: inline-block; padding: 2px 10px; border-radius: 99px;'
-                f' background: #f9fafb; border: 1px solid #e5e7eb;'
-                f' color: {risk_color}; font-size: 12px; font-weight: 600;">'
-                f'&#9679; {risk_level_raw.capitalize()} &middot; {score_str}</span>'
+                f'<li style="margin-bottom: 8px; list-style: none;">'
+                f'<table style="width: 100%; background: #fafafa; border-radius: 6px;'
+                f' border: 1px solid #f3f4f6; border-collapse: collapse;">'
+                f'<tr>'
+                f'<td style="padding: 8px 10px; font-size: 14px; width: 100%;">'
+                f'<strong style="color: #111827;">{name}</strong>'
+                f'</td>'
+                f'<td style="padding: 8px 10px; text-align: right; white-space: nowrap;">'
+                f'<span style="display: inline-block; padding: 3px 12px; border-radius: 99px;'
+                f' background: {risk_bg}; color: {risk_text_color}; font-size: 12px; font-weight: 600;">'
+                f'Risk Level: {risk_level_raw.capitalize()}</span>'
+                f'</td>'
+                f'</tr>'
+                f'</table>'
                 f'</li>'
             )
         return "\n".join(rows)
 
-    subject = "On-Call Health Weekly Digest"
+    week_of = local_now.strftime("%B %d, %Y")
+    subject = f"Weekly Digest – {week_of}"
 
     # ── Plain-text body ──────────────────────────────────────────────────────
     text_lines = [
-        "On-Call Health Weekly Digest",
+        f"Weekly Digest – {week_of}",
         "",
-        f"Integration: {integration_name} ({time_range}-day window)",
-        f"Last updated: {last_updated_relative} ({last_updated_absolute})",
-        f"Timezone: {tz_name}",
+        f"Integration: {integration_name}",
+        f"Last updated: {last_updated_relative}",
         "",
         "Team Overview",
-        f"  Total members:   {risk['total']}",
+        f"  Team Risk Level: {team_risk_label}",
         f"  At risk:         {risk['at_risk']}",
-        f"  Worsening trend: {len(worsening_trend) + len(critical_trend)}",
+        f"  Critical trend:  {len(critical_trend)}",
+        f"  Worsening trend: {len(worsening_trend)}",
     ]
-    if risk["avg_score"] is not None:
-        text_lines.append(f"  Avg OCH score:   {risk['avg_score']}")
     text_lines += [
         "",
         "Critical Trend",
@@ -418,66 +527,85 @@ def _build_email_content(
         "",
         f"View full report: {dashboard_url}",
     ]
+    if rootly_promo_text:
+        text_lines.append(rootly_promo_text)
     if blocked_note_text:
         text_lines.append(blocked_note_text)
     if unsubscribe_url:
-        text_lines += ["", f"Unsubscribe: {unsubscribe_url}"]
+        text_lines += ["", "--", f"Unsubscribe from weekly digests: {unsubscribe_url}"]
     text_body = "\n".join(text_lines)
 
     # ── Metrics table HTML ───────────────────────────────────────────────────
-    avg_td = ""
-    if risk["avg_score"] is not None:
-        avg_td = f"""
-        <td style="padding: 16px; text-align: center; border-left: 1px solid #e5e7eb;">
-          <div style="font-size: 26px; font-weight: 700; color: #111827; line-height: 1;">{risk['avg_score']}</div>
-          <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Avg OCH Score</div>
-        </td>"""
 
     unsubscribe_html = (
-        f'<a href="{unsubscribe_url}" style="color: #9ca3af; text-decoration: underline; font-size: 12px;">'
-        f'Unsubscribe from weekly digests</a>'
+        f'<p style="margin: 10px 0 0; font-size: 12px; color: #9ca3af;">'
+        f''
+        f'<a href="{unsubscribe_url}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe from weekly digests</a>'
+        f'</p>'
         if unsubscribe_url else ""
     )
 
-    html_body = f"""
+    html_body = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Digest</title>
+  <style>
+    @media only screen and (max-width: 480px) {{
+      .stats-cell {{ display: block !important; width: 100% !important; box-sizing: border-box !important; border-left: none !important; border-top: 1px solid #e5e7eb !important; }}
+      .stats-cell:first-child {{ border-top: none !important; }}
+    }}
+  </style>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #ffffff;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;color:#ffffff;line-height:1;">{integration_name} &mdash; Team Risk Level: {team_risk_label} &middot; {risk['at_risk']} Users at Risk &middot; {len(critical_trend)} Critical &middot; {len(worsening_trend)} Worsening&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #111827;">
 
-  <div style="border-left: 4px solid #7c3aed; padding-left: 16px; margin-bottom: 20px;">
-    <h2 style="margin: 0 0 4px; font-size: 22px; color: #111827;">Weekly Digest</h2>
-    <p style="margin: 0; color: #6b7280; font-size: 14px;">{integration_name} &middot; {time_range}-day window</p>
-  </div>
-
-  <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px;">
-    Last updated {last_updated_relative} ({last_updated_absolute}) &middot; {tz_name}
-  </p>
-
-  <table style="width: 100%; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; border-collapse: collapse; margin-bottom: 24px;">
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
     <tr>
-      <td style="padding: 16px; text-align: center;">
-        <div style="font-size: 26px; font-weight: 700; color: #111827; line-height: 1;">{risk['total']}</div>
-        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Total Members</div>
+      <td style="vertical-align: top;">
+        <div style="border-left: 4px solid #7c3aed; padding-left: 16px;">
+          <h2 style="margin: 0 0 4px; font-size: 22px; color: #111827;">Weekly Digest</h2>
+          <p style="margin: 0; color: #6b7280; font-size: 14px;">{integration_name} &middot; Last updated {last_updated_relative}</p>
+        </div>
       </td>
-      <td style="padding: 16px; text-align: center; border-left: 1px solid #e5e7eb;">
-        <div style="font-size: 26px; font-weight: 700; color: #ef4444; line-height: 1;">{risk['at_risk']}</div>
-        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">At Risk</div>
+      <td style="vertical-align: top; text-align: right;">
+        <img src="{settings.FRONTEND_URL}/images/on-call-health-logo.svg" alt="On-Call Health" height="28" style="display: block; margin-left: auto; margin-bottom: 4px;">
+        <img src="{settings.FRONTEND_URL}/images/rootly-ai-logo.png" alt="Powered by Rootly AI" height="14" style="display: block; margin-left: auto;">
       </td>
-      <td style="padding: 16px; text-align: center; border-left: 1px solid #e5e7eb;">
-        <div style="font-size: 26px; font-weight: 700; color: #f59e0b; line-height: 1;">{len(worsening_trend) + len(critical_trend)}</div>
-        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Worsening Trend</div>
-      </td>
-      {avg_td}
     </tr>
   </table>
 
-  <h3 style="margin: 0 0 8px; font-size: 15px; color: #ef4444;">Critical Trend</h3>
-  <ul style="margin: 0 0 20px; padding-left: 0; font-size: 14px; line-height: 1.7;">
-    {format_list_html(critical_trend, "significantly_worsening")}
-  </ul>
+  <table style="width: 100%; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; border-collapse: collapse; margin-bottom: 24px;">
+    <tr>
+      <td class="stats-cell" style="padding: 16px; text-align: center;">
+        <div style="font-size: 22px; font-weight: 700; color: {team_risk_color}; line-height: 1;">{team_risk_label}</div>
+        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Team Risk Level</div>
+      </td>
+      <td class="stats-cell" style="padding: 16px; text-align: center; border-left: 1px solid #e5e7eb;">
+        <div style="font-size: 26px; font-weight: 700; color: #111827; line-height: 1;">{risk['at_risk']}</div>
+        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Users At Risk</div>
+      </td>
+      <td class="stats-cell" style="padding: 16px; text-align: center; border-left: 1px solid #e5e7eb;">
+        <div style="font-size: 26px; font-weight: 700; color: #111827; line-height: 1;">{len(critical_trend)}</div>
+        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Critical Trend</div>
+      </td>
+      <td class="stats-cell" style="padding: 16px; text-align: center; border-left: 1px solid #e5e7eb;">
+        <div style="font-size: 26px; font-weight: 700; color: #111827; line-height: 1;">{len(worsening_trend)}</div>
+        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Worsening Trend</div>
+      </td>
+    </tr>
+  </table>
 
-  <h3 style="margin: 0 0 8px; font-size: 15px; color: #f59e0b;">Worsening Trend</h3>
-  <ul style="margin: 0 0 24px; padding-left: 0; font-size: 14px; line-height: 1.7;">
-    {format_list_html(worsening_trend, "worsening")}
-  </ul>
+  <table style="width: 100%; background: white; border-collapse: collapse; margin-bottom: 24px;">
+    <tr style="border-bottom: 1px solid #e5e7eb;">
+      <td style="padding: 12px 14px; font-size: 12px; font-weight: 700; color: #9ca3af;">MEMBER</td>
+      <td style="padding: 12px 14px; font-size: 12px; font-weight: 700; color: #9ca3af; text-align: center;">RISK LEVEL</td>
+      <td style="padding: 12px 14px; font-size: 12px; font-weight: 700; color: #9ca3af; text-align: right;">TREND</td>
+    </tr>
+    {_render_combined_trends_table(combined_trends, _risk_colors, _trend_badges)}
+  </table>
 
   <a href="{dashboard_url}"
      style="display: inline-block; background: #7c3aed; color: white; text-decoration: none;
@@ -485,13 +613,14 @@ def _build_email_content(
     View Full Report &rarr;
   </a>
 
+{rootly_promo_html}
+
 {blocked_note_html}
+{unsubscribe_html}
 
-  <div style="border-top: 1px solid #e5e7eb; margin-top: 32px; padding-top: 16px; color: #9ca3af;">
-    {unsubscribe_html}
-  </div>
-
-</div>"""
+</div>
+</body>
+</html>"""
 
     return {"subject": subject, "text": text_body, "html": html_body}
 
@@ -501,10 +630,16 @@ async def _send_resend_email(
     to_name: Optional[str],
     subject: str,
     text_body: str,
-    html_body: str
+    html_body: str,
+    unsubscribe_url: Optional[str] = None
 ) -> bool:
     if not settings.RESEND_API_KEY or not settings.RESEND_FROM_EMAIL:
-        logger.warning("Weekly digest disabled: missing RESEND_API_KEY or RESEND_FROM_EMAIL")
+        missing = []
+        if not settings.RESEND_API_KEY:
+            missing.append("RESEND_API_KEY")
+        if not settings.RESEND_FROM_EMAIL:
+            missing.append("RESEND_FROM_EMAIL")
+        logger.warning(f"Weekly digest disabled: missing env var(s): {', '.join(missing)}")
         return False
 
     from_name = settings.RESEND_FROM_NAME.strip() if settings.RESEND_FROM_NAME else ""
@@ -516,7 +651,11 @@ async def _send_resend_email(
         "to": [to_email],
         "subject": subject,
         "text": text_body,
-        "html": html_body
+        "html": html_body,
+        **({"headers": {
+            "List-Unsubscribe": f"<{unsubscribe_url}>",
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+        }} if unsubscribe_url else {})
     }
 
     headers = {
@@ -539,7 +678,6 @@ async def _send_resend_email(
 def _get_latest_auto_refresh_analysis(db, user: User) -> Optional[Analysis]:
     return db.query(Analysis).filter(
         Analysis.user_id == user.id,
-        Analysis.organization_id == user.organization_id,
         Analysis.is_auto_refresh == True,
         Analysis.status == "completed",
         Analysis.completed_at.isnot(None),
@@ -556,8 +694,8 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
         User.status == "active"
     ).first()
 
-    if not user or not user.email or not user.organization_id:
-        return {"sent": False, "message": "User not found or missing organization"}
+    if not user or not user.email:
+        return {"sent": False, "message": "User not found or missing email"}
 
     analysis = _get_latest_auto_refresh_analysis(db, user)
     if not analysis:
@@ -576,7 +714,7 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
     local_now = datetime.now(tz)
 
     unsubscribe_token = _generate_unsubscribe_token(user.id)
-    unsubscribe_url = f"{settings.API_BASE_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
+    unsubscribe_url = f"{settings.FRONTEND_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
 
     content = _build_email_content(
         user=user,
@@ -592,7 +730,8 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
         to_name=user.name,
         subject=content["subject"],
         text_body=content["text"],
-        html_body=content["html"]
+        html_body=content["html"],
+        unsubscribe_url=unsubscribe_url
     )
 
     if not sent:
@@ -604,6 +743,19 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
         "analysis_id": analysis.id,
         "last_updated_at": analysis.completed_at.isoformat() if analysis.completed_at else None
     }
+
+
+async def _log_digest_countdown() -> None:
+    """Runs every 2 minutes when WEEKLY_DIGEST_FORCE_SEND=true to show time until next send."""
+    if not settings.WEEKLY_DIGEST_FORCE_SEND or _scheduler_start_time is None:
+        return
+    elapsed = (datetime.now() - _scheduler_start_time).total_seconds() / 60
+    next_tick = _DIGEST_INTERVAL_MINUTES - (elapsed % _DIGEST_INTERVAL_MINUTES)
+    logger.info(
+        f"⏳ [WEEKLY_DIGEST] Force-send mode active — "
+        f"next digest check in ~{next_tick:.0f} min "
+        f"(elapsed: {elapsed:.1f} min since scheduler start)"
+    )
 
 
 async def check_and_send_weekly_digests() -> None:
@@ -631,6 +783,8 @@ async def check_and_send_weekly_digests() -> None:
             )
         ).all()
 
+        logger.info(f"📬 [WEEKLY_DIGEST] Found {len(analyses)} auto-refresh analyses to process")
+
         for analysis in analyses:
             try:
                 user = db.query(User).filter(
@@ -639,48 +793,53 @@ async def check_and_send_weekly_digests() -> None:
                 ).first()
 
                 if not user or not user.email:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP analysis={analysis.id}: user not found or no email (user_id={analysis.user_id})")
                     continue
 
-                if not analysis.organization_id or not user.organization_id:
-                    continue
+                logger.info(f"📬 [WEEKLY_DIGEST] Processing analysis={analysis.id} for user={user.email}")
 
-                if analysis.organization_id != user.organization_id:
-                    continue
-
-                # Skip users who have opted out
                 if not user.weekly_digest_enabled:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: weekly_digest_enabled=False")
                     continue
 
                 config = _ensure_dict(analysis.config)
                 if config.get("is_demo") is True:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: demo analysis")
                     continue
 
                 tz_name = _get_user_timezone(db, user.id)
                 tz = pytz.timezone(tz_name)
                 local_now = datetime.now(tz)
 
-                # Monday at 10am local time
-                if local_now.weekday() != 0:
-                    continue
-                if local_now.hour != 10:
-                    continue
+                # Monday at 10am local time (skipped when WEEKLY_DIGEST_FORCE_SEND=true)
+                if not settings.WEEKLY_DIGEST_FORCE_SEND:
+                    if local_now.weekday() != 0:
+                        continue
+                    if local_now.hour != 10:
+                        continue
 
                 week_start_date = _get_week_start_date(local_now)
 
-                existing_log = db.query(WeeklyDigestLog).filter(
-                    WeeklyDigestLog.user_id == user.id,
-                    WeeklyDigestLog.week_start_date == week_start_date
-                ).first()
+                # Skip dedup check when force-sending locally
+                if not settings.WEEKLY_DIGEST_FORCE_SEND:
+                    existing_log = db.query(WeeklyDigestLog).filter(
+                        WeeklyDigestLog.user_id == user.id,
+                        WeeklyDigestLog.week_start_date == week_start_date
+                    ).first()
 
-                if existing_log:
-                    continue
+                    if existing_log:
+                        logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: already sent this week ({week_start_date})")
+                        continue
 
                 results = _ensure_dict(analysis.results)
                 if not results:
+                    logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: analysis results are empty")
                     continue
 
+                logger.info(f"📬 [WEEKLY_DIGEST] Sending digest to {user.email} (analysis={analysis.id})...")
+
                 unsubscribe_token = _generate_unsubscribe_token(user.id)
-                unsubscribe_url = f"{settings.API_BASE_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
+                unsubscribe_url = f"{settings.FRONTEND_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
 
                 content = _build_email_content(
                     user=user,
@@ -696,11 +855,17 @@ async def check_and_send_weekly_digests() -> None:
                     to_name=user.name,
                     subject=content["subject"],
                     text_body=content["text"],
-                    html_body=content["html"]
+                    html_body=content["html"],
+                    unsubscribe_url=unsubscribe_url
                 )
 
                 if not sent:
                     continue
+
+                logger.info(
+                    f"📧 [WEEKLY_DIGEST] Digest sent to {user.email} "
+                    f"(user_id={user.id}, subject={content['subject']})"
+                )
 
                 log_entry = WeeklyDigestLog(
                     user_id=user.id,
@@ -733,14 +898,27 @@ class WeeklyDigestScheduler:
         self.scheduler = AsyncIOScheduler()
 
     def start(self) -> None:
+        global _scheduler_start_time
         if self.scheduler.running:
             return
+        _scheduler_start_time = datetime.now()
         self.scheduler.add_job(
             check_and_send_weekly_digests,
             trigger=CronTrigger(minute="*/10"),
             id="weekly_digest",
             replace_existing=True
         )
+        if settings.WEEKLY_DIGEST_FORCE_SEND:
+            self.scheduler.add_job(
+                _log_digest_countdown,
+                trigger=CronTrigger(minute="*/2"),
+                id="weekly_digest_countdown",
+                replace_existing=True
+            )
+            logger.info(
+                "⚡ [WEEKLY_DIGEST] FORCE_SEND mode enabled — "
+                "digest will send on next 10-min tick, countdown logged every 2 min"
+            )
         self.scheduler.start()
         logger.info("Weekly digest scheduler started (every 10 minutes)")
 

@@ -198,23 +198,9 @@ async def startup_event():
     finally:
         db.close()
 
-    # Start MCP connection cleanup scheduler
-    # Uses same AsyncIOScheduler pattern as survey_scheduler
-    from apscheduler.schedulers.asyncio import AsyncIOScheduler
-    from app.mcp.infrastructure.cleanup import get_cleanup_job_config
-
-    mcp_cleanup_scheduler = AsyncIOScheduler()
-    job_config = get_cleanup_job_config()
-    mcp_cleanup_scheduler.add_job(
-        job_config["func"],
-        trigger=job_config["trigger"],
-        id=job_config["id"],
-        replace_existing=job_config["replace_existing"],
-    )
-    mcp_cleanup_scheduler.start()
-    print("MCP connection cleanup scheduler started (every 5 minutes)")
 
     # Start auto-refresh analysis scheduler — one cron job per interval cadence
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
     from apscheduler.triggers.cron import CronTrigger
     from app.services.auto_refresh_scheduler import (
         check_and_run_auto_refresh_analyses,
@@ -222,7 +208,7 @@ async def startup_event():
     )
 
     auto_refresh_scheduler = AsyncIOScheduler()
-    for interval in ["10m", "24h", "3d", "7d"]:
+    for interval in ["24h", "7d"]:
         auto_refresh_scheduler.add_job(
             check_and_run_auto_refresh_analyses,
             trigger=_make_cron_trigger(interval),
@@ -231,7 +217,7 @@ async def startup_event():
             kwargs={"interval_filter": interval},
         )
     auto_refresh_scheduler.start()
-    print("Auto-refresh analysis scheduler started (10m: every 10 min | 24h: daily | 3d: every 3 days | 7d: every 7 days)")
+    print("Auto-refresh analysis scheduler started (24h: daily | 7d: every 7 days)")
 
     # Start weekly digest email scheduler (Monday 10am local time, checked every 10 min)
     from app.services.weekly_digest_service import weekly_digest_scheduler
@@ -263,14 +249,3 @@ app.include_router(invitations.router, prefix="/api", tags=["invitations"])
 app.include_router(api_keys.router, prefix="/api", tags=["api-keys"])
 app.include_router(surveys.router, prefix="/api/surveys", tags=["surveys"])
 logger.debug("Surveys router registered successfully")
-
-# Mount MCP transport endpoints
-# Streamable HTTP at /mcp/mcp, SSE at /mcp/sse, health at /mcp/health
-# MCP transport has its own CORS middleware configured for web-based MCP clients
-# Lazy import to avoid loading MCP dependencies unless actually needed
-try:
-    from .mcp.transport import mcp_http_app
-    app.mount("/mcp", mcp_http_app)
-    logger.debug("MCP transport mounted at /mcp")
-except ImportError as e:
-    logger.warning(f"MCP transport not available: {e}. MCP endpoints will not be mounted.")

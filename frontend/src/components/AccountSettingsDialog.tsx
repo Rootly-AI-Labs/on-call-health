@@ -275,17 +275,15 @@ export function AccountSettingsDialog({
 
         <div className="px-6 pb-6">
           <Tabs defaultValue="account" className="w-full">
-            {/* Account tab panel temporarily disabled */}
-            {/*
-            <TabsList className="grid w-full grid-cols-1 bg-neutral-100/70">
+            <TabsList className="grid w-full grid-cols-2 bg-neutral-100/70">
               <TabsTrigger value="account" className="data-[state=active]:bg-white">
                 Account
               </TabsTrigger>
+              <TabsTrigger value="weekly" className="data-[state=active]:bg-white">
+                Weekly Digest
+              </TabsTrigger>
             </TabsList>
-            */}
 
-            {/* Weekly digest content temporarily disabled */}
-            {/*
             <TabsContent value="weekly" className="mt-6">
               <div className="border border-neutral-200 rounded-xl p-5 bg-white shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
@@ -359,13 +357,9 @@ export function AccountSettingsDialog({
                       </>
                     )}
                   </Button>
-                  <span className="text-[13px] text-neutral-500">
-                    Test sends the latest auto-refresh results to your email.
-                  </span>
                 </div>
               </div>
             </TabsContent>
-            */}
 
             <TabsContent value="account" className="mt-6">
               <div className="pt-6 border-t border-neutral-200">

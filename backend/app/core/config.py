@@ -68,9 +68,14 @@ class Settings:
 
     # Weekly digest emails
     WEEKLY_DIGEST_ENABLED: bool = os.getenv("WEEKLY_DIGEST_ENABLED", "false").lower() == "true"
+
+
+    WEEKLY_DIGEST_FORCE_SEND: bool = os.getenv("WEEKLY_DIGEST_FORCE_SEND", "false").lower() == "true"
     RESEND_API_KEY: Optional[str] = os.getenv("RESEND_API_KEY")
     RESEND_FROM_EMAIL: Optional[str] = os.getenv("RESEND_FROM_EMAIL")
     RESEND_FROM_NAME: str = os.getenv("RESEND_FROM_NAME", "On-Call Health")
+    #todo
+    # API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:8000")
 
     # Working Hours Configuration
     # These define what is considered "business hours" for burnout analysis

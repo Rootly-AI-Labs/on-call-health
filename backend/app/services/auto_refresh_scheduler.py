@@ -325,9 +325,11 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                     db.delete(old_analysis)
                     db.commit()
     
+                    user_obj = db.query(User).filter(User.id == old_analysis.user_id).first()
+                    user_label = user_obj.email if user_obj else str(old_analysis.user_id)
                     logger.info(
                         f"🔄 [AUTO_REFRESH_SCHEDULER] Replaced analysis {old_analysis.id} → new analysis {new_id} "
-                        f"(user={old_analysis.user_id}, interval={old_analysis.auto_refresh_interval})"
+                        f"(user={user_label}, interval={old_analysis.auto_refresh_interval})"
                     )
     
                     # Fire the background task
