@@ -571,8 +571,14 @@ def _build_email_content(
         </div>
       </td>
       <td style="vertical-align: top; text-align: right;">
-        <img src="{settings.FRONTEND_URL}/images/on-call-health-logo.svg" alt="On-Call Health" height="28" style="display: block; margin-left: auto; margin-bottom: 4px;">
-        <img src="{settings.FRONTEND_URL}/images/rootly-ai-logo.png" alt="Powered by Rootly AI" height="14" style="display: block; margin-left: auto;">
+        <div style="margin-bottom: 5px;">
+          <img src="{settings.FRONTEND_URL}/images/on-call-health-logo.svg" alt="" width="18" height="18" style="display: inline-block; vertical-align: middle; margin-right: 5px;">
+          <span style="font-size: 15px; font-weight: 700; color: #111827; vertical-align: middle;">On-Call Health</span>
+        </div>
+        <div>
+          <span style="font-size: 12px; color: #6b7280; vertical-align: middle; margin-right: 4px;">Powered by</span>
+          <img src="{settings.FRONTEND_URL}/images/rootly-ai-logo.png" alt="Rootly AI" height="14" style="display: inline-block; vertical-align: middle;">
+        </div>
       </td>
     </tr>
   </table>
