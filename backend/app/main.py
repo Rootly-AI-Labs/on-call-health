@@ -200,6 +200,7 @@ async def startup_event():
 
 
     # Start auto-refresh analysis scheduler — one cron job per interval cadence
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
     from apscheduler.triggers.cron import CronTrigger
     from app.services.auto_refresh_scheduler import (
         check_and_run_auto_refresh_analyses,
