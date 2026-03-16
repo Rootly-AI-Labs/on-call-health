@@ -357,9 +357,6 @@ export function AccountSettingsDialog({
                       </>
                     )}
                   </Button>
-                  <span className="text-[13px] text-neutral-500">
-                    Test sends the latest auto-refresh results to your email.
-                  </span>
                 </div>
               </div>
             </TabsContent>
