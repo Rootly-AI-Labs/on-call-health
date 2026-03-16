@@ -1,7 +1,7 @@
 """
 API key authentication dependency for FastAPI.
 
-Provides get_current_user_from_api_key for programmatic/MCP endpoints.
+Provides get_current_user_from_api_key for programmatic API endpoints.
 Uses two-phase validation: SHA-256 lookup (fast) + Argon2 verification (secure).
 """
 import asyncio
@@ -56,7 +56,7 @@ async def get_current_user_from_api_key(
     db: Session = Depends(get_db)
 ) -> User:
     """
-    Authenticate user via API key for MCP/programmatic endpoints.
+    Authenticate user via API key for programmatic endpoints.
 
     Two-phase validation:
     1. SHA-256 lookup (fast, indexed) - finds the key record
