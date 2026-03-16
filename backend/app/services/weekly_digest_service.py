@@ -668,7 +668,6 @@ async def _send_resend_email(
 def _get_latest_auto_refresh_analysis(db, user: User) -> Optional[Analysis]:
     return db.query(Analysis).filter(
         Analysis.user_id == user.id,
-        Analysis.organization_id == user.organization_id,
         Analysis.is_auto_refresh == True,
         Analysis.status == "completed",
         Analysis.completed_at.isnot(None),
@@ -685,8 +684,8 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
         User.status == "active"
     ).first()
 
-    if not user or not user.email or not user.organization_id:
-        return {"sent": False, "message": "User not found or missing organization"}
+    if not user or not user.email:
+        return {"sent": False, "message": "User not found or missing email"}
 
     analysis = _get_latest_auto_refresh_analysis(db, user)
     if not analysis:
