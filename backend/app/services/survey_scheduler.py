@@ -722,16 +722,18 @@ class SurveyScheduler:
 
                 for user in users:
                     try:
-                        # Skip users without a valid user_id (UserCorrelation without matching User record)
-                        if user['user_id'] is None:
-                            skipped_count += 1
-                            logger.warning(f"Skipping DM for {user.get('email')} - no User record found (user_id is None)")
-                            continue
                         normalized_email = normalize_survey_email(user.get('email'))
                         if not normalized_email:
                             skipped_count += 1
                             logger.warning("Skipping DM for user with missing email")
                             continue
+
+                        if user['user_id'] is None:
+                            logger.info(
+                                "Sending %s to %s without a local User record; email-based survey tracking will be used",
+                                message_type,
+                                mask_email(normalized_email),
+                            )
 
                         recipient_lock_key = self._get_recipient_delivery_lock_key(normalized_email)
                         async with with_distributed_lock(
@@ -758,16 +760,20 @@ class SurveyScheduler:
                                 continue
 
                             # If reminder, check if user already completed survey today
-                            # Check is scoped by user only - one survey per user per day regardless of org
+                            # Check is scoped by recipient email so roster-only members without
+                            # local User rows are treated the same as members with accounts.
                             if is_reminder:
                                 already_completed = db.query(UserBurnoutReport).filter(
-                                    UserBurnoutReport.user_id == user['user_id'],
+                                    func.lower(UserBurnoutReport.email) == normalized_email,
                                     UserBurnoutReport.submitted_at >= today_start_utc
                                 ).first()
 
                                 if already_completed:
                                     skipped_count += 1
-                                    logger.debug(f"Skipping reminder for user {user['user_id']} - already completed")
+                                    logger.debug(
+                                        "Skipping reminder for %s - already completed",
+                                        mask_email(normalized_email),
+                                    )
                                     continue
 
                             await self.dm_sender.send_survey_dm(
@@ -781,16 +787,17 @@ class SurveyScheduler:
                             sent_count += 1
 
                             # Create notification for the user who received the survey
-                            try:
-                                notification_service = NotificationService(db)
-                                notification_service.create_survey_received_notification(
-                                    user_id=user['user_id'],
-                                    organization_id=organization_id,
-                                    is_reminder=is_reminder,
-                                    commit=False
-                                )
-                            except Exception as notif_error:
-                                logger.error(f"Failed to create notification for user {user['user_id']}: {str(notif_error)}")
+                            if user['user_id'] is not None:
+                                try:
+                                    notification_service = NotificationService(db)
+                                    notification_service.create_survey_received_notification(
+                                        user_id=user['user_id'],
+                                        organization_id=organization_id,
+                                        is_reminder=is_reminder,
+                                        commit=False
+                                    )
+                                except Exception as notif_error:
+                                    logger.error(f"Failed to create notification for user {user['user_id']}: {str(notif_error)}")
 
                             # Create survey period for follow-up tracking (only for initial sends)
                             if not is_reminder and schedule and user.get('correlation'):

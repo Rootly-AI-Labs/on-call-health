@@ -82,12 +82,48 @@ export function SlackSurveyTabs({
   const [savedRecipients, setSavedRecipients] = useState<Set<number>>(new Set()) // Track what's actually saved
   const [savingRecipients, setSavingRecipients] = useState(false)
   const [loadingRecipients, setLoadingRecipients] = useState(false)
+  const [showScheduledRecipientsDialog, setShowScheduledRecipientsDialog] = useState(false)
 
   // Memoize recipient changes check to avoid repeated Set operations
   const hasRecipientChanges = useMemo(() => {
     if (selectedRecipients.size !== savedRecipients.size) return true
     return Array.from(selectedRecipients).some(id => !savedRecipients.has(id))
   }, [selectedRecipients, savedRecipients])
+
+  const slackUsers = useMemo(
+    () => syncedUsers.filter((u: any) => u.slack_user_id),
+    [syncedUsers]
+  )
+
+  const selectedScheduledRecipientUsers = useMemo(() => {
+    if (savedRecipients.size > 0) {
+      return slackUsers.filter((user: any) => savedRecipients.has(user.id))
+    }
+
+    return slackUsers
+  }, [savedRecipients, slackUsers])
+
+  const scheduledRecipientUsers = useMemo(() => {
+    const effectiveUsers = selectedScheduledRecipientUsers.filter((user: any) => {
+      if (typeof user.eligible_for_automated_surveys === 'boolean') {
+        return user.eligible_for_automated_surveys
+      }
+
+      return Boolean(user.slack_user_id && user.email)
+    })
+
+    return effectiveUsers
+  }, [selectedScheduledRecipientUsers])
+
+  const nonDeliverableScheduledUsers = useMemo(
+    () => selectedScheduledRecipientUsers.filter(
+      (user: any) => !scheduledRecipientUsers.some((scheduledUser: any) => scheduledUser.id === user.id)
+    ),
+    [scheduledRecipientUsers, selectedScheduledRecipientUsers]
+  )
+
+  const usesDefaultScheduledRecipients = savedRecipients.size === 0
+  const accessibleAutomatedScheduleCount = scheduleEnabled ? 1 : 0
 
   // Load schedule on mount - backend uses auth token to determine org
   useEffect(() => {
@@ -400,7 +436,6 @@ export function SlackSurveyTabs({
                   <span className="text-sm text-neutral-700">Loading team members...</span>
                 </div>
               ) : (() => {
-                const slackUsers = syncedUsers.filter((u: any) => u.slack_user_id)
                 return slackUsers.length > 0 ? (
                   <div>
                     {hasRecipientChanges && (
@@ -591,10 +626,29 @@ export function SlackSurveyTabs({
                 <p className="text-xs text-neutral-500 mt-1">
                   This schedule is shared across your org and appears the same under any connected token.
                 </p>
-                {scheduleEnabled && (
-                  <p className="text-xs font-medium text-purple-600 mt-1.5">
-                    {Math.max(0, selectedRecipients.size)} {selectedRecipients.size === 1 ? 'user' : 'users'} selected
-                  </p>
+                <p className="text-xs text-neutral-500 mt-1">
+                  {accessibleAutomatedScheduleCount} automated {accessibleAutomatedScheduleCount === 1 ? 'schedule' : 'schedules'} currently available across the orgs you can access here.
+                </p>
+                <p className="text-xs text-neutral-400 mt-1">
+                  Today that count is org-wide, so it will be 0 or 1 rather than one schedule per token.
+                </p>
+                {scheduleEnabled && !loadingSyncedUsers && !loadingRecipients && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowScheduledRecipientsDialog(true)}
+                      className="mt-1.5 text-left text-xs font-medium text-purple-600 underline decoration-purple-300 underline-offset-2 hover:text-purple-700"
+                    >
+                      {usesDefaultScheduledRecipients
+                        ? `All ${scheduledRecipientUsers.length} eligible ${scheduledRecipientUsers.length === 1 ? 'user' : 'users'} will receive surveys`
+                        : `${scheduledRecipientUsers.length} ${scheduledRecipientUsers.length === 1 ? 'user' : 'users'} will receive surveys`}
+                    </button>
+                    {hasRecipientChanges && (
+                      <p className="text-xs text-amber-700 mt-1">
+                        Unsaved Team Members changes are not included in the automated schedule until you save recipients.
+                      </p>
+                    )}
+                  </>
                 )}
                 {lastModifiedAt && lastModifiedByUserId && (
                   <p className="text-xs text-neutral-400 mt-1.5">
@@ -879,6 +933,87 @@ export function SlackSurveyTabs({
       </TabsContent>
     </Tabs>
 
+    <Dialog open={showScheduledRecipientsDialog} onOpenChange={setShowScheduledRecipientsDialog}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Scheduled Survey Recipients</DialogTitle>
+          <DialogDescription>
+            {usesDefaultScheduledRecipients
+              ? "No saved recipient filter is set, so the automated schedule will send to all eligible Slack-linked team members shown below."
+              : "These are the saved team members who will receive automated Slack surveys on the current schedule."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="rounded-lg bg-neutral-100 px-3 py-2 text-sm text-neutral-700">
+            {scheduledRecipientUsers.length} {scheduledRecipientUsers.length === 1 ? 'recipient' : 'recipients'}
+            {usesDefaultScheduledRecipients ? ' (default all eligible users)' : ''}
+          </div>
+
+          {hasRecipientChanges && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              You have unsaved checkbox changes in Team Members. This list reflects the current saved automated schedule recipients.
+            </div>
+          )}
+
+          {nonDeliverableScheduledUsers.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {nonDeliverableScheduledUsers.length} saved {nonDeliverableScheduledUsers.length === 1 ? 'recipient is' : 'recipients are'} currently excluded because they are missing survey eligibility requirements, such as a deliverable email, Slack mapping, or active survey preferences.
+            </div>
+          )}
+
+          {scheduledRecipientUsers.length > 0 ? (
+            <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+              {scheduledRecipientUsers.map((user: any) => (
+                <div key={user.id} className="flex items-center justify-between rounded-lg border bg-white px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-neutral-900">{user.name}</div>
+                    <div className="truncate text-xs text-neutral-500">{user.email}</div>
+                  </div>
+                  {user.survey_count > 0 && (
+                    <Badge variant="secondary" className="ml-3 text-xs bg-green-100 text-green-700 border-green-200">
+                      {user.survey_count} {user.survey_count === 1 ? 'survey' : 'surveys'}
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border bg-neutral-50 px-3 py-6 text-center text-sm text-neutral-600">
+              No eligible Slack recipients are currently available for the automated schedule.
+            </div>
+          )}
+
+          {nonDeliverableScheduledUsers.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Saved but not currently deliverable
+              </div>
+              <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
+                {nonDeliverableScheduledUsers.map((user: any) => (
+                  <div key={user.id} className="flex items-center justify-between rounded-lg border border-amber-200 bg-white px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-neutral-900">{user.name}</div>
+                      <div className="truncate text-xs text-neutral-500">{user.email || "Missing email"}</div>
+                    </div>
+                    <Badge variant="outline" className="ml-3 text-xs border-amber-300 text-amber-700">
+                      Excluded
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowScheduledRecipientsDialog(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     {/* Save Schedule Confirmation Dialog */}
     <Dialog open={showSaveConfirmation} onOpenChange={setShowSaveConfirmation}>
       <DialogContent>
@@ -898,7 +1033,7 @@ export function SlackSurveyTabs({
                       return `${displayHour}:${String(minute).padStart(2, '0')} ${period}`
                     })()} ({Intl.DateTimeFormat().resolvedOptions().timeZone})</div>
                     <div>• <strong>Frequency:</strong> {frequencyType === 'daily' ? 'Every day' : frequencyType === 'weekday' ? 'Weekdays (Mon-Fri)' : `Every ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dayOfWeek]}`}</div>
-                    <div>• <strong>Recipients:</strong> {savedRecipients.size > 0 ? `${savedRecipients.size} configured member${savedRecipients.size !== 1 ? 's' : ''}` : 'All team members with Slack (configure in Team Members tab)'}</div>
+                    <div>• <strong>Recipients:</strong> {usesDefaultScheduledRecipients ? `All ${scheduledRecipientUsers.length} eligible Slack-linked members` : `${scheduledRecipientUsers.length} configured member${scheduledRecipientUsers.length !== 1 ? 's' : ''}`}</div>
                     <div>• <strong>Daily Reminders:</strong> {followUpRemindersEnabled ? 'Enabled (until answered)' : 'Disabled'}</div>
                   </div>
                 </div>

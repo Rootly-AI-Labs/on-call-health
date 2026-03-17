@@ -352,29 +352,29 @@ class TestSlackDMSenderValidation:
 class TestSurveySchedulerUserValidation:
     """Tests for survey scheduler user validation."""
 
-    def test_skip_users_without_user_id(self):
+    def test_allow_users_without_user_id_when_email_present(self):
         """
-        Test that users without a valid user_id are skipped when sending DMs.
-        This prevents sending buttons that will fail when clicked.
+        Test that roster members without a local User record are still eligible
+        for scheduled Slack surveys as long as they have an email address.
         """
         users = [
             {'user_id': 1, 'slack_user_id': 'U001', 'email': 'user1@example.com'},
-            {'user_id': None, 'slack_user_id': 'U002', 'email': 'user2@example.com'},  # Should be skipped
+            {'user_id': None, 'slack_user_id': 'U002', 'email': 'user2@example.com'},
             {'user_id': 3, 'slack_user_id': 'U003', 'email': 'user3@example.com'},
         ]
 
-        sent_users = []
+        sendable_users = []
         skipped_users = []
 
         for user in users:
-            if user['user_id'] is None:
+            if not user['email']:
                 skipped_users.append(user)
             else:
-                sent_users.append(user)
+                sendable_users.append(user)
 
-        assert len(sent_users) == 2
-        assert len(skipped_users) == 1
-        assert skipped_users[0]['email'] == 'user2@example.com'
+        assert len(sendable_users) == 3
+        assert len(skipped_users) == 0
+        assert any(user['user_id'] is None for user in sendable_users)
 
     def test_user_correlation_without_user_record(self):
         """
@@ -608,34 +608,35 @@ class TestSurveySchedulerEdgeCases:
 
     def test_mixed_valid_and_invalid_users(self):
         """
-        Test processing a list with both valid and invalid users.
+        Test processing a list with both email-backed and missing-email users.
         """
         users = [
             {'user_id': 1, 'email': 'valid1@example.com'},
             {'user_id': None, 'email': 'orphan1@example.com'},
             {'user_id': 2, 'email': 'valid2@example.com'},
-            {'user_id': None, 'email': 'orphan2@example.com'},
+            {'user_id': None, 'email': None},
             {'user_id': 3, 'email': 'valid3@example.com'},
         ]
 
-        valid_users = [u for u in users if u['user_id'] is not None]
-        invalid_users = [u for u in users if u['user_id'] is None]
+        sendable_users = [u for u in users if u['email']]
+        invalid_users = [u for u in users if not u['email']]
 
-        assert len(valid_users) == 3
-        assert len(invalid_users) == 2
+        assert len(sendable_users) == 4
+        assert len(invalid_users) == 1
 
     def test_all_users_are_orphans(self):
         """
-        Test handling when all users are orphans (no valid user_id).
+        Test handling when all users are roster-only members without local
+        User rows but still have deliverable emails.
         """
         users = [
             {'user_id': None, 'email': 'orphan1@example.com'},
             {'user_id': None, 'email': 'orphan2@example.com'},
         ]
 
-        valid_users = [u for u in users if u['user_id'] is not None]
+        sendable_users = [u for u in users if u['email']]
 
-        assert len(valid_users) == 0, "Should have no valid users"
+        assert len(sendable_users) == 2, "Email-backed roster members should remain eligible"
 
     def test_empty_user_list(self):
         """
@@ -659,17 +660,19 @@ class TestSurveySchedulerEdgeCases:
 class TestLoggingMessages:
     """Tests to verify logging messages are informative."""
 
-    def test_orphan_skip_log_includes_email(self):
+    def test_roster_member_send_log_includes_email(self):
         """
-        Test that the skip log message includes the user's email for debugging.
+        Test that the log message for roster-only members includes the user's email.
         """
         email = "orphan@example.com"
-        user_id = None
 
-        log_message = f"Skipping DM for {email} - no User record found (user_id is None)"
+        log_message = (
+            "Sending initial survey to "
+            f"{email} without a local User record; email-based survey tracking will be used"
+        )
 
         assert email in log_message
-        assert "user_id is None" in log_message
+        assert "email-based survey tracking" in log_message
 
     def test_slack_integration_not_found_log_includes_team_id(self):
         """
