@@ -51,6 +51,7 @@ export default function AuthSuccessPage() {
           if (key && (
             key.includes('integrations') ||
             key.includes('selected_organization') ||
+            key === 'selectedOrganization' ||
             key.includes('analyses') ||
             key.includes('user_') ||
             key.includes('github_') ||

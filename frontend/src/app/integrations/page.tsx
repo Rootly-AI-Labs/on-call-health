@@ -97,6 +97,11 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import {
+  getStoredSelectedOrganization,
+  setStoredSelectedOrganization,
+  subscribeToSelectedOrganization,
+} from "@/lib/selected-organization"
 import { MappingDrawer } from "@/components/mapping-drawer"
 import { NotificationDrawer } from "@/components/notifications"
 import ManualSurveyDeliveryModal from "@/components/ManualSurveyDeliveryModal"
@@ -779,7 +784,7 @@ export default function IntegrationsPage() {
     loadLlmConfig() // Load AI config to persist connection state
 
     // Load saved organization preference
-    const savedOrg = localStorage.getItem('selected_organization')
+    const savedOrg = getStoredSelectedOrganization()
     // Accept both numeric IDs and beta string IDs (like "beta-rootly")
     if (savedOrg) {
       setSelectedOrganization(savedOrg)
@@ -867,6 +872,14 @@ export default function IntegrationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    return subscribeToSelectedOrganization((value) => {
+      if (!value) return
+      if (!integrations.some((integration) => integration.id.toString() === value)) return
+      setSelectedOrganization((current) => (current === value ? current : value))
+    })
+  }, [integrations])
+
   // Load Slack permissions when integration is available
   useEffect(() => {
     if (slackIntegration && activeEnhancementTab === 'slack') {
@@ -912,7 +925,7 @@ export default function IntegrationsPage() {
       const firstIntegration = integrations[0]
       const firstIntegrationId = firstIntegration.id.toString()
       setSelectedOrganization(firstIntegrationId)
-      localStorage.setItem('selected_organization', firstIntegrationId)
+      setStoredSelectedOrganization(firstIntegrationId)
 
       // Show sync modal after auto-selecting (same as manual switch)
       setTimeout(() => {
@@ -2290,22 +2303,25 @@ export default function IntegrationsPage() {
               {/* Incident Management Platform Card */}
         <Card className="mb-8" data-incident-section>
           <CardContent className="p-8">
-        {/* Introduction Text */}
-        <div className="text-center mb-2">
-          <h2 className="text-4xl font-bold text-black">Connect Your Incident Management Platform</h2>
-        </div>
-
-        {/* Integration Status Message */}
-        {!loadingRootly && !loadingPagerDuty && (
-          <div className="text-center mb-6">
-            {integrations.length === 0 ? (
+        {/* Introduction Text - only show when no incident management integration connected */}
+        {integrations.length === 0 && !loadingRootly && !loadingPagerDuty && (
+          <>
+            <div className="text-center mb-2">
+              <h2 className="text-4xl font-bold text-black">Connect Your Incident Management Platform</h2>
+            </div>
+            <div className="text-center mb-6">
               <p className="text-lg font-medium text-neutral-700">Add a Rootly or PagerDuty integration to get started!</p>
-            ) : (
-              <p className="text-lg font-medium text-neutral-700">
-                You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected!{' '}
-                <Link href="/dashboard?run=true" className="text-purple-700 font-semibold hover:underline">Run an Analysis</Link> to view your team's risk
-              </p>
-            )}
+            </div>
+          </>
+        )}
+
+        {/* Integration Status Message - show when integrations exist */}
+        {integrations.length > 0 && !loadingRootly && !loadingPagerDuty && (
+          <div className="text-center mb-6">
+            <p className="text-lg font-medium text-neutral-700">
+              You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected!{' '}
+              <Link href="/dashboard?run=true" className="text-purple-700 font-semibold hover:underline">Run an Analysis</Link> to view your team's risk
+            </p>
           </div>
         )}
 
@@ -2563,7 +2579,7 @@ export default function IntegrationsPage() {
                       onValueChange={async (value) => {
                         // Update state immediately for instant UI response
                         setSelectedOrganization(value)
-                        localStorage.setItem('selected_organization', value)
+                        setStoredSelectedOrganization(value)
 
                         // Only show toast and check permissions if selecting a different organization
                         if (value !== selectedOrganization) {

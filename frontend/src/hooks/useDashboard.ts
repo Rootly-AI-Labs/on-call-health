@@ -1606,7 +1606,9 @@ export default function useDashboard() {
     stages.push({
       key: "preparing",
       label: "Finalizing Analysis",
-      detail: "This may take 5-15 minutes depending on incident volume",
+      detail: hasGithub
+        ? "GitHub's API limits requests to 30/min, so this may take several minutes for larger teams"
+        : "Processing results and preparing dashboard",
       progress: 95
     })
 

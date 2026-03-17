@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Sparkles, Copy, Check } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -53,7 +52,6 @@ export function AIInsightsModal({ isOpen, onClose, currentAnalysis }: AIInsights
             <div className="flex items-center space-x-2">
               <Sparkles className="w-6 h-6 text-blue-600" />
               <DialogTitle>AI Team Insights</DialogTitle>
-              <Badge variant="secondary" className="text-xs">AI Enhanced</Badge>
             </div>
             {aiInsights?.llm_team_analysis && (
               <Button
