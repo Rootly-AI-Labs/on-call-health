@@ -21,7 +21,7 @@ Get started at [www.oncallhealth.ai](https://www.oncallhealth.ai/) or [self-host
 
 ##  Methodology
 
-On-call Health takes inspiration from the [CBI](https://emerge.ucsd.edu/r_2qfb6wi4uepyugd/) to measure overwork risk in professional settings. On-call Health isn't a medical or diagnostic tool; it is designed to help identify patterns and trends that may suggest overwork.
+On-call Health measures overwork risk in professional settings. On-call Health isn't a medical or diagnostic tool; it is designed to help identify patterns and trends that may suggest overwork.
 
 The tool is centered around 2 main metrics:
 * **On-Call Health (OCH) Score** — A composite score derived from all collected signals, reflecting an individual's incident response workload.
@@ -138,7 +138,7 @@ The frontend will be available at `http://localhost:3000`
 
 ## API
 
-On-call Health also offers [an API](https://api.oncallhealth.ai/docs) and [MCP server](https://github.com/Rootly-AI-Labs/On-Call-Health/tree/main/packages/oncallhealth-mcp) that can expose its findings. <br>
+On-call Health also offers [an API](https://api.oncallhealth.ai/docs) that can expose its findings. <br>
 [<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://god.gw.postman.com/run-collection/45004446-1074ba3c-44fe-40e3-a932-af7c071b96eb?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D45004446-1074ba3c-44fe-40e3-a932-af7c071b96eb%26entityType%3Dcollection%26workspaceId%3D4bec6e3c-50a0-4746-85f1-00a703c32f24)
 
 ## 🔗 About the Rootly AI Labs

@@ -30,7 +30,7 @@ class NotificationService:
             type='invitation',
             title=f"Invitation to join {invitation.organization.name}",
             message=f"You've been invited to join {invitation.organization.name} as a {invitation.role}.",
-            action_url=f"/invitations/accept/{invitation.id}",
+            action_url="/management?view=team",
             action_text="View Invitation",
             organization_invitation_id=invitation.id,
             priority='high',
@@ -421,7 +421,8 @@ class NotificationService:
         organization_id: int,
         triggered_by: Optional[User],
         recipient_count: int,
-        is_manual: bool = False
+        is_manual: bool = False,
+        commit: bool = True
     ) -> List[UserNotification]:
         """
         Create notification when surveys are delivered.
@@ -461,14 +462,16 @@ class NotificationService:
             notifications.append(notification)
             self.db.add(notification)
 
-        self.db.commit()
+        if commit:
+            self.db.commit()
         return notifications
 
     def create_survey_received_notification(
         self,
         user_id: int,
         organization_id: int,
-        is_reminder: bool = False
+        is_reminder: bool = False,
+        commit: bool = True
     ) -> UserNotification:
         """
         Create notification when a user receives a survey DM.
@@ -496,7 +499,8 @@ class NotificationService:
             priority='normal'
         )
         self.db.add(notification)
-        self.db.commit()
+        if commit:
+            self.db.commit()
         return notification
 
     def create_role_change_notification(self, user: User, old_role: str, new_role: str, changed_by: User) -> UserNotification:

@@ -8,9 +8,10 @@ from .base import Base
 
 class SlackIntegration(Base):
     __tablename__ = "slack_integrations"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)  # NULL for personal integrations
     slack_token = Column(Text, nullable=True)  # Encrypted Slack token
     slack_user_id = Column(String(20), nullable=True)  # Slack user ID (e.g., U01234567) - nullable for bot tokens
     workspace_id = Column(String(20), nullable=False)  # Slack workspace/team ID

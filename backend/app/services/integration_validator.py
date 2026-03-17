@@ -4,8 +4,10 @@ Integration validation service for pre-flight connection checks.
 Validates API tokens for GitHub, Linear, and Jira integrations before
 starting analysis to detect stale/expired tokens early.
 """
+import asyncio
 import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any, Dict, Optional
 from sqlalchemy import text
@@ -378,7 +380,10 @@ class IntegrationValidator:
         if use_cache:
             cached_results = get_cached_validation(user_id)
             if cached_results is not None:
+                logger.info(f"[VALIDATION] user_id={user_id} cache_hit=true")
                 return cached_results
+
+        logger.info(f"[VALIDATION] user_id={user_id} cache_hit=false starting_validation")
 
         validators = [
             ("github", self._validate_github),
@@ -386,11 +391,24 @@ class IntegrationValidator:
             ("jira", self._validate_jira),
         ]
 
+        # Run validations in parallel to avoid blocking each other
+        # This prevents a slow GitHub validation from delaying Linear/Jira
+        total_start = time.time()
+        validator_tasks = [validator_func(user_id) for _, validator_func in validators]
+        validator_results = await asyncio.gather(*validator_tasks, return_exceptions=True)
+        total_duration = time.time() - total_start
+
         results = {}
-        for name, validator_func in validators:
-            result = await validator_func(user_id)
+        for (name, _), result in zip(validators, validator_results):
+            # Skip exceptions (will be logged by individual validators)
+            if isinstance(result, Exception):
+                logger.error(f"[VALIDATION] user_id={user_id} integration={name} error={type(result).__name__}")
+                continue
             if result:
+                logger.info(f"[VALIDATION] user_id={user_id} integration={name} valid={result.get('valid') if result else None}")
                 results[name] = result
+
+        logger.info(f"[VALIDATION] user_id={user_id} total_duration={total_duration:.3f}s integrations_validated={len(results)}")
 
         # Cache the results
         set_cached_validation(user_id, results)

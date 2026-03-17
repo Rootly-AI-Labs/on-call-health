@@ -182,15 +182,15 @@ export function TeamHealthOverview({
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 overflow-visible">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 overflow-visible">
         <Card className="border border-neutral-300 overflow-visible min-h-[200px]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-purple-700 flex items-center space-x-2">
-              <Heart className="w-4 h-4" />
+          <CardHeader className="pb-1 md:pb-2 px-2 md:px-4 py-2 md:py-3">
+            <CardTitle className="text-xs md:text-base font-medium text-purple-700 flex items-center space-x-1 md:space-x-2">
+              <Heart className="w-3 md:w-4 h-3 md:h-4" />
               <span>Team Health</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-0">
+          <CardContent className="pb-0 px-2 md:px-4 py-2 md:py-3">
             {currentAnalysis?.analysis_data?.team_health || (currentAnalysis?.analysis_data?.team_analysis && currentAnalysis?.status === 'completed') ? (
               (() => {
                 const teamOchScore = calculateTeamOCHScore(currentAnalysis)
@@ -210,15 +210,15 @@ export function TeamHealthOverview({
                 return (
                   <div>
                     {/* Score */}
-                    <div className="text-center mb-3">
-                      <div className="text-3xl font-bold text-neutral-900">
+                    <div className="text-center mb-2 md:mb-3">
+                      <div className="text-xl md:text-3xl font-bold text-neutral-900">
                         {scoreValue !== null ? scoreValue : 'N/A'}
-                        <span className="text-sm font-normal text-neutral-400 ml-0.5">/100</span>
+                        <span className="text-[10px] md:text-sm font-normal text-neutral-400 ml-0.5">/100</span>
                       </div>
-                      <p className="text-xs text-neutral-500 inline-flex items-center gap-1">
+                      <p className="text-[10px] md:text-xs text-neutral-500 inline-flex items-center gap-0.5 md:gap-1">
                         Risk Level
                         <Info
-                          className="w-3 h-3 text-neutral-400 cursor-help hover:text-neutral-600 transition-colors"
+                          className="w-2.5 md:w-3 h-2.5 md:h-3 text-neutral-400 cursor-help hover:text-neutral-600 transition-colors"
                           onMouseEnter={(e) => showTooltip('och-score-tooltip', e.currentTarget.getBoundingClientRect(), 180, 120)}
                           onMouseLeave={() => hideTooltip('och-score-tooltip')}
                         />
@@ -227,29 +227,29 @@ export function TeamHealthOverview({
 
                     {/* Progress bar */}
                     {scoreValue !== null && (
-                      <div className="mb-3">
-                        <div className="flex h-2 rounded-full overflow-hidden bg-neutral-100">
+                      <div className="mb-2 md:mb-3">
+                        <div className="flex h-1.5 md:h-2 rounded-full overflow-hidden bg-neutral-100">
                           <div className={`${barColor} rounded-full transition-all`} style={{ width: `${Math.min(scoreValue, 100)}%` }} />
                         </div>
-                        <div className="flex justify-between mt-1">
-                          <span className="text-[10px] text-neutral-400">Healthy</span>
-                          <span className="text-[10px] text-neutral-400">Critical</span>
+                        <div className="flex justify-between mt-0.5 md:mt-1">
+                          <span className="text-[8px] md:text-[10px] text-neutral-400">Healthy</span>
+                          <span className="text-[8px] md:text-[10px] text-neutral-400">Critical</span>
                         </div>
                       </div>
                     )}
 
                     {/* Status */}
-                    <div className="flex items-center justify-center space-x-1">
-                      <div className="text-sm font-medium text-purple-600">
+                    <div className="flex items-center justify-center space-x-0.5 md:space-x-1">
+                      <div className="text-[10px] md:text-sm font-medium text-purple-600">
                         {getHealthStatusLabel(getHealthPercentage(currentAnalysis, historicalTrends))}
                       </div>
                       <Info
-                        className="w-3 h-3 text-purple-500 cursor-help"
+                        className="w-2.5 md:w-3 h-2.5 md:h-3 text-purple-500 cursor-help"
                         onMouseEnter={(e) => showTooltip('health-rubric-tooltip', e.currentTarget.getBoundingClientRect(), 220, 160)}
                         onMouseLeave={() => hideTooltip('health-rubric-tooltip')}
                       />
                     </div>
-                    <p className="text-xs text-neutral-500 text-center mt-0.5">
+                    <p className="text-[9px] md:text-xs text-neutral-500 text-center mt-0.5">
                       {getHealthStatusDescription(getHealthPercentage(currentAnalysis, historicalTrends))}
                     </p>
                   </div>
@@ -264,13 +264,13 @@ export function TeamHealthOverview({
         </Card>
 
         <Card className="border border-neutral-300 min-h-[200px]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-purple-700 flex items-center space-x-2">
-              <Shield className="w-4 h-4" />
+          <CardHeader className="pb-1 md:pb-2 px-2 md:px-4 py-2 md:py-3">
+            <CardTitle className="text-xs md:text-base font-medium text-purple-700 flex items-center space-x-1 md:space-x-2">
+              <Shield className="w-3 md:w-4 h-3 md:h-4" />
               <span>At Risk</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-0">
+          <CardContent className="pb-0 px-2 md:px-4 py-2 md:py-3">
             {currentAnalysis?.analysis_data?.team_health || (currentAnalysis?.analysis_data?.team_analysis && currentAnalysis?.status === 'completed') ? (
               <div>
                 <div className="space-y-1">
@@ -300,10 +300,10 @@ export function TeamHealthOverview({
 
                       if (atRiskTotal === 0) {
                         return (
-                          <div className="text-center py-3">
-                            <div className="text-2xl font-bold text-green-600 mb-1">0</div>
-                            <div className="text-sm text-green-700 font-medium">Team shows healthy levels</div>
-                            <div className="text-xs text-neutral-500 mt-1">{riskCounts.low} member{riskCounts.low !== 1 ? 's' : ''} with low risk</div>
+                          <div className="text-center py-2 md:py-3">
+                            <div className="text-lg md:text-2xl font-bold text-green-600 mb-0.5 md:mb-1">0</div>
+                            <div className="text-[10px] md:text-sm text-green-700 font-medium">Team shows healthy levels</div>
+                            <div className="text-[9px] md:text-xs text-neutral-500 mt-0.5 md:mt-1">{riskCounts.low} member{riskCounts.low !== 1 ? 's' : ''} with low risk</div>
                           </div>
                         );
                       }
@@ -313,28 +313,28 @@ export function TeamHealthOverview({
                       return (
                         <>
                           {/* Summary number */}
-                          <div className="text-center mb-3">
-                            <div className="text-3xl font-bold text-neutral-900">{atRiskTotal}</div>
-                            <p className="text-xs text-neutral-500">members at risk</p>
+                          <div className="text-center mb-2 md:mb-3">
+                            <div className="text-xl md:text-3xl font-bold text-neutral-900">{atRiskTotal}</div>
+                            <p className="text-[9px] md:text-xs text-neutral-500">members at risk</p>
                           </div>
 
-                          {/* Risk breakdown - single row matching Total Incidents style */}
-                          <div className="grid grid-cols-4 gap-2">
-                            <div className="bg-red-50 rounded-lg p-2 text-center">
-                              <div className="text-xs font-semibold text-red-800">Critical</div>
-                              <div className="text-lg font-bold text-red-700">{riskCounts.critical}</div>
+                          {/* Risk breakdown - 2x2 on mobile, 4 cols on md+ */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-1 md:gap-2">
+                            <div className="bg-red-50 rounded-lg p-1 md:p-2 text-center">
+                              <div className="text-[8px] md:text-xs font-semibold text-red-800">Critical</div>
+                              <div className="text-sm md:text-lg font-bold text-red-700">{riskCounts.critical}</div>
                             </div>
-                            <div className="bg-orange-50 rounded-lg p-2 text-center">
-                              <div className="text-xs font-semibold text-orange-700">High</div>
-                              <div className="text-lg font-bold text-orange-600">{riskCounts.high}</div>
+                            <div className="bg-orange-50 rounded-lg p-1 md:p-2 text-center">
+                              <div className="text-[8px] md:text-xs font-semibold text-orange-700">High</div>
+                              <div className="text-sm md:text-lg font-bold text-orange-600">{riskCounts.high}</div>
                             </div>
-                            <div className="bg-yellow-50 rounded-lg p-2 text-center">
-                              <div className="text-xs font-semibold text-yellow-700">Medium</div>
-                              <div className="text-lg font-bold text-yellow-600">{riskCounts.medium}</div>
+                            <div className="bg-yellow-50 rounded-lg p-1 md:p-2 text-center">
+                              <div className="text-[8px] md:text-xs font-semibold text-yellow-700">Medium</div>
+                              <div className="text-sm md:text-lg font-bold text-yellow-600">{riskCounts.medium}</div>
                             </div>
-                            <div className="bg-green-50 rounded-lg p-2 text-center">
-                              <div className="text-xs font-semibold text-green-700">Low</div>
-                              <div className="text-lg font-bold text-green-600">{riskCounts.low}</div>
+                            <div className="bg-green-50 rounded-lg p-1 md:p-2 text-center">
+                              <div className="text-[8px] md:text-xs font-semibold text-green-700">Low</div>
+                              <div className="text-sm md:text-lg font-bold text-green-600">{riskCounts.low}</div>
                             </div>
                           </div>
                         </>
@@ -362,7 +362,7 @@ export function TeamHealthOverview({
                     );
                   })()}
                 </div>
-                <p className="text-xs text-neutral-400 mt-3 text-center">
+                <p className="text-[9px] md:text-xs text-neutral-400 mt-2 md:mt-3 text-center">
                   {Array.isArray(currentAnalysis.analysis_data.team_analysis) ? currentAnalysis.analysis_data.team_analysis.length : (currentAnalysis.analysis_data.team_analysis?.members?.length || 0)} total members
                 </p>
               </div>
@@ -375,22 +375,19 @@ export function TeamHealthOverview({
         </Card>
 
         <Card className="border border-neutral-300 min-h-[200px]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-purple-700 flex items-center space-x-2">
-              <BarChart3 className="w-4 h-4" />
+          <CardHeader className="pb-1 md:pb-2 px-2 md:px-4 py-2 md:py-3">
+            <CardTitle className="text-xs md:text-base font-medium text-purple-700 flex items-center space-x-1 md:space-x-2">
+              <BarChart3 className="w-3 md:w-4 h-3 md:h-4" />
               <span>Total Incidents</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-0">
-            <div className="text-center mb-3">
-              <div className="text-3xl font-bold text-neutral-900">
-                {(currentAnalysis.analysis_data as any)?.metadata?.total_incidents !== undefined
-                  ? (currentAnalysis.analysis_data as any).metadata.total_incidents
-                  : (currentAnalysis.analysis_data as any)?.team_analysis?.total_incidents !== undefined
-                    ? (currentAnalysis.analysis_data as any).team_analysis.total_incidents
-                    : currentAnalysis.analysis_data?.partial_data?.incidents?.length || 0}
+          <CardContent className="pb-0 px-2 md:px-4 py-2 md:py-3">
+            <div className="text-center mb-2 md:mb-3">
+              <div className="text-xl md:text-3xl font-bold text-neutral-900">
+                {getTeamMembers(currentAnalysis).reduce((sum: number, m: any) => sum + (m.incident_count || 0), 0) ||
+                  currentAnalysis.analysis_data?.partial_data?.incidents?.length || 0}
               </div>
-              <p className="text-xs text-neutral-500">
+              <p className="text-[9px] md:text-xs text-neutral-500">
                 In the last {currentAnalysis.time_range || 30} days
               </p>
             </div>
@@ -445,52 +442,52 @@ export function TeamHealthOverview({
               return severityBreakdown && (
                 isPagerDuty ? (
                   // PagerDuty: Show only High/Low urgency
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <div className="bg-red-50 rounded-lg p-2 text-center">
-                      <div className="text-xs font-semibold text-red-700">High Urgency</div>
-                      <div className="text-lg font-bold text-red-600">
+                  <div className="mt-2 md:mt-4 grid grid-cols-2 gap-1 md:gap-2">
+                    <div className="bg-red-50 rounded-lg p-1 md:p-2 text-center">
+                      <div className="text-[8px] md:text-xs font-semibold text-red-700">High Urgency</div>
+                      <div className="text-sm md:text-lg font-bold text-red-600">
                         {severityBreakdown.sev1_count}
                       </div>
                     </div>
-                    <div className="bg-green-50 rounded-lg p-2 text-center">
-                      <div className="text-xs font-semibold text-green-700">Low Urgency</div>
-                      <div className="text-lg font-bold text-green-600">
+                    <div className="bg-green-50 rounded-lg p-1 md:p-2 text-center">
+                      <div className="text-[8px] md:text-xs font-semibold text-green-700">Low Urgency</div>
+                      <div className="text-sm md:text-lg font-bold text-green-600">
                         {severityBreakdown.sev4_count}
                       </div>
                     </div>
                   </div>
                 ) : (
                   // Rootly: Show standard SEV0-SEV4
-                  <div className={`mt-4 grid ${severityBreakdown.sev0_count > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
+                  <div className={`mt-2 md:mt-4 grid ${severityBreakdown.sev0_count > 0 ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'} gap-1 md:gap-2`}>
                     {severityBreakdown.sev0_count > 0 && (
-                      <div className="bg-red-100 rounded-lg p-2 text-center">
-                        <div className="text-xs font-semibold text-red-800">SEV0</div>
-                        <div className="text-lg font-bold text-red-800">
+                      <div className="bg-red-100 rounded-lg p-1 md:p-2 text-center">
+                        <div className="text-[8px] md:text-xs font-semibold text-red-800">SEV0</div>
+                        <div className="text-sm md:text-lg font-bold text-red-800">
                           {severityBreakdown.sev0_count}
                         </div>
                       </div>
                     )}
-                    <div className="bg-red-50 rounded-lg p-2 text-center">
-                      <div className="text-xs font-semibold text-red-600">SEV1</div>
-                      <div className="text-lg font-bold text-red-600">
+                    <div className="bg-red-50 rounded-lg p-1 md:p-2 text-center">
+                      <div className="text-[8px] md:text-xs font-semibold text-red-600">SEV1</div>
+                      <div className="text-sm md:text-lg font-bold text-red-600">
                         {severityBreakdown.sev1_count}
                       </div>
                     </div>
-                    <div className="bg-orange-50 rounded-lg p-2 text-center">
-                      <div className="text-xs font-semibold text-orange-600">SEV2</div>
-                      <div className="text-lg font-bold text-orange-600">
+                    <div className="bg-orange-50 rounded-lg p-1 md:p-2 text-center">
+                      <div className="text-[8px] md:text-xs font-semibold text-orange-600">SEV2</div>
+                      <div className="text-sm md:text-lg font-bold text-orange-600">
                         {severityBreakdown.sev2_count}
                       </div>
                     </div>
-                    <div className="bg-yellow-50 rounded-lg p-2 text-center">
-                      <div className="text-xs font-semibold text-yellow-600">SEV3</div>
-                      <div className="text-lg font-bold text-yellow-600">
+                    <div className="bg-yellow-50 rounded-lg p-1 md:p-2 text-center">
+                      <div className="text-[8px] md:text-xs font-semibold text-yellow-600">SEV3</div>
+                      <div className="text-sm md:text-lg font-bold text-yellow-600">
                         {severityBreakdown.sev3_count}
                       </div>
                     </div>
-                    <div className="bg-green-50 rounded-lg p-2 text-center">
-                      <div className="text-xs font-semibold text-green-600">SEV4</div>
-                      <div className="text-lg font-bold text-green-600">
+                    <div className="bg-green-50 rounded-lg p-1 md:p-2 text-center">
+                      <div className="text-[8px] md:text-xs font-semibold text-green-600">SEV4</div>
+                      <div className="text-sm md:text-lg font-bold text-green-600">
                         {severityBreakdown.sev4_count}
                       </div>
                     </div>

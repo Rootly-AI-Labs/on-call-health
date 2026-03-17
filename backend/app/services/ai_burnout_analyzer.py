@@ -1305,7 +1305,7 @@ You are an Engineering Manager who is mindful of your on-call team workload and 
 - 25-49: Mild stress symptoms
 - 50-74: Moderate/significant stress
 - 75-100: High/severe stress (critical intervention needed)
-- OCH is inspired by the Copenhagen Burnout Inventory and measures Personal + Work-Related stress dimensions"""
+- OCH measures Personal + Work-Related stress dimensions"""
         else:
             return """This team uses legacy stress scoring:
 - Scale: 0-10 where higher scores = more stress

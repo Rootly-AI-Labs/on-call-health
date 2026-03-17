@@ -5,6 +5,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, TYPE_CHECKING
+from sqlalchemy import or_, and_
 
 from .mapping_recorder import MappingRecorder
 
@@ -21,79 +22,109 @@ async def collect_team_github_data_with_mapping(
     analysis_id: Optional[int] = None,
     source_platform: str = "rootly",
     email_to_name: Optional[Dict[str, str]] = None,
-    db: Optional["Session"] = None
+    db: Optional["Session"] = None,
+    org_id: Optional[int] = None
 ) -> Dict[str, Dict]:
     """
-    Enhanced version of collect_team_github_data that records mapping attempts.
-    
-    Phase 2: Uses smart caching service when enabled, falls back to original logic.
+    Collect GitHub data for team members who have synced GitHub usernames.
+
+    This function pre-filters users by checking UserCorrelation.github_username
+    to avoid unnecessary API calls for users without GitHub mappings.
+
+    Performance optimization:
+    - Queries UserCorrelation once for all team emails
+    - Only processes emails with github_username NOT NULL
+    - Skips unmapped users entirely (no API calls)
+
+    Args:
+        team_emails: List of team member emails to process
+        days: Number of days of GitHub activity to collect
+        github_token: GitHub API token for authentication
+        user_id: User ID for mapping context
+        analysis_id: Analysis ID for tracking
+        source_platform: Platform the emails came from (e.g., "rootly")
+        email_to_name: Optional mapping of emails to full names
+        db: Database session
+        org_id: Organization ID for multi-tenancy isolation
+
+    Returns:
+        Dict mapping email -> github_data (only for users with mappings)
     """
     # Phase 2: Check if smart caching is enabled
     use_smart_caching = os.getenv('USE_SMART_GITHUB_CACHING', 'true').lower() == 'true'
-    
-    # OPTIMIZATION: Check if we should use fast mode for analysis performance
-    # DISABLED by default - fast mode was using mock data instead of real GitHub API data
-    # User requested: "i dont want any hardcoded mappings nor any fake data"
-    fast_mode = os.getenv('GITHUB_FAST_MODE', 'false').lower() == 'true'
-    
-    # FAST MODE: Only use existing synced mappings from integrations page
-    # This avoids redundant GitHub API calls since users are synced via "Sync Members"
-    if fast_mode and user_id:
-        from .github_collector import GitHubCollector
+
+    # PRE-FILTERING: Query UserCorrelation to find emails with GitHub mappings
+    # This optimization skips unmapped users entirely, avoiding unnecessary API calls
+    emails_to_process = set(team_emails)  # Default: process all emails
+
+    if user_id and db:
         from ..models import UserCorrelation
 
         # Reuse passed db session or create new one if not provided/invalid
         session_to_use = db
         should_close = False
-        if session_to_use is None or not session_to_use.is_active:
+        if session_to_use is None:
             from ..models import SessionLocal
             session_to_use = SessionLocal()
             should_close = True
 
         try:
-            collector = GitHubCollector()
-            github_data = {}
-
             # Query UserCorrelation for synced GitHub usernames
-            # Don't filter by user_id - allow lookups across the organization
-            user_correlations = session_to_use.query(UserCorrelation).filter(
-                UserCorrelation.email.in_(team_emails),
-                UserCorrelation.github_username.isnot(None)
-            ).all()
-
-            # Create a lookup dict: email -> github_username (skip null emails)
-            # Note: If duplicate emails exist, last entry wins (log warning for visibility)
-            email_to_github = {}
-            for uc in user_correlations:
-                if uc.email is not None:
-                    if uc.email in email_to_github:
-                        logger.warning(f"Duplicate email {uc.email} in UserCorrelation, using latest github_username")
-                    email_to_github[uc.email] = uc.github_username
-
-            if len(email_to_github) == 0:
-                logger.warning(f"💻 GitHub: No synced usernames found in UserCorrelation")
-
-            # Generate mock data for users with synced mappings
-            for email in team_emails:
-                github_username = email_to_github.get(email)
-                if github_username:
-                    github_data[email] = collector._generate_mock_github_data(
-                        github_username, email,
-                        datetime.now() - timedelta(days=days),
-                        datetime.now()
+            # Filter by organization to prevent cross-org data leakage
+            if org_id:
+                user_correlations = session_to_use.query(UserCorrelation).filter(
+                    UserCorrelation.email.in_(team_emails),
+                    UserCorrelation.github_username.isnot(None),
+                    or_(
+                        UserCorrelation.user_id == user_id,  # Personal mappings
+                        and_(
+                            UserCorrelation.user_id.is_(None),
+                            UserCorrelation.organization_id == org_id
+                        )  # Team roster mappings
                     )
+                ).all()
+            else:
+                # Fallback: no organization filter if org_id not provided (backward compatibility)
+                user_correlations = session_to_use.query(UserCorrelation).filter(
+                    UserCorrelation.email.in_(team_emails),
+                    UserCorrelation.github_username.isnot(None)
+                ).all()
 
-            return github_data
+            # Extract emails with GitHub mappings
+            emails_with_github = {uc.email for uc in user_correlations if uc.email is not None}
+            emails_without_github = set(team_emails) - emails_with_github
+
+            # Log filtering results for transparency
+            logger.info(
+                f"📊 [GITHUB_FILTER] Team: {len(team_emails)} members total, "
+                f"{len(emails_with_github)} with GitHub mappings, "
+                f"{len(emails_without_github)} skipped (no mapping)"
+            )
+
+            # Only process emails with GitHub mappings
+            if emails_with_github:
+                emails_to_process = emails_with_github
+            else:
+                logger.warning(f"💻 GitHub: No synced usernames found in UserCorrelation for any team member")
+                emails_to_process = set()  # Skip all users
         finally:
             if should_close:
                 session_to_use.close()
-    
+
+    # If no emails to process after filtering, return empty dict
+    if not emails_to_process:
+        logger.info(f"💻 [GITHUB_FILTER] No emails to process after filtering, returning empty result")
+        return {}
+
+    # Convert back to list for processing
+    filtered_team_emails = list(emails_to_process)
+
     if use_smart_caching and user_id:
         try:
             from .github_mapping_service import GitHubMappingService
             mapping_service = GitHubMappingService(db=db)
             return await mapping_service.get_smart_github_data(
-                team_emails=team_emails,
+                team_emails=filtered_team_emails,  # Use pre-filtered emails
                 days=days,
                 github_token=github_token,
                 user_id=user_id,
@@ -103,26 +134,26 @@ async def collect_team_github_data_with_mapping(
             )
         except Exception as e:
             logger.error(f"💻 GitHub: Smart caching failed: {e}")
-            # Fall through to original logic
+            # Fall through to original logic with filtered emails
     recorder = MappingRecorder(db=db) if user_id else None
-    
+
     # Phase 1.3: Track processed emails to prevent duplicates within this analysis session
     processed_emails = set()
-    
+
     # Call original function with user_id for manual mapping support
     # Pass email_to_name mapping for better GitHub username matching
     from .github_collector import GitHubCollector
     collector = GitHubCollector()
     github_data = {}
 
-    logger.info(f"💻 [GITHUB_COLLECTION] Starting collection for {len(team_emails)} team members")
+    logger.info(f"💻 [GITHUB_COLLECTION] Starting collection for {len(filtered_team_emails)} team members (after pre-filtering)")
 
     success_count = 0
     failure_count = 0
     correlation_failures = 0
     api_failures = 0
 
-    for email in team_emails:
+    for email in filtered_team_emails:
         try:
             # Get full name for this email if available
             full_name = email_to_name.get(email) if email_to_name else None
@@ -142,7 +173,7 @@ async def collect_team_github_data_with_mapping(
             logger.error(f"❌ [GITHUB_COLLECTION_ERROR] Failed to collect GitHub data for {email}: {e}")
             failure_count += 1
 
-    logger.info(f"📊 [GITHUB_COLLECTION_SUMMARY] Processed {len(team_emails)} members: {success_count} succeeded, {failure_count} failed")
+    logger.info(f"📊 [GITHUB_COLLECTION_SUMMARY] Processed {len(filtered_team_emails)} members: {success_count} succeeded, {failure_count} failed")
 
     # Log final rate limit status
     if github_token:
@@ -167,6 +198,23 @@ async def collect_team_github_data_with_mapping(
                 logger.debug(f"Skipping {email} - already processed in this analysis session")
                 continue
             processed_emails.add(email)
+
+            # Check if this email was skipped due to no mapping
+            if email not in emails_to_process:
+                # Email was pre-filtered (no GitHub mapping in UserCorrelation)
+                member_user_id, org_id = recorder.get_user_and_org_for_email(email, analysis_id)
+                recorder.record_failed_mapping(
+                    user_id=member_user_id,
+                    organization_id=org_id,
+                    analysis_id=analysis_id,
+                    source_platform=source_platform,
+                    source_identifier=email,
+                    target_platform="github",
+                    error_message="No GitHub mapping found in UserCorrelation (skipped)",
+                    mapping_method="pre_filter_skip"
+                )
+                continue
+
             if email in github_data:
                 # Successful mapping
                 data_points = 0

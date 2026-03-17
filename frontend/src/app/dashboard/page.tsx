@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState, useMemo, useEffect, type JSX } from "react"
+import { Suspense, useState, useMemo, useEffect, useRef, type JSX } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { MappingDrawer } from "@/components/mapping-drawer"
@@ -41,11 +41,14 @@ import {
   Users,
   Star,
   Info,
-  BarChart3,
   CalendarIcon,
   ArrowRight,
   RefreshCw,
   Loader2,
+  ChevronRight,
+  ChevronLeft,
+  Bookmark,
+  Timer,
 } from "lucide-react"
 
 // Helper function for platform-based colors
@@ -73,18 +76,48 @@ import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgress
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
 import { TeamRiskFactorsCard, FACTOR_DESCRIPTIONS } from "@/components/dashboard/TeamRiskFactorsCard"
+import { AlertsCountCard } from "@/components/dashboard/AlertsCountCard"
+import { AlertsLeaderboard } from "@/components/dashboard/AlertsLeaderboard"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
 import RiskFactorsAllPopup from "@/components/dashboard/RiskFactorsAllPopup"
 import { DeleteAnalysisDialog } from "@/components/dashboard/dialogs/DeleteAnalysisDialog"
 import Image from "next/image"
-import { format } from "date-fns"
+import { format, formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
 import useDashboard from "@/hooks/useDashboard"
 import { TopPanel } from "@/components/TopPanel"
 import { useOnboarding } from "@/hooks/useOnboarding"
 import IntroGuide from "@/components/IntroGuide"
+
+/** Measures Team Alerts' natural height and locks Alerts Leaderboard to that same height. */
+function AlertsCardsRow({ currentAnalysis }: { currentAnalysis: any }) {
+  const teamAlertsRef = useRef<HTMLDivElement>(null)
+  const [teamAlertsHeight, setTeamAlertsHeight] = useState<number | null>(null)
+
+  useEffect(() => {
+    const el = teamAlertsRef.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      setTeamAlertsHeight(el.offsetHeight)
+    })
+    observer.observe(el)
+    setTeamAlertsHeight(el.offsetHeight)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
+      <div ref={teamAlertsRef}>
+        <AlertsCountCard currentAnalysis={currentAnalysis} />
+      </div>
+      <div style={teamAlertsHeight ? { height: teamAlertsHeight } : undefined} className="flex flex-col">
+        <AlertsLeaderboard currentAnalysis={currentAnalysis} />
+      </div>
+    </div>
+  )
+}
 
 function DashboardContent() {
   const {
@@ -128,6 +161,7 @@ function DashboardContent() {
   // core data
   integrations,
   currentAnalysis,
+  autoRefreshAnalysis,
   previousAnalyses,
   totalAnalysesCount,
   historicalTrends,
@@ -188,6 +222,8 @@ function DashboardContent() {
   openDeleteDialog,
   confirmDeleteAnalysis,
   loadPreviousAnalyses,
+  saveCurrentAnalysis,
+  loadAutoRefreshAnalysis,
   loadSpecificAnalysis,
   loadHistoricalTrends,
   fetchPlatformMappings,
@@ -200,6 +236,7 @@ function DashboardContent() {
   shouldShowInsufficientDataCard,
   hasNoIncidentsInPeriod,
   updateURLWithAnalysis,
+  refreshCurrentAnalysis,
 
   // start-analysis modal
   showTimeRangeDialog,
@@ -215,6 +252,10 @@ function DashboardContent() {
   setDialogSelectedIntegration,
   noIntegrationsFound,
   setNoIntegrationsFound,
+  autoRefreshEnabled,
+  setAutoRefreshEnabled,
+  autoRefreshInterval,
+  setAutoRefreshInterval,
 
   // delete modal
   deleteDialogOpen,
@@ -228,15 +269,67 @@ function DashboardContent() {
   setRedirectingToSuggested
   } = useDashboard()
 
+  // Helper function to safely sanitize untrusted strings to prevent XSS
+  const sanitizeString = (str: any): string => {
+    if (typeof str !== 'string') {
+      return String(str || '')
+    }
+    // Create a temporary element to use browser's HTML parsing for safe text extraction
+    const temp = document.createElement('div')
+    temp.textContent = str
+    return temp.textContent ?? ''
+  }
+
+  // Helper function to check if run analysis button should be disabled
+  const isRunAnalysisDisabled = (): boolean => {
+    if (!dialogSelectedIntegration) return true
+    if (isCustomRange && !validateCustomDate(customStartDate).valid) return true
+
+    const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration)
+    if (!selectedIntegration) return true
+
+    // Check if no team members synced
+    if ((selectedIntegration.total_users || 0) === 0) return true
+
+    // Only check permissions for Rootly integrations, not PagerDuty
+    if (selectedIntegration.platform === 'rootly') {
+      const hasUserPermission = selectedIntegration.permissions?.users?.access
+      const hasIncidentPermission = selectedIntegration.permissions?.incidents?.access
+      return !hasUserPermission || !hasIncidentPermission
+    }
+
+    // For PagerDuty or other platforms, don't block based on permissions
+    return false
+  }
+
   // Get userId from localStorage for user-specific onboarding tracking
   const userId = typeof window !== 'undefined' ? localStorage.getItem("user_id") : null
   const onboarding = useOnboarding(userId)
 
   // Track if component has mounted on client to prevent hydration mismatch
   const [mounted, setMounted] = useState(false)
+  const sidebarRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Click outside sidebar detection for mobile collapse
+  useEffect(() => {
+    // Only handle click-outside on mobile
+    if (typeof window === 'undefined') return
+    if (window.innerWidth >= 768) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!sidebarCollapsed &&
+          sidebarRef.current &&
+          !sidebarRef.current.contains(event.target as Node)) {
+        setSidebarCollapsed(true)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [sidebarCollapsed, setSidebarCollapsed])
 
   // Auto-open analysis dialog when redirected from integrations page with ?run=true
   useEffect(() => {
@@ -278,7 +371,7 @@ function DashboardContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-100">
+    <div className="flex flex-col h-screen w-full bg-neutral-100">
       <TopPanel />
       {!onboarding.hasSeenOnboarding && (
         <IntroGuide
@@ -290,149 +383,233 @@ function DashboardContent() {
         />
       )}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Unified Sidebar - Works on all screen sizes */}
         <div
-          onMouseEnter={() => setSidebarCollapsed(false)}
-          onMouseLeave={() => setSidebarCollapsed(true)}
-          className={`${sidebarCollapsed ? "w-16" : "w-60"} bg-neutral-900 text-white transition-all duration-300 flex flex-col overflow-hidden`}
+          ref={sidebarRef}
+          className={`flex ${sidebarCollapsed ? "w-10 sm:w-12 md:w-16" : "w-60"} bg-neutral-900 text-white transition-all duration-300 flex-col overflow-hidden cursor-pointer md:cursor-default relative group md:relative`}
+          style={
+            mounted && !sidebarCollapsed && typeof window !== 'undefined' && window.innerWidth < 768
+              ? { position: 'fixed', left: 0, top: 0, height: '100vh', zIndex: 50 }
+              : {}
+          }
         >
+          {/* Clickable overlay for mobile */}
+          {sidebarCollapsed && (
+            <div
+              onClick={(e) => {
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  e.stopPropagation()
+                  setSidebarCollapsed(false)
+                }
+              }}
+              onTouchEnd={(e) => {
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  e.stopPropagation()
+                  setSidebarCollapsed(false)
+                }
+              }}
+              className="absolute inset-0 z-10 md:hidden"
+              style={{ pointerEvents: 'auto' }}
+            />
+          )}
         {/* Navigation */}
-        <div className={`flex-1 flex flex-col min-h-0 ${sidebarCollapsed ? 'p-2' : 'p-4'} space-y-2`}>
-          {!sidebarCollapsed ? (
-            <div className="flex-1 space-y-2 min-h-0 flex flex-col">
-              <Button
-                onClick={startAnalysis}
-                disabled={analysisRunning}
-                className="w-full justify-start bg-purple-700 hover:bg-purple-800 text-white text-base mt-2"
-              >
-                <Play className="w-5 h-5 mr-2" />
-                New Analysis
-              </Button>
+        <div className={`flex-1 flex flex-col min-h-0 ${sidebarCollapsed ? 'p-1 sm:p-1.5 md:p-2' : 'p-4'} space-y-2 relative z-0`}>
+          {/* New Analysis Button - show when expanded, or on desktop when collapsed */}
+          {sidebarCollapsed ? (
+            <Button
+              onClick={startAnalysis}
+              disabled={analysisRunning}
+              className="w-full h-10 bg-purple-700 hover:bg-purple-800 text-white hidden md:flex items-center justify-center"
+            >
+              <Play className="w-5 h-5" />
+            </Button>
+          ) : (
+            <Button
+              onClick={startAnalysis}
+              disabled={analysisRunning}
+              className="w-full justify-start bg-purple-700 hover:bg-purple-800 text-white text-base mt-2"
+            >
+              <Play className="w-5 h-5 mr-2" />
+              New Analysis
+            </Button>
+          )}
 
-            <div className="space-y-1 flex-1 flex flex-col min-h-0">
-              {!sidebarCollapsed && previousAnalyses.length > 0 && (
-                <p className="text-sm text-neutral-500 uppercase tracking-wide px-2 py-1 mt-4">Recent</p>
-              )}
-              <div className={`flex-1 relative scrollbar-dark pr-1 ${previousAnalyses.length > 12 ? 'overflow-y-scroll' : 'overflow-y-auto'}`}>
-                {loadingAnalyses && previousAnalyses.length === 0 ? (
-                  // Show loading state for analyses
-                  <div className="flex items-center justify-center py-8">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin"></div>
-                      {!sidebarCollapsed && (
-                        <span className="text-sm text-neutral-500">Loading analyses...</span>
-                      )}
-                    </div>
-                  </div>
-                ) : previousAnalyses.length === 0 ? (
-                  // Show empty state
-                  !sidebarCollapsed && (
-                    <div className="text-center py-8 text-neutral-500">
-                      <p className="text-sm">No analyses yet</p>
-                      <p className="text-sm mt-1">Start your first analysis above</p>
-                    </div>
-                  )
-                ) : (
-                  // Show analyses list
-                  previousAnalyses.map((analysis) => {
-                const analysisDate = new Date(analysis.created_at)
-                const timeStr = analysisDate.toLocaleTimeString([], { 
-                  hour: 'numeric', 
-                  minute: '2-digit',
-                  hour12: true,
-                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                })
-                const dateStr = analysisDate.toLocaleDateString([], { 
-                  month: 'short', 
-                  day: 'numeric',
-                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                })
-                
-                // SIMPLE: Use integration name and platform stored directly with analysis
-                const organizationName = (analysis as any).integration_name || 'Unknown Integration'
-                const analysisPlatform = (analysis as any).platform
-                const isSelected = currentAnalysis?.id === analysis.id
-                
-                const platformColor = getPlatformColor(analysisPlatform)
+          {!sidebarCollapsed ? (
+            <div className="flex-1 space-y-1 min-h-0 flex flex-col overflow-y-auto scrollbar-dark">
+
+              {/* AUTO ANALYSIS section */}
+              <p className="text-xs text-neutral-500 uppercase tracking-wide px-2 py-1 mt-4 flex items-center gap-1">
+                <Timer className="w-3 h-3" />
+                Auto Analysis
+              </p>
+              {autoRefreshAnalysis ? (() => {
+                const arDate = new Date(autoRefreshAnalysis.created_at)
+                const arTimeStr = arDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+                const arDateStr = arDate.toLocaleDateString([], { month: 'short', day: 'numeric' })
+                const arOrgName = sanitizeString((autoRefreshAnalysis as any).integration_name || 'Unknown')
+                const arPlatform = (autoRefreshAnalysis as any).platform
+                const arColor = getPlatformColor(arPlatform)
+                const isArSelected = currentAnalysis?.id === autoRefreshAnalysis.id
+                const isArRunning = autoRefreshAnalysis.status === 'running' || autoRefreshAnalysis.status === 'pending'
                 return (
-                  <div key={analysis.id} className={`relative group ${isSelected ? 'bg-neutral-800' : ''} rounded`}>
+                  <div className={`relative group ${isArSelected ? 'bg-neutral-800' : ''} rounded`}>
                     <Button
                       variant="ghost"
                       disabled={analysisRunning || loadingAnalysisId !== null}
-                      className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isSelected ? 'bg-neutral-800 text-white' : ''} ${loadingAnalysisId === analysis.id ? 'bg-neutral-700 text-white' : ''} ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isArSelected ? 'bg-neutral-800 text-white' : ''}`}
                       onClick={async () => {
-                        // Set immediate loading state for visual feedback
-                        setLoadingAnalysisId(analysis.id)
-
-                        const analysisKey = analysis.uuid || analysis.id.toString()
-
-                        // Get members array - handle both object and array formats
-                        const teamAnalysis = analysis.analysis_data?.team_analysis
-                        const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis as any)?.members
-
-                        // Check cache first - but only use if it has full analysis data with members
-                        const cachedAnalysis = analysisCache.get(analysisKey)
-                        const cachedTeamAnalysis = cachedAnalysis?.analysis_data?.team_analysis
-                        const cachedMembers = Array.isArray(cachedTeamAnalysis) ? cachedTeamAnalysis : (cachedTeamAnalysis as any)?.members
-
-                        if (cachedAnalysis && cachedAnalysis.analysis_data && cachedMembers && Array.isArray(cachedMembers) && cachedMembers.length > 0) {
-                          // Use cached full analysis data
-                          setCurrentAnalysis(cachedAnalysis)
-                          setRedirectingToSuggested(false) // Turn off redirect loader
-                          updateURLWithAnalysis(cachedAnalysis.uuid || cachedAnalysis.id)
-                          setLoadingAnalysisId(null) // Clear loading state
-                          return
-                        }
-
-                        // If analysis doesn't have full data with members, fetch it
-                        if (!analysis.analysis_data || !members || !Array.isArray(members) || members.length === 0) {
-                          try {
-                            const authToken = localStorage.getItem('auth_token')
-                            if (!authToken) {
-                              setLoadingAnalysisId(null)
-                              return
-                            }
-
-                            const response = await fetch(`${API_BASE}/analyses/${analysis.id}`, {
-                              headers: {
-                                'Authorization': `Bearer ${authToken}`
-                              }
-                            })
-
-                            if (response.ok) {
-                              const fullAnalysis = await response.json()
-                              // Cache the full analysis data
-                              setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
-                              setCurrentAnalysis(fullAnalysis)
-                              setRedirectingToSuggested(false) // Turn off redirect loader
-                              updateURLWithAnalysis(fullAnalysis.uuid || fullAnalysis.id)
-                            } else {
-                              console.error('Failed to fetch full analysis:', response.status)
-                              setRedirectingToSuggested(false)
-                            }
-                          } catch (error) {
-                            console.error('Error fetching full analysis:', error)
+                        setLoadingAnalysisId(autoRefreshAnalysis.id)
+                        try {
+                          const authToken = localStorage.getItem('auth_token')
+                          if (!authToken) return
+                          const resp = await fetch(`${API_BASE}/analyses/${autoRefreshAnalysis.id}`, {
+                            headers: { 'Authorization': `Bearer ${authToken}` }
+                          })
+                          if (resp.ok) {
+                            const full = await resp.json()
+                            setCurrentAnalysis(full)
                             setRedirectingToSuggested(false)
-                          } finally {
-                            setLoadingAnalysisId(null) // Clear loading state
+                            updateURLWithAnalysis(String(full.id))
                           }
-                        } else {
-                          // Analysis already has full data, cache it and use it
-                          setAnalysisCache(prev => new Map(prev.set(analysisKey, analysis)))
-                          setCurrentAnalysis(analysis)
-                          setRedirectingToSuggested(false) // Turn off redirect loader
-                          updateURLWithAnalysis(analysis.uuid || analysis.id)
-                          setLoadingAnalysisId(null) // Clear loading state
+                        } finally {
+                          setLoadingAnalysisId(null)
                         }
                       }}
                     >
-                      {sidebarCollapsed ? (
-                        <Clock className="w-5 h-5" />
-                      ) : (
+                      <div className="flex flex-col items-start w-full text-sm pr-8">
+                        <div className="flex justify-between items-center w-full mb-1 gap-2">
+                          <div className="flex items-center space-x-2 min-w-0">
+                            {arColor !== 'bg-neutral-1000' && (
+                              <div className={`w-2.5 h-2.5 rounded-full ${arColor} flex-shrink-0`}></div>
+                            )}
+                            <span className="font-medium truncate">{arOrgName}</span>
+                          </div>
+                          <span className="text-neutral-500 flex-shrink-0">{autoRefreshAnalysis.time_range || 30}d</span>
+                        </div>
+                        <div className="flex justify-between items-center w-full text-neutral-500">
+                          <span>{arDateStr}</span>
+                          <span>{arTimeStr}</span>
+                        </div>
+                        {isArRunning && (
+                          <div className="mt-1 flex items-center gap-1 text-xs text-blue-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                            <span>Refreshing</span>
+                          </div>
+                        )}
+                      </div>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 h-6 w-6 text-neutral-500 hover:text-red-400 hover:bg-red-900/20"
+                      onClick={(e) => openDeleteDialog(autoRefreshAnalysis, e)}
+                      title="Delete auto analysis"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )
+              })() : (
+                <div className="px-2 py-2 text-neutral-600 text-xs">
+                  <p>No auto analysis</p>
+                  <p className="mt-0.5 text-neutral-700">Enable Auto Refresh when running</p>
+                </div>
+              )}
+
+              {/* SAVED section */}
+              <p className="text-xs text-neutral-500 uppercase tracking-wide px-2 py-1 mt-3 flex items-center gap-1">
+                <Bookmark className="w-3 h-3" />
+                Saved
+              </p>
+              {loadingAnalyses && previousAnalyses.length === 0 ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm text-neutral-500">Loading...</span>
+                  </div>
+                </div>
+              ) : previousAnalyses.length === 0 ? (
+                <div className="text-center py-4 text-neutral-600 text-xs">
+                  <p>No saved analyses yet</p>
+                  <p className="mt-0.5 text-neutral-700">Save an analysis to see it here</p>
+                </div>
+              ) : (
+                previousAnalyses.map((analysis) => {
+                  const analysisDate = new Date(analysis.created_at)
+                  const timeStr = analysisDate.toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                  })
+                  const dateStr = analysisDate.toLocaleDateString([], {
+                    month: 'short',
+                    day: 'numeric',
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                  })
+                  const rawName = (analysis as any).integration_name || 'Unknown Integration'
+                  const organizationName = sanitizeString(rawName)
+                  const analysisPlatform = (analysis as any).platform
+                  const isSelected = currentAnalysis?.id === analysis.id
+                  const platformColor = getPlatformColor(analysisPlatform)
+                  return (
+                    <div key={analysis.id} className={`relative group ${isSelected ? 'bg-neutral-800' : ''} rounded`}>
+                      <Button
+                        variant="ghost"
+                        disabled={analysisRunning || loadingAnalysisId !== null}
+                        className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isSelected ? 'bg-neutral-800 text-white' : ''} ${loadingAnalysisId === analysis.id ? 'bg-neutral-700 text-white' : ''} ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={async () => {
+                          setLoadingAnalysisId(analysis.id)
+                          const analysisKey = analysis.uuid || analysis.id.toString()
+                          const teamAnalysis = analysis.analysis_data?.team_analysis
+                          const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis as any)?.members
+                          const cachedAnalysis = analysisCache.get(analysisKey)
+                          const cachedTeamAnalysis = cachedAnalysis?.analysis_data?.team_analysis
+                          const cachedMembers = Array.isArray(cachedTeamAnalysis) ? cachedTeamAnalysis : (cachedTeamAnalysis as any)?.members
+                          const hasCachedAnalysisData = cachedAnalysis?.analysis_data
+                          const hasCachedMembers = Array.isArray(cachedMembers) && cachedMembers.length > 0
+
+                          if (hasCachedAnalysisData && hasCachedMembers) {
+                            setCurrentAnalysis(cachedAnalysis)
+                            setRedirectingToSuggested(false)
+                            updateURLWithAnalysis(String(cachedAnalysis.id))
+                            setLoadingAnalysisId(null)
+                            return
+                          }
+
+                          if (!analysis.analysis_data || !members || !Array.isArray(members) || members.length === 0) {
+                            try {
+                              const authToken = localStorage.getItem('auth_token')
+                              if (!authToken) { setLoadingAnalysisId(null); return }
+                              const response = await fetch(`${API_BASE}/analyses/${analysis.id}`, {
+                                headers: { 'Authorization': `Bearer ${authToken}` }
+                              })
+                              if (response.ok) {
+                                const fullAnalysis = await response.json()
+                                setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
+                                setCurrentAnalysis(fullAnalysis)
+                                setRedirectingToSuggested(false)
+                                updateURLWithAnalysis(String(fullAnalysis.id))
+                              } else {
+                                setRedirectingToSuggested(false)
+                              }
+                            } catch (error) {
+                              setRedirectingToSuggested(false)
+                            } finally {
+                              setLoadingAnalysisId(null)
+                            }
+                          } else {
+                            setAnalysisCache(prev => new Map(prev.set(analysisKey, analysis)))
+                            setCurrentAnalysis(analysis)
+                            setRedirectingToSuggested(false)
+                            updateURLWithAnalysis(String(analysis.id))
+                            setLoadingAnalysisId(null)
+                          }
+                        }}
+                      >
                         <div className="flex flex-col items-start w-full text-sm pr-8">
                           <div className="flex justify-between items-center w-full mb-1 gap-2">
                             <div className="flex items-center space-x-2 min-w-0">
-                              {/* Always show platform dot if we have a color */}
                               {platformColor !== 'bg-neutral-1000' && (
                                 <div className={`w-2.5 h-2.5 rounded-full ${platformColor} flex-shrink-0`}></div>
                               )}
@@ -445,9 +622,7 @@ function DashboardContent() {
                             <span>{timeStr}</span>
                           </div>
                         </div>
-                      )}
-                    </Button>
-                    {!sidebarCollapsed && (
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -457,50 +632,56 @@ function DashboardContent() {
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>
-                    )}
-                  </div>
-                )
+                    </div>
+                  )
                 })
-                )}
-                
-                {/* Load More Button */}
-                {hasMoreAnalyses && !sidebarCollapsed && (
-                  <div className="px-3 py-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadPreviousAnalyses(true)}
-                      disabled={loadingMoreAnalyses || analysisRunning}
-                      className="w-full border-neutral-500 bg-neutral-800 text-neutral-200 hover:bg-neutral-700 hover:text-white hover:border-neutral-400 text-sm"
-                    >
-                      {(loadingMoreAnalyses || (loadingAnalyses && previousAnalyses.length === 0)) ? (
-                        <>
-                          <div className="w-3 h-3 border border-neutral-300 border-t-transparent rounded-full animate-spin mr-2" />
-                          Loading...
-                        </>
-                      ) : (
-                        <>+ {Math.min(3, totalAnalysesCount - previousAnalyses.length)} more</>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
+              )}
+
+              {/* Load More Button */}
+              {hasMoreAnalyses && (
+                <div className="px-3 py-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadPreviousAnalyses(true)}
+                    disabled={loadingMoreAnalyses || analysisRunning}
+                    className="w-full border-neutral-500 bg-neutral-800 text-neutral-200 hover:bg-neutral-700 hover:text-white hover:border-neutral-400 text-sm"
+                  >
+                    {(loadingMoreAnalyses || (loadingAnalyses && previousAnalyses.length === 0)) ? (
+                      <>
+                        <div className="w-3 h-3 border border-neutral-300 border-t-transparent rounded-full animate-spin mr-2" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>+ {Math.min(3, totalAnalysesCount - previousAnalyses.length)} more</>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="flex-1">
-              {/* Collapsed state - just show new analysis button */}
-              <Button
-                onClick={startAnalysis}
-                disabled={analysisRunning}
-                className="w-full bg-purple-700 hover:bg-purple-800 text-white p-2"
-                title="New Analysis"
-              >
-                <Play className="w-5 h-5" />
-              </Button>
+            <div className="flex items-center justify-center pt-2 md:hidden">
+              {/* Collapsed state - show chevron arrow at top (click sidebar to expand) - mobile only */}
+              <ChevronRight className="w-6 h-6 text-white" />
             </div>
           )}
         </div>
+
+        {/* Close button for expanded mobile sidebar */}
+        {!sidebarCollapsed && (
+          <div className="md:hidden flex items-center justify-end p-2 bg-neutral-900">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setSidebarCollapsed(true)
+              }}
+              className="text-white hover:text-neutral-300 transition-colors p-1"
+              title="Close sidebar"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Content */}
@@ -515,6 +696,84 @@ function DashboardContent() {
           </div>
         )}
         <div className="p-6">
+          {/* Save Banner: shown when analysis is complete, unsaved, and not auto-refresh */}
+          {currentAnalysis?.status === 'completed' &&
+           currentAnalysis?.is_saved === false &&
+           currentAnalysis?.is_auto_refresh === false && (
+            <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
+              <div className="flex items-center gap-2 text-violet-800 text-sm">
+                <Bookmark className="w-4 h-4 flex-shrink-0" />
+                <span>This analysis hasn&apos;t been saved yet.</span>
+              </div>
+              <button
+                onClick={saveCurrentAnalysis}
+                className="flex-shrink-0 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors"
+              >
+                Save Analysis
+              </button>
+            </div>
+          )}
+
+          {/* Auto-Refresh Info Bar: shown when viewing an auto-refresh analysis */}
+          {currentAnalysis?.is_auto_refresh === true && currentAnalysis?.status === 'completed' && (
+            <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              <div className="flex items-center gap-1.5 font-medium">
+                <Timer className="w-4 h-4" />
+                Auto Analysis
+              </div>
+              <span className="text-blue-600">|</span>
+              <span>Time Range: Last {currentAnalysis.time_range || 30} days</span>
+              {currentAnalysis.auto_refresh_interval && (
+                <>
+                  <span className="text-blue-600">|</span>
+                  <span>Refreshes every {currentAnalysis.auto_refresh_interval}</span>
+                </>
+              )}
+              {currentAnalysis.config?.auto_refresh_blocked && (
+                <>
+                  <span className="text-blue-600">|</span>
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700"
+                    title={`${(currentAnalysis.config as any).auto_refresh_blocked?.provider || 'Integration'} ${(currentAnalysis.config as any).auto_refresh_blocked?.message || 'Token expired or removed.'}`}
+                  >
+                    Token expired or removed
+                  </span>
+                </>
+              )}
+              {currentAnalysis.config?.include_github || currentAnalysis.config?.include_jira || currentAnalysis.config?.include_linear ? (
+                <>
+                  <span className="text-blue-600">|</span>
+                  <span className="flex items-center gap-1">
+                    Integrations:
+                    {currentAnalysis.config?.include_github && <span className="ml-1 text-xs bg-blue-100 px-1.5 py-0.5 rounded">GitHub</span>}
+                    {currentAnalysis.config?.include_jira && <span className="ml-1 text-xs bg-blue-100 px-1.5 py-0.5 rounded">Jira</span>}
+                    {currentAnalysis.config?.include_linear && <span className="ml-1 text-xs bg-blue-100 px-1.5 py-0.5 rounded">Linear</span>}
+                  </span>
+                </>
+              ) : null}
+              {currentAnalysis.completed_at && (
+                <>
+                  <span className="text-blue-600 ml-auto">|</span>
+                  <span className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5" />
+                    Last updated {formatDistanceToNow(new Date(currentAnalysis.completed_at))} ago
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={refreshCurrentAnalysis}
+                      disabled={analysisRunning}
+                      className="h-6 px-1.5 text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+                      title="Refresh analysis now"
+                    >
+                      <RefreshCw className={analysisRunning ? "w-3.5 h-3.5 animate-spin" : "w-3.5 h-3.5"} />
+                    </Button>
+                    
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
           <AnalysisProgressSection
             analysisRunning={analysisRunning}
             analysisStage={analysisStage}
@@ -541,14 +800,52 @@ function DashboardContent() {
                       </div>
                       <div>
                         <p className="text-white font-semibold text-lg">You&apos;re viewing sample data</p>
-                        <p className="text-white/90 text-sm">Connect your incident management platform to see real insights</p>
+                        <p className="text-white/90 text-sm">
+                          {integrations.some(i => i.platform === 'rootly' || i.platform === 'pagerduty')
+                            ? 'Run an analysis to see real insights'
+                            : 'Connect your incident management platform and run an analysis to see real insights'}
+                        </p>
+                      </div>
+                    </div>
+                    {integrations.some(i => i.platform === 'rootly' || i.platform === 'pagerduty') ? (
+                      <button
+                        onClick={() => setShowTimeRangeDialog(true)}
+                        className="px-6 py-2.5 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors shadow-md"
+                      >
+                        New Analysis →
+                      </button>
+                    ) : (
+                      <a
+                        href="/integrations"
+                        className="px-6 py-2.5 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors shadow-md"
+                      >
+                        Connect Integrations →
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* GitHub Integration Connected but No Data Warning */}
+              {!currentAnalysis?.config?.is_demo &&
+               connectedIntegrations.has('github') &&
+               !currentAnalysis?.analysis_data?.data_sources?.github_data && (
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-3">
+                      <Info className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <p className="text-blue-900 font-semibold">No GitHub Data Available</p>
+                        <p className="text-blue-700 text-sm">
+                          Sync members in the Management page to link GitHub accounts with your team.
+                        </p>
                       </div>
                     </div>
                     <a
-                      href="/integrations"
-                      className="px-6 py-2.5 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors shadow-md"
+                      href="/management"
+                      className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
                     >
-                      Connect Integrations →
+                      Sync Members →
                     </a>
                   </div>
                 </div>
@@ -753,22 +1050,11 @@ function DashboardContent() {
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="space-y-1.5">
-                          <CardTitle className="flex items-center space-x-2">
-                            {highRiskFactors.length > 0 ? (
-                              <>
-                                <span>Risk Factors</span>
-                              </>
-                            ) : (
-                              <>
-                                <BarChart3 className="w-5 h-5 text-blue-500" />
-                                <span>Risk Factors</span>
-                              </>
-                            )}
-                          </CardTitle>
+                          <CardTitle>Risk Factors</CardTitle>
                           <CardDescription>
                             Current factors affecting team health
                           </CardDescription>
-                        </div>
+                        </div>                        {/* commented out the vie affected members 
                         <button
                           onClick={() => setShowAllRiskFactorsPopup(true)}
                           className="flex items-center gap-1 text-red-600 hover:text-red-700 transition-colors text-sm font-medium whitespace-nowrap ml-4"
@@ -776,6 +1062,7 @@ function DashboardContent() {
                           View Affected Members
                           <ArrowRight className="w-4 h-4" />
                         </button>
+                      */}
                       </div>
                     </CardHeader>
 
@@ -883,6 +1170,11 @@ function DashboardContent() {
                 }}
               />
 
+              {/* Show Alerts cards only for Rootly (not implemented for PagerDuty) */}
+              {currentAnalysis?.platform === 'rootly' && (
+                <AlertsCardsRow currentAnalysis={currentAnalysis} />
+              )}
+
               <TeamMembersList
                 currentAnalysis={currentAnalysis}
                 setSelectedMember={setSelectedMember}
@@ -968,7 +1260,7 @@ function DashboardContent() {
                       updateURLWithAnalysis(null)
                       if (previousAnalyses.length > 0) {
                         setCurrentAnalysis(previousAnalyses[0])
-                        updateURLWithAnalysis(previousAnalyses[0].uuid || previousAnalyses[0].id)
+                        updateURLWithAnalysis(String(previousAnalyses[0].id))
                       }
                     }}
                     className="bg-red-600 hover:bg-red-700"
@@ -990,8 +1282,8 @@ function DashboardContent() {
           {/* Empty State or Loading State */}
           {!analysisRunning && !currentAnalysis && !searchParams.get('analysis') && (
             <>
-              {/* Show loading state while analyses are loading OR if we have analyses but currentAnalysis isn't set */}
-              {loadingAnalyses || (previousAnalyses.length > 0 && !currentAnalysis) ? (
+              {/* Show loading state while initial data hasn't settled yet, or while a subsequent reload is running */}
+              {(!initialDataLoaded || loadingAnalyses) ? (
                 <Card className="text-center p-8">
                   <div className="w-16 h-16 bg-neutral-200 rounded-full flex items-center justify-center mx-auto mb-4">
                     <div className="w-8 h-8 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin"></div>
@@ -1180,7 +1472,6 @@ function DashboardContent() {
                 {(() => {
                   const selected = integrations.find(i => i.id.toString() === dialogSelectedIntegration)
                   if (selected) {
-                    // Use same logic as integrations page - show integration.name
                     const organizationName = selected.name
                     
                     // Use platform field from backend (not inferred from name)
@@ -1201,9 +1492,14 @@ function DashboardContent() {
                       <div>
                         <div className="flex items-center">
                           <div className={`w-2 h-2 rounded-full mr-2 ${platformColor}`}></div>
-                          <span className="font-medium">
-                            {organizationName}
-                          </span>
+                          <div className="min-w-0">
+                            <span className="font-medium block truncate">{organizationName}</span>
+                            {selected.platform === 'rootly' && selected.team_name && (
+                              <span className="mt-1 inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700">
+                                Team scope: {selected.team_name}
+                              </span>
+                            )}
+                          </div>
                           <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 ml-auto" />
                         </div>
                         <button 
@@ -1548,9 +1844,13 @@ function DashboardContent() {
                     const defaultDate = new Date()
                     defaultDate.setDate(defaultDate.getDate() - 30)
                     setCustomStartDate(defaultDate)
+                    setAutoRefreshEnabled(false)
                   } else {
                     setIsCustomRange(false)
                     setSelectedTimeRange(value)
+                    if (value !== "30" && value !== "90") {
+                      setAutoRefreshEnabled(false)
+                    }
                   }
                 }}
               >
@@ -1632,6 +1932,74 @@ function DashboardContent() {
                 </div>
               )}
             </div>
+
+            {/* Auto Refresh Section */}
+            {(() => {
+              const autoRefreshAvailable = selectedTimeRange === "30" || selectedTimeRange === "90"
+              return (
+                <div className="space-y-2">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <RefreshCw className="w-4 h-4 text-neutral-600" />
+                      <span className="text-sm font-medium text-neutral-700">Auto Refresh</span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="text-neutral-400 hover:text-neutral-600 transition-colors">
+                            <Info className="w-3.5 h-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 text-sm text-neutral-700 p-3" side="top" align="start">
+                          Auto Refresh is available for Last 30 days or Last 90 days time ranges. Once enabled, select how often you want the analysis to automatically re-run.
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <Switch
+                      checked={autoRefreshEnabled}
+                      onCheckedChange={(checked) => {
+                        if (autoRefreshAvailable) {
+                          setAutoRefreshEnabled(checked)
+                        }
+                      }}
+                      disabled={!autoRefreshAvailable}
+                    />
+                  </div>
+
+                  {/* Body box */}
+                  <div className={`rounded-md border p-3 space-y-2 transition-colors ${
+                    autoRefreshEnabled
+                      ? "border-purple-300 bg-purple-50"
+                      : "border-neutral-200 bg-neutral-50"
+                  }`}>
+                    <p className={`text-xs ${autoRefreshEnabled ? "text-purple-700" : "text-neutral-400"}`}>
+                      {autoRefreshEnabled
+                        ? "Analysis will automatically refresh at the selected interval"
+                        : "Enable to automatically re-run analysis on a schedule"}
+                    </p>
+                    <Select
+                      value={autoRefreshInterval}
+                      onValueChange={setAutoRefreshInterval}
+                      disabled={!autoRefreshEnabled}
+                    >
+                      <SelectTrigger className={`bg-white ${!autoRefreshEnabled ? "opacity-50" : ""}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="24h">Every 24 hours</SelectItem>
+                        <SelectItem value="7d">Every 7 days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {autoRefreshEnabled && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <span className="text-xs font-medium text-green-700">Auto refresh enabled</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+
             <div className="flex justify-end space-x-2 pt-4">
               <Button variant="outline" onClick={() => setShowTimeRangeDialog(false)}>
                 Cancel
@@ -1639,28 +2007,7 @@ function DashboardContent() {
               <Button
                 onClick={runAnalysisWithTimeRange}
                 className="bg-purple-700 hover:bg-purple-800"
-                disabled={
-                  !dialogSelectedIntegration ||
-                  (isCustomRange && !validateCustomDate(customStartDate).valid) ||
-                  (() => {
-                    const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
-
-                    // Check if no team members synced
-                    if ((selectedIntegration?.total_users || 0) === 0) {
-                      return true;
-                    }
-
-                    // Only check permissions for Rootly integrations, not PagerDuty
-                    if (selectedIntegration?.platform === 'rootly') {
-                      const hasUserPermission = selectedIntegration?.permissions?.users?.access;
-                      const hasIncidentPermission = selectedIntegration?.permissions?.incidents?.access;
-                      return !hasUserPermission || !hasIncidentPermission;
-                    }
-
-                    // For PagerDuty or other platforms, don't block based on permissions
-                    return false;
-                  })()
-                }
+                disabled={isRunAnalysisDisabled()}
               >
                 <>
                   <Play className="w-4 h-4 mr-2" />
@@ -1680,6 +2027,7 @@ function DashboardContent() {
         analysisId={currentAnalysis?.id || currentAnalysis?.uuid}
         currentAnalysis={currentAnalysis}
         timeRange={currentAnalysis?.time_range || timeRange}
+        integrations={integrations}
       />
 
       {/* Delete Analysis Dialog */}

@@ -46,6 +46,7 @@ import {
   fetchGithubUsers,
   fetchJiraUsers,
   fetchLinearUsers,
+  fetchSlackUsers,
   updateUserCorrelation,
 } from "./handlers/user-mapping-handlers"
 
@@ -62,6 +63,7 @@ interface SyncedUser {
   jira_email?: string
   linear_user_id?: string
   linear_email?: string
+  slack_user_id?: string
   on_call_status?: string
   is_oncall?: boolean
   role?: string
@@ -132,6 +134,7 @@ function TeamPageContent() {
   const [githubUsers, setGithubUsers] = useState<string[]>([])
   const [jiraUsers, setJiraUsers] = useState<any[]>([])
   const [linearUsers, setLinearUsers] = useState<any[]>([])
+  const [slackUsers, setSlackUsers] = useState<any[]>([])
   const [loadingIntegrationUsers, setLoadingIntegrationUsers] = useState(false)
   const [integrationSearchQuery, setIntegrationSearchQuery] = useState("")
 
@@ -148,7 +151,7 @@ function TeamPageContent() {
       github_matched?: number
       jira_matched?: number
       linear_matched?: number
-      slack_synced?: number
+      slack_matched?: number
       slack_skipped?: number
     }
   } | null>(null)
@@ -276,11 +279,13 @@ function TeamPageContent() {
     }
   }, [selectedOrganization])
 
-  // Clear integration users data when organization changes to force fresh data load
+  // Clear integration users data and reset pagination when organization changes
   useEffect(() => {
     setGithubUsers([])
     setJiraUsers([])
     setLinearUsers([])
+    setSlackUsers([])
+    setCurrentPage(1)  // Reset to page 1 when switching orgs
   }, [selectedOrganization])
 
   // Cleanup timeout on unmount and mark component as unmounted
@@ -310,19 +315,23 @@ function TeamPageContent() {
     const userEmail = localStorage.getItem('user_email')
     const userRole = localStorage.getItem('user_role')
     const userId = localStorage.getItem('user_id')
+    const userOrgId = localStorage.getItem('user_organization_id')
 
     if (userName && userEmail) {
+      const parsedOrgId = userOrgId ? parseInt(userOrgId, 10) : null
       setUserInfo({
         name: userName,
         email: userEmail,
         role: userRole,
-        id: userId
+        id: userId,
+        organization_id: parsedOrgId && !isNaN(parsedOrgId) ? parsedOrgId : null
       })
     }
   }, [])
 
-  // Load organization data when Company tab is selected
+  // Load organization data and reset pagination when switching view modes
   useEffect(() => {
+    setCurrentPage(1)  // Reset to page 1 when switching views
     if (viewMode === 'company') {
       loadOrganizationData()
     }
@@ -394,6 +403,9 @@ function TeamPageContent() {
       if (connectedIntegrations.has('linear') && (orgChanged || linearUsers.length === 0)) {
         promises.push(loadLinearUsersForMapping())
       }
+      if (connectedIntegrations.has('slack') && (orgChanged || slackUsers.length === 0)) {
+        promises.push(loadSlackUsersForMapping())
+      }
 
       if (promises.length > 0) {
         await Promise.all(promises)
@@ -419,6 +431,9 @@ function TeamPageContent() {
       }
       if (connectedIntegrations.has('linear') && linearUsers.length === 0) {
         promises.push(loadLinearUsersForMapping())
+      }
+      if (connectedIntegrations.has('slack') && slackUsers.length === 0) {
+        promises.push(loadSlackUsersForMapping())
       }
 
       if (promises.length > 0) {
@@ -472,6 +487,21 @@ function TeamPageContent() {
     }
   }
 
+  const loadSlackUsersForMapping = async () => {
+    if (!selectedOrganization) return
+    setLoadingIntegrationUsers(true)
+    try {
+      const users = await fetchSlackUsers(selectedOrganization)
+      setSlackUsers(users || [])
+    } catch (error) {
+      console.error('Error loading Slack users:', error)
+      toast.error("Failed to load Slack users")
+      setSlackUsers([])
+    } finally {
+      setLoadingIntegrationUsers(false)
+    }
+  }
+
   const handleUserMapping = async (userId: number, integrationType: string, integrationUserId: string) => {
     try {
       // Build the updates object based on integration type
@@ -482,9 +512,16 @@ function TeamPageContent() {
         updates.jira_account_id = integrationUserId
       } else if (integrationType === 'linear') {
         updates.linear_user_id = integrationUserId
+      } else if (integrationType === 'slack') {
+        updates.slack_user_id = integrationUserId
       }
 
-      await updateUserCorrelation(userId, updates)
+      const success = await updateUserCorrelation(userId, updates)
+      if (!success) {
+        // updateUserCorrelation already showed an error toast
+        return
+      }
+
       toast.success("User mapping updated successfully")
       await fetchSyncedUsers(false, false, true) // Refresh the users list
       setOpenMappingUserId(null)
@@ -643,6 +680,8 @@ function TeamPageContent() {
           github_matched: syncResults.stats?.github_matched,
           jira_matched: syncResults.stats?.jira_matched,
           linear_matched: syncResults.stats?.linear_matched,
+          slack_matched: syncResults.stats?.slack_matched,
+          slack_skipped: syncResults.stats?.slack_skipped,
         }
       })
 
@@ -775,6 +814,10 @@ function TeamPageContent() {
   const selectedIntegration = selectedOrganization
     ? integrations.find(i => i.id.toString() === selectedOrganization)
     : null
+  const getTeamScopeLabel = (integration: Integration) => {
+    if (integration.platform !== "rootly") return null
+    return `Team: ${integration.team_name || "All users"}`
+  }
 
   // Check if any primary integration (Rootly or PagerDuty) exists
   // Since the integrations array only contains Rootly and PagerDuty entries, length > 0 is sufficient
@@ -796,6 +839,15 @@ function TeamPageContent() {
       return true
     })
     .sort((a, b) => {
+      // Always show logged-in user at the top
+      const currentUserEmail = localStorage.getItem('user_email')?.toLowerCase()
+      const aIsCurrentUser = a.email?.toLowerCase() === currentUserEmail
+      const bIsCurrentUser = b.email?.toLowerCase() === currentUserEmail
+
+      if (aIsCurrentUser && !bIsCurrentUser) return -1
+      if (!aIsCurrentUser && bIsCurrentUser) return 1
+
+      // Then apply regular sorting
       if (!sortBy) return 0
 
       let comparison = 0
@@ -847,6 +899,13 @@ function TeamPageContent() {
       }
     }
 
+    // Show Slack if user is mapped and Slack is connected
+    // Unlike other integrations, we don't validate against slackUsers
+    // because the slack_user_id is already saved and we trust it
+    if (user.slack_user_id && connectedIntegrations.has('slack')) {
+      integrations.push('slack')
+    }
+
     return integrations
   }
 
@@ -878,6 +937,20 @@ function TeamPageContent() {
     return linearUser?.name || linearUser?.email || 'Unmapped'
   }
 
+  // Get display name for Slack user from user ID
+  const getSlackDisplayName = (userId: string | null | undefined) => {
+    if (!userId) return 'Not mapped'
+
+    // Show loading indicator until data is actually loaded (prevents ID flash)
+    if (slackUsers.length === 0) {
+      return 'Loading...'
+    }
+
+    const slackUser = slackUsers.find(u => u.id === userId)
+    // Never show raw ID - show "Unmapped" instead for privacy
+    return slackUser?.name || slackUser?.email || 'Unmapped'
+  }
+
   // Handle column header click for sorting
   const handleSort = (column: 'name' | 'email' | 'oncall') => {
     if (sortBy === column) {
@@ -901,13 +974,15 @@ function TeamPageContent() {
   }
 
   return (
-    <>
+    <div className="flex flex-col h-screen w-full bg-neutral-50">
       <TopPanel />
-      <main className="min-h-screen bg-neutral-50 p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Header with Title and View Mode Toggle */}
-          <div className="mb-6 flex items-start justify-between pl-4">
-            <div>
+      <main className="flex-1 overflow-hidden w-full bg-neutral-50">
+        <div className="h-full w-full overflow-y-auto">
+          <div className="p-6 lg:p-8">
+            <div className="max-w-4xl mx-auto">
+            {/* Header with Title and View Mode Toggle */}
+          <div className="mb-6 flex flex-col-reverse md:flex-row md:items-start md:justify-between md:pl-4 gap-4 md:gap-0">
+            <div className="flex-1 min-w-0">
               <h1 className="text-2xl font-semibold text-neutral-900">
                 {viewMode === 'organization' ? 'Organization Management' : 'Team Management'}
               </h1>
@@ -918,10 +993,10 @@ function TeamPageContent() {
               </p>
             </div>
             {/* View Mode Toggle */}
-            <div className="relative flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1">
+            <div className="relative grid grid-cols-2 bg-white border border-neutral-200 rounded-lg p-1 md:flex-shrink-0">
               <button
                 onClick={() => setViewMode('organization')}
-                className={`relative z-10 px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
+                className={`relative z-10 flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'organization'
                     ? 'text-purple-700'
                     : 'text-neutral-600 hover:text-neutral-900'
@@ -931,7 +1006,7 @@ function TeamPageContent() {
               </button>
               <button
                 onClick={() => setViewMode('company')}
-                className={`relative z-10 px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
+                className={`relative z-10 flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded transition-all duration-200 ${
                   viewMode === 'company'
                     ? 'text-purple-700'
                     : 'text-neutral-600 hover:text-neutral-900'
@@ -940,8 +1015,8 @@ function TeamPageContent() {
                 Team Roles
               </button>
               <div
-                className={`absolute top-1 bottom-1 bg-purple-100 rounded transition-all duration-300 ease-in-out ${
-                  viewMode === 'organization' ? 'left-1 w-[calc(50%-0.25rem)]' : 'left-[calc(50%+0.125rem)] w-[calc(50%-0.375rem)]'
+                className={`absolute top-1 bottom-1 bg-purple-100 rounded transition-all duration-300 ease-in-out w-[calc(50%-0.25rem)] ${
+                  viewMode === 'organization' ? 'left-1' : 'left-[calc(50%+0.125rem)]'
                 }`}
               />
             </div>
@@ -949,7 +1024,7 @@ function TeamPageContent() {
 
           {/* Organization Management Section */}
           {(selectedOrganization || !hasPrimaryIntegration) && !loadingIntegrations && (
-            <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
+              <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
               {viewMode === 'organization' ? (
                 <>
                   {/* Organization View */}
@@ -959,8 +1034,30 @@ function TeamPageContent() {
                     {/* Organization Selector and Members Section - Only show when primary integration exists */}
                     {hasPrimaryIntegration && (
                       <div className="space-y-4">
+                        {/* Sync Button - Mobile Only (Above Select Organization) */}
+                        <div className="md:hidden flex flex-col gap-2">
+                          <Button
+                            onClick={() => {
+                              setSyncProgress(null) // Reset sync progress when opening modal
+                              setShowSyncConfirmModal(true)
+                            }}
+                            disabled={loadingSyncedUsers || !hasPrimaryIntegration}
+                            className="bg-purple-700 hover:bg-purple-800 text-white w-full"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Sync Now
+                          </Button>
+                          {lastSyncInfo && (
+                            <p className="text-xs text-neutral-500 text-center">
+                              Last synced {new Date(lastSyncInfo.synced_at).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+
                         {/* Top row: Organization Selector and Sync Button */}
-                        <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-3 border-b border-neutral-200 gap-4 md:gap-0">
                           <div className="flex-shrink-0">
                             <label className="text-sm font-medium text-neutral-900 mb-2 block">Select Organization</label>
                             <Select
@@ -968,19 +1065,39 @@ function TeamPageContent() {
                               onValueChange={setSelectedOrganization}
                               disabled={loadingIntegrations || !hasPrimaryIntegration}
                             >
-                              <SelectTrigger className="w-64">
-                                <SelectValue placeholder="Select an organization..." />
+                              <SelectTrigger className="w-full sm:w-72">
+                                <SelectValue placeholder="Select an organization...">
+                                  {selectedIntegration && (
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${selectedIntegration.platform === "rootly" ? "bg-purple-500" : "bg-green-500"}`}></span>
+                                      <span className="truncate">{selectedIntegration.name || `Integration #${selectedIntegration.id}`}</span>
+                                      {getTeamScopeLabel(selectedIntegration) && (
+                                        <span className="ml-auto inline-flex max-w-[140px] items-center truncate rounded bg-purple-100 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 flex-shrink-0">
+                                          {getTeamScopeLabel(selectedIntegration)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
                                 {integrations.map((integration) => (
                                   <SelectItem key={integration.id} value={integration.id.toString()}>
-                                    {integration.name || `Integration #${integration.id}`}
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${integration.platform === "rootly" ? "bg-purple-500" : "bg-green-500"}`}></span>
+                                      <span className="truncate">{integration.name || `Integration #${integration.id}`}</span>
+                                      {getTeamScopeLabel(integration) && (
+                                        <span className="ml-auto inline-flex max-w-[140px] items-center truncate rounded bg-purple-100 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 flex-shrink-0">
+                                          {getTeamScopeLabel(integration)}
+                                        </span>
+                                      )}
+                                    </div>
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="flex flex-col items-end gap-2">
+                          <div className="hidden md:flex flex-col items-end gap-2">
                             <Button
                               onClick={() => {
                                 setSyncProgress(null) // Reset sync progress when opening modal
@@ -1003,12 +1120,16 @@ function TeamPageContent() {
                         </div>
 
                         {/* Bottom row: Organization Members and Search Bar */}
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                           <div className="flex items-center gap-2">
                             <h3 className="text-sm font-semibold text-neutral-900">Organization Members</h3>
-                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 text-xs font-medium text-neutral-700">{syncedUsers.length}</span>
+                            {loadingSyncedUsers ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                            ) : (
+                              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-200 text-xs font-medium text-neutral-700">{syncedUsers.length}</span>
+                            )}
                           </div>
-                          <div className="w-80">
+                          <div className="w-full sm:w-64 md:w-80">
                             <div className="relative">
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                               <Input
@@ -1111,6 +1232,8 @@ function TeamPageContent() {
                         {paginatedUsers.map((user, index) => {
                           const integrations = getUserIntegrations(user)
                           const displayName = user.email?.split('@')[0] || 'Unknown'
+                          const currentUserEmail = localStorage.getItem('user_email')?.toLowerCase()
+                          const isCurrentUser = user.email?.toLowerCase() === currentUserEmail
 
                           return (
                             <tr key={user.id} className={`border-b border-neutral-100 hover:bg-neutral-50 ${index === paginatedUsers.length - 1 ? 'border-b-0' : ''}`}>
@@ -1127,9 +1250,16 @@ function TeamPageContent() {
                                         .substring(0, 2)}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <span className="text-sm font-medium text-neutral-900 capitalize">
-                                    {displayName.replace(/[._]/g, ' ')}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-neutral-900 capitalize">
+                                      {displayName.replace(/[._]/g, ' ')}
+                                    </span>
+                                    {isCurrentUser && (
+                                      <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 text-xs px-2 py-0.5">
+                                        You
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                               <td className="py-3 px-6">
@@ -1169,6 +1299,9 @@ function TeamPageContent() {
                                         )}
                                         {integration === 'linear' && (
                                           <Image src="/images/linear-logo.png" alt="Linear" width={20} height={20} />
+                                        )}
+                                        {integration === 'slack' && (
+                                          <Image src="/images/slack-logo.png" alt="Slack" width={20} height={20} />
                                         )}
                                       </div>
                                     ))
@@ -1448,6 +1581,71 @@ function TeamPageContent() {
                                             )}
                                           </div>
                                         )}
+
+                                        {/* Slack */}
+                                        {connectedIntegrations.has('slack') && (
+                                          <div className="border border-neutral-200 rounded">
+                                            <button
+                                              onClick={() => setExpandedIntegration(expandedIntegration === 'slack' ? null : 'slack')}
+                                              className="w-full flex items-center justify-between p-2 hover:bg-neutral-50"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <Image src="/images/slack-logo.png" alt="Slack" width={16} height={16} />
+                                                <div className="text-left">
+                                                  <div className="text-sm font-medium">Slack</div>
+                                                  <div className={`text-xs ${user.slack_user_id ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {user.slack_user_id ? getSlackDisplayName(user.slack_user_id) : 'Not mapped'}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'slack' ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {expandedIntegration === 'slack' && (
+                                              <div className="p-2 border-t border-neutral-200">
+                                                <input
+                                                  type="text"
+                                                  placeholder="Search Slack users..."
+                                                  value={integrationSearchQuery}
+                                                  onChange={(e) => setIntegrationSearchQuery(e.target.value)}
+                                                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
+                                                />
+                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                  {loadingIntegrationUsers ? (
+                                                    <div className="text-center py-2">
+                                                      <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      {user.slack_user_id && (
+                                                        <button
+                                                          onClick={() => handleUserMapping(user.id, 'slack', '')}
+                                                          className="w-full text-left px-2 py-1 text-sm hover:bg-red-50 text-red-600 rounded border-b border-neutral-200 mb-1"
+                                                        >
+                                                          Clear mapping
+                                                        </button>
+                                                      )}
+                                                      {slackUsers.filter(u => (u.name || u.email || '').toLowerCase().includes(integrationSearchQuery.toLowerCase())).length > 0 ? (
+                                                        slackUsers
+                                                          .filter(u => (u.name || u.email || '').toLowerCase().includes(integrationSearchQuery.toLowerCase()))
+                                                          .map((slackUser) => (
+                                                            <button
+                                                              key={slackUser.id}
+                                                              onClick={() => handleUserMapping(user.id, 'slack', slackUser.id)}
+                                                              className="w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded"
+                                                            >
+                                                              {slackUser.name || slackUser.email}
+                                                            </button>
+                                                          ))
+                                                      ) : (
+                                                        <p className="text-xs text-neutral-500 text-center py-2">No users found</p>
+                                                      )}
+                                                    </>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                           ) : (
                             <p className="text-xs text-neutral-500 text-center py-2">No integrations connected</p>
@@ -1516,15 +1714,11 @@ function TeamPageContent() {
                   />
                 </>
               )}
-            </div>
+              </div>
           )}
-
-          {!selectedOrganization && !loadingIntegrations && (
-            <div className="flex items-center justify-center h-96">
-              <p className="text-neutral-600">Please select an organization to view users</p>
-            </div>
-          )}
-        </div>
+            </div>  {/* Close max-w-4xl mx-auto */}
+          </div>  {/* Close p-6 lg:p-8 */}
+        </div>  {/* Close h-full overflow-y-auto */}
       </main>
 
       {/* Sync Confirmation Modal */}
@@ -1535,7 +1729,7 @@ function TeamPageContent() {
               <DialogHeader>
                 <DialogTitle>Sync Organization Users</DialogTitle>
                 <DialogDescription>
-                  This will sync all users from your connected integrations and match them with GitHub, Jira, and Linear accounts
+                  This will sync all users from your connected integrations and match them with GitHub, Jira, Linear, and Slack accounts
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -1618,7 +1812,8 @@ function TeamPageContent() {
                         {/* Newly Mapped Integrations */}
                         {(syncProgress.results.github_matched !== undefined ||
                           syncProgress.results.jira_matched !== undefined ||
-                          syncProgress.results.linear_matched !== undefined) && (
+                          syncProgress.results.linear_matched !== undefined ||
+                          syncProgress.results.slack_matched !== undefined) && (
                           <div className="border rounded-lg p-4">
                             <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
                               Newly Mapped Integrations
@@ -1666,6 +1861,19 @@ function TeamPageContent() {
                                   </span>
                                 </div>
                               )}
+
+                              {/* Slack */}
+                              {syncProgress.results.slack_matched !== undefined && (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Image src="/images/slack-logo.png" alt="Slack" width={20} height={20} />
+                                    <span className="text-sm font-medium text-neutral-700">Slack</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900">
+                                    {syncProgress.results.slack_matched}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -1701,7 +1909,7 @@ function TeamPageContent() {
         onMappingUpdated={handleMappingUpdated}
         connectedIntegrations={connectedIntegrations}
       />
-    </>
+    </div>
   )
 }
 

@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Sparkles, Copy, Check } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -59,7 +58,7 @@ export function AIInsightsModal({ isOpen, onClose, currentAnalysis }: AIInsights
                 variant="outline"
                 size="sm"
                 onClick={handleCopy}
-                className="flex items-center space-x-2 mr-6"
+                className="flex items-center space-x-2 mr-8"
               >
                 {copied ? (
                   <>

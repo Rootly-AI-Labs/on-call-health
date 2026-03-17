@@ -88,6 +88,8 @@ export interface Integration {
   last_used_at: string | null
   token_suffix: string
   platform: "rootly" | "pagerduty"
+  key_type?: string       // "global" | "team" | null
+  team_name?: string      // owning team name for team-scoped keys
   permissions?: {
     users: {
       access: boolean
@@ -96,6 +98,8 @@ export interface Integration {
     incidents: {
       access: boolean
       error: string | null
+      team_scoped?: boolean
+      team_name?: string
     }
   }
 }
@@ -206,6 +210,16 @@ export interface LinearUser {
   active: boolean
 }
 
+export interface RootlyTeam {
+  id: string
+  name: string
+  slug: string
+  member_count: number
+  already_added?: boolean
+  existing_integration_name?: string | null
+  existing_integration_id?: number | null
+}
+
 export interface PreviewData {
   organization_name: string
   total_users: number
@@ -213,6 +227,11 @@ export interface PreviewData {
   suggested_name?: string
   can_add?: boolean
   current_user?: string
+  key_type?: string       // "global" | "team"
+  team_name?: string      // selected team filter (null = all teams)
+  team_names?: string[]   // selected team filters for multi-select mode
+  team_scopes?: Array<{ name: string; member_count: number }>
+  teams?: RootlyTeam[]    // available teams for global keys
   permissions?: {
     users?: {
       access: boolean
@@ -221,6 +240,8 @@ export interface PreviewData {
     incidents?: {
       access: boolean
       error?: string
+      team_scoped?: boolean
+      team_name?: string
     }
   }
 }

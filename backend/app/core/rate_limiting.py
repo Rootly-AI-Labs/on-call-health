@@ -26,8 +26,8 @@ RATE_LIMITS = {
     "account_delete": "3/hour",          # Account deletion attempts (very strict)
     "admin_api_key": "5/minute",          # Admin API key attempts (strict to prevent brute force)
 
-    # MCP API key endpoints - per-key rate limiting
-    "api_key_mcp": "100/minute",          # Per API key limit for MCP endpoints
+    # API key endpoints - per-key rate limiting
+    "api_key": "100/minute",              # Per API key limit for programmatic endpoints
 
     # Analysis endpoints - moderate limits
     "analysis_create": "3/minute",       # Create new analysis
@@ -49,6 +49,9 @@ RATE_LIMITS = {
     # General API endpoints
     "api_general": "1000/minute",        # General API calls
     "api_heavy": "100/minute",           # Heavy operations
+
+    # Digest endpoints - strict to deter brute force on tokens
+    "digest_unsubscribe": "5/minute",
 }
 
 def _ensure_redis_db(url: str, db: int = RATE_LIMIT_REDIS_DB) -> str:
@@ -211,6 +214,10 @@ def mapping_rate_limit(endpoint_type: str = "mapping_create"):
     """Rate limiter for mapping endpoints."""
     return limiter.limit(RATE_LIMITS.get(endpoint_type, "20/minute"))
 
+def digest_rate_limit(endpoint_type: str = "digest_unsubscribe"):
+    """Rate limiter for digest endpoints."""
+    return limiter.limit(RATE_LIMITS.get(endpoint_type, "5/minute"))
+
 def general_rate_limit(endpoint_type: str = "api_general"):
     """Rate limiter for general API endpoints."""
     return limiter.limit(RATE_LIMITS.get(endpoint_type, "1000/minute"))
@@ -223,8 +230,8 @@ def admin_rate_limit(endpoint_type: str = "admin_api_key"):
     """Rate limiter for admin API key protected endpoints (strict to prevent brute force)."""
     return limiter.limit(RATE_LIMITS.get(endpoint_type, "5/minute"))
 
-def mcp_rate_limit(endpoint_type: str = "api_key_mcp"):
-    """Rate limiter for MCP API key endpoints (100 req/min per key)."""
+def api_key_rate_limit(endpoint_type: str = "api_key"):
+    """Rate limiter for API key endpoints (100 req/min per key)."""
     return limiter.limit(RATE_LIMITS.get(endpoint_type, "100/minute"))
 
 # Rate limiting bypass for testing/development

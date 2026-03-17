@@ -7,12 +7,13 @@ import ClientToaster from '@/components/ClientToaster'
 import { GettingStartedProvider } from '@/contexts/GettingStartedContext'
 import { GettingStartedDialog } from '@/components/GettingStartedDialog'
 import { ChartModeProvider } from '@/contexts/ChartModeContext'
-import { baseMetadata } from '@/lib/metadata'
+import { baseMetadata, baseViewport } from '@/lib/metadata'
 import AuthInterceptor from '@/components/AuthInterceptor'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = baseMetadata
+export const viewport = baseViewport
 
 export default function RootLayout({
   children,
@@ -25,7 +26,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* Preload critical background images for landing page */}
-        <link rel="preload" as="image" href="/images/landing/rootly-bg.avif" />
+        <link rel="preload" as="image" href="/images/landing/rootly-bg-hq.webp" />
         <link rel="preload" as="image" href="/images/landing/rootly-bg-gradient.avif" />
       </head>
       <body className={inter.className} suppressHydrationWarning>

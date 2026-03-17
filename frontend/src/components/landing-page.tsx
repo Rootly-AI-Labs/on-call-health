@@ -58,7 +58,7 @@ export default function LandingPage() {
       img.src = url
     }
 
-    preloadImage('/images/landing/rootly-bg.avif')
+    preloadImage('/images/landing/rootly-bg-hq.webp')
     preloadImage('/images/landing/rootly-bg-gradient.avif')
     preloadImage('/images/landing/cta-background.png')
 
@@ -143,7 +143,7 @@ export default function LandingPage() {
     <div className={`${ppMori.className} min-h-screen bg-white overflow-x-hidden`}>
 
       {/* Hero Section */}
-      <section className="bg-[url(/images/landing/rootly-bg.avif)] bg-cover bg-[position:50%_15%] lg:bg-[size:210%] lg:bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
+      <section className="bg-[url(/images/landing/rootly-bg-hq.webp)] bg-cover bg-[position:50%_15%] lg:bg-[size:210%] lg:bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
         {/* Header */}
         <div className="px-4 pt-6 pb-2 lg:px-16 lg:pt-8">
           <div className="flex items-start justify-between w-full">
@@ -196,9 +196,9 @@ export default function LandingPage() {
             </h1>
 
             <p className="text-lg lg:text-xl lg:pr-10 mb-4 relative lg:-top-3">
-              An open source tool that looks for early warning signs of
+              An open source tool that looks for signs of overload in
               <br />
-              overload in your on-call engineers.
+              your on-call engineers.
             </p>
 
             {/* OAuth Login Buttons */}
@@ -291,9 +291,9 @@ export default function LandingPage() {
       <section className="pt-0 pb-0 bg-white lg:pt-8 lg:pb-12">
         <div className="container mx-auto px-4">
           <div className="text-center mb-4">
-            <h2 className="text-4xl md:text-5xl font-semibold text-slate-900 mb-4">Sustainable work backed by data.</h2>
+            <h2 className="text-4xl md:text-5xl font-semibold text-slate-900 mb-4">Spot overload before it spirals.</h2>
             <p className="text-lg text-slate-600 max-w-3xl mx-auto">
-              Proof you can act on to justify change.
+              Objective signals that make the case for change.
             </p>
             <Image
               src="/images/landing/integration-dashboard.png"

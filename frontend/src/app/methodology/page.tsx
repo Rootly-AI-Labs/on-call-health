@@ -169,7 +169,7 @@ const content = {
   // Research enhancements section
   enhancements: {
     title: "Risk Level Formula",
-    intro: `The Risk Level is a metric specific to On-Call Health—it is not a clinically validated health metric or diagnostic tool. We took inspiration from research-led frameworks (including the Copenhagen Burnout Inventory and first responder stress studies) and adapted them to the specific needs of incident responders. We share this methodology so you have full clarity on how scores are calculated. Since On-Call Health is open source, you're free to adjust the weights and thresholds to fit your team's needs.`,
+    intro: `The Risk Level is a metric specific to On-Call Health—it is not a clinically validated health metric or diagnostic tool. We took inspiration from research-led frameworks (including first responder stress studies) and adapted them to the specific needs of incident responders. We share this methodology so you have full clarity on how scores are calculated. Since On-Call Health is open source, you're free to adjust the weights and thresholds to fit your team's needs.`,
     items: [
       {
         icon: "AlertTriangle",

@@ -18,6 +18,8 @@ from ...auth.dependencies import get_current_active_user, get_current_user_flexi
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
+from ...core.alert_health_calculator import calculate_alert_health_score
+from ...core.och_config import apply_alert_health_to_och, OCHConfig
 from ...utils.visual_logger import log_task_start, log_task_complete
 
 logger = logging.getLogger(__name__)
@@ -105,17 +107,22 @@ class AnalysisResponse(BaseModel):
     id: int
     uuid: Optional[str]
     integration_id: Optional[int]
-    
+
     # NEW: Integration details stored directly with analysis (optional for backward compatibility)
     integration_name: Optional[str] = None  # "PagerDuty (Beta Access)", "Failwhale Tales", etc.
     platform: Optional[str] = None          # "rootly", "pagerduty"
-    
+
     status: str
     created_at: datetime
     completed_at: Optional[datetime]
     time_range: int
     analysis_data: Optional[dict]
     config: Optional[dict]
+
+    # Save and auto-refresh fields
+    is_saved: bool = False
+    is_auto_refresh: bool = False
+    auto_refresh_interval: Optional[str] = None
 
 
 class AnalysisListResponse(BaseModel):
@@ -324,6 +331,21 @@ async def run_burnout_analysis(
         if hasattr(integration, 'organization_name'):
             logger.info(f"🔍 Integration organization_name: '{integration.organization_name}'")
 
+        # Handle auto-refresh: delete existing auto-refresh analysis for same user/org
+        auto_refresh_enabled = getattr(request, 'auto_refresh_enabled', False)
+        auto_refresh_interval = getattr(request, 'auto_refresh_interval', None) if auto_refresh_enabled else None
+
+        if auto_refresh_enabled:
+            existing_auto_refresh = db.query(Analysis).filter(
+                Analysis.user_id == current_user.id,
+                Analysis.organization_id == current_user.organization_id,
+                Analysis.is_auto_refresh == True
+            ).first()
+            if existing_auto_refresh:
+                logger.info(f"🔄 [AUTO_REFRESH] Deleting previous auto-refresh analysis {existing_auto_refresh.id} for user {current_user.id}")
+                db.delete(existing_auto_refresh)
+                db.commit()
+
         analysis = Analysis(
             user_id=current_user.id,
             organization_id=current_user.organization_id,  # Add organization_id for multi-tenancy
@@ -335,6 +357,9 @@ async def run_burnout_analysis(
 
             time_range=request.time_range,
             status="pending",
+            is_saved=False,
+            is_auto_refresh=auto_refresh_enabled,
+            auto_refresh_interval=auto_refresh_interval,
             config={
                 "include_weekends": request.include_weekends,
                 "include_github": request.include_github,
@@ -394,17 +419,20 @@ async def run_burnout_analysis(
             id=analysis.id,
             uuid=getattr(analysis, 'uuid', None),
             integration_id=analysis.rootly_integration_id,
-            
+
             # Include new integration fields
             integration_name=analysis.integration_name,
             platform=analysis.platform,
-            
+
             status=analysis.status,
             created_at=analysis.created_at,
             completed_at=analysis.completed_at,
             time_range=analysis.time_range,
             analysis_data=None,
-            config=analysis.config
+            config=analysis.config,
+            is_saved=analysis.is_saved,
+            is_auto_refresh=analysis.is_auto_refresh,
+            auto_refresh_interval=analysis.auto_refresh_interval,
         )
     except Exception as e:
         logger.error(f"Critical error in run_burnout_analysis: {str(e)}")
@@ -438,7 +466,11 @@ async def list_analyses(
     logger.info(f"📋 [LIST_ANALYSES] Request received - user_id={current_user.id}, limit={limit}, offset={offset}, status={filter_status}")
 
     # Build base filter conditions
-    filters = [Analysis.user_id == current_user.id]
+    filters = [
+        Analysis.user_id == current_user.id,
+        Analysis.is_saved == True,
+        Analysis.is_auto_refresh == False,
+    ]
 
     # Filter by integration if specified
     if integration_id:
@@ -479,6 +511,9 @@ async def list_analyses(
         Analysis.integration_name,
         Analysis.platform,
         Analysis.rootly_integration_id,
+        Analysis.is_saved,
+        Analysis.is_auto_refresh,
+        Analysis.auto_refresh_interval,
         count_window
     ).filter(
         *filters
@@ -506,7 +541,10 @@ async def list_analyses(
                 completed_at=row.completed_at,
                 time_range=row.time_range or 30,
                 analysis_data=extract_analysis_summary(None),  # Don't access results - excluded
-                config=row.config
+                config=row.config,
+                is_saved=getattr(row, 'is_saved', True),
+                is_auto_refresh=getattr(row, 'is_auto_refresh', False),
+                auto_refresh_interval=getattr(row, 'auto_refresh_interval', None),
             )
         )
 
@@ -514,6 +552,77 @@ async def list_analyses(
     return AnalysisListResponse(
         analyses=response_analyses,
         total=total
+    )
+
+
+@router.get("/auto-refresh", response_model=Optional[AnalysisResponse])
+async def get_auto_refresh_analysis(
+    current_user: User = Depends(get_current_user_flexible),
+    db: Session = Depends(get_db)
+):
+    """Get the current auto-refresh analysis for this user/org."""
+    analysis = db.query(Analysis).options(defer(Analysis.results)).filter(
+        Analysis.user_id == current_user.id,
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.is_auto_refresh == True
+    ).order_by(Analysis.created_at.desc()).first()
+
+    if not analysis:
+        return None
+
+    return AnalysisResponse(
+        id=analysis.id,
+        uuid=getattr(analysis, 'uuid', None),
+        integration_id=analysis.rootly_integration_id,
+        integration_name=analysis.integration_name,
+        platform=analysis.platform,
+        status=analysis.status,
+        created_at=analysis.created_at,
+        completed_at=analysis.completed_at,
+        time_range=analysis.time_range or 30,
+        analysis_data=extract_analysis_summary(None),
+        config=analysis.config,
+        is_saved=False,
+        is_auto_refresh=True,
+        auto_refresh_interval=getattr(analysis, 'auto_refresh_interval', None),
+    )
+
+
+@router.post("/{analysis_id}/save", response_model=AnalysisResponse)
+async def save_analysis(
+    analysis_id: int,
+    current_user: User = Depends(get_current_user_flexible),
+    db: Session = Depends(get_db)
+):
+    """Mark an analysis as saved."""
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id,
+        Analysis.user_id == current_user.id,
+        Analysis.is_auto_refresh == False
+    ).first()
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    analysis.is_saved = True
+    db.commit()
+    db.refresh(analysis)
+
+    return AnalysisResponse(
+        id=analysis.id,
+        uuid=getattr(analysis, 'uuid', None),
+        integration_id=analysis.rootly_integration_id,
+        integration_name=analysis.integration_name,
+        platform=analysis.platform,
+        status=analysis.status,
+        created_at=analysis.created_at,
+        completed_at=analysis.completed_at,
+        time_range=analysis.time_range or 30,
+        analysis_data=extract_analysis_summary(None),
+        config=analysis.config,
+        is_saved=True,
+        is_auto_refresh=False,
+        auto_refresh_interval=getattr(analysis, 'auto_refresh_interval', None),
     )
 
 
@@ -587,7 +696,10 @@ async def get_analysis_by_uuid(
         completed_at=analysis.completed_at,
         time_range=analysis.time_range or 30,
         analysis_data=analysis_data,
-        config=analysis.config
+        config=analysis.config,
+        is_saved=getattr(analysis, 'is_saved', True),
+        is_auto_refresh=getattr(analysis, 'is_auto_refresh', False),
+        auto_refresh_interval=getattr(analysis, 'auto_refresh_interval', None),
     )
 
 
@@ -646,7 +758,10 @@ async def get_analysis(
         completed_at=analysis.completed_at,
         time_range=analysis.time_range or 30,
         analysis_data=analysis_data,
-        config=analysis.config
+        config=analysis.config,
+        is_saved=getattr(analysis, 'is_saved', True),
+        is_auto_refresh=getattr(analysis, 'is_auto_refresh', False),
+        auto_refresh_interval=getattr(analysis, 'auto_refresh_interval', None),
     )
 
 
@@ -658,6 +773,9 @@ _ANALYSIS_DATA_KEYS = [
 ]
 
 # Build the SQL once: SELECT results->'key1', results->'key2', ... FROM analyses WHERE id = :id
+# _ANALYSIS_DATA_KEYS is a hardcoded tuple of string literals defined above — not user input —
+# so the f-string interpolation here is safe from SQL injection. The :id parameter is
+# bound at execution time via SQLAlchemy's parameterized query interface.
 _RESULTS_SELECT_COLS = ", ".join(f"results->'{k}'" for k in _ANALYSIS_DATA_KEYS)
 _RESULTS_EXTRACT_SQL = f"SELECT {_RESULTS_SELECT_COLS} FROM analyses WHERE id = :id"
 
@@ -949,11 +1067,12 @@ async def delete_analysis(
     db: Session = Depends(get_db)
 ):
     """Delete a specific analysis."""
-    # Filter by user_id to be consistent with list_analyses endpoint
-    # This ensures users can delete analyses they own, regardless of organization changes
+    # Filter by both user_id AND organization_id to prevent cross-org deletion.
     analysis = db.query(Analysis).filter(
         Analysis.id == analysis_id,
-        Analysis.user_id == current_user.id
+        Analysis.user_id == current_user.id,
+        Analysis.organization_id == current_user.organization_id,
+        Analysis.organization_id.isnot(None)
     ).first()
 
     if not analysis:
@@ -2843,6 +2962,14 @@ async def run_analysis_task(
         # Log database connection info
         logger.info(f"BACKGROUND_TASK [{node_id}]: Got new database session for analysis {analysis_ref}")
 
+        # Fetch team scope for Rootly integrations (team-scoped analysis)
+        rootly_team_name = None
+        if platform == "rootly" and integration_id:
+            integration_obj = db.query(RootlyIntegration).filter(RootlyIntegration.id == integration_id).first()
+            rootly_team_name = getattr(integration_obj, 'team_name', None) if integration_obj else None
+            if rootly_team_name:
+                logger.info(f"BACKGROUND_TASK [{node_id}]: Rootly integration {integration_id} has team_name={rootly_team_name!r} - analysis will be team-scoped")
+
         # Row-level locking prevents duplicate execution across replicas
         try:
             analysis = db.query(Analysis).filter(
@@ -3000,9 +3127,10 @@ async def run_analysis_task(
                 integration_id_str = str(integration_id)
                 logger.info(f"BACKGROUND_TASK: Querying UserCorrelation for organization_id={user.organization_id}, integration_id={integration_id_str}")
 
-                # Query all correlations for this organization
+                # Query all correlations for this organization (team roster only)
                 correlations = db.query(UserCorrelation).filter(
-                    UserCorrelation.organization_id == user.organization_id
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None)  # Team roster only
                 ).all()
 
                 jira_mapped = [c for c in correlations if c.jira_account_id]
@@ -3159,6 +3287,22 @@ async def run_analysis_task(
         else:
             logger.info("BACKGROUND_TASK: Skipping Team Sync query (missing user_id or integration_id)")
 
+        # Team-scope filter: when a global Rootly key is saved with a team scope, limit
+        # synced_users to only members of that team.
+        if rootly_team_name and synced_users:
+            from ...core.rootly_client import RootlyAPIClient
+            _scope_client = RootlyAPIClient(api_token=effective_api_token)
+            try:
+                team_emails = await _scope_client.get_team_member_emails(rootly_team_name)
+                if team_emails:
+                    before_count = len(synced_users)
+                    synced_users = [u for u in synced_users if (u.get('email') or '').lower() in team_emails]
+                    logger.info(f"BACKGROUND_TASK: Team scope filter '{rootly_team_name}': {before_count} → {len(synced_users)} synced users")
+                else:
+                    logger.warning(f"BACKGROUND_TASK: Team scope filter '{rootly_team_name}': no team member emails returned — keeping all synced users")
+            except Exception as team_filter_err:
+                logger.warning(f"BACKGROUND_TASK: Team scope filter failed: {team_filter_err} — keeping all synced users")
+
         # CRITICAL: Verify user_id hasn't been overwritten before passing to analyzer
         logger.info(f"BACKGROUND_TASK: Creating analyzer with current_user_id={user_id} (should match the logged-in user, NOT a team member ID)")
 
@@ -3173,7 +3317,9 @@ async def run_analysis_task(
             organization_name=organization_name,
             synced_users=synced_users,  # Pass synced users from Team Sync
             current_user_id=user_id,  # Pass the current user ID for Jira integration lookup
-            db=db  # Reuse DB session to prevent connection pool exhaustion
+            organization_id=user.organization_id if user else None,  # Pass org_id for GitHub pre-filter scoping
+            db=db,  # Reuse DB session to prevent connection pool exhaustion
+            team_name=rootly_team_name  # Team scope for incident filtering
         )
         logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}, current_user_id={user_id}")
         
@@ -3246,6 +3392,280 @@ async def run_analysis_task(
                     
             except Exception as monitoring_error:
                 logger.warning(f"A/B testing monitoring failed: {monitoring_error}")
+
+            # Attach Rootly alerts summary for dashboard card (non-blocking)
+            if platform == "rootly" and isinstance(results, dict):
+                try:
+                    from ...core.rootly_client import RootlyAPIClient
+                    end_dt = analysis.created_at or datetime.now(timezone.utc)
+                    if end_dt.tzinfo is None:
+                        end_dt = end_dt.replace(tzinfo=timezone.utc)
+                    start_dt = end_dt - timedelta(days=time_range)
+
+                    alerts_client = RootlyAPIClient(api_token=effective_api_token)
+                    team_id = None
+                    if rootly_team_name:
+                        team_id = await alerts_client.get_team_id(rootly_team_name)
+                    team_members = []
+                    team_analysis = results.get("team_analysis") if isinstance(results.get("team_analysis"), (dict, list)) else None
+                    if isinstance(team_analysis, dict):
+                        team_members = team_analysis.get("members") or []
+                    elif isinstance(team_analysis, list):
+                        team_members = team_analysis
+
+                    user_ids = set()
+                    user_emails = set()
+                    user_timezones_by_id = {}
+                    user_timezones_by_email = {}
+                    if isinstance(team_members, list):
+                        for member in team_members:
+                            if not isinstance(member, dict):
+                                continue
+                            if member.get("rootly_user_id"):
+                                user_ids.add(str(member.get("rootly_user_id")))
+                                if member.get("user_timezone"):
+                                    user_timezones_by_id[str(member.get("rootly_user_id"))] = member.get("user_timezone")
+                            if member.get("user_id"):
+                                user_ids.add(str(member.get("user_id")))
+                                if member.get("user_timezone"):
+                                    user_timezones_by_id[str(member.get("user_id"))] = member.get("user_timezone")
+                            if member.get("user_email"):
+                                user_emails.add(str(member.get("user_email")).lower())
+                                if member.get("user_timezone"):
+                                    user_timezones_by_email[str(member.get("user_email")).lower()] = member.get("user_timezone")
+                    include_list = ",".join([
+                        "environments",
+                        "services",
+                        "groups",
+                        "responders",
+                        "incidents",
+                        "events",
+                        "alert_urgency",
+                        "heartbeat",
+                        "live_call_router",
+                        "alert_group",
+                        "group_leader_alert",
+                        "group_member_alerts",
+                        "alert_field_values",
+                        "alerting_targets",
+                        "escalation_policies",
+                        "alert_call_recording"
+                    ])
+                    alerts_counts = await alerts_client.get_alerts_count(
+                        start_date=start_dt,
+                        end_date=end_dt,
+                        team_id=team_id,
+                        user_ids=user_ids,
+                        user_emails=user_emails,
+                        include=include_list,
+                        user_timezones_by_id=user_timezones_by_id,
+                        user_timezones_by_email=user_timezones_by_email
+                    )
+                    logger.info(
+                        f"ALERTS_SUMMARY: analysis_id={analysis_id}, "
+                        f"team_name={rootly_team_name}, team_id={team_id}, "
+                        f"start={start_dt.isoformat()}, end={end_dt.isoformat()}, "
+                        f"total={alerts_counts.get('total_count')}, "
+                        f"filtered_total={alerts_counts.get('filtered_count')}, "
+                        f"pages_scanned={alerts_counts.get('pages_scanned')}, "
+                        f"total_pages={alerts_counts.get('total_pages')}, "
+                        f"truncated={alerts_counts.get('truncated', False)}, "
+                        f"error={alerts_counts.get('error')}"
+                    )
+
+                    metadata = results.get("metadata") if isinstance(results.get("metadata"), dict) else {}
+                    metadata["alerts"] = {
+                        "start": start_dt.isoformat(),
+                        "end": end_dt.isoformat(),
+                        "total": alerts_counts.get("total_count"),
+                        "filtered_total": alerts_counts.get("filtered_count"),
+                        "team_name": rootly_team_name,
+                        "team_id": team_id,
+                        "filter_method": "group_ids" if team_id else None,
+                        "include": include_list,
+                        "pages_scanned": alerts_counts.get("pages_scanned"),
+                        "total_pages": alerts_counts.get("total_pages"),
+                        "truncated": alerts_counts.get("truncated", False),
+                        "error": alerts_counts.get("error"),
+                        "noise_counts": alerts_counts.get("noise_counts") or {},
+                        "source_counts": alerts_counts.get("source_counts") or {},
+                        "derived_source_counts": alerts_counts.get("derived_source_counts") or {},
+                        "after_hours_count": alerts_counts.get("after_hours_count", 0),
+                        "night_time_count": alerts_counts.get("night_time_count", 0),
+                        "urgency_counts": alerts_counts.get("urgency_counts") or {},
+                        "alerts_with_incidents_count": alerts_counts.get("alerts_with_incidents_count", 0),
+                        "related_counts": alerts_counts.get("related_counts") or {},
+                        "included_counts": alerts_counts.get("included_counts") or {},
+                        "avg_mtta_seconds": alerts_counts.get("avg_mtta_seconds"),
+                        "mtta_count": alerts_counts.get("mtta_count", 0),
+                        "avg_mttr_seconds": alerts_counts.get("avg_mttr_seconds"),
+                        "mttr_count": alerts_counts.get("mttr_count", 0),
+                        "escalated_count": alerts_counts.get("escalated_count", 0),
+                        "retrigger_count": alerts_counts.get("retrigger_count", 0),
+                    }
+                    results["metadata"] = metadata
+
+                    # Attach per-user alert counts to team members for the user popup
+                    if not alerts_counts.get("error") and isinstance(team_members, list):
+                        per_user_ids = alerts_counts.get("per_user_id_counts") or {}
+                        per_user_emails = alerts_counts.get("per_user_email_counts") or {}
+                        per_user_notified_ids = alerts_counts.get("per_user_notified_by_id") or {}
+                        per_user_notified_emails = alerts_counts.get("per_user_notified_by_email") or {}
+                        per_user_responded_ids = alerts_counts.get("per_user_responded_by_id") or {}
+                        per_user_responded_emails = alerts_counts.get("per_user_responded_by_email") or {}
+                        per_user_alerts_with_incidents_ids = alerts_counts.get("per_user_alerts_with_incidents_by_id") or {}
+                        per_user_alerts_with_incidents_emails = alerts_counts.get("per_user_alerts_with_incidents_by_email") or {}
+                        per_user_source_ids = alerts_counts.get("per_user_source_by_id") or {}
+                        per_user_source_emails = alerts_counts.get("per_user_source_by_email") or {}
+                        per_user_derived_source_ids = alerts_counts.get("per_user_derived_source_by_id") or {}
+                        per_user_derived_source_emails = alerts_counts.get("per_user_derived_source_by_email") or {}
+                        per_user_related_ids = alerts_counts.get("per_user_related_by_id") or {}
+                        per_user_related_emails = alerts_counts.get("per_user_related_by_email") or {}
+                        per_user_noise_ids = alerts_counts.get("per_user_noise_by_id") or {}
+                        per_user_noise_emails = alerts_counts.get("per_user_noise_by_email") or {}
+                        per_user_after_hours_ids = alerts_counts.get("per_user_after_hours_by_id") or {}
+                        per_user_after_hours_emails = alerts_counts.get("per_user_after_hours_by_email") or {}
+                        per_user_night_time_ids = alerts_counts.get("per_user_night_time_by_id") or {}
+                        per_user_night_time_emails = alerts_counts.get("per_user_night_time_by_email") or {}
+                        per_user_urgency_ids = alerts_counts.get("per_user_urgency_by_id") or {}
+                        per_user_urgency_emails = alerts_counts.get("per_user_urgency_by_email") or {}
+                        per_user_acked_ids = alerts_counts.get("per_user_acked_by_id") or {}
+                        per_user_acked_emails = alerts_counts.get("per_user_acked_by_email") or {}
+                        per_user_resolved_ids = alerts_counts.get("per_user_resolved_by_id") or {}
+                        per_user_resolved_emails = alerts_counts.get("per_user_resolved_by_email") or {}
+                        per_user_escalated_ids = alerts_counts.get("per_user_escalated_by_id") or {}
+                        per_user_escalated_emails = alerts_counts.get("per_user_escalated_by_email") or {}
+                        per_user_retriggered_ids = alerts_counts.get("per_user_retriggered_by_id") or {}
+                        per_user_retriggered_emails = alerts_counts.get("per_user_retriggered_by_email") or {}
+                        per_user_mtta_avg_ids = alerts_counts.get("per_user_mtta_avg_by_id") or {}
+                        per_user_mtta_avg_emails = alerts_counts.get("per_user_mtta_avg_by_email") or {}
+                        per_user_mttr_avg_ids = alerts_counts.get("per_user_mttr_avg_by_id") or {}
+                        per_user_mttr_avg_emails = alerts_counts.get("per_user_mttr_avg_by_email") or {}
+                        for member in team_members:
+                            if not isinstance(member, dict):
+                                continue
+                            count = None
+                            related_counts = {}
+                            noise_counts = {}
+                            after_hours_count = 0
+                            night_time_count = 0
+                            urgency_counts = {}
+                            notified_count = 0
+                            responded_count = 0
+                            alerts_with_incidents_count = 0
+                            source_counts = {}
+                            derived_source_counts = {}
+                            acked_count = 0
+                            resolved_count = 0
+                            escalated_count = 0
+                            retriggered_count = 0
+                            avg_mtta_seconds = None
+                            avg_mttr_seconds = None
+                            member_rootly_id = member.get("rootly_user_id")
+                            member_user_id = member.get("user_id")
+                            member_email = member.get("user_email")
+                            if member_rootly_id and str(member_rootly_id) in per_user_ids:
+                                k = str(member_rootly_id)
+                                count = per_user_ids.get(k, 0)
+                                related_counts = per_user_related_ids.get(k, {})
+                                noise_counts = per_user_noise_ids.get(k, {})
+                                after_hours_count = per_user_after_hours_ids.get(k, 0)
+                                night_time_count = per_user_night_time_ids.get(k, 0)
+                                urgency_counts = per_user_urgency_ids.get(k, {})
+                                notified_count = per_user_notified_ids.get(k, 0)
+                                responded_count = per_user_responded_ids.get(k, 0)
+                                alerts_with_incidents_count = per_user_alerts_with_incidents_ids.get(k, 0)
+                                source_counts = per_user_source_ids.get(k, {})
+                                derived_source_counts = per_user_derived_source_ids.get(k, {})
+                                acked_count = per_user_acked_ids.get(k, 0)
+                                resolved_count = per_user_resolved_ids.get(k, 0)
+                                escalated_count = per_user_escalated_ids.get(k, 0)
+                                retriggered_count = per_user_retriggered_ids.get(k, 0)
+                                avg_mtta_seconds = per_user_mtta_avg_ids.get(k)
+                                avg_mttr_seconds = per_user_mttr_avg_ids.get(k)
+                            elif member_user_id and str(member_user_id) in per_user_ids:
+                                k = str(member_user_id)
+                                count = per_user_ids.get(k, 0)
+                                related_counts = per_user_related_ids.get(k, {})
+                                noise_counts = per_user_noise_ids.get(k, {})
+                                after_hours_count = per_user_after_hours_ids.get(k, 0)
+                                night_time_count = per_user_night_time_ids.get(k, 0)
+                                urgency_counts = per_user_urgency_ids.get(k, {})
+                                notified_count = per_user_notified_ids.get(k, 0)
+                                responded_count = per_user_responded_ids.get(k, 0)
+                                alerts_with_incidents_count = per_user_alerts_with_incidents_ids.get(k, 0)
+                                source_counts = per_user_source_ids.get(k, {})
+                                derived_source_counts = per_user_derived_source_ids.get(k, {})
+                                acked_count = per_user_acked_ids.get(k, 0)
+                                resolved_count = per_user_resolved_ids.get(k, 0)
+                                escalated_count = per_user_escalated_ids.get(k, 0)
+                                retriggered_count = per_user_retriggered_ids.get(k, 0)
+                                avg_mtta_seconds = per_user_mtta_avg_ids.get(k)
+                                avg_mttr_seconds = per_user_mttr_avg_ids.get(k)
+                            elif member_email and str(member_email).lower() in per_user_emails:
+                                k = str(member_email).lower()
+                                count = per_user_emails.get(k, 0)
+                                related_counts = per_user_related_emails.get(k, {})
+                                noise_counts = per_user_noise_emails.get(k, {})
+                                after_hours_count = per_user_after_hours_emails.get(k, 0)
+                                night_time_count = per_user_night_time_emails.get(k, 0)
+                                urgency_counts = per_user_urgency_emails.get(k, {})
+                                notified_count = per_user_notified_emails.get(k, 0)
+                                responded_count = per_user_responded_emails.get(k, 0)
+                                alerts_with_incidents_count = per_user_alerts_with_incidents_emails.get(k, 0)
+                                source_counts = per_user_source_emails.get(k, {})
+                                derived_source_counts = per_user_derived_source_emails.get(k, {})
+                                acked_count = per_user_acked_emails.get(k, 0)
+                                resolved_count = per_user_resolved_emails.get(k, 0)
+                                escalated_count = per_user_escalated_emails.get(k, 0)
+                                retriggered_count = per_user_retriggered_emails.get(k, 0)
+                                avg_mtta_seconds = per_user_mtta_avg_emails.get(k)
+                                avg_mttr_seconds = per_user_mttr_avg_emails.get(k)
+                            if count is None:
+                                count = 0
+                            member["alerts_count"] = count
+                            member["alerts_related_counts"] = related_counts
+                            member["alerts_noise_counts"] = noise_counts
+                            member["alerts_after_hours_count"] = after_hours_count
+                            member["alerts_night_time_count"] = night_time_count
+                            member["alerts_urgency_counts"] = urgency_counts
+                            member["alerts_notified_count"] = notified_count
+                            member["alerts_responded_count"] = responded_count
+                            member["alerts_with_incidents_count"] = alerts_with_incidents_count
+                            member["alerts_source_counts"] = source_counts
+                            member["alerts_derived_source_counts"] = derived_source_counts
+                            member["alerts_acked_count"] = acked_count
+                            member["alerts_resolved_count"] = resolved_count
+                            member["alerts_escalated_count"] = escalated_count
+                            member["alerts_retriggered_count"] = retriggered_count
+                            member["alerts_avg_mtta_seconds"] = avg_mtta_seconds
+                            member["alerts_avg_mttr_seconds"] = avg_mttr_seconds
+
+                            # Calculate alert health score (0-100) for OCH integration
+                            signal_quality_pct = 100.0
+                            if noise_counts and (noise_counts.get('not_noise', 0) + noise_counts.get('noise', 0)) > 0:
+                                not_noise = noise_counts.get('not_noise', 0)
+                                total_noise_checked = not_noise + noise_counts.get('noise', 0)
+                                signal_quality_pct = (not_noise / total_noise_checked * 100) if total_noise_checked > 0 else 100.0
+
+                            alert_health_result = calculate_alert_health_score(
+                                total_alerts=count or 0,
+                                night_time_alerts=night_time_count or 0,
+                                escalated_alerts=escalated_count or 0,
+                                retriggered_alerts=retriggered_count or 0,
+                                alerts_with_incidents=alerts_with_incidents_count or 0,
+                                after_hours_alerts=after_hours_count or 0,
+                                signal_quality_pct=signal_quality_pct
+                            )
+                            member["alerts_health_score"] = alert_health_result['score']
+                            member["alerts_health_interpretation"] = alert_health_result['interpretation']
+
+                            # Apply alert health to OCH score (post-process since alert data
+                            # is fetched after the analyzer runs)
+                            adjusted_score = alert_health_result['score'] * OCHConfig.ALERT_HEALTH_MULTIPLIER
+                            apply_alert_health_to_och(member, adjusted_score)
+                except Exception as alerts_err:
+                    logger.warning(f"BACKGROUND_TASK: Failed to attach alert metadata for analysis {analysis_ref}: {alerts_err}")
 
             logger.info(f"🔍 DEBUG: About to save results for analysis {analysis_ref}")
 

@@ -29,7 +29,7 @@ class GitHubOnlyBurnoutAnalyzer:
     """
     
     def __init__(self):
-        # Using On-Call Health (OCH) methodology (inspired by Copenhagen Burnout Inventory)
+        # Using On-Call Health (OCH) methodology
         logger.info("GitHub analyzer using On-Call Health methodology")
         
         # GitHub-specific thresholds for burnout detection
@@ -160,7 +160,7 @@ class GitHubOnlyBurnoutAnalyzer:
                 logger.warning(f"No GitHub metrics for {email}")
                 return None
             
-            # Calculate burnout dimensions using OCH methodology (Copenhagen Burnout Inventory)
+            # Calculate burnout dimensions using OCH methodology
             # OCH uses 2 dimensions for software engineers (65/35 split)
             logger.debug(f"Using OCH methodology for {email}")
             personal_burnout = self._calculate_personal_burnout_och(
@@ -214,7 +214,7 @@ class GitHubOnlyBurnoutAnalyzer:
     
     # =============================================================================
     # OCH (On-Call Health) CALCULATION METHODS
-    # Burnout assessment inspired by Copenhagen Burnout Inventory
+    # On-Call Health burnout assessment methodology
     # =============================================================================
     
     def _calculate_personal_burnout_och(

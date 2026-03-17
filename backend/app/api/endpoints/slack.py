@@ -27,6 +27,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/slack", tags=["slack-integration"])
 
+# Cache for Slack users to avoid rate limiting
+# Key: workspace_id, Value: (timestamp, users_list)
+# TTL is set to 5 minutes to balance freshness with Slack API rate limits (Tier 3: 50+ calls/min)
+# User lists change infrequently, so 5 minutes provides good UX without hitting rate limits
+_slack_users_cache: Dict[str, tuple[datetime, list]] = {}
+CACHE_TTL_SECONDS = 300  # 5 minutes - configurable via environment if needed
+
 # Helper function to get the user isolation key (organization_id or user_id for beta)
 def get_user_isolation_key(user: User) -> tuple:
     """
@@ -341,11 +348,13 @@ async def slack_oauth_callback(
         if slack_integration:
             # Update existing OAuth integration
             slack_integration.slack_token = encrypt_token(access_token)
+            slack_integration.organization_id = organization_id  # Update org attribution
             slack_integration.updated_at = datetime.now(timezone.utc)
         else:
             # Create new OAuth integration (won't conflict with manual integrations)
             slack_integration = SlackIntegration(
                 user_id=owner_user.id,
+                organization_id=organization_id,  # NULL for personal, set for org
                 slack_token=encrypt_token(access_token),
                 workspace_id=workspace_id,
                 token_source="oauth"
@@ -587,6 +596,7 @@ async def get_slack_status(
     synced_users_count = db.query(UserCorrelation).filter(
         UserCorrelation.organization_id == current_user.organization_id,
         UserCorrelation.organization_id.isnot(None),
+        UserCorrelation.user_id.is_(None),  # Team roster only
         UserCorrelation.slack_user_id.isnot(None)
     ).count()
 
@@ -842,6 +852,13 @@ async def sync_slack_user_ids(
 
             logger.debug(f"Built mapping for {len(email_to_slack_id)} Slack users with emails")
 
+            # DEBUG: Log current user and org info
+            logger.info(f"🔍 SLACK_SYNC_DEBUG: Current user: {current_user.email}, org_id: {current_user.organization_id}")
+
+            # DEBUG: Log sample of Slack emails
+            slack_emails = list(email_to_slack_id.keys())[:5]
+            logger.info(f"🔍 SLACK_SYNC_DEBUG: Sample Slack emails: {slack_emails}")
+
             # Update correlations for team members only (user_id=NULL)
             # Match by organization + email to support team roster
             # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
@@ -853,13 +870,33 @@ async def sync_slack_user_ids(
                 UserCorrelation.email.in_(list(email_to_slack_id.keys()))
             ).all()
 
+            # DEBUG: Log found correlations
+            logger.info(f"🔍 SLACK_SYNC_DEBUG: Found {len(correlations)} user_correlations to match")
+            if len(correlations) > 0:
+                sample_emails = [c.email for c in correlations[:5]]
+                logger.info(f"🔍 SLACK_SYNC_DEBUG: Sample correlation emails: {sample_emails}")
+
+            # DEBUG: Check if current user is in correlations
+            current_user_correlation = next((c for c in correlations if c.email.lower() == current_user.email.lower()), None)
+            if current_user_correlation:
+                logger.info(f"✅ SLACK_SYNC_DEBUG: Current user {current_user.email} found in correlations")
+            else:
+                logger.warning(f"⚠️ SLACK_SYNC_DEBUG: Current user {current_user.email} NOT in correlations")
+                # Check if current user is in Slack
+                if current_user.email.lower() in email_to_slack_id:
+                    logger.warning(f"⚠️ SLACK_SYNC_DEBUG: But current user IS in Slack with ID: {email_to_slack_id[current_user.email.lower()]}")
+                else:
+                    logger.warning(f"⚠️ SLACK_SYNC_DEBUG: Current user NOT in Slack either")
+
             updated_count = 0
             for correlation in correlations:
                 slack_id = email_to_slack_id.get(correlation.email.lower())
                 if slack_id:
                     correlation.slack_user_id = slack_id
                     updated_count += 1
-                    logger.debug(f"Matched {mask_email(correlation.email)} -> {slack_id}")
+                    logger.info(f"✅ SLACK_SYNC_MATCH: {mask_email(correlation.email)} -> {slack_id}")
+                else:
+                    logger.warning(f"⚠️ SLACK_SYNC_NOMATCH: {mask_email(correlation.email)} not found in Slack")
 
             db.commit()
 
@@ -907,6 +944,151 @@ class SlackModalPayload(BaseModel):
     user_id: str
     team_id: str
     user_email: str = ""
+
+
+@router.get("/slack-users")
+async def get_slack_users(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of Slack workspace members for user mapping interface.
+    Returns user IDs, names, and emails.
+    """
+    logger.info(f"🔍 SLACK_USERS_ENDPOINT: Request from user {current_user.id}, email={current_user.email}, org_id={current_user.organization_id}")
+
+    workspace_mapping = get_active_workspace_mapping(db, current_user)
+    if not workspace_mapping:
+        logger.warning(f"❌ SLACK_USERS_ENDPOINT: No workspace mapping found for user {current_user.id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active Slack workspace connection found"
+        )
+
+    logger.info(f"✅ SLACK_USERS_ENDPOINT: Found workspace mapping, workspace_id={workspace_mapping.workspace_id}")
+
+    # Get the bot token from SlackIntegration
+    slack_integration = db.query(SlackIntegration).filter(
+        SlackIntegration.workspace_id == workspace_mapping.workspace_id
+    ).first()
+
+    if not slack_integration:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Slack bot token not found"
+        )
+
+    try:
+        access_token = decrypt_token(slack_integration.slack_token)
+
+        # Validate decrypted token format
+        if not access_token or not isinstance(access_token, str):
+            logger.error("Decrypted token is empty or invalid type")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid Slack token format"
+            )
+
+        if not access_token.startswith(("xoxb-", "xoxp-")):
+            logger.error("Decrypted token has invalid format (expected xoxb- or xoxp- prefix)")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid Slack token format"
+            )
+
+        logger.info("✅ SLACK_USERS_ENDPOINT: Token decrypted and validated successfully")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to decrypt Slack token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to decrypt Slack token"
+        )
+
+    # Check cache first to avoid rate limiting
+    # Validate workspace_id for cache key (should be alphanumeric from Slack)
+    cache_key = workspace_mapping.workspace_id
+    if not cache_key or not isinstance(cache_key, str) or len(cache_key) > 100:
+        logger.error(f"Invalid workspace_id for cache key: {cache_key}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid workspace configuration"
+        )
+
+    now = datetime.now(timezone.utc)
+
+    if cache_key in _slack_users_cache:
+        cached_time, cached_users = _slack_users_cache[cache_key]
+        age_seconds = (now - cached_time).total_seconds()
+
+        if age_seconds < CACHE_TTL_SECONDS:
+            logger.info(f"🎯 SLACK_USERS_CACHE_HIT: Returning cached data (age: {int(age_seconds)}s)")
+            return {"users": cached_users}
+        else:
+            logger.info(f"⏰ SLACK_USERS_CACHE_EXPIRED: Cache expired (age: {int(age_seconds)}s), fetching fresh data")
+    else:
+        logger.info(f"🔄 SLACK_USERS_CACHE_MISS: No cache found, fetching from Slack API")
+
+    # Fetch Slack workspace members
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://slack.com/api/users.list",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Slack API returned status {response.status_code}"
+                )
+
+            data = response.json()
+            if not data.get("ok"):
+                error = data.get("error", "unknown")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Slack API error: {error}"
+                )
+
+            members = data.get("members", [])
+            logger.info(f"📥 SLACK_USERS_ENDPOINT: Fetched {len(members)} total members from Slack API")
+
+            # Format users for frontend
+            slack_users = []
+            for member in members:
+                if not member.get("deleted") and not member.get("is_bot"):
+                    profile = member.get("profile", {})
+                    slack_users.append({
+                        "id": member.get("id"),
+                        "name": profile.get("real_name") or profile.get("display_name") or member.get("name"),
+                        "email": profile.get("email"),
+                        "avatar": profile.get("image_72")
+                    })
+
+            logger.info(f"✅ SLACK_USERS_ENDPOINT: Returning {len(slack_users)} active non-bot Slack users")
+
+            # Log sample for debugging
+            if slack_users:
+                sample = slack_users[:3]
+                logger.info(f"📋 SLACK_USERS_ENDPOINT: Sample users: {[(u['name'], u['email']) for u in sample]}")
+
+            # Store in cache to avoid rate limiting
+            _slack_users_cache[cache_key] = (now, slack_users)
+            logger.info(f"💾 SLACK_USERS_CACHE_STORED: Cached {len(slack_users)} users for workspace {cache_key}")
+
+            return {"users": slack_users}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching Slack users: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch Slack users"
+        )
 
 
 @router.get("/debug/correlation")

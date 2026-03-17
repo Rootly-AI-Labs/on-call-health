@@ -14,6 +14,7 @@ import { UserRiskFactorsCard } from "@/components/dashboard/UserRiskFactorsCard"
 import { UserIncidentCard } from "@/components/dashboard/UserIncidentCard"
 import { SurveyResultsCard } from "@/components/dashboard/SurveyResultsCard"
 import { TicketingCard } from "@/components/dashboard/TicketingCard"
+import { UserAlertsCard } from "@/components/dashboard/UserAlertsCard"
 
 // OCH risk level helpers
 function getOCHRiskInfo(score: number | undefined | null): { level: string; label: string } {
@@ -276,6 +277,7 @@ interface MemberDetailModalProps {
   analysisId?: number | string
   currentAnalysis?: any
   timeRange?: number | string
+  integrations?: any[]
 }
 
 export function MemberDetailModal({
@@ -284,6 +286,7 @@ export function MemberDetailModal({
   members,
   analysisId,
   currentAnalysis,
+  integrations = [],
   timeRange
 }: MemberDetailModalProps) {
   const [dailyCommitsData, setDailyCommitsData] = useState<any[]>([]);
@@ -342,12 +345,14 @@ export function MemberDetailModal({
     <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
       <DialogContent
         ref={dialogContentRef}
-        className="max-w-6xl max-h-[80vh] overflow-y-auto"
+        className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-3rem)] md:w-auto md:max-w-6xl max-h-[80vh] overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6"
         aria-describedby="member-detail-description"
       >
         {selectedMember && (() => {
           // Find the correct member data from the analysis (consistent with dashboard)
-          const memberData = members?.find(m => m.user_name === selectedMember.name);
+          const memberData = members?.find(m => m.user_id && m.user_id === selectedMember.id)
+            || members?.find(m => m.user_email && m.user_email === selectedMember.email)
+            || members?.find(m => m.user_name && m.user_name === selectedMember.name);
 
           return (
             <>
@@ -362,11 +367,11 @@ export function MemberDetailModal({
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-xl font-semibold">{selectedMember?.name}</h2>
-                        <p className="text-neutral-700">{selectedMember?.role || selectedMember?.email}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h2 className="text-xl font-semibold break-words">{selectedMember?.name}</h2>
+                        <p className="text-neutral-700 break-words text-sm">{selectedMember?.role || selectedMember?.email}</p>
                       </div>
                     </div>
                   </div>
@@ -447,9 +452,11 @@ export function MemberDetailModal({
                 {/* Dynamic tile ordering - tiles with data appear first */}
                 {(() => {
                   // Define all tiles with their data availability checks
+                  const isRootly = currentAnalysis?.platform === 'rootly'
                   const tiles = [
                     {
                       id: 'userTrends',
+                      order: 1,
                       hasData: memberData?.incident_count > 0, // User trends has data if there are incidents
                       component: (
                         <UserObjectiveDataCard
@@ -461,8 +468,21 @@ export function MemberDetailModal({
                         />
                       )
                     },
+                    ...(isRootly ? [{
+                      id: 'userAlerts',
+                      order: 2,
+                      hasData: true,
+                      component: (
+                        <UserAlertsCard
+                          key="userAlerts"
+                          memberData={memberData || selectedMember}
+                          alertsMeta={currentAnalysis?.analysis_data?.metadata?.alerts}
+                        />
+                      )
+                    }] : []),
                     {
                       id: 'riskFactors',
+                      order: 3,
                       hasData: (memberData?.och_factors?.all?.length || 0) > 0,
                       component: (
                         <UserRiskFactorsCard key="riskFactors" selectedMember={memberData || selectedMember} />
@@ -470,6 +490,7 @@ export function MemberDetailModal({
                     },
                     {
                       id: 'incidents',
+                      order: 4,
                       hasData: (memberData?.incident_count || 0) > 0,
                       component: (
                         <UserIncidentCard
@@ -483,6 +504,7 @@ export function MemberDetailModal({
                     },
                     {
                       id: 'survey',
+                      order: 5,
                       hasData: (currentAnalysis?.analysis_data?.member_surveys?.[selectedMember.user_email || selectedMember.email]?.survey_count_in_period || 0) > 0,
                       component: (
                         <SurveyResultsCard
@@ -493,34 +515,30 @@ export function MemberDetailModal({
                     },
                     {
                       id: 'githubSlack',
-                      hasData: (selectedMember.github_activity?.commits_count > 0 ||
-                        selectedMember.github_activity?.pull_requests_count > 0 ||
-                        selectedMember.slack_activity?.messages_sent > 0 ||
-                        selectedMember.slack_activity?.channels_active > 0),
+                      order: 6,
+                      hasData: true,
                       component: (() => {
-                        const hasGitHubData = selectedMember.github_activity?.commits_count > 0 ||
-                          selectedMember.github_activity?.pull_requests_count > 0
+                        const hasGitHubData = !!selectedMember.github_activity
 
                         const hasSlackData = selectedMember.slack_activity?.messages_sent > 0 ||
                           selectedMember.slack_activity?.channels_active > 0
 
-                        const tabCount = [hasGitHubData, hasSlackData].filter(Boolean).length
-                        const defaultTab = hasGitHubData ? "github" : "communication"
-
-                        if (tabCount === 0) return null
+                        // GitHub tab temporarily hidden — tabCount excludes it
+                        const tabCount = [hasSlackData].filter(Boolean).length
+                        const defaultTab = "communication"
 
                         return (
                           <Tabs key="githubSlack" defaultValue={defaultTab} className="w-full">
                             {tabCount > 1 && (
                               <TabsList className={`grid w-full ${getGridColsClass(tabCount)}`}>
-                                {hasGitHubData && <TabsTrigger value="github">GitHub</TabsTrigger>}
+                                {/* <TabsTrigger value="github">GitHub</TabsTrigger> */}
                                 {hasSlackData && <TabsTrigger value="communication">Communication</TabsTrigger>}
                               </TabsList>
                             )}
 
+                            {/* GitHub Activity Card — temporarily commented out
                             <TabsContent value="github" className="space-y-4">
-                              {/* COMMENTED OUT - GitHub Activity Card */}
-                              {/* {selectedMember.github_activity ? (
+                              {selectedMember.github_activity ? (
                                 <Card>
                                   <CardHeader>
                                     <CardTitle>GitHub Activity</CardTitle>
@@ -635,7 +653,7 @@ export function MemberDetailModal({
                                         </div>
                                         <div className="bg-neutral-100 p-3 rounded-md">
                                           <p className="text-xs text-neutral-700">Avg PR Size</p>
-                                          <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.avg_pr_size || 0} lines</p>
+                                          <p className="text-lg font-semibold text-neutral-900">{selectedMember.github_activity?.avg_pr_size > 0 ? `${selectedMember.github_activity.avg_pr_size} lines` : 'N/A'}</p>
                                         </div>
                                       </div>
                                       <div className="space-y-3">
@@ -665,8 +683,9 @@ export function MemberDetailModal({
                                     <p className="text-neutral-500">No GitHub activity data available</p>
                                   </CardContent>
                                 </Card>
-                              )} */}
+                              )}
                             </TabsContent>
+                            */}
 
                             <TabsContent value="communication" className="space-y-4">
                               {selectedMember.slack_activity ? (
@@ -709,6 +728,7 @@ export function MemberDetailModal({
                     },
                     {
                       id: 'ticketing',
+                      order: 7,
                       hasData: (memberData?.jira_tickets?.length || 0) > 0 || (memberData?.linear_issues?.length || 0) > 0,
                       component: <TicketingCard key="ticketing" memberData={memberData} />
                     }
@@ -718,7 +738,7 @@ export function MemberDetailModal({
                   const sortedTiles = [...tiles].sort((a, b) => {
                     if (a.hasData && !b.hasData) return -1
                     if (!a.hasData && b.hasData) return 1
-                    return 0
+                    return (a.order ?? 0) - (b.order ?? 0)
                   })
 
                   // Render sorted tiles (filter out null components)

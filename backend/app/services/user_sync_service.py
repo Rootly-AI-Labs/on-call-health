@@ -49,9 +49,10 @@ class UserSyncService:
             if not integration:
                 raise ValueError(f"Integration {integration_id} not found")
 
-            # Fetch users from the platform
+            # Fetch users from the platform (respecting team scope if set)
             if integration.platform == "rootly":
-                users = await self._fetch_rootly_users(integration.api_token)
+                team_name = getattr(integration, 'team_name', None)
+                users = await self._fetch_rootly_users(integration.api_token, team_name=team_name)
             elif integration.platform == "pagerduty":
                 users = await self._fetch_pagerduty_users(integration.api_token)
             else:
@@ -177,14 +178,42 @@ class UserSyncService:
                 stats['linear_skipped'] = 0
                 stats['linear_error'] = error_msg
 
+            # After syncing Rootly/PagerDuty users, try to match Slack user IDs
+            # Wrap in try-except to ensure Slack failures don't block other operations
+            logger.info(f"🚀 SYNC: Attempting Slack matching for user {current_user.id}, email={current_user.email}")
+            try:
+                slack_stats = await self._match_slack_users(current_user)
+                logger.info(f"📊 SYNC: Slack matching returned: {slack_stats}")
+                if slack_stats:
+                    stats['slack_matched'] = slack_stats['matched']
+                    stats['slack_skipped'] = slack_stats['skipped']
+                    logger.info(
+                        f"✅ SYNC: Slack matching complete - {slack_stats['matched']} users matched, "
+                        f"{slack_stats['skipped']} skipped"
+                    )
+                else:
+                    logger.info("ℹ️ SYNC: Slack matching returned None (no Slack integration or not applicable)")
+                # If None is returned (no Slack integration), don't set stats
+                # This prevents frontend from showing "Matched 0 users to Slack"
+            except Exception as e:
+                error_msg = f"Slack matching failed: {str(e)}"
+                logger.error(f"❌ SYNC: {error_msg} - continuing with other operations")
+                logger.exception(e)  # Log full traceback
+                stats['slack_matched'] = 0
+                stats['slack_skipped'] = 0
+                stats['slack_error'] = error_msg
+
             return stats
 
         except Exception as e:
             logger.error(f"Error syncing integration users: {e}")
             raise
 
-    async def _fetch_rootly_users(self, api_token: str) -> List[Dict[str, Any]]:
-        """Fetch incident responders from Rootly API (IR role holders only)."""
+    async def _fetch_rootly_users(self, api_token: str, team_name: str = None) -> List[Dict[str, Any]]:
+        """Fetch incident responders from Rootly API (IR role holders only).
+
+        If team_name is provided, only users who are members of that team are returned.
+        """
         client = RootlyAPIClient(api_token)
 
         # Fetch users with IR role data
@@ -193,6 +222,21 @@ class UserSyncService:
         # Filter to only incident responders (exclude observers/no_access)
         filtered_users = client.filter_incident_responders(raw_users, included_roles)
         logger.info(f"Rootly: Filtered {len(raw_users)} total users → {len(filtered_users)} incident responders")
+
+        # If a team scope is set, further filter to only team members
+        if team_name:
+            team_user_ids = await client.get_team_user_ids(team_name)
+            if team_user_ids:
+                team_user_ids_set = set(team_user_ids)
+                before = len(filtered_users)
+                filtered_users = [u for u in filtered_users if str(u.get("id")) in team_user_ids_set]
+                logger.info(
+                    f"Rootly sync: team scope '{team_name}' → {before} IR responders → {len(filtered_users)} team members"
+                )
+            else:
+                logger.warning(
+                    f"Rootly sync: could not fetch member IDs for team '{team_name}', syncing all IR responders"
+                )
 
         # Extract from JSONAPI format
         users = []
@@ -301,20 +345,19 @@ class UserSyncService:
             # This prevents one user from overwriting another user's correlations
 
             # Determine user_id assignment FIRST (before querying)
-            if email.lower() == current_user.email.lower():
-                # Current user's own email always gets user_id=current_user.id
-                assigned_user_id = current_user.id
-                logger.debug(f"Assigning correlation for {email} to current user {current_user.id}")
-            else:
-                # Team members:
-                # - In multi-tenant mode: user_id=NULL (org-scoped roster data)
-                # - In beta mode: user_id=current_user.id (personal isolation)
-                if organization_id:
-                    assigned_user_id = None  # Org-scoped
-                    logger.debug(f"Creating org-scoped correlation for team member {email}")
+            # CHANGED: In org mode, ALL users (including current user) use team roster (user_id=NULL)
+            # This prevents duplicate-looking entries where same email has both personal + roster records
+            if organization_id:
+                # Multi-tenant mode: Everyone is team roster (user_id=NULL)
+                assigned_user_id = None
+                if email.lower() == current_user.email.lower():
+                    logger.debug(f"Creating org-scoped correlation for current user {email} (team roster)")
                 else:
-                    assigned_user_id = current_user.id  # Beta mode: isolate by user_id
-                    logger.debug(f"Creating personal correlation for team member {email} (beta mode)")
+                    logger.debug(f"Creating org-scoped correlation for team member {email}")
+            else:
+                # Beta mode: Personal correlations only (user_id=current_user.id)
+                assigned_user_id = current_user.id
+                logger.debug(f"Creating personal correlation for {email} (beta mode)")
 
             # Query with correct uniqueness key based on assigned_user_id
             if assigned_user_id is not None:
@@ -392,6 +435,11 @@ class UserSyncService:
         for attempt in range(max_retries):
             try:
                 self.db.commit()
+                # MONITORING: Log successful sync stats
+                logger.info(
+                    f"✅ SYNC_SUCCESS: org_id={organization_id}, "
+                    f"created={created}, updated={updated}, skipped={skipped}"
+                )
                 break
             except IntegrityError as e:
                 self.db.rollback()
@@ -403,14 +451,21 @@ class UserSyncService:
                 ])
 
                 if is_duplicate_key:
+                    # MONITORING: Log duplicate attempts with context for alerting
+                    logger.warning(
+                        f"🚨 DUPLICATE_ATTEMPT: org_id={organization_id}, "
+                        f"user_id={user_id}, attempt={attempt+1}/{max_retries}, "
+                        f"created={created}, updated={updated}, error={error_str}"
+                    )
                     if attempt < max_retries - 1:
-                        logger.warning(
-                            f"Duplicate key violation on commit (attempt {attempt+1}/{max_retries}). "
-                            f"Retrying after concurrent insert... Error: {error_str}"
-                        )
+                        logger.warning(f"Retrying after concurrent insert...")
                         continue
                     else:
-                        logger.error(f"Failed to commit after {max_retries} attempts: {e}")
+                        # ALERT: This should rarely happen with proper constraints
+                        logger.error(
+                            f"❌ DUPLICATE_FAILURE: Failed to commit after {max_retries} attempts. "
+                            f"org_id={organization_id}, created={created}, updated={updated}"
+                        )
                         raise
                 else:
                     # Different IntegrityError, don't retry
@@ -904,10 +959,19 @@ class UserSyncService:
             )
 
             # Get all synced users without GitHub usernames
-            correlations = self.db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == user.id,
-                UserCorrelation.github_username.is_(None)
-            ).all()
+            # For org mode: match team roster (user_id IS NULL)
+            # For personal mode: match personal correlations (user_id == user.id)
+            if user.organization_id:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.github_username.is_(None)
+                ).all()
+            else:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user.id,
+                    UserCorrelation.github_username.is_(None)
+                ).all()
 
             if not correlations:
                 logger.info("No users need GitHub matching")
@@ -1033,6 +1097,187 @@ class UserSyncService:
             self.db.rollback()
             return 0
 
+    async def _match_slack_users(self, user: User) -> Optional[Dict[str, int]]:
+        """
+        Match all synced users to Slack accounts using email matching.
+
+        This uses email exact matching to link user_correlations with Slack user IDs.
+
+        Returns statistics about matching results.
+        """
+        try:
+            from app.models import SlackWorkspaceMapping, SlackIntegration
+            from app.api.endpoints.slack import decrypt_token
+            import httpx
+
+            # Check for Slack workspace mapping
+            logger.info(f"🔍 SLACK_MATCH: Checking Slack workspace for user {user.id}, email={user.email}, org_id={user.organization_id}")
+            workspace_mapping = self.db.query(SlackWorkspaceMapping).filter(
+                SlackWorkspaceMapping.organization_id == user.organization_id
+            ).first()
+
+            if not workspace_mapping:
+                logger.info("❌ SLACK_MATCH: No Slack workspace connected for this organization")
+                return None
+
+            logger.info(f"✅ SLACK_MATCH: Found workspace mapping, workspace_id={workspace_mapping.workspace_id}")
+
+            # Get Slack integration for token
+            slack_integration = self.db.query(SlackIntegration).filter(
+                SlackIntegration.workspace_id == workspace_mapping.workspace_id
+            ).first()
+
+            if not slack_integration:
+                logger.info("❌ SLACK_MATCH: No Slack integration found for workspace")
+                return None
+
+            logger.info(f"✅ SLACK_MATCH: Found Slack integration, starting matching for user {user.id}")
+
+            # Decrypt token
+            try:
+                access_token = decrypt_token(slack_integration.slack_token)
+
+                # Validate decrypted token format
+                if not access_token or not isinstance(access_token, str):
+                    logger.error("❌ SLACK_MATCH: Decrypted token is empty or invalid type")
+                    return None
+
+                if not access_token.startswith(("xoxb-", "xoxp-")):
+                    logger.error("❌ SLACK_MATCH: Decrypted token has invalid format (expected xoxb- or xoxp- prefix)")
+                    return None
+
+                logger.info("✅ SLACK_MATCH: Token decrypted and validated successfully")
+            except Exception as e:
+                logger.error(f"❌ SLACK_MATCH: Failed to decrypt Slack token: {e}")
+                return None
+
+            # Fetch Slack workspace members using async httpx
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    "https://slack.com/api/users.list",
+                    headers={"Authorization": f"Bearer {access_token}"}
+                )
+
+            if response.status_code != 200:
+                logger.error(f"Slack API returned status {response.status_code}")
+                return None
+
+            data = response.json()
+
+            if not data or not data.get("ok"):
+                logger.error(f"Slack API error: {data.get('error') if data else 'unknown'}")
+                return None
+
+            members = data.get("members", [])
+            logger.info(f"📥 SLACK_MATCH: Fetched {len(members)} total Slack members from API")
+
+            # Build email -> slack_user_id mapping
+            email_to_slack_id = {
+                member.get("profile", {}).get("email", "").lower(): member.get("id")
+                for member in members
+                if not member.get("deleted")
+                and not member.get("is_bot")
+                and member.get("profile", {}).get("email")
+                and member.get("id")
+            }
+
+            logger.info(f"📧 SLACK_MATCH: Built mapping for {len(email_to_slack_id)} Slack users with emails")
+
+            # Log sample of Slack emails for debugging
+            sample_emails = list(email_to_slack_id.keys())[:5]
+            logger.info(f"📧 SLACK_MATCH: Sample Slack emails: {sample_emails}")
+
+            # Check if current user's email is in Slack
+            if user.email.lower() in email_to_slack_id:
+                logger.info(f"✅ SLACK_MATCH: Current user {user.email} found in Slack workspace")
+            else:
+                logger.warning(f"⚠️ SLACK_MATCH: Current user {user.email} NOT found in Slack workspace")
+
+            if not email_to_slack_id:
+                logger.info("❌ SLACK_MATCH: No Slack users with emails found to match")
+                return {"matched": 0, "skipped": 0}
+
+            # Get all synced users without Slack IDs
+            # For org mode: match team roster (user_id IS NULL)
+            # For personal mode: match personal correlations (user_id == user.id)
+            if user.organization_id:
+                logger.info(f"🔍 SLACK_MATCH: Querying team roster for org_id={user.organization_id}, user_id IS NULL, slack_user_id IS NULL")
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.slack_user_id.is_(None)
+                ).all()
+            else:
+                logger.info(f"🔍 SLACK_MATCH: Querying personal correlations for user_id={user.id}")
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user.id,
+                    UserCorrelation.slack_user_id.is_(None)
+                ).all()
+
+            logger.info(f"📋 SLACK_MATCH: Found {len(correlations)} correlations without Slack IDs")
+
+            # Log sample of correlation emails
+            if correlations:
+                sample_corr_emails = [c.email for c in correlations[:5] if c.email]
+                logger.info(f"📋 SLACK_MATCH: Sample correlation emails: {sample_corr_emails}")
+
+            if not correlations:
+                logger.info("ℹ️ SLACK_MATCH: No users need Slack matching (all already have Slack IDs)")
+                return {"matched": 0, "skipped": 0}
+
+            logger.info(f"🔄 SLACK_MATCH: Starting to match {len(correlations)} users with {len(email_to_slack_id)} Slack users")
+
+            matched = 0
+            skipped = 0
+
+            # Try to match each correlation to a Slack user
+            for correlation in correlations:
+                # Check if there's a manual mapping for this user's Slack account
+                # Manual mappings should take precedence over automatic matching
+                manual_mapping = self.db.query(UserMapping).filter(
+                    and_(
+                        UserMapping.user_id == user.id,
+                        UserMapping.source_identifier == correlation.email,
+                        UserMapping.target_platform == "slack",
+                        UserMapping.mapping_type == "manual"
+                    )
+                ).first()
+
+                if manual_mapping:
+                    # Manual mapping exists - respect it and don't overwrite
+                    logger.info(f"⚠️  Skipping {correlation.email} - manual Slack mapping exists: {manual_mapping.target_identifier}")
+                    skipped += 1
+                    continue
+
+                # Try exact email match
+                if correlation.email:
+                    slack_id = email_to_slack_id.get(correlation.email.lower())
+                    if slack_id:
+                        correlation.slack_user_id = slack_id
+                        matched += 1
+                        logger.info(f"✅ Matched {correlation.email} to Slack ID {slack_id}")
+                    else:
+                        logger.debug(f"No Slack match for {correlation.email}")
+                        skipped += 1
+                else:
+                    logger.debug(f"Skipping correlation without email")
+                    skipped += 1
+
+            # Commit changes
+            if matched > 0:
+                self.db.commit()
+                logger.info(f"✅ SLACK_MATCH: Successfully matched {matched} users to Slack accounts")
+            else:
+                logger.info(f"ℹ️ SLACK_MATCH: No new Slack matches (0 matched, {skipped} skipped)")
+
+            logger.info(f"📊 SLACK_MATCH: Final results - matched: {matched}, skipped: {skipped}")
+            return {"matched": matched, "skipped": skipped}
+
+        except Exception as e:
+            logger.error(f"Error matching Slack users: {e}")
+            self.db.rollback()
+            return None
+
     async def _match_jira_users(self, user: User) -> Optional[Dict[str, int]]:
         """
         Match all synced users to Jira accounts using email and name matching.
@@ -1076,10 +1321,19 @@ class UserSyncService:
                 return {"matched": 0, "skipped": 0}
 
             # Get all synced users without Jira account IDs
-            correlations = self.db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == user.id,
-                UserCorrelation.jira_account_id.is_(None)
-            ).all()
+            # For org mode: match team roster (user_id IS NULL)
+            # For personal mode: match personal correlations (user_id == user.id)
+            if user.organization_id:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.jira_account_id.is_(None)
+                ).all()
+            else:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user.id,
+                    UserCorrelation.jira_account_id.is_(None)
+                ).all()
 
             if not correlations:
                 logger.info("No users need Jira matching")
@@ -1226,10 +1480,19 @@ class UserSyncService:
                 return {"matched": 0, "skipped": 0}
 
             # Get all synced users without Linear account IDs
-            correlations = self.db.query(UserCorrelation).filter(
-                UserCorrelation.user_id == user.id,
-                UserCorrelation.linear_user_id.is_(None)
-            ).all()
+            # For org mode: match team roster (user_id IS NULL)
+            # For personal mode: match personal correlations (user_id == user.id)
+            if user.organization_id:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.linear_user_id.is_(None)
+                ).all()
+            else:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user.id,
+                    UserCorrelation.linear_user_id.is_(None)
+                ).all()
 
             if not correlations:
                 logger.info("No users need Linear matching")

@@ -142,7 +142,7 @@ function getTrendConfig(trend: UserTrend) {
       return {
         label: 'Worsening',
         icon: <TrendingDown className="w-4 h-4" />,
-        className: 'bg-red-50 text-red-600 border-red-100',
+        className: 'bg-yellow-50 text-yellow-700 border-yellow-100',
         tooltip: 'Workload trending up'
       }
     case 'significantly_worsening':
@@ -171,7 +171,7 @@ export function TeamMembersList({
   connectedIntegrations = new Set()
 }: TeamMembersListProps) {
   const [showMembersWithoutIncidents, setShowMembersWithoutIncidents] = useState(false);
-  const [sortBy, setSortBy] = useState<'risk' | 'trend'>('risk');
+  const [sortBy, setSortBy] = useState<'risk' | 'trend' | 'incidents'>('risk');
   const dataSources = currentAnalysis?.analysis_data?.data_sources;
   const analysisConfig = currentAnalysis?.config;
   const individualDailyData = currentAnalysis?.analysis_data?.individual_daily_data;
@@ -255,10 +255,10 @@ export function TeamMembersList({
         className={`cursor-pointer hover:bg-neutral-100 transition-colors border-b border-neutral-100 last:border-b-0 ${index % 2 === 1 ? 'bg-neutral-50' : ''}`}
         onClick={() => handleMemberClick(member, trendInfo)}
       >
-        {/* Avatar + Name */}
-        <td className="py-3 px-4">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-8 w-8">
+        {/* Avatar + Name - Stack on mobile */}
+        <td className="py-2 px-2 sm:py-3 sm:px-4 md:py-3 md:px-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+            <Avatar className="h-8 w-8 flex-shrink-0">
               {member.avatar_url && (
                 <AvatarImage src={member.avatar_url} alt={member.user_name || 'User avatar'} />
               )}
@@ -272,28 +272,47 @@ export function TeamMembersList({
           </div>
         </td>
 
-        {/* Risk Level */}
-        <td className="py-3 px-4">
+        {/* Risk Level + Trend (stacked on mobile) */}
+        <td className="py-2 px-2 sm:py-3 sm:px-4 md:py-3 md:px-4">
           {member?.och_score !== undefined ? (
-            <div className="flex items-center gap-3">
-              <div className="relative h-2 w-24 overflow-hidden rounded-full bg-neutral-200 flex-shrink-0">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${member.och_score}%`,
-                    backgroundColor: getOCHProgressColor(member.och_score)
-                  }}
-                />
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+              {/* Trend badge (mobile only) */}
+              <div className="relative group md:hidden">
+                <Badge className={`inline-flex items-center gap-1.5 ${trendConfig.className} border text-xs`}>
+                  {trendConfig.icon}
+                  {trendConfig.label}
+                </Badge>
+                {trendInfo.percentage > 0 && (
+                  <div className="absolute bottom-full left-0 mb-1 px-2 py-1 bg-neutral-900/95 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    {trendInfo.trend.includes('improving')
+                      ? `Down ${trendInfo.percentage}% (${Math.round(trendInfo.firstHalfScore)} → ${Math.round(trendInfo.secondHalfScore)})`
+                      : trendInfo.trend.includes('worsening')
+                      ? `Up ${trendInfo.percentage}% (${Math.round(trendInfo.firstHalfScore)} → ${Math.round(trendInfo.secondHalfScore)})`
+                      : `Stable (${Math.round(trendInfo.firstHalfScore)} → ${Math.round(trendInfo.secondHalfScore)})`}
+                  </div>
+                )}
               </div>
-              <span className="text-sm font-medium text-neutral-700 tabular-nums">{Math.round(member.och_score)}</span>
+              {/* Risk Level Bar and Score */}
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="relative h-2 w-16 md:w-24 overflow-hidden rounded-full bg-neutral-200 flex-shrink-0">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${member.och_score}%`,
+                      backgroundColor: getOCHProgressColor(member.och_score)
+                    }}
+                  />
+                </div>
+                <span className="text-sm font-medium text-neutral-700 tabular-nums">{Math.round(member.och_score)}</span>
+              </div>
             </div>
           ) : (
             <span className="text-xs text-neutral-400">No data</span>
           )}
         </td>
 
-        {/* Trend */}
-        <td className="py-3 px-4">
+        {/* Trend (desktop only) */}
+        <td className="py-2 px-2 sm:py-3 sm:px-4 md:py-3 md:px-4 hidden md:table-cell">
           <div className="relative group">
             <Badge className={`inline-flex items-center gap-1.5 ${trendConfig.className} border text-xs`}>
               {trendConfig.icon}
@@ -312,12 +331,12 @@ export function TeamMembersList({
         </td>
 
         {/* Incidents */}
-        <td className="py-3 px-4">
+        <td className="py-2 px-2 sm:py-3 sm:px-4 md:py-3 md:px-4 hidden md:table-cell">
           <span className="text-sm font-semibold tabular-nums text-neutral-700">{member.incident_count || 0}</span>
         </td>
 
         {/* On-Call Status */}
-        <td className="py-3 px-4">
+        <td className="py-2 px-2 sm:py-3 sm:px-4 md:py-3 md:px-4 hidden md:table-cell">
           {member.is_oncall && (
             <Badge className="bg-purple-50 text-purple-700 border border-purple-200 text-xs">
               ON-CALL
@@ -326,7 +345,7 @@ export function TeamMembersList({
         </td>
 
         {/* Data Sources - mapped icons first, then greyed-out unmapped */}
-        <td className="py-3 px-4">
+        <td className="py-2 px-2 sm:py-3 sm:px-4 md:py-3 md:px-4 hidden md:table-cell">
           {(() => {
             const githubEnabled = connectedIntegrations.has('github') && isDataSourceEnabled('github');
             const slackEnabled = connectedIntegrations.has('slack') && isDataSourceEnabled('slack');
@@ -420,12 +439,15 @@ export function TeamMembersList({
     <table className="w-full">
       <thead>
         <tr className="border-b border-neutral-200">
-          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Member</th>
-          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Risk Level</th>
-          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Trend ({currentAnalysis?.time_range || 30}d)</th>
-          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Incidents</th>
-          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Status</th>
-          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4">Data Sources</th>
+          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4">Member</th>
+          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4">
+            <span className="md:hidden">Risk Level / Trends</span>
+            <span className="hidden md:inline">Risk Level</span>
+          </th>
+          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Trend ({currentAnalysis?.time_range || 30}d)</th>
+          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Incidents</th>
+          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Status</th>
+          <th className="text-left text-xs font-medium text-neutral-500 uppercase tracking-wide py-2 px-4 sm:py-2 sm:px-4 md:py-2 md:px-4 hidden md:table-cell">Data Sources</th>
         </tr>
       </thead>
       <tbody>
@@ -438,12 +460,15 @@ export function TeamMembersList({
     <>
       {/* Organization Members Grid */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <CardTitle>Team Member Risk Levels</CardTitle>
+            <CardTitle className="flex flex-col md:flex-row md:items-center md:gap-1">
+              <span className="md:inline">Team Member</span>
+              <span className="md:inline">Risk Levels</span>
+            </CardTitle>
             <CardDescription>Click on a member to view detailed analysis</CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-2 w-full md:w-auto">
             <span className="text-sm text-neutral-500">Sort by:</span>
             <div className="flex items-center bg-neutral-100 rounded-lg p-0.5">
               <button
@@ -465,6 +490,16 @@ export function TeamMembersList({
                 }`}
               >
                 Trend
+              </button>
+              <button
+                onClick={() => setSortBy('incidents')}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  sortBy === 'incidents'
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                Incidents
               </button>
             </div>
           </div>
@@ -502,29 +537,33 @@ export function TeamMembersList({
               if (sortBy === 'risk') {
                 // Sort by OCH risk level (higher score = higher risk)
                 return [...members].sort((a, b) => (b.och_score || 0) - (a.och_score || 0));
-              } else {
-                // Sort by trend (worsening first, then stable, then improving)
-                // For same trend level, sort by risk level (higher risk first)
-                const trendOrder: Record<string, number> = {
-                  'significantly_worsening': 0,
-                  'worsening': 1,
-                  'stable': 2,
-                  'improving': 3,
-                  'significantly_improving': 4
-                };
-
-                return [...members].sort((a, b) => {
-                  const trendA = calculateUserTrend(a.user_email, individualDailyData);
-                  const trendB = calculateUserTrend(b.user_email, individualDailyData);
-                  // Use ?? instead of || because 0 is a valid order value (significantly_worsening)
-                  const trendComparison = (trendOrder[trendA.trend] ?? 2) - (trendOrder[trendB.trend] ?? 2);
-                  // If same trend level, sort by risk level (higher risk first)
-                  if (trendComparison === 0) {
-                    return (b.och_score || 0) - (a.och_score || 0);
-                  }
-                  return trendComparison;
-                });
               }
+
+              if (sortBy === 'incidents') {
+                return [...members].sort((a, b) => (b.incident_count || 0) - (a.incident_count || 0));
+              }
+
+              // Sort by trend (worsening first, then stable, then improving)
+              // For same trend level, sort by risk level (higher risk first)
+              const trendOrder: Record<string, number> = {
+                'significantly_worsening': 0,
+                'worsening': 1,
+                'stable': 2,
+                'improving': 3,
+                'significantly_improving': 4
+              };
+
+              return [...members].sort((a, b) => {
+                const trendA = calculateUserTrend(a.user_email, individualDailyData);
+                const trendB = calculateUserTrend(b.user_email, individualDailyData);
+                // Use ?? instead of || because 0 is a valid order value (significantly_worsening)
+                const trendComparison = (trendOrder[trendA.trend] ?? 2) - (trendOrder[trendB.trend] ?? 2);
+                // If same trend level, sort by risk level (higher risk first)
+                if (trendComparison === 0) {
+                  return (b.och_score || 0) - (a.och_score || 0);
+                }
+                return trendComparison;
+              });
             }
 
             // Sort members alphabetically by name
@@ -547,30 +586,56 @@ export function TeamMembersList({
                 {(membersWithoutIncidents.length > 0 || isLoading) && (
                   <div className="mt-6">
                     <Button
-                      variant="outline" 
+                      variant="outline"
                       onClick={() => setShowMembersWithoutIncidents(!showMembersWithoutIncidents)}
-                      className="w-full mb-4 text-neutral-700 border-neutral-300 hover:bg-neutral-100"
+                      className="w-full mb-4 py-3 md:py-2 px-3 h-auto text-neutral-700 border-neutral-300 hover:bg-neutral-100"
                       disabled={isLoading}
                     >
-                      <div className="flex items-center justify-center space-x-2">
+                      {/* Desktop: Single row */}
+                      <div className="hidden md:flex items-center justify-center gap-2">
                         {isLoading ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           showMembersWithoutIncidents ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
                         )}
                         <Users className="w-4 h-4" />
-                        <span>
-                          {isLoading ? (
-                            'Loading team members...'
-                          ) : (
-                            <>
+                        {isLoading ? (
+                          'Loading team members...'
+                        ) : (
+                          <>
+                            <span>
                               {showMembersWithoutIncidents ? 'Hide' : 'Show'} team members with no activity
-                              <span className="ml-1 text-xs bg-neutral-300 px-2 py-1 rounded">
-                                {membersWithoutIncidents.length}
-                              </span>
-                            </>
+                            </span>
+                            <span className="ml-1 text-xs bg-neutral-300 px-2 py-1 rounded">
+                              {membersWithoutIncidents.length}
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Mobile: Two rows */}
+                      <div className="flex flex-col md:hidden gap-1 w-full">
+                        {/* Row 1: Logo + First part of text */}
+                        <div className="flex items-center gap-2 justify-center">
+                          {isLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            showMembersWithoutIncidents ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
                           )}
-                        </span>
+                          <Users className="w-4 h-4" />
+                          <span className="text-sm">
+                            {isLoading ? 'Loading...' : `${showMembersWithoutIncidents ? 'Hide' : 'Show'} team members`}
+                          </span>
+                        </div>
+                        {/* Row 2: Second part of text + Badge */}
+                        {!isLoading && (
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-sm">with no activity</span>
+                            <span className="text-xs bg-neutral-300 px-2 py-1 rounded">
+                              {membersWithoutIncidents.length}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </Button>
 
