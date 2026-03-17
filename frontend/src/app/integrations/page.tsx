@@ -875,9 +875,10 @@ export default function IntegrationsPage() {
   useEffect(() => {
     return subscribeToSelectedOrganization((value) => {
       if (!value) return
+      if (!integrations.some((integration) => integration.id.toString() === value)) return
       setSelectedOrganization((current) => (current === value ? current : value))
     })
-  }, [])
+  }, [integrations])
 
   // Load Slack permissions when integration is available
   useEffect(() => {

@@ -4,6 +4,15 @@ export const SELECTED_ORGANIZATION_STORAGE_KEY = "selected_organization"
 const LEGACY_SELECTED_ORGANIZATION_STORAGE_KEY = "selectedOrganization"
 const SELECTED_ORGANIZATION_EVENT = "selected-organization-change"
 
+function readSelectedOrganization() {
+  if (typeof window === "undefined") return null
+
+  return (
+    localStorage.getItem(SELECTED_ORGANIZATION_STORAGE_KEY) ||
+    localStorage.getItem(LEGACY_SELECTED_ORGANIZATION_STORAGE_KEY)
+  )
+}
+
 function writeSelectedOrganization(value: string | null) {
   if (typeof window === "undefined") return
 
@@ -17,28 +26,36 @@ function writeSelectedOrganization(value: string | null) {
 }
 
 export function getStoredSelectedOrganization(): string | null {
-  if (typeof window === "undefined") return null
-
-  const value =
-    localStorage.getItem(SELECTED_ORGANIZATION_STORAGE_KEY) ||
-    localStorage.getItem(LEGACY_SELECTED_ORGANIZATION_STORAGE_KEY)
-
-  if (value) {
-    writeSelectedOrganization(value)
-  }
-
-  return value
+  return readSelectedOrganization()
 }
 
-export function setStoredSelectedOrganization(value: string | null) {
+export function setStoredSelectedOrganization(
+  value: string | null,
+  options: { emit?: boolean } = {}
+) {
   if (typeof window === "undefined") return
 
+  const primaryValue = localStorage.getItem(SELECTED_ORGANIZATION_STORAGE_KEY)
+  const legacyValue = localStorage.getItem(LEGACY_SELECTED_ORGANIZATION_STORAGE_KEY)
+  const currentValue = readSelectedOrganization()
+  const valueChanged = currentValue !== value
+  const storageAlreadySynced = value
+    ? primaryValue === value && legacyValue === value
+    : primaryValue === null && legacyValue === null
+
+  if (storageAlreadySynced) {
+    return
+  }
+
   writeSelectedOrganization(value)
-  window.dispatchEvent(
-    new CustomEvent(SELECTED_ORGANIZATION_EVENT, {
-      detail: { value },
-    })
-  )
+
+  if (options.emit !== false && valueChanged) {
+    window.dispatchEvent(
+      new CustomEvent(SELECTED_ORGANIZATION_EVENT, {
+        detail: { value },
+      })
+    )
+  }
 }
 
 export function subscribeToSelectedOrganization(callback: (value: string | null) => void) {
