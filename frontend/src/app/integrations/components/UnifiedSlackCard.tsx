@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { API_BASE } from "../types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -73,6 +73,11 @@ export function UnifiedSlackCard({
   const [showSurveyDisableConfirm, setShowSurveyDisableConfirm] = useState(false)
 
   const isConnected = !!slackIntegration
+
+  useEffect(() => {
+    const nextSurveyEnabled = slackIntegration?.survey_enabled ?? true
+    setSurveyEnabled(nextSurveyEnabled)
+  }, [slackIntegration?.id, slackIntegration?.workspace_id, slackIntegration?.survey_enabled])
 
   const handleSlackConnect = () => {
     const clientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID
@@ -191,6 +196,7 @@ export function UnifiedSlackCard({
 
   const toggleSurveyFeature = async (enabled: boolean) => {
     const backendUrl = API_BASE
+    const authToken = localStorage.getItem('auth_token')
 
     // Optimistically update UI
     setSurveyEnabled(enabled)
@@ -200,7 +206,7 @@ export function UnifiedSlackCard({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           feature: 'survey',
@@ -208,19 +214,35 @@ export function UnifiedSlackCard({
         })
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to toggle feature')
+      const rawResponse = await response.text()
+      let parsedResponse: any = null
+      try {
+        parsedResponse = rawResponse ? JSON.parse(rawResponse) : null
+      } catch {
+        parsedResponse = null
       }
 
-      toast.success(`Survey Delivery ${enabled ? 'enabled' : 'disabled'}`)
+      if (!response.ok) {
+        throw new Error(parsedResponse?.detail || rawResponse || 'Failed to toggle feature')
+      }
+
+      toast.success(
+        enabled
+          ? 'Slack Surveys enabled. Scheduled surveys and reminders can run again.'
+          : 'Slack Surveys disabled. Scheduled surveys, reminders, and manual sends are now paused.'
+      )
 
       if (loadSlackStatus) {
         await loadSlackStatus(true)
       }
     } catch (error) {
-      console.error('Error toggling feature:', error)
-      setSurveyEnabled(!enabled)
-      toast.error(`Failed to ${enabled ? 'enable' : 'disable'} Survey Delivery`)
+      console.error('Error toggling Slack survey feature:', error)
+      setSurveyEnabled(slackIntegration?.survey_enabled ?? !enabled)
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Failed to ${enabled ? 'enable' : 'disable'} Survey Delivery`
+      )
     }
   }
 
@@ -485,12 +507,15 @@ export function UnifiedSlackCard({
               Disable Slack Surveys?
             </DialogTitle>
             <div className="space-y-3 pt-2 text-sm text-muted-foreground">
-              <p>This will disable all Slack survey features, including:</p>
+              <p>Disabling Slack Surveys will immediately pause all survey activity for this Slack workspace, including:</p>
               <ul className="list-disc list-inside space-y-1 text-sm">
                 <li>The <code className="bg-neutral-200 px-1 rounded">/oncall-health</code> command</li>
-                <li>Automated survey delivery (scheduled surveys will stop)</li>
+                <li>Automated survey delivery, scheduled surveys, and follow-up reminders</li>
                 <li>Manual survey sending</li>
               </ul>
+              <p>
+                Your saved survey schedule and selected recipients will stay in place. Re-enabling Slack Surveys will let the existing schedule resume.
+              </p>
               <p className="text-sm font-medium text-orange-600">
                 You can re-enable surveys anytime by toggling this back on.
               </p>

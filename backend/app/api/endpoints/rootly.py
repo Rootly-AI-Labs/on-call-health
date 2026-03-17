@@ -1693,21 +1693,20 @@ async def get_synced_users(
 
         # Get saved recipient IDs if configured
         saved_recipient_ids = None
-        if surveys_enabled:
-            if current_user.organization_id:
-                saved_recipient_ids = get_saved_recipient_ids_for_org(db, current_user.organization_id)
-            elif integration_id:
-                try:
-                    numeric_id = int(integration_id)
-                    # SECURITY: Verify user owns this integration
-                    integration = db.query(RootlyIntegration).filter(
-                        RootlyIntegration.id == numeric_id,
-                        RootlyIntegration.user_id == current_user.id
-                    ).first()
-                    if integration and integration.survey_recipients:
-                        saved_recipient_ids = set(integration.survey_recipients)
-                except (ValueError, AttributeError):
-                    pass
+        if current_user.organization_id:
+            saved_recipient_ids = get_saved_recipient_ids_for_org(db, current_user.organization_id)
+        elif integration_id:
+            try:
+                numeric_id = int(integration_id)
+                # SECURITY: Verify user owns this integration
+                integration = db.query(RootlyIntegration).filter(
+                    RootlyIntegration.id == numeric_id,
+                    RootlyIntegration.user_id == current_user.id
+                ).first()
+                if integration and integration.survey_recipients:
+                    saved_recipient_ids = set(integration.survey_recipients)
+            except (ValueError, AttributeError):
+                pass
 
         # Format the response
         synced_users = []
@@ -1731,17 +1730,27 @@ async def get_synced_users(
             # SAFETY: Guard against NULL email to prevent crash
             is_oncall = bool(corr.email and corr.email.lower() in {email.lower() for email in oncall_emails})
 
-            # Determine if user will receive automated surveys
-            receives_automated_surveys = False
-            if surveys_enabled and corr.slack_user_id and corr.user_id:
-                # Check if user is in saved recipients (or no filter configured)
-                if saved_recipient_ids is None or corr.id in saved_recipient_ids:
-                    # Check if user has opted out
-                    preference = db.query(UserSurveyPreference).filter(
-                        UserSurveyPreference.user_id == corr.user_id
-                    ).first()
-                    if not preference or (preference.receive_daily_surveys and preference.receive_slack_dms):
-                        receives_automated_surveys = True
+            selected_for_automated_surveys = saved_recipient_ids is None or corr.id in saved_recipient_ids
+
+            preference = None
+            if corr.user_id:
+                preference = db.query(UserSurveyPreference).filter(
+                    UserSurveyPreference.user_id == corr.user_id
+                ).first()
+
+            eligible_for_automated_surveys = (
+                bool(corr.slack_user_id)
+                and bool(corr.email)
+                and selected_for_automated_surveys
+                and (
+                    preference is None
+                    or (preference.receive_daily_surveys and preference.receive_slack_dms)
+                )
+            )
+
+            # Keep the existing field for compatibility, but define it using the
+            # same effective eligibility rules the scheduler uses when surveys are enabled.
+            receives_automated_surveys = surveys_enabled and eligible_for_automated_surveys
 
             synced_users.append({
                 "id": corr.id,
@@ -1758,6 +1767,8 @@ async def get_synced_users(
                 "linear_email": corr.linear_email,
                 "is_oncall": is_oncall,
                 "survey_count": survey_counts.get(corr.id, 0),
+                "selected_for_automated_surveys": selected_for_automated_surveys,
+                "eligible_for_automated_surveys": eligible_for_automated_surveys,
                 "receives_automated_surveys": receives_automated_surveys,
                 "created_at": corr.created_at.isoformat() if corr.created_at else None
             })

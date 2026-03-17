@@ -2251,25 +2251,6 @@ export default function IntegrationsPage() {
   const hasSlackSurvey = slackIntegration?.connection_type === 'oauth'
   const hasSlackEnhanced = slackIntegration && slackIntegration.connection_type !== 'oauth'
 
-  // Close active enhancement tab when clicking outside
-  useEffect(() => {
-    const handleMouseDown = (event: MouseEvent) => {
-      // If the click target was detached from the DOM before mousedown fired
-      // (Radix removes its portal/overlay on pointerdown), ignore this event.
-      if (!(event.target as Node).isConnected) return
-      if (document.querySelector('[data-radix-popper-content-wrapper]')) return
-      const enhancedSection = document.querySelector('[data-enhancement-section]')
-      if (enhancedSection && !enhancedSection.contains(event.target as Node)) {
-        setActiveEnhancementTab(null)
-      }
-    }
-
-    if (activeEnhancementTab) {
-      document.addEventListener('mousedown', handleMouseDown)
-      return () => document.removeEventListener('mousedown', handleMouseDown)
-    }
-  }, [activeEnhancementTab])
-
   // Close active incident management tab when clicking outside.
   // If add modal is open, keep tab selection stable and let modal handle closure.
   useEffect(() => {
@@ -3274,15 +3255,7 @@ export default function IntegrationsPage() {
           </div>
 
           {/* Integration Forms */}
-          <div
-            className="space-y-6"
-            onClick={(e) => {
-              // Deselect on click if target is the div itself (empty space)
-              if (e.target === e.currentTarget) {
-                setActiveEnhancementTab(null)
-              }
-            }}
-          >
+          <div className="space-y-6">
             {/* GitHub Token Form */}
             {activeEnhancementTab === 'github' && !githubIntegration && (
               <GitHubIntegrationCard
