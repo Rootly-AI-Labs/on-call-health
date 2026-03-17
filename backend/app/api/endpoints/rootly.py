@@ -1708,6 +1708,18 @@ async def get_synced_users(
             except (ValueError, AttributeError):
                 pass
 
+        user_ids_with_preferences = {
+            corr.user_id for corr in correlations if corr.user_id is not None
+        }
+        preferences_by_user_id = {}
+        if user_ids_with_preferences:
+            preferences_by_user_id = {
+                preference.user_id: preference
+                for preference in db.query(UserSurveyPreference).filter(
+                    UserSurveyPreference.user_id.in_(user_ids_with_preferences)
+                ).all()
+            }
+
         # Format the response
         synced_users = []
         for corr in correlations:
@@ -1732,11 +1744,7 @@ async def get_synced_users(
 
             selected_for_automated_surveys = saved_recipient_ids is None or corr.id in saved_recipient_ids
 
-            preference = None
-            if corr.user_id:
-                preference = db.query(UserSurveyPreference).filter(
-                    UserSurveyPreference.user_id == corr.user_id
-                ).first()
+            preference = preferences_by_user_id.get(corr.user_id) if corr.user_id else None
 
             eligible_for_automated_surveys = (
                 bool(corr.slack_user_id)
