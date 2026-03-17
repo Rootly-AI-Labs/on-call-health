@@ -212,7 +212,8 @@ class SurveyScheduler:
                 period.mark_expired()
                 logger.debug(f"Expired old period {period.id} for user (correlation {user_correlation.id})")
 
-            # Create new period - IntegrityError will be caught if concurrent transaction creates it
+            # Create new period inside a nested transaction so a concurrent insert
+            # only rolls back this insert attempt instead of the whole session.
             new_period = SurveyPeriod(
                 organization_id=organization_id,
                 user_correlation_id=user_correlation.id,
@@ -225,16 +226,17 @@ class SurveyScheduler:
                 initial_sent_at=sent_at,
                 reminder_count=0
             )
-            db.add(new_period)
 
             try:
-                db.flush()
+                with db.begin_nested():
+                    db.add(new_period)
+                    db.flush()
                 logger.debug(f"Created survey period {new_period.id}: {frequency_type} period {period_start} to {period_end}")
                 return new_period
             except IntegrityError as ie:
-                # Race condition: another transaction created the period between our check and insert
-                # Roll back this transaction and query for the existing period
-                db.rollback()
+                # Race condition: another transaction created the period between our
+                # check and insert. The nested transaction rollback keeps the outer
+                # session state intact, so we can safely look up the winner.
                 logger.debug(f"IntegrityError creating period - concurrent transaction created it: {str(ie)}")
                 existing = db.query(SurveyPeriod).filter(
                     SurveyPeriod.organization_id == organization_id,
