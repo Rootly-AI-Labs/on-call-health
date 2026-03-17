@@ -1,5 +1,9 @@
 import { toast } from "sonner"
 import { type Integration, API_BASE } from "../types"
+import {
+  getStoredSelectedOrganization,
+  setStoredSelectedOrganization,
+} from "@/lib/selected-organization"
 
 /**
  * Test connection to Rootly or PagerDuty with API token
@@ -434,7 +438,7 @@ export async function addIntegration(
           (platform === 'rootly' ? firstCreatedIntegrationId : null)
         if (newIntegrationId) {
           const integrationIdStr = newIntegrationId.toString()
-          localStorage.setItem('selected_organization', integrationIdStr)
+          setStoredSelectedOrganization(integrationIdStr)
           // Update React state to reflect the selection in UI
           if (setSelectedOrganization) {
             setSelectedOrganization(integrationIdStr)
@@ -559,9 +563,9 @@ export async function deleteIntegration(
       }
 
       // If we deleted the currently selected integration, clear the selection
-      const selectedOrg = localStorage.getItem('selected_organization')
+      const selectedOrg = getStoredSelectedOrganization()
       if (selectedOrg === integrationIdStr) {
-        localStorage.removeItem('selected_organization')
+        setStoredSelectedOrganization(null)
         // Clear React state to trigger auto-select
         if (setSelectedOrganization) {
           setSelectedOrganization("")
