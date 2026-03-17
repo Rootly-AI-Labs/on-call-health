@@ -80,11 +80,12 @@ class GitHubMappingService:
                 logger.debug(f"🔄 Cache STALE: {email} mapping is {self._get_mapping_age_days(cached_mapping)} days old")
                 
             elif cached_mapping and not cached_mapping.mapping_successful:
-                # Failed mapping: retry if enough time passed
-                if self._should_retry_failed_mapping(cached_mapping):
+                # Failed mapping: retry if we have a name to try (new strategy) or enough time passed
+                has_name = email_to_name and email_to_name.get(email)
+                if has_name or self._should_retry_failed_mapping(cached_mapping):
                     cache_stats["retries"] += 1
                     emails_needing_mapping.append(email)
-                    logger.debug(f"🔄 RETRY: {email} failed mapping ready for retry")
+                    logger.debug(f"🔄 RETRY: {email} failed mapping ready for retry (name_available={bool(has_name)})")
                 else:
                     logger.debug(f"⏳ SKIP: {email} failed mapping too recent to retry")
                     

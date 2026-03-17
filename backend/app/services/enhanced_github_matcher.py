@@ -9,9 +9,14 @@ from difflib import SequenceMatcher
 import aiohttp
 from datetime import datetime, timedelta, timezone
 
+from .github_org_cache import (
+    get_cached_org_members, set_cached_org_members,
+    get_cached_org_profiles, set_cached_org_profiles,
+)
+
 logger = logging.getLogger(__name__)
 
-# Global cache to persist across matcher instances
+# In-memory fallback (used within a single process lifetime)
 _GLOBAL_ORG_CACHE = {}
 _GLOBAL_MEMBER_PROFILES_CACHE = {}
 
@@ -142,13 +147,24 @@ class EnhancedGitHubMatcher:
                 
                 # Try different matching strategies against the known member list
                 result = await self._match_name_against_members(full_name_clean, all_members, fallback_email)
-                
+
                 if result:
                     return result
-                    
+
         except Exception as e:
             logger.error(f"Error in optimized name matching: {e}")
-        
+
+        # FALLBACK: Search GitHub by profile name using search API
+        try:
+            name_parts = self._extract_name_parts_from_full_name(full_name_clean)
+            if name_parts:
+                search_result = await self._search_github_by_name(name_parts, full_name_clean, fallback_email)
+                if search_result:
+                    logger.info(f"✅ GitHub search API matched '{full_name_clean}' -> {search_result}")
+                    return search_result
+        except Exception as e:
+            logger.warning(f"GitHub search API fallback failed for '{full_name_clean}': {e}")
+
         logger.warning(f"❌ No GitHub match found for name: '{full_name_clean}'")
         return None
     
@@ -163,33 +179,39 @@ class EnhancedGitHubMatcher:
 
             for org in self.organizations:
                 try:
+                    # 1) Check Redis cache for profiles (survives deploys)
+                    redis_profiles = get_cached_org_profiles(org)
+                    if redis_profiles:
+                        all_members.extend(redis_profiles)
+                        # Also populate in-memory caches for this process
+                        _GLOBAL_MEMBER_PROFILES_CACHE[f"{org}_profiles"] = redis_profiles
+                        if org not in self._org_members_cache:
+                            self._org_members_cache[org] = set(p['username'] for p in redis_profiles)
+                        continue
 
-                    # Get org members list
-                    if org not in self._org_members_cache:
-                        members = await self._get_org_members(org, session)
-                        self._org_members_cache[org] = members
-
-                    # Check if we have cached profiles already (persist across sync runs)
+                    # 2) Check in-memory cache (same process)
                     cache_key = f"{org}_profiles"
                     if cache_key in _GLOBAL_MEMBER_PROFILES_CACHE:
                         cached_profiles = _GLOBAL_MEMBER_PROFILES_CACHE[cache_key]
                         all_members.extend(cached_profiles)
                         continue
 
-                    # Batch fetch profiles concurrently (much faster than sequential)
+                    # 3) Cache miss — fetch from GitHub API
+                    if org not in self._org_members_cache:
+                        members = await self._get_org_members(org, session)
+                        self._org_members_cache[org] = members
+                        set_cached_org_members(org, list(members))
+
                     org_profiles = []
                     usernames = list(self._org_members_cache[org])
 
-                    # Process in batches of 10 to avoid overwhelming the API
                     batch_size = 10
                     for i in range(0, len(usernames), batch_size):
                         batch = usernames[i:i + batch_size]
 
-                        # Fetch all profiles in this batch concurrently
                         tasks = [self._get_github_user_profile(username, session) for username in batch]
                         profiles = await asyncio.gather(*tasks, return_exceptions=True)
 
-                        # Process results
                         for username, profile in zip(batch, profiles):
                             if isinstance(profile, Exception):
                                 logger.debug(f"Error fetching profile for {username}: {profile}")
@@ -203,12 +225,12 @@ class EnhancedGitHubMatcher:
                                     'organization': org
                                 })
 
-                        # Small delay between batches to respect rate limits
                         if i + batch_size < len(usernames):
                             await asyncio.sleep(0.5)
 
-                    # Cache profiles globally for this org
+                    # Store in both Redis (survives deploys) and in-memory (fast)
                     _GLOBAL_MEMBER_PROFILES_CACHE[cache_key] = org_profiles
+                    set_cached_org_profiles(org, org_profiles)
                     all_members.extend(org_profiles)
 
 

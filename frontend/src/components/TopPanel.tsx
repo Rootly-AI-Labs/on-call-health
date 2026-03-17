@@ -144,7 +144,7 @@ export function TopPanel() {
                     : "text-neutral-700 hover:text-white hover:bg-purple-800"
                 }`}
               >
-                Management
+                Team Settings
               </Link>
             </nav>
 

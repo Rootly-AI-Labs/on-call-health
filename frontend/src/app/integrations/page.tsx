@@ -2290,22 +2290,25 @@ export default function IntegrationsPage() {
               {/* Incident Management Platform Card */}
         <Card className="mb-8" data-incident-section>
           <CardContent className="p-8">
-        {/* Introduction Text */}
-        <div className="text-center mb-2">
-          <h2 className="text-4xl font-bold text-black">Connect Your Incident Management Platform</h2>
-        </div>
-
-        {/* Integration Status Message */}
-        {!loadingRootly && !loadingPagerDuty && (
-          <div className="text-center mb-6">
-            {integrations.length === 0 ? (
+        {/* Introduction Text - only show when no incident management integration connected */}
+        {integrations.length === 0 && !loadingRootly && !loadingPagerDuty && (
+          <>
+            <div className="text-center mb-2">
+              <h2 className="text-4xl font-bold text-black">Connect Your Incident Management Platform</h2>
+            </div>
+            <div className="text-center mb-6">
               <p className="text-lg font-medium text-neutral-700">Add a Rootly or PagerDuty integration to get started!</p>
-            ) : (
-              <p className="text-lg font-medium text-neutral-700">
-                You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected!{' '}
-                <Link href="/dashboard?run=true" className="text-purple-700 font-semibold hover:underline">Run an Analysis</Link> to view your team's risk
-              </p>
-            )}
+            </div>
+          </>
+        )}
+
+        {/* Integration Status Message - show when integrations exist */}
+        {integrations.length > 0 && !loadingRootly && !loadingPagerDuty && (
+          <div className="text-center mb-6">
+            <p className="text-lg font-medium text-neutral-700">
+              You have {integrations.length} integration{integrations.length > 1 ? 's' : ''} connected!{' '}
+              <Link href="/dashboard?run=true" className="text-purple-700 font-semibold hover:underline">Run an Analysis</Link> to view your team's risk
+            </p>
           </div>
         )}
 

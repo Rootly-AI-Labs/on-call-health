@@ -42,6 +42,7 @@ export function TeamRiskFactorsCard({
       showAlert={highRiskFactorsCount > 0}
       alertCount={highRiskFactorsCount}
       factorDescriptions={FACTOR_DESCRIPTIONS}
+      showInfoTooltip={false}
       loading={loadingAnalysis}
     />
   )
