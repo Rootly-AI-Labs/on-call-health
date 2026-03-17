@@ -449,9 +449,14 @@ export function SlackSurveyTabs({
                     <div className="flex items-center justify-between mb-3">
                       <h5 className="text-sm font-medium text-neutral-900">
                         Team Members ({slackUsers.length})
-                        {savedRecipients.size > 0 && (
+                        {(savedRecipients.size > 0 || nonDeliverableScheduledUsers.length > 0) && (
                           <span className="ml-2 text-green-600">
-                            • {savedRecipients.size} configured for automated surveys
+                            • {scheduledRecipientUsers.length} configured for automated surveys
+                            {nonDeliverableScheduledUsers.length > 0 && (
+                              <span className="ml-1 text-amber-600">
+                                ({nonDeliverableScheduledUsers.length} excluded)
+                              </span>
+                            )}
                           </span>
                         )}
                       </h5>
