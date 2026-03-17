@@ -97,6 +97,11 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import {
+  getStoredSelectedOrganization,
+  setStoredSelectedOrganization,
+  subscribeToSelectedOrganization,
+} from "@/lib/selected-organization"
 import { MappingDrawer } from "@/components/mapping-drawer"
 import { NotificationDrawer } from "@/components/notifications"
 import ManualSurveyDeliveryModal from "@/components/ManualSurveyDeliveryModal"
@@ -779,7 +784,7 @@ export default function IntegrationsPage() {
     loadLlmConfig() // Load AI config to persist connection state
 
     // Load saved organization preference
-    const savedOrg = localStorage.getItem('selected_organization')
+    const savedOrg = getStoredSelectedOrganization()
     // Accept both numeric IDs and beta string IDs (like "beta-rootly")
     if (savedOrg) {
       setSelectedOrganization(savedOrg)
@@ -867,6 +872,14 @@ export default function IntegrationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    return subscribeToSelectedOrganization((value) => {
+      if (!value) return
+      if (!integrations.some((integration) => integration.id.toString() === value)) return
+      setSelectedOrganization((current) => (current === value ? current : value))
+    })
+  }, [integrations])
+
   // Load Slack permissions when integration is available
   useEffect(() => {
     if (slackIntegration && activeEnhancementTab === 'slack') {
@@ -912,7 +925,7 @@ export default function IntegrationsPage() {
       const firstIntegration = integrations[0]
       const firstIntegrationId = firstIntegration.id.toString()
       setSelectedOrganization(firstIntegrationId)
-      localStorage.setItem('selected_organization', firstIntegrationId)
+      setStoredSelectedOrganization(firstIntegrationId)
 
       // Show sync modal after auto-selecting (same as manual switch)
       setTimeout(() => {
@@ -2566,7 +2579,7 @@ export default function IntegrationsPage() {
                       onValueChange={async (value) => {
                         // Update state immediately for instant UI response
                         setSelectedOrganization(value)
-                        localStorage.setItem('selected_organization', value)
+                        setStoredSelectedOrganization(value)
 
                         // Only show toast and check permissions if selecting a different organization
                         if (value !== selectedOrganization) {

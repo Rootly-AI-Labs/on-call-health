@@ -43,6 +43,11 @@ import { UserMappingDrawer } from "./components/UserMappingDrawer"
 import { OrganizationManagementDialog } from "@/app/integrations/dialogs/OrganizationManagementDialog"
 import * as OrganizationHandlers from "@/app/integrations/handlers/organization-handlers"
 import {
+  getStoredSelectedOrganization,
+  setStoredSelectedOrganization,
+  subscribeToSelectedOrganization,
+} from "@/lib/selected-organization"
+import {
   fetchGithubUsers,
   fetchJiraUsers,
   fetchLinearUsers,
@@ -203,15 +208,22 @@ function TeamPageContent() {
 
         // Restore selected org, with validation against actual integration IDs
         const urlOrgId = searchParams.get("org")
-        const saved = localStorage.getItem("selectedOrganization")
+        const saved = getStoredSelectedOrganization()
         const matchesIntegration = (id: string) => allIntegrations.some(i => i.id.toString() === id)
 
+        let nextSelectedOrganization: string | null = null
+
         if (urlOrgId && matchesIntegration(urlOrgId)) {
-          setSelectedOrganization(urlOrgId)
+          nextSelectedOrganization = urlOrgId
         } else if (saved && matchesIntegration(saved)) {
-          setSelectedOrganization(saved)
+          nextSelectedOrganization = saved
         } else if (allIntegrations.length > 0) {
-          setSelectedOrganization(allIntegrations[0].id.toString())
+          nextSelectedOrganization = allIntegrations[0].id.toString()
+        }
+
+        if (nextSelectedOrganization) {
+          setSelectedOrganization(nextSelectedOrganization)
+          setStoredSelectedOrganization(nextSelectedOrganization, { emit: false })
         }
       } catch (error) {
         console.error("Failed to load integrations:", error)
@@ -222,6 +234,14 @@ function TeamPageContent() {
 
     fetchIntegrations()
   }, [searchParams])
+
+  useEffect(() => {
+    return subscribeToSelectedOrganization((value) => {
+      if (!value) return
+      if (!integrations.some((integration) => integration.id.toString() === value)) return
+      setSelectedOrganization((current) => (current === value ? current : value))
+    })
+  }, [integrations])
 
   // Handle view parameter from URL
   useEffect(() => {
@@ -271,13 +291,6 @@ function TeamPageContent() {
 
     fetchConnectedIntegrations()
   }, [])
-
-  // Save selected organization to localStorage
-  useEffect(() => {
-    if (selectedOrganization) {
-      localStorage.setItem("selectedOrganization", selectedOrganization)
-    }
-  }, [selectedOrganization])
 
   // Clear integration users data and reset pagination when organization changes
   useEffect(() => {
@@ -1062,7 +1075,10 @@ function TeamPageContent() {
                             <label className="text-sm font-medium text-neutral-900 mb-2 block">Select Organization</label>
                             <Select
                               value={selectedOrganization}
-                              onValueChange={setSelectedOrganization}
+                              onValueChange={(value) => {
+                                setSelectedOrganization(value)
+                                setStoredSelectedOrganization(value)
+                              }}
                               disabled={loadingIntegrations || !hasPrimaryIntegration}
                             >
                               <SelectTrigger className="w-full sm:w-72">
