@@ -412,7 +412,7 @@ async def github_callback(
 @auth_rate_limit("auth_login")
 async def okta_login(request: Request, redirect_origin: str = Query(None)):
     """Initiate Okta OIDC login."""
-    if not settings.OKTA_CLIENT_ID:
+    if not settings.OKTA_CLIENT_ID or not settings.OKTA_ISSUER:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="Okta OAuth not configured"
@@ -438,7 +438,7 @@ async def okta_callback(
     db: Session = Depends(get_db)
 ):
     """Handle Okta OIDC callback."""
-    if not settings.OKTA_CLIENT_ID:
+    if not settings.OKTA_CLIENT_ID or not settings.OKTA_ISSUER:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="Okta OAuth not configured"
