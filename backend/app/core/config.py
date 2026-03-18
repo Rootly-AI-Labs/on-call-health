@@ -43,6 +43,12 @@ class Settings:
     GITHUB_CLIENT_SECRET: Optional[str] = os.getenv("GITHUB_CLIENT_SECRET")
     GITHUB_REDIRECT_URI: str = os.getenv("GITHUB_REDIRECT_URI", "http://localhost:8000/auth/github/callback")
     
+    # OAuth - Okta (OIDC)
+    OKTA_CLIENT_ID: Optional[str] = os.getenv("OKTA_CLIENT_ID")
+    OKTA_CLIENT_SECRET: Optional[str] = os.getenv("OKTA_CLIENT_SECRET")
+    OKTA_ISSUER: Optional[str] = os.getenv("OKTA_ISSUER")
+    OKTA_REDIRECT_URI: str = os.getenv("OKTA_REDIRECT_URI", "http://localhost:8000/auth/okta/callback")
+    
     # OAuth - Slack
     SLACK_CLIENT_ID: Optional[str] = os.getenv("SLACK_CLIENT_ID")
     SLACK_CLIENT_SECRET: Optional[str] = os.getenv("SLACK_CLIENT_SECRET")

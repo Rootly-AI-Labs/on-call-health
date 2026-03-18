@@ -213,6 +213,78 @@ class GitHubOAuth(OAuthProvider):
         # Fall back to first verified email
         return github_emails[0]["email"] if github_emails else None
 
+class OktaOAuth(OAuthProvider):
+    """Okta OIDC provider."""
+
+    def __init__(self):
+        super().__init__(
+            client_id=settings.OKTA_CLIENT_ID or "",
+            client_secret=settings.OKTA_CLIENT_SECRET or "",
+            redirect_uri=settings.OKTA_REDIRECT_URI,
+        )
+        issuer = (settings.OKTA_ISSUER or "").rstrip("/")
+        self.auth_url = f"{issuer}/v1/authorize"
+        self.token_url = f"{issuer}/v1/token"
+        self.user_info_url = f"{issuer}/v1/userinfo"
+
+    def get_authorization_url(self, state: str = None) -> str:
+        """Generate Okta OIDC authorization URL."""
+        params = {
+            "client_id": self.client_id,
+            "redirect_uri": self.redirect_uri,
+            "scope": "openid email profile",
+            "response_type": "code",
+        }
+        if state:
+            params["state"] = state
+        return f"{self.auth_url}?{urlencode(params)}"
+
+    async def exchange_code_for_token(self, code: str) -> Dict[str, Any]:
+        """Exchange Okta authorization code for access token."""
+        data = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "code": code,
+            "grant_type": "authorization_code",
+            "redirect_uri": self.redirect_uri,
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(self.token_url, data=data)
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to exchange code for token",
+            )
+
+        return response.json()
+
+    async def get_user_info(self, access_token: str) -> Dict[str, Any]:
+        """Get Okta user information via OIDC userinfo endpoint."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(self.user_info_url, headers=headers)
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to get user info",
+            )
+
+        user_data = response.json()
+        logger.info(
+            f"Okta OIDC user_info: email={user_data.get('email')}, sub={user_data.get('sub')}"
+        )
+        return user_data
+
+
 # Provider instances
 google_oauth = GoogleOAuth()
 github_oauth = GitHubOAuth()
+okta_oauth = OktaOAuth()
