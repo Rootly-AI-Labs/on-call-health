@@ -32,7 +32,10 @@ class AccountLinkingService:
         """
         # Okta uses "sub" as unique identifier; Google/GitHub use "id"
         if provider == "okta":
-            provider_user_id = str(user_info.get("sub"))
+            raw_id = user_info.get("sub")
+            if not raw_id:
+                raise ValueError("Okta userinfo response missing 'sub' field")
+            provider_user_id = str(raw_id)
         else:
             provider_user_id = str(user_info.get("id"))
         
@@ -46,7 +49,8 @@ class AccountLinkingService:
         elif provider in ("google", "okta"):
             primary_email = user_info.get("email")
             email_list = [primary_email] if primary_email else []
-            primary_email_data = [{"email": primary_email, "verified": True, "primary": True}] if primary_email else []
+            is_verified = user_info.get("email_verified", True) if provider == "okta" else True
+            primary_email_data = [{"email": primary_email, "verified": is_verified, "primary": True}] if primary_email else []
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
