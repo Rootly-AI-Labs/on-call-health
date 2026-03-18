@@ -13,7 +13,7 @@ import secrets
 from pydantic import EmailStr, field_validator, Field, BaseModel
 
 from ...models import get_db, User, OAuthProvider, UserEmail, OrganizationInvitation
-from ...auth.oauth import google_oauth, github_oauth
+from ...auth.oauth import google_oauth, github_oauth, okta_oauth
 from ...auth.jwt import create_access_token
 from ...auth.dependencies import get_current_active_user
 from ...services.account_linking import AccountLinkingService
@@ -402,6 +402,113 @@ async def github_callback(
         error_msg = str(e) if str(e) else "Unknown authentication error"
         logger.error(f"GitHub OAuth callback error: {error_msg}")
         # Use state for error redirect too
+        frontend_url = settings.FRONTEND_URL
+        if state and state in ALLOWED_OAUTH_ORIGINS:
+            frontend_url = state
+        error_url = build_error_redirect(frontend_url, error_msg)
+        return RedirectResponse(url=error_url)
+
+@router.get("/okta")
+@auth_rate_limit("auth_login")
+async def okta_login(request: Request, redirect_origin: str = Query(None)):
+    """Initiate Okta OIDC login."""
+    if not settings.OKTA_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Okta OAuth not configured"
+        )
+
+    state = None
+    if redirect_origin and redirect_origin in ALLOWED_OAUTH_ORIGINS:
+        state = redirect_origin
+
+    authorization_url = okta_oauth.get_authorization_url(state=state)
+
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and "application/json" not in accept:
+        return RedirectResponse(url=authorization_url)
+
+    return {"authorization_url": authorization_url}
+
+@router.get("/okta/callback")
+async def okta_callback(
+    code: str = Query(None),
+    error: str = Query(None),
+    state: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Handle Okta OIDC callback."""
+    if not settings.OKTA_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Okta OAuth not configured"
+        )
+
+    if error:
+        if error == "access_denied":
+            return RedirectResponse(url=settings.FRONTEND_URL)
+        else:
+            error_url = build_error_redirect(settings.FRONTEND_URL, f'OAuth error: {error}')
+            return RedirectResponse(url=error_url)
+
+    if not code:
+        logger.warning("Okta OAuth callback received without authorization code")
+        return RedirectResponse(url=settings.FRONTEND_URL)
+
+    try:
+        token_data = await okta_oauth.exchange_code_for_token(code)
+        access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
+
+        if not access_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No access token received"
+            )
+
+        user_info = await okta_oauth.get_user_info(access_token)
+
+        linking_service = AccountLinkingService(db)
+        user, is_new_user = await linking_service.link_or_create_user(
+            provider="okta",
+            user_info=user_info,
+            access_token=access_token,
+            refresh_token=refresh_token
+        )
+
+        if is_new_user:
+            try:
+                assign_user_to_organization(db, user)
+            except Exception as e:
+                logger.error(f"Failed to auto-assign organization for new user {user.id}: {e}")
+
+        if is_new_user:
+            try:
+                create_demo_analysis_for_new_user(db, user)
+            except Exception as e:
+                logger.error(f"Failed to create demo analysis for new user {user.id}: {e}")
+
+        jwt_token = create_access_token(data={"sub": user.id})
+
+        frontend_url = settings.FRONTEND_URL
+        if state and state in ALLOWED_OAUTH_ORIGINS:
+            frontend_url = state
+
+        auth_code = secrets.token_urlsafe(32)
+
+        logger.info(f"Storing OAuth code for user {user.id}: {auth_code[:10]}...")
+
+        store_oauth_code(db, auth_code, jwt_token, user.id)
+
+        logger.info("Okta OAuth code stored successfully")
+
+        success_url = f"{frontend_url}/auth/success?code={auth_code}"
+        response = RedirectResponse(url=success_url)
+        return response
+
+    except Exception as e:
+        error_msg = str(e) if str(e) else "Unknown authentication error"
+        logger.error("Okta OAuth callback error: %s", error_msg)
         frontend_url = settings.FRONTEND_URL
         if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state

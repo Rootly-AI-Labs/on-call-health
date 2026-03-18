@@ -30,7 +30,11 @@ class AccountLinkingService:
         Returns:
             Tuple of (User, is_new_user)
         """
-        provider_user_id = str(user_info.get("id"))
+        # Okta uses "sub" as unique identifier; Google/GitHub use "id"
+        if provider == "okta":
+            provider_user_id = str(user_info.get("sub"))
+        else:
+            provider_user_id = str(user_info.get("id"))
         
         # Get primary email only (no secondary emails)
         if provider == "github":
@@ -39,11 +43,9 @@ class AccountLinkingService:
             email_list = [primary_email]  # Only use primary email for user matching
             # Only store primary email (no secondary emails)
             primary_email_data = [{"email": primary_email, "verified": True, "primary": True}]
-        elif provider == "google":
-            # Google typically provides one verified email
+        elif provider in ("google", "okta"):
             primary_email = user_info.get("email")
             email_list = [primary_email] if primary_email else []
-            # Only store primary email
             primary_email_data = [{"email": primary_email, "verified": True, "primary": True}] if primary_email else []
         else:
             raise ValueError(f"Unsupported provider: {provider}")

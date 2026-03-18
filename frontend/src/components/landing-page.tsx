@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import localFont from "next/font/local"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Link2, Brain, Target, Github, Chrome, Loader2, Flame, Linkedin } from "lucide-react";
+import { Link2, Brain, Target, Github, Chrome, Loader2, Flame, Linkedin, ShieldCheck } from "lucide-react";
 import { siX } from "simple-icons"
 import Image from "next/image"
 
@@ -48,7 +48,7 @@ const ppMori = localFont({
 // TODO: set the meta title and description - what's the right way of doing it?
 
 export default function LandingPage() {
-  const [isLoading, setIsLoading] = useState<'google' | 'github' | null>(null)
+  const [isLoading, setIsLoading] = useState<'google' | 'github' | 'okta' | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Preload background images and autoplay video on mount
@@ -136,6 +136,38 @@ export default function LandingPage() {
     } catch (error) {
       console.error('GitHub login error:', error)
       setIsLoading(null) // Reset loading state on error
+    }
+  }
+
+  const handleOktaLogin = async () => {
+    try {
+      setIsLoading('okta')
+      const currentOrigin = window.location.origin
+      const response = await fetch(`${API_BASE}/auth/okta?redirect_origin=${encodeURIComponent(currentOrigin)}`)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Okta auth API error:', response.status, errorText)
+        throw new Error(`Authentication failed: ${response.status}`)
+      }
+
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const responseText = await response.text()
+        console.error('Expected JSON but got:', contentType, responseText)
+        throw new Error('Invalid response format from authentication server')
+      }
+
+      const data = await response.json()
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url
+      } else {
+        console.error('No authorization URL in response:', data)
+        throw new Error('Invalid authentication response')
+      }
+    } catch (error) {
+      console.error('Okta login error:', error)
+      setIsLoading(null)
     }
   }
 
@@ -245,6 +277,26 @@ export default function LandingPage() {
               </span>
             </Button>
 
+            <Button
+              size="lg"
+              className="w-full rounded-3xl sm:w-auto bg-[#00297A] hover:bg-[#001f5c] text-white px-6 py-5 text-base font-display font-bold flex items-center justify-center lg:px-8 lg:py-7 lg:text-lg"
+              onClick={handleOktaLogin}
+              disabled={isLoading === "okta"}
+            >
+              <span className="flex items-center justify-center gap-3 translate-y-[1.5px]">
+                {isLoading === "okta" ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Connecting to Okta...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="h-6 w-6 -translate-y-0.5" aria-hidden="true" />
+                    Sign in with Okta
+                  </>
+                )}
+              </span>
+            </Button>
 
             </div>
           </main>
