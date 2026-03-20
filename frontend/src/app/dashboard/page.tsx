@@ -715,7 +715,7 @@ function DashboardContent() {
           )}
 
           {/* Auto-Refresh Info Bar: shown when viewing an auto-refresh analysis */}
-          {currentAnalysis?.is_auto_refresh === true && currentAnalysis?.status === 'completed' && (
+          {currentAnalysis?.is_auto_refresh === true && currentAnalysis?.status === 'completed' && !analysisRunning && (
             <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
               <div className="flex items-center gap-1.5 font-medium">
                 <Timer className="w-4 h-4" />

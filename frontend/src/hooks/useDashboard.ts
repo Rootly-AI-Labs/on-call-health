@@ -1655,7 +1655,7 @@ export default function useDashboard() {
   const [isCustomRange, setIsCustomRange] = useState(false)
   const [dialogSelectedIntegration, setDialogSelectedIntegration] = useState<string>("")
   const [noIntegrationsFound, setNoIntegrationsFound] = useState(false)
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false)
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
   const [autoRefreshInterval, setAutoRefreshInterval] = useState("24h")
   
   // GitHub/Slack integration states
