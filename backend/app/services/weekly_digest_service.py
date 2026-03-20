@@ -21,6 +21,7 @@ from ..models import Analysis, SessionLocal, User, UserCorrelation, WeeklyDigest
 
 logger = logging.getLogger(__name__)
 
+
 # Tracks scheduler start time for FORCE_SEND countdown logging
 _scheduler_start_time: Optional[datetime] = None
 _DIGEST_INTERVAL_MINUTES = 10
@@ -577,7 +578,7 @@ def _build_email_content(
         </div>
         <div>
           <span style="font-size: 12px; color: #6b7280; vertical-align: middle; margin-right: 4px;">Powered by</span>
-          <img src="{settings.FRONTEND_URL}/images/rootly-ai-logo.png" alt="Rootly AI" height="14" style="display: inline-block; vertical-align: middle;">
+          <img src="{settings.FRONTEND_URL}/images/rootly-ai-logo.png" alt="Rootly AI" height="20" style="display: inline-block; vertical-align: middle;">
         </div>
       </td>
     </tr>
