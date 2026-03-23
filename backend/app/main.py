@@ -223,7 +223,7 @@ async def startup_event():
     from app.services.weekly_digest_service import weekly_digest_scheduler
     if settings.WEEKLY_DIGEST_ENABLED:
         weekly_digest_scheduler.start()
-        print("Weekly digest scheduler started (every 10 minutes)")
+        print("Weekly digest scheduler started (fires :40 of every hour; sends Monday 2am per user's local timezone — TODO: revert to 10am before deploying)")
     else:
         print("Weekly digest scheduler disabled (WEEKLY_DIGEST_ENABLED=false)")
 

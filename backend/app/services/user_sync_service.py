@@ -412,23 +412,44 @@ class UserSyncService:
                     )
                     updated += self._update_correlation(existing_record, user, platform, integration_id)
                 else:
-                    # Safe to create new correlation
-                    # Extract email domain from the user's email address
-                    email_domain = email.split("@")[1].lower() if "@" in email else None
+                    # Check for existing row by platform user ID to prevent duplicates
+                    # across account re-creations (e.g. user_id changed from 54→82→85)
+                    platform_record = None
+                    if platform == "rootly" and user.get("id"):
+                        platform_record = self.db.query(UserCorrelation).filter(
+                            UserCorrelation.rootly_user_id == str(user["id"]),
+                            UserCorrelation.email == email
+                        ).first()
+                    elif platform == "pagerduty" and user.get("id"):
+                        platform_record = self.db.query(UserCorrelation).filter(
+                            UserCorrelation.pagerduty_user_id == str(user["id"]),
+                            UserCorrelation.email == email
+                        ).first()
 
-                    correlation = UserCorrelation(
-                        user_id=assigned_user_id,  # NULL for team members (org mode), current_user.id for own/beta mode
-                        organization_id=organization_id,  # Multi-tenancy key (or NULL for beta mode)
-                        email_domain=email_domain,  # User's actual domain for data sharing
-                        email=email,
-                        name=user.get("name"),  # Store user's display name
-                        timezone=user.get("timezone"),  # User's timezone from Rootly/PagerDuty
-                        avatar_url=user.get("avatar_url"),  # Profile image from PagerDuty/Rootly
-                        integration_ids=[integration_id] if integration_id else []  # Initialize array
-                    )
-                    self._update_correlation(correlation, user, platform, integration_id)
-                    self.db.add(correlation)
-                    created += 1
+                    if platform_record:
+                        logger.info(
+                            f"Found existing {platform} record by platform user ID for {email} "
+                            f"(row id={platform_record.id}, user_id={platform_record.user_id}). Updating instead of inserting."
+                        )
+                        updated += self._update_correlation(platform_record, user, platform, integration_id)
+                    else:
+                        # Safe to create new correlation
+                        # Extract email domain from the user's email address
+                        email_domain = email.split("@")[1].lower() if "@" in email else None
+
+                        correlation = UserCorrelation(
+                            user_id=assigned_user_id,  # NULL for team members (org mode), current_user.id for own/beta mode
+                            organization_id=organization_id,  # Multi-tenancy key (or NULL for beta mode)
+                            email_domain=email_domain,  # User's actual domain for data sharing
+                            email=email,
+                            name=user.get("name"),  # Store user's display name
+                            timezone=user.get("timezone"),  # User's timezone from Rootly/PagerDuty
+                            avatar_url=user.get("avatar_url"),  # Profile image from PagerDuty/Rootly
+                            integration_ids=[integration_id] if integration_id else []  # Initialize array
+                        )
+                        self._update_correlation(correlation, user, platform, integration_id)
+                        self.db.add(correlation)
+                        created += 1
 
         # Commit all changes with retry logic for race conditions and transient errors
         max_retries = 3

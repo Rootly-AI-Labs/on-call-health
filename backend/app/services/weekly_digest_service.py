@@ -18,6 +18,7 @@ from sqlalchemy import and_, func
 
 from ..core.config import settings
 from ..models import Analysis, SessionLocal, User, UserCorrelation, WeeklyDigestLog
+from ..models.survey_schedule import SurveySchedule
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ def _ensure_dict(value: Any) -> Dict[str, Any]:
 
 
 def _get_user_timezone(db, user_id: int) -> str:
+    # 1. Try user_correlations.timezone by user_id (populated from integration sync)
     correlation = db.query(UserCorrelation).filter(
         UserCorrelation.user_id == user_id,
         UserCorrelation.timezone.isnot(None),
@@ -49,8 +51,32 @@ def _get_user_timezone(db, user_id: int) -> str:
         UserCorrelation.last_synced_at.desc().nullslast(),
         UserCorrelation.id.desc()
     ).first()
-
     tz_name = correlation.timezone if correlation else None
+
+    # 2. Fallback: match user_correlations by email (handles accounts not yet linked by user_id)
+    if not tz_name:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.email:
+            correlation = db.query(UserCorrelation).filter(
+                UserCorrelation.email == user.email,
+                UserCorrelation.timezone.isnot(None),
+            ).order_by(
+                UserCorrelation.last_synced_at.desc().nullslast(),
+                UserCorrelation.id.desc()
+            ).first()
+            tz_name = correlation.timezone if correlation else None
+
+    # 3. Fallback: survey_schedules.timezone for the user's organization
+    if not tz_name:
+        user = user if 'user' in dir() else db.query(User).filter(User.id == user_id).first()
+        if user and user.organization_id:
+            schedule = db.query(SurveySchedule).filter(
+                SurveySchedule.organization_id == user.organization_id,
+                SurveySchedule.timezone.isnot(None),
+            ).first()
+            tz_name = schedule.timezone if schedule else None
+
+    # 4. Final fallback: UTC
     if not tz_name:
         return "UTC"
 
@@ -818,11 +844,11 @@ async def check_and_send_weekly_digests() -> None:
                 tz = pytz.timezone(tz_name)
                 local_now = datetime.now(tz)
 
-                # Monday at 10am local time (skipped when WEEKLY_DIGEST_FORCE_SEND=true)
+                # TODO: revert to hour != 10 before deploying (currently set to 10am local for testing)
+                logger.info(f"📬 [WEEKLY_DIGEST] {user.email} timezone={tz_name} local_now={local_now.strftime('%A %H:%M')} (weekday={local_now.weekday()}, hour={local_now.hour})")
                 if not settings.WEEKLY_DIGEST_FORCE_SEND:
-                    if local_now.weekday() != 0:
-                        continue
-                    if local_now.hour != 10:
+                    if local_now.weekday() != 0 or local_now.hour != 11:
+                        logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: not Monday 11am local (weekday={local_now.weekday()}, hour={local_now.hour})")
                         continue
 
                 week_start_date = _get_week_start_date(local_now)
@@ -839,6 +865,7 @@ async def check_and_send_weekly_digests() -> None:
                         continue
 
                 results = _ensure_dict(analysis.results)
+                logger.info(f"📬 [WEEKLY_DIGEST] analysis={analysis.id} results type={type(analysis.results).__name__} keys={list(results.keys())[:5] if results else 'EMPTY'}")
                 if not results:
                     logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: analysis results are empty")
                     continue
@@ -867,6 +894,7 @@ async def check_and_send_weekly_digests() -> None:
                 )
 
                 if not sent:
+                    logger.warning(f"📬 [WEEKLY_DIGEST] FAILED to send to {user.email} (analysis={analysis.id}) — will retry next cron tick")
                     continue
 
                 logger.info(
@@ -911,7 +939,7 @@ class WeeklyDigestScheduler:
         _scheduler_start_time = datetime.now()
         self.scheduler.add_job(
             check_and_send_weekly_digests,
-            trigger=CronTrigger(minute="*/10"),
+            trigger=CronTrigger(minute="*/30"),  # fires every 30 min; sends when local hour == 11 (Monday)
             id="weekly_digest",
             replace_existing=True
         )
@@ -927,7 +955,7 @@ class WeeklyDigestScheduler:
                 "digest will send on next 10-min tick, countdown logged every 2 min"
             )
         self.scheduler.start()
-        logger.info("Weekly digest scheduler started (every 10 minutes)")
+        logger.info("Weekly digest scheduler started (fires :02 of every hour; sends Monday 10am per user's local timezone — TODO: revert to minute=0 before deploying)")
 
 
 weekly_digest_scheduler = WeeklyDigestScheduler()
