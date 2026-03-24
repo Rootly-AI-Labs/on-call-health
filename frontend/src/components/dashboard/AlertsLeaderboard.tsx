@@ -2,95 +2,55 @@
 
 import { useState, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Trophy } from "lucide-react"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 
 interface AlertsLeaderboardProps {
   currentAnalysis: any
 }
 
-type SortKey =
-  | "total"
-  | "with_incidents"
-  | "after_hours"
-  | "night_time"
-  | "escalated"
-  | "retriggered"
-  | "high"
-  | "mtta"
-  | "mttr"
+type FilterKey = "total" | "noise" | "night_time" | "no_incident" | "escalated" | "retriggered"
 
-const FILTERS: { key: SortKey; label: string; description: string }[] = [
-  { key: "total",          label: "Total",          description: "Total alerts responded to by each team member." },
-  { key: "with_incidents", label: "With Incidents", description: "Alerts that escalated into a full incident." },
-  { key: "after_hours",    label: "After-Hours",    description: "Alerts received outside of business hours (before 9am or after 5pm, and weekends)." },
-  { key: "night_time",     label: "Night-Time",     description: "Alerts received during deep night hours (10pm – 6am)." },
-  { key: "escalated",      label: "Escalated",      description: "Alerts that were escalated to another responder or level." },
-  { key: "retriggered",    label: "Retriggered",    description: "Alerts that fired again after being acknowledged or resolved." },
-  { key: "high",           label: "High Urgency",   description: "Alerts classified as high urgency — requiring immediate attention." },
-  { key: "mtta",           label: "Avg MTTA",       description: "Average time from alert trigger to first acknowledgement." },
-  { key: "mttr",           label: "Avg MTTR",       description: "Average time from alert trigger to full resolution." },
+const FILTERS: { key: FilterKey; label: string; description: string }[] = [
+  { key: "total",       label: "Most Fired",      description: "Alerts that fired the most times in this period." },
+  { key: "noise",       label: "Noisiest",        description: "Alerts classified as noise — firing frequently without being actionable." },
+  { key: "night_time",  label: "Night-Time",      description: "Alerts firing during deep night hours (10pm – 6am), disrupting sleep." },
+  { key: "no_incident", label: "No Incident",     description: "Alerts that fired but never escalated into a full incident — potential noise or misconfiguration." },
+  { key: "escalated",   label: "Escalated",       description: "Alerts that were escalated to another responder or level." },
+  { key: "retriggered", label: "Retriggered",     description: "Alerts that fired again after being acknowledged or resolved." },
 ]
 
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`
-  if (seconds < 3600) {
-    const m = Math.floor(seconds / 60)
-    const s = Math.round(seconds % 60)
-    return s > 0 ? `${m}m ${s}s` : `${m}m`
-  }
-  const h = Math.floor(seconds / 3600)
-  const m = Math.round((seconds % 3600) / 60)
-  return m > 0 ? `${h}h ${m}m` : `${h}h`
+const BAR_COLORS: Record<FilterKey, string> = {
+  total:       "bg-neutral-400",
+  noise:       "bg-red-400",
+  night_time:  "bg-indigo-400",
+  no_incident: "bg-orange-400",
+  escalated:   "bg-yellow-400",
+  retriggered: "bg-pink-400",
 }
-
-function getMemberValue(member: any, key: SortKey): number {
-  switch (key) {
-    case "total":          return member.alerts_count ?? 0
-    case "with_incidents": return member.alerts_with_incidents_count ?? 0
-    case "after_hours":    return member.alerts_after_hours_count ?? 0
-    case "night_time":     return member.alerts_night_time_count ?? 0
-    case "escalated":      return member.alerts_escalated_count ?? 0
-    case "retriggered":    return member.alerts_retriggered_count ?? 0
-    case "high":           return member.alerts_urgency_counts?.high ?? 0
-    case "mtta":           return member.alerts_avg_mtta_seconds ?? 0
-    case "mttr":           return member.alerts_avg_mttr_seconds ?? 0
-    default:               return 0
-  }
-}
-
-function formatValue(value: number, key: SortKey): string {
-  if (key === "mtta" || key === "mttr") return value > 0 ? formatDuration(value) : "—"
-  return String(value)
-}
-
-const RANK_COLORS    = ["text-yellow-500", "text-neutral-400", "text-orange-600"]
-const RANK_BAR_COLORS = ["bg-yellow-400",  "bg-neutral-400",   "bg-orange-400"]
 
 export function AlertsLeaderboard({ currentAnalysis }: AlertsLeaderboardProps) {
-  const [activeKey, setActiveKey] = useState<SortKey>("total")
+  const [activeKey, setActiveKey] = useState<FilterKey>("total")
+
+  const topAlerts: any[] = useMemo(() => {
+    return currentAnalysis?.analysis_data?.metadata?.alerts?.top_alerts ?? []
+  }, [currentAnalysis])
 
   const activeFilter = FILTERS.find((f) => f.key === activeKey)!
 
-  const members: any[] = useMemo(() => {
-    const teamAnalysis = currentAnalysis?.analysis_data?.team_analysis
-    const arr = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis as any)?.members ?? []
-    return arr.filter((m: any) => typeof m === "object" && m !== null)
-  }, [currentAnalysis])
-
   const sorted = useMemo(() => {
-    return [...members]
-      .filter((m) => getMemberValue(m, activeKey) > 0)
-      .sort((a, b) => getMemberValue(b, activeKey) - getMemberValue(a, activeKey))
-  }, [members, activeKey])
+    return [...topAlerts]
+      .filter((a) => (a[activeKey] ?? 0) > 0)
+      .sort((a, b) => (b[activeKey] ?? 0) - (a[activeKey] ?? 0))
+  }, [topAlerts, activeKey])
 
-  const maxVal = sorted.length > 0 ? getMemberValue(sorted[0], activeKey) : 1
+  const maxVal = sorted.length > 0 ? (sorted[0][activeKey] ?? 0) : 1
 
   return (
     <Card className="bg-white flex flex-col h-full overflow-hidden">
       <CardHeader className="pb-2 shrink-0">
         <div className="space-y-1">
-          <CardTitle className="text-neutral-900">Alerts Leaderboard</CardTitle>
-          <CardDescription>Team members ranked by alert metric</CardDescription>
+          <CardTitle className="text-neutral-900">Alerts Breakdown</CardTitle>
+          <CardDescription>Top alerts ranked by negative impact criteria</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden">
@@ -112,33 +72,43 @@ export function AlertsLeaderboard({ currentAnalysis }: AlertsLeaderboardProps) {
         </div>
 
         {/* Active filter description */}
-        <p className="text-xs text-neutral-400 mb-3 shrink-0">{activeFilter.description}</p>
+        <div className="flex items-center gap-1 mb-3 shrink-0">
+          <p className="text-xs text-neutral-400">{activeFilter.description}</p>
+        </div>
 
-        {sorted.length === 0 ? (
-          <div className="text-sm text-neutral-400 text-center py-6">No data for this metric</div>
+        {topAlerts.length === 0 ? (
+          <div className="text-sm text-neutral-400 text-center py-6">
+            No alert data available — run a new analysis to populate this.
+          </div>
+        ) : sorted.length === 0 ? (
+          <div className="text-sm text-neutral-400 text-center py-6">No alerts match this filter</div>
         ) : (
-          <div className="overflow-y-auto flex-1 space-y-2 pr-6 min-h-0">
-            {sorted.map((member, i) => {
-              const name   = member.user_name || member.name || member.user_email || "Unknown"
-              const val    = getMemberValue(member, activeKey)
+          <div className="overflow-y-auto flex-1 space-y-2.5 pr-2 min-h-0">
+            {sorted.map((alert, i) => {
+              const val = alert[activeKey] ?? 0
+              const total = alert.total ?? 0
               const barPct = Math.max(maxVal > 0 ? (val / maxVal) * 100 : 0, 2)
-              const isTop3 = i < 3
+              const pct = total > 0 ? Math.round((val / total) * 100) : null
 
               return (
-                <div key={member.user_id ?? member.user_email ?? i} className="flex items-center gap-3">
-                  <span className={`text-xs font-bold w-5 text-right shrink-0 ${RANK_COLORS[i] ?? "text-neutral-400"}`}>
-                    {i + 1}
-                  </span>
-                  <span className="text-sm text-neutral-700 font-medium w-36 shrink-0 truncate">{name}</span>
-                  <div className="flex-1 min-w-0 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                <div key={alert.title + i} className="space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-xs text-neutral-700 font-medium leading-tight flex-1 min-w-0 truncate" title={alert.title}>
+                      {alert.title}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {pct !== null && activeKey !== "total" && (
+                        <span className="text-xs text-neutral-400">{pct}%</span>
+                      )}
+                      <span className="text-xs font-semibold text-neutral-800 w-6 text-right">{val}</span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${isTop3 ? (RANK_BAR_COLORS[i] ?? "bg-neutral-300") : "bg-neutral-300"}`}
+                      className={`h-full rounded-full ${BAR_COLORS[activeKey]}`}
                       style={{ width: `${barPct}%` }}
                     />
                   </div>
-                  <span className={`text-xs font-semibold shrink-0 w-10 text-right ${isTop3 ? RANK_COLORS[i] : "text-neutral-600"}`}>
-                    {formatValue(val, activeKey)}
-                  </span>
                 </div>
               )
             })}

@@ -495,6 +495,7 @@ class RootlyAPIClient:
         after_hours_count = 0
         night_time_count = 0
         urgency_counts: Dict[str, int] = {}
+        per_alert_title: Dict[str, Dict[str, int]] = {}  # alert summary → {total, noise, night_time, no_incident, escalated, retriggered}
 
         def _parse_dt(value: Optional[str]) -> Optional[datetime]:
             if not value:
@@ -1004,6 +1005,24 @@ class RootlyAPIClient:
                             if is_retriggered:
                                 retrigger_count += 1
 
+                            # Per-alert-title aggregation
+                            alert_title = (attrs.get("summary") or attrs.get("description") or "Unknown Alert").strip()
+                            if len(alert_title) > 120:
+                                alert_title = alert_title[:120] + "…"
+                            if alert_title not in per_alert_title:
+                                per_alert_title[alert_title] = {"total": 0, "noise": 0, "night_time": 0, "no_incident": 0, "escalated": 0, "retriggered": 0}
+                            per_alert_title[alert_title]["total"] += 1
+                            if noise_value == "noise":
+                                per_alert_title[alert_title]["noise"] += 1
+                            if alert_night_time_any:
+                                per_alert_title[alert_title]["night_time"] += 1
+                            if not has_incident:
+                                per_alert_title[alert_title]["no_incident"] += 1
+                            if is_escalated:
+                                per_alert_title[alert_title]["escalated"] += 1
+                            if is_retriggered:
+                                per_alert_title[alert_title]["retriggered"] += 1
+
                             # Who acknowledged and who resolved (from event user fields)
                             def _extract_user_ids_emails(ev: dict):
                                 uids: Set[str] = set()
@@ -1307,6 +1326,10 @@ class RootlyAPIClient:
                 "per_user_mtta_avg_by_email": {k: per_user_mtta_sum_by_email[k] / per_user_mtta_count_by_email[k] for k in per_user_mtta_sum_by_email if per_user_mtta_count_by_email.get(k, 0) > 0},
                 "per_user_mttr_avg_by_id": {k: per_user_mttr_sum_by_id[k] / per_user_mttr_count_by_id[k] for k in per_user_mttr_sum_by_id if per_user_mttr_count_by_id.get(k, 0) > 0},
                 "per_user_mttr_avg_by_email": {k: per_user_mttr_sum_by_email[k] / per_user_mttr_count_by_email[k] for k in per_user_mttr_sum_by_email if per_user_mttr_count_by_email.get(k, 0) > 0},
+                "top_alerts": sorted(
+                    [{"title": t, **counts} for t, counts in per_alert_title.items()],
+                    key=lambda x: x["total"], reverse=True
+                )[:50],
             }
 
         return {
@@ -1364,6 +1387,10 @@ class RootlyAPIClient:
             "per_user_mtta_avg_by_email": {k: per_user_mtta_sum_by_email[k] / per_user_mtta_count_by_email[k] for k in per_user_mtta_sum_by_email if per_user_mtta_count_by_email.get(k, 0) > 0},
             "per_user_mttr_avg_by_id": {k: per_user_mttr_sum_by_id[k] / per_user_mttr_count_by_id[k] for k in per_user_mttr_sum_by_id if per_user_mttr_count_by_id.get(k, 0) > 0},
             "per_user_mttr_avg_by_email": {k: per_user_mttr_sum_by_email[k] / per_user_mttr_count_by_email[k] for k in per_user_mttr_sum_by_email if per_user_mttr_count_by_email.get(k, 0) > 0},
+            "top_alerts": sorted(
+                [{"title": t, **counts} for t, counts in per_alert_title.items()],
+                key=lambda x: x["total"], reverse=True
+            )[:50],
         }
 
     async def get_team_member_emails(self, team_name: str) -> set:

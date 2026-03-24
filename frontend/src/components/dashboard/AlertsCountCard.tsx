@@ -1,7 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Bell, AlertTriangle, Clock, Calendar, TrendingUp, RefreshCw } from "lucide-react"
+import { AlertTriangle, Clock, TrendingUp, RefreshCw } from "lucide-react"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 
 interface AlertsCountCardProps {
   currentAnalysis: any
@@ -123,13 +124,8 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Count + date */}
-            <div className="flex flex-col gap-1">
-              <span className="text-4xl font-bold text-neutral-900">
-                {typeof total === "number" ? total : "N/A"}
-              </span>
-              <span className="text-sm text-neutral-500">{dateRange}</span>
-            </div>
+            {/* Date range only */}
+            <span className="text-sm text-neutral-500">{dateRange}</span>
 
             {alerts.truncated && (
               <div className="text-xs text-yellow-700">Alert count may be partial (page limit reached)</div>
@@ -142,7 +138,10 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
                 {urgencyEntries.length > 0 && (
                   <div>
                     <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-neutral-700 font-medium">Urgency</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-neutral-700 font-medium">Urgency</span>
+                        <InfoTooltip content="Distribution of alerts by urgency level: High requires immediate attention, Medium is important but not critical, Low can be addressed later." side="bottom" />
+                      </div>
                       <div className="flex items-center gap-2 text-xs text-neutral-600">
                         {urgencyEntries.map(([key, value]) => (
                           <div key={key} className="flex items-center gap-1">
@@ -172,7 +171,10 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
                 {notNoisePct !== null && (
                   <div>
                     <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-neutral-700 font-medium">Signal Quality</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-neutral-700 font-medium">Signal Quality</span>
+                        <InfoTooltip content="Percentage of alerts that are actionable (not noise)." side="bottom" />
+                      </div>
                       <span className="text-green-600 font-medium">{notNoisePct}% actionable</span>
                     </div>
                     <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
@@ -186,29 +188,6 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
               </div>
             )}
 
-            {/* Avg MTTA + MTTR */}
-            {(avgMttaSeconds !== null || avgMttrSeconds !== null) && (
-              <div className="grid grid-cols-2 gap-3">
-                {avgMttaSeconds !== null && (
-                  <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-                    <div className="text-xs text-neutral-500 mb-1">
-                      Avg MTTA
-                      {mttaCount > 0 && <span className="ml-1">({mttaCount})</span>}
-                    </div>
-                    <div className="text-lg font-bold text-neutral-900">{formatDuration(avgMttaSeconds)}</div>
-                  </div>
-                )}
-                {avgMttrSeconds !== null && (
-                  <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-                    <div className="text-xs text-neutral-500 mb-1">
-                      Avg MTTR
-                      {mttrCount > 0 && <span className="ml-1">({mttrCount})</span>}
-                    </div>
-                    <div className="text-lg font-bold text-neutral-900">{formatDuration(avgMttrSeconds)}</div>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Alert Breakdown */}
             {(alertsWithIncidentsCount !== null || afterHoursCount !== null || nightTimeCount !== null || escalatedCount !== null || retriggerCount !== null) && (
