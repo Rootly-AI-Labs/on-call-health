@@ -15,6 +15,7 @@ import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import and_, func
+from sqlalchemy.exc import IntegrityError
 
 from ..core.config import settings
 from ..models import Analysis, SessionLocal, User, UserCorrelation, WeeklyDigestLog
@@ -908,11 +909,16 @@ async def check_and_send_weekly_digests() -> None:
                     timezone=tz_name
                 )
                 db.add(log_entry)
-                db.commit()
-
-                logger.info(
-                    f"Weekly digest sent to {user.email} for week starting {week_start_date}"
-                )
+                try:
+                    db.commit()
+                    logger.info(
+                        f"Weekly digest sent to {user.email} for week starting {week_start_date}"
+                    )
+                except IntegrityError:
+                    db.rollback()
+                    logger.info(
+                        f"📬 [WEEKLY_DIGEST] Dedup: digest already logged for {user.email} week={week_start_date} (race condition — email was sent, skipping duplicate log)"
+                    )
 
             except Exception as per_user_error:
                 logger.error(
