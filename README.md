@@ -167,8 +167,8 @@ The frontend will be available at `http://localhost:3000`
 On-call Health also offers [an API](https://api.oncallhealth.ai/docs) that can expose its findings. <br>
 [<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://god.gw.postman.com/run-collection/45004446-1074ba3c-44fe-40e3-a932-af7c071b96eb?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D45004446-1074ba3c-44fe-40e3-a932-af7c071b96eb%26entityType%3Dcollection%26workspaceId%3D4bec6e3c-50a0-4746-85f1-00a703c32f24)
 
-## 🔗 About the Rootly AI Labs
-On-call Health is built with ❤️ by the [Rootly AI Labs](https://rootly.com/ai-labs) for engineering teams everywhere. The Rootly AI Labs is a fellow-led community designed to redefine reliability engineering. We develop innovative prototypes, create open-source tools, and produce research that's shared to advance operational excellence standards. We want to thank Anthropic, Google Cloud, and Google DeepMind for their support.
+## 🔗 About Rootly AI Labs
+On-call Health is built with ❤️ by [Rootly AI Labs](https://rootly.com/ai-labs) for engineering teams everywhere. Rootly AI Labs is a fellow-led community designed to redefine reliability engineering. We develop innovative prototypes, create open-source tools, and produce research that's shared to advance operational excellence standards. We want to thank Anthropic, Google Cloud, and Google DeepMind for their support.
 
 This project is licensed under the Apache License 2.0.
 
