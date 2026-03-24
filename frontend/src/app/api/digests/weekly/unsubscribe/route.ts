@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
+// Legacy GET handler — redirect to the confirmation page instead of auto-unsubscribing
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
 
@@ -10,13 +8,8 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Missing token", { status: 400 });
   }
 
-  const backendUrl = `${BACKEND_URL}/api/digests/weekly/unsubscribe?token=${encodeURIComponent(token)}`;
+  const redirectUrl = new URL("/unsubscribe", request.nextUrl.origin);
+  redirectUrl.searchParams.set("token", token);
 
-  const response = await fetch(backendUrl);
-  const html = await response.text();
-
-  return new NextResponse(html, {
-    status: response.status,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
+  return NextResponse.redirect(redirectUrl.toString(), { status: 302 });
 }

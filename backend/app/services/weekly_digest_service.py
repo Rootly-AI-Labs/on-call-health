@@ -709,6 +709,39 @@ async def _send_resend_email(
         return False
 
 
+async def send_unsubscribe_feedback(user_email: str, reason: str) -> None:
+    """Fire-and-forget: email unsubscribe feedback to the configured address."""
+    feedback_to = settings.UNSUBSCRIBE_FEEDBACK_EMAIL
+    if not feedback_to:
+        logger.info("[UNSUBSCRIBE_FEEDBACK] UNSUBSCRIBE_FEEDBACK_EMAIL not set — skipping feedback email")
+        return
+    if not reason.strip():
+        logger.info(f"[UNSUBSCRIBE_FEEDBACK] {user_email} unsubscribed with no reason — skipping feedback email")
+        return
+
+    logger.info(f"[UNSUBSCRIBE_FEEDBACK] Sending feedback from {user_email} to {feedback_to}: {reason[:80]}")
+
+    subject = f"Weekly digest unsubscribe feedback from {user_email}"
+    text_body = f"User: {user_email}\n\nReason:\n{reason.strip()}"
+    html_body = (
+        f"<p><strong>User:</strong> {user_email}</p>"
+        f"<p><strong>Reason:</strong></p>"
+        f"<p style='white-space:pre-wrap;'>{reason.strip()}</p>"
+    )
+
+    sent = await _send_resend_email(
+        to_email=feedback_to,
+        to_name=None,
+        subject=subject,
+        text_body=text_body,
+        html_body=html_body,
+    )
+    if sent:
+        logger.info(f"[UNSUBSCRIBE_FEEDBACK] Feedback email sent successfully to {feedback_to}")
+    else:
+        logger.warning(f"[UNSUBSCRIBE_FEEDBACK] Failed to send feedback email to {feedback_to}")
+
+
 def _get_latest_auto_refresh_analysis(db, user: User) -> Optional[Analysis]:
     return db.query(Analysis).filter(
         Analysis.user_id == user.id,
@@ -748,7 +781,7 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
     local_now = datetime.now(tz)
 
     unsubscribe_token = _generate_unsubscribe_token(user.id)
-    unsubscribe_url = f"{settings.FRONTEND_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
+    unsubscribe_url = f"{settings.FRONTEND_URL}/unsubscribe?token={unsubscribe_token}"
 
     content = _build_email_content(
         user=user,
@@ -878,7 +911,7 @@ async def check_and_send_weekly_digests() -> None:
                         continue
 
                 unsubscribe_token = _generate_unsubscribe_token(user.id)
-                unsubscribe_url = f"{settings.FRONTEND_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
+                unsubscribe_url = f"{settings.FRONTEND_URL}/unsubscribe?token={unsubscribe_token}"
 
                 content = _build_email_content(
                     user=user,

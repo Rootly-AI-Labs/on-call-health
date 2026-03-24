@@ -14,6 +14,7 @@ from ...services.weekly_digest_service import (
     _get_latest_auto_refresh_analysis,
     _get_next_digest_time,
     _get_user_timezone,
+    send_unsubscribe_feedback,
     send_weekly_digest_test,
     verify_unsubscribe_token,
 )
@@ -26,6 +27,11 @@ router = APIRouter(
 
 class DigestPreferenceUpdate(BaseModel):
     enabled: bool
+
+
+class UnsubscribeConfirm(BaseModel):
+    token: str
+    reason: str = ""
 
 
 @router.get("/weekly/preference")
@@ -130,6 +136,38 @@ async def unsubscribe_weekly_digest(
 </body>
 </html>"""
     return HTMLResponse(content=html)
+
+
+@router.post("/weekly/unsubscribe")
+@digest_rate_limit("digest_unsubscribe")
+async def confirm_unsubscribe_weekly_digest(
+    request: Request,
+    body: UnsubscribeConfirm,
+    db: Session = Depends(get_db)
+):
+    token = body.token
+    if not token or len(token) < 20 or len(token) > 512:
+        raise HTTPException(status_code=400, detail="Invalid or expired unsubscribe link.")
+
+    allowed = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=")
+    if any(ch not in allowed for ch in token):
+        raise HTTPException(status_code=400, detail="Invalid or expired unsubscribe link.")
+
+    user_id = verify_unsubscribe_token(token)
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Invalid or expired unsubscribe link.")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    user.weekly_digest_enabled = False
+    db.commit()
+
+    if body.reason and body.reason.strip():
+        await send_unsubscribe_feedback(user.email, body.reason)
+
+    return {"success": True, "message": "You have been unsubscribed from weekly digest emails."}
 
 
 @router.post("/weekly/test")
