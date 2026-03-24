@@ -292,7 +292,7 @@ export function AccountSettingsDialog({
                       Weekly Digest
                     </h3>
                     <p className="text-[15px] text-neutral-600 mt-1.5 leading-relaxed">
-                      Sends a summary every Monday at 10:00 AM in your local timezone.
+                      Sends a summary every Tuesday at 10:00 AM in your local timezone.
                     </p>
                   </div>
                   <Switch
