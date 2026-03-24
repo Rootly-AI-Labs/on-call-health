@@ -954,7 +954,7 @@ class WeeklyDigestScheduler:
                 "digest will send on next 10-min tick, countdown logged every 2 min"
             )
         self.scheduler.start()
-        logger.info("Weekly digest scheduler started (fires :02 of every hour; sends Monday 10am per user's local timezone — TODO: revert to minute=0 before deploying)")
+        logger.info("Weekly digest scheduler started (fires */30; sends Tuesday 10am per user's local timezone)")
 
 
 weekly_digest_scheduler = WeeklyDigestScheduler()
