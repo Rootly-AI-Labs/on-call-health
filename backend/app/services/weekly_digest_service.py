@@ -393,13 +393,17 @@ def _build_email_content(
         team_risk_label = "Low"
         team_risk_color = "#22c55e"
 
-    # PagerDuty → Rootly soft promotion
+    # Platform-specific promotions
     is_pagerduty = "pagerduty" in platform
+    is_rootly = "rootly" in platform
     rootly_promo_text = (
         "\n\nPagerDuty charges extra for what Rootly includes.\n"
         "Slack bot integration, alert grouping, and automated workflows — all built in, no add-ons. Teams switch in minutes.\n"
         "Try Rootly for free or book a demo: https://rootly.com/demo"
-        if is_pagerduty else ""
+        if is_pagerduty else
+        "\n\nYou track the load. Now let Rootly AI SRE reduce it.\n"
+        "Learn more: https://rootly.com/ai-sre"
+        if is_rootly else ""
     )
     rootly_promo_html = (
         f"""
@@ -410,7 +414,15 @@ def _build_email_content(
     </p>
     <a href="https://rootly.com/demo" style="display: inline-block; font-size: 12px; font-weight: 600; color: #7c3aed; text-decoration: underline;">Try Rootly for free or book a demo &rarr;</a>
   </div>"""
-        if is_pagerduty else ""
+        if is_pagerduty else
+        f"""
+  <div style="margin-top: 24px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 14px 16px;">
+    <p style="margin: 0; font-size: 13px; color: #6b7280; line-height: 1.6;">
+      You track the load. Now let <strong style="color: #5b21b6;">Rootly AI SRE</strong> reduce it.
+      <a href="https://rootly.com/ai-sre" style="margin-left: 6px; font-size: 12px; font-weight: 600; color: #7c3aed; text-decoration: underline;">Learn more &rarr;</a>
+    </p>
+  </div>"""
+        if is_rootly else ""
     )
 
     blocked = _ensure_dict(analysis.config).get("auto_refresh_blocked") if analysis.config else None
