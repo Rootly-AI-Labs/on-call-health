@@ -853,24 +853,29 @@ async def check_and_send_weekly_digests() -> None:
 
                 week_start_date = _get_week_start_date(local_now)
 
-                # Skip dedup check when force-sending locally
-                if not settings.WEEKLY_DIGEST_FORCE_SEND:
-                    existing_log = db.query(WeeklyDigestLog).filter(
-                        WeeklyDigestLog.user_id == user.id,
-                        WeeklyDigestLog.week_start_date == week_start_date
-                    ).first()
-
-                    if existing_log:
-                        logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: already sent this week ({week_start_date})")
-                        continue
-
                 results = _ensure_dict(analysis.results)
                 logger.info(f"📬 [WEEKLY_DIGEST] analysis={analysis.id} results type={type(analysis.results).__name__} keys={list(results.keys())[:5] if results else 'EMPTY'}")
                 if not results:
                     logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: analysis results are empty")
                     continue
 
-                logger.info(f"📬 [WEEKLY_DIGEST] Sending digest to {user.email} (analysis={analysis.id})...")
+                # Claim the send slot BEFORE sending — insert log row first.
+                # If another instance already inserted (race condition), the unique
+                # constraint fires here and we skip without sending a duplicate email.
+                if not settings.WEEKLY_DIGEST_FORCE_SEND:
+                    log_entry = WeeklyDigestLog(
+                        user_id=user.id,
+                        analysis_id=analysis.id,
+                        week_start_date=week_start_date,
+                        timezone=tz_name
+                    )
+                    db.add(log_entry)
+                    try:
+                        db.commit()
+                    except IntegrityError:
+                        db.rollback()
+                        logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: already sent this week ({week_start_date}) — race condition caught before send")
+                        continue
 
                 unsubscribe_token = _generate_unsubscribe_token(user.id)
                 unsubscribe_url = f"{settings.FRONTEND_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
@@ -883,6 +888,8 @@ async def check_and_send_weekly_digests() -> None:
                     tz_name=tz_name,
                     unsubscribe_url=unsubscribe_url,
                 )
+
+                logger.info(f"📬 [WEEKLY_DIGEST] Sending digest to {user.email} (analysis={analysis.id})...")
 
                 sent = await _send_resend_email(
                     to_email=user.email,
@@ -901,24 +908,7 @@ async def check_and_send_weekly_digests() -> None:
                     f"📧 [WEEKLY_DIGEST] Digest sent to {user.email} "
                     f"(user_id={user.id}, subject={content['subject']})"
                 )
-
-                log_entry = WeeklyDigestLog(
-                    user_id=user.id,
-                    analysis_id=analysis.id,
-                    week_start_date=week_start_date,
-                    timezone=tz_name
-                )
-                db.add(log_entry)
-                try:
-                    db.commit()
-                    logger.info(
-                        f"Weekly digest sent to {user.email} for week starting {week_start_date}"
-                    )
-                except IntegrityError:
-                    db.rollback()
-                    logger.info(
-                        f"📬 [WEEKLY_DIGEST] Dedup: digest already logged for {user.email} week={week_start_date} (race condition — email was sent, skipping duplicate log)"
-                    )
+                logger.info(f"Weekly digest sent to {user.email} for week starting {week_start_date}")
 
             except Exception as per_user_error:
                 logger.error(
