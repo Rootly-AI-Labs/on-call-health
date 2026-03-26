@@ -209,8 +209,6 @@ function DashboardContent() {
 
   // helpers
   getTrendIcon,
-  getRiskColor,
-  getProgressColor,
   getAnalysisStages,
   getAnalysisDescription,
 
@@ -1177,8 +1175,6 @@ function DashboardContent() {
               <TeamMembersList
                 currentAnalysis={currentAnalysis}
                 setSelectedMember={setSelectedMember}
-                getRiskColor={getRiskColor}
-                getProgressColor={getProgressColor}
                 connectedIntegrations={connectedIntegrations}
               />
             </>
