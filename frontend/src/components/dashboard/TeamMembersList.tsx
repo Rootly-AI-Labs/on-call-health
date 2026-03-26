@@ -52,7 +52,7 @@ function aggregateToWeekly(dailyData: Record<string, any>): { weekStart: string;
     .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
 }
 
-// Calculate user trend from their individual daily data (aggregated to weekly)
+// Calculate user trend using OLS linear regression on weekly scores
 function calculateUserTrend(
   userEmail: string,
   individualDailyData: Record<string, Record<string, any>> | undefined
@@ -61,57 +61,58 @@ function calculateUserTrend(
 
   if (!individualDailyData || !userEmail) return defaultTrend
 
-  // Find user data (try both exact match and lowercase)
   const userData = individualDailyData[userEmail] || individualDailyData[userEmail.toLowerCase()]
   if (!userData) return defaultTrend
 
-  // Aggregate to weekly data
   const weeklyData = aggregateToWeekly(userData)
   if (weeklyData.length < 2) return defaultTrend
 
-  // Compare first week(s) to last week(s) - same logic as UserObjectiveDataCard
-  const numWeeksToCompare = Math.min(2, Math.floor(weeklyData.length / 2))
-  const firstWeeksAvg = weeklyData.slice(0, numWeeksToCompare).reduce((sum, w) => sum + w.score, 0) / numWeeksToCompare
-  const lastWeeksAvg = weeklyData.slice(-numWeeksToCompare).reduce((sum, w) => sum + w.score, 0) / numWeeksToCompare
+  const scores = weeklyData.map((w) => w.score)
+  const n = scores.length
+  const xMean = (n - 1) / 2
+  const yMean = scores.reduce((s, v) => s + v, 0) / n
 
-  // Calculate percentage change (positive = worsening, negative = improving)
-  if (firstWeeksAvg === 0 && lastWeeksAvg === 0) {
-    return { trend: 'stable', percentage: 0, firstHalfScore: 0, secondHalfScore: 0 }
+  let num = 0, den = 0
+  for (let i = 0; i < n; i++) {
+    num += (i - xMean) * (scores[i] - yMean)
+    den += (i - xMean) ** 2
   }
 
-  // When both scores are low (< 10), percentage changes are misleading (e.g. 0→3 = "3000%")
-  // Use absolute difference instead for trend classification
-  const bothLow = firstWeeksAvg < 10 && lastWeeksAvg < 10
-  const absDiff = lastWeeksAvg - firstWeeksAvg
+  const slope = den !== 0 ? num / den : 0
+  const intercept = yMean - slope * xMean
+
+  const predicted0 = intercept
+  const predictedN = intercept + slope * (n - 1)
+
+  // For low absolute scores use point diff to avoid misleading % (e.g. 0→3 = "300%")
+  const bothLow = predicted0 < 10 && predictedN < 10
+  const absDiff = predictedN - predicted0
 
   let change: number
   if (bothLow) {
-    // Use absolute point difference as the "change" metric
     change = absDiff
   } else {
-    const baseline = firstWeeksAvg === 0 ? 1 : firstWeeksAvg || 1
-    change = ((lastWeeksAvg - firstWeeksAvg) / baseline) * 100
+    const baseline = Math.abs(predicted0) > 0 ? predicted0 : 1
+    change = ((predictedN - predicted0) / baseline) * 100
   }
 
   let trend: UserTrend
   if (bothLow) {
-    // For low scores, use absolute point thresholds
-    if (absDiff <= -5) trend = 'significantly_improving'
+    if (absDiff <= -5)      trend = 'significantly_improving'
     else if (absDiff <= -2) trend = 'improving'
-    else if (absDiff >= 5) trend = 'significantly_worsening'
-    else if (absDiff >= 2) trend = 'worsening'
-    else trend = 'stable'
+    else if (absDiff >= 5)  trend = 'significantly_worsening'
+    else if (absDiff >= 2)  trend = 'worsening'
+    else                    trend = 'stable'
   } else {
-    // Use 15% threshold for stable (matches UserObjectiveDataCard)
-    if (change <= -30) trend = 'significantly_improving'
+    if (change <= -30)      trend = 'significantly_improving'
     else if (change <= -15) trend = 'improving'
-    else if (change >= 30) trend = 'significantly_worsening'
-    else if (change >= 15) trend = 'worsening'
-    else trend = 'stable'
+    else if (change >= 30)  trend = 'significantly_worsening'
+    else if (change >= 15)  trend = 'worsening'
+    else                    trend = 'stable'
   }
 
   const displayPercentage = bothLow ? Math.round(Math.abs(absDiff)) : Math.round(Math.abs(change))
-  return { trend, percentage: displayPercentage, firstHalfScore: firstWeeksAvg, secondHalfScore: lastWeeksAvg }
+  return { trend, percentage: displayPercentage, firstHalfScore: predicted0, secondHalfScore: predictedN }
 }
 
 // Get trend display config
@@ -171,7 +172,7 @@ export function TeamMembersList({
   connectedIntegrations = new Set()
 }: TeamMembersListProps) {
   const [showMembersWithoutIncidents, setShowMembersWithoutIncidents] = useState(false);
-  const [sortBy, setSortBy] = useState<'risk' | 'trend' | 'incidents'>('risk');
+  const [sortBy, setSortBy] = useState<'risk' | 'trend'>('risk');
   const dataSources = currentAnalysis?.analysis_data?.data_sources;
   const analysisConfig = currentAnalysis?.config;
   const individualDailyData = currentAnalysis?.analysis_data?.individual_daily_data;
@@ -490,16 +491,6 @@ export function TeamMembersList({
                 }`}
               >
                 Trend
-              </button>
-              <button
-                onClick={() => setSortBy('incidents')}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  sortBy === 'incidents'
-                    ? 'bg-white text-neutral-900 shadow-sm'
-                    : 'text-neutral-500 hover:text-neutral-700'
-                }`}
-              >
-                Incidents
               </button>
             </div>
           </div>

@@ -3497,6 +3497,7 @@ async def run_analysis_task(
                         "escalated_count": alerts_counts.get("escalated_count", 0),
                         "retrigger_count": alerts_counts.get("retrigger_count", 0),
                         "top_alerts": alerts_counts.get("top_alerts") or [],
+                        "daily_alert_breakdown": alerts_counts.get("daily_alert_breakdown") or {},
                     }
                     results["metadata"] = metadata
 

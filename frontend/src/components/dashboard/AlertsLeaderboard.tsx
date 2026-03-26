@@ -8,12 +8,13 @@ interface AlertsLeaderboardProps {
   currentAnalysis: any
 }
 
-type FilterKey = "total" | "noise" | "night_time" | "no_incident" | "escalated" | "retriggered"
+type FilterKey = "total" | "noise" | "night_time" | "after_hours" | "no_incident" | "escalated" | "retriggered"
 
 const FILTERS: { key: FilterKey; label: string; description: string }[] = [
   { key: "total",       label: "Most Fired",      description: "Alerts that fired the most times in this period." },
-  { key: "noise",       label: "Noisiest",        description: "Alerts classified as noise — firing frequently without being actionable." },
-  { key: "night_time",  label: "Night-Time",      description: "Alerts firing during deep night hours (10pm – 6am), disrupting sleep." },
+  { key: "noise",       label: "Noisiest",        description: "Alerts classified as noise (firing without being actionable)." },
+  { key: "night_time",  label: "Night-Time",      description: "Alerts firing during deep night hours (10pm–6am)." },
+  { key: "after_hours", label: "After-Hours",     description: "Alerts firing outside business hours (6pm–9am), evenings and weekends." },
   { key: "no_incident", label: "No Incident",     description: "Alerts that fired but never escalated into a full incident — potential noise or misconfiguration." },
   { key: "escalated",   label: "Escalated",       description: "Alerts that were escalated to another responder or level." },
   { key: "retriggered", label: "Retriggered",     description: "Alerts that fired again after being acknowledged or resolved." },
@@ -23,6 +24,7 @@ const BAR_COLORS: Record<FilterKey, string> = {
   total:       "bg-neutral-400",
   noise:       "bg-red-400",
   night_time:  "bg-indigo-400",
+  after_hours: "bg-violet-400",
   no_incident: "bg-orange-400",
   escalated:   "bg-yellow-400",
   retriggered: "bg-pink-400",
@@ -49,7 +51,7 @@ export function AlertsLeaderboard({ currentAnalysis }: AlertsLeaderboardProps) {
     <Card className="bg-white flex flex-col h-full overflow-hidden">
       <CardHeader className="pb-2 shrink-0">
         <div className="space-y-1">
-          <CardTitle className="text-neutral-900">Alerts Breakdown</CardTitle>
+          <CardTitle className="text-neutral-900">Alert Leaderboard</CardTitle>
           <CardDescription>Top alerts ranked by negative impact criteria</CardDescription>
         </div>
       </CardHeader>

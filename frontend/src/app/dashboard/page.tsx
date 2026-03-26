@@ -112,9 +112,9 @@ function AlertsCardsRow({ currentAnalysis }: { currentAnalysis: any }) {
       <div ref={teamAlertsRef}>
         <AlertsCountCard currentAnalysis={currentAnalysis} />
       </div>
-      <div style={teamAlertsHeight ? { height: teamAlertsHeight } : undefined} className="flex flex-col">
+      {/* <div style={teamAlertsHeight ? { height: teamAlertsHeight } : undefined} className="flex flex-col">
         <AlertsLeaderboard currentAnalysis={currentAnalysis} />
-      </div>
+      </div> */}
     </div>
   )
 }
