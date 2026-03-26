@@ -1415,7 +1415,7 @@ class RootlyAPIClient:
             "per_user_mttr_avg_by_id": {k: per_user_mttr_sum_by_id[k] / per_user_mttr_count_by_id[k] for k in per_user_mttr_sum_by_id if per_user_mttr_count_by_id.get(k, 0) > 0},
             "per_user_mttr_avg_by_email": {k: per_user_mttr_sum_by_email[k] / per_user_mttr_count_by_email[k] for k in per_user_mttr_sum_by_email if per_user_mttr_count_by_email.get(k, 0) > 0},
             "top_alerts": sorted(
-                [{"title": t, **counts} for t, counts in per_alert_title.items()],
+                [{"title": t, **counts, "days_fired": len(per_alert_title_days.get(t, set()))} for t, counts in per_alert_title.items()],
                 key=lambda x: x["total"], reverse=True
             )[:50],
             "daily_alert_breakdown": daily_alert_breakdown,
