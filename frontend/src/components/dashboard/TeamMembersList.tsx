@@ -530,10 +530,6 @@ export function TeamMembersList({
                 return [...members].sort((a, b) => (b.och_score || 0) - (a.och_score || 0));
               }
 
-              if (sortBy === 'incidents') {
-                return [...members].sort((a, b) => (b.incident_count || 0) - (a.incident_count || 0));
-              }
-
               // Sort by trend (worsening first, then stable, then improving)
               // For same trend level, sort by risk level (higher risk first)
               const trendOrder: Record<string, number> = {
