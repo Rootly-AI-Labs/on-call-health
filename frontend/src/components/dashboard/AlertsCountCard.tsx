@@ -428,9 +428,7 @@ function AlertBreakdownChart({
                   {sorted.map((alert, i) => {
                     const val = alert[leaderboardKey] ?? 0
                     const barPct = Math.max(maxVal > 0 ? (val / maxVal) * 100 : 0, 2)
-                    const pct = alert.total > 0 && leaderboardKey !== "total" && leaderboardKey !== "days_fired"
-                      ? Math.round((val / alert.total) * 100)
-                      : null
+                    const pct = null
                     return (
                       <div key={alert.title + i}>
                         <div className="flex items-start justify-between gap-2 mb-0.5">
