@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, Clock, TrendingUp, TrendingDown, Minus, RefreshCw, ChevronRight, X, Eye, EyeOff } from "lucide-react"
@@ -89,23 +89,28 @@ function calcAlertTrend(
   return Math.round(((predictedN - predicted0) / predicted0) * 100)
 }
 
+const TREND_IMPROVING_FAST = -30
+const TREND_IMPROVING = -15
+const TREND_WORSENING = 15
+const TREND_CRITICAL = 30
+
 function getTrendConfig(change: number): { label: string; icon: React.ReactNode; className: string } {
-  if (change <= -30) return {
+  if (change <= TREND_IMPROVING_FAST) return {
     label: "Improving Fast",
     icon: <><TrendingUp className="w-2.5 h-2.5" /><TrendingUp className="w-2.5 h-2.5" /></>,
     className: "bg-green-100 text-green-700 border-green-200",
   }
-  if (change <= -15) return {
+  if (change <= TREND_IMPROVING) return {
     label: "Improving",
     icon: <TrendingUp className="w-2.5 h-2.5" />,
     className: "bg-green-50 text-green-600 border-green-100",
   }
-  if (change >= 30) return {
+  if (change >= TREND_CRITICAL) return {
     label: "Critical",
     icon: <><TrendingDown className="w-2.5 h-2.5" /><TrendingDown className="w-2.5 h-2.5" /></>,
     className: "bg-red-100 text-red-700 border-red-200",
   }
-  if (change >= 15) return {
+  if (change >= TREND_WORSENING) return {
     label: "Worsening",
     icon: <TrendingDown className="w-2.5 h-2.5" />,
     className: "bg-yellow-50 text-yellow-700 border-yellow-100",
@@ -428,7 +433,6 @@ function AlertBreakdownChart({
                   {sorted.map((alert, i) => {
                     const val = alert[leaderboardKey] ?? 0
                     const barPct = Math.max(maxVal > 0 ? (val / maxVal) * 100 : 0, 2)
-                    const pct = null
                     return (
                       <div key={alert.title + i}>
                         <div className="flex items-start justify-between gap-2 mb-0.5">
@@ -480,6 +484,17 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
   const [showChart, setShowChart] = useState(false)
   const [initialTab, setInitialTab] = useState<PopupTab>("breakdown")
 
+  const trends = useMemo(() => {
+    const d: Record<string, any> = currentAnalysis?.analysis_data?.metadata?.alerts?.daily_alert_breakdown || {}
+    return {
+      incidents:   calcAlertTrend(d, "incidents"),
+      after_hours: calcAlertTrend(d, "after_hours"),
+      night_time:  calcAlertTrend(d, "night_time"),
+      escalated:   calcAlertTrend(d, "escalated"),
+      retrigger:   calcAlertTrend(d, "retrigger"),
+    }
+  }, [currentAnalysis])
+
   const alerts = currentAnalysis?.analysis_data?.metadata?.alerts
   if (!alerts) return null
 
@@ -528,7 +543,7 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
       pct: alertsWithIncidentsPct,
       label: "With incidents",
       metricKey: "incidents" as AlertTrendKey,
-      trend: calcAlertTrend(daily, "incidents"),
+      trend: trends.incidents,
     },
     afterHoursCount !== null && {
       icon: <Clock className="w-4 h-4" />,
@@ -536,7 +551,7 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
       pct: afterHoursPct,
       label: "After-hours",
       metricKey: "after_hours" as AlertTrendKey,
-      trend: calcAlertTrend(daily, "after_hours"),
+      trend: trends.after_hours,
     },
     nightTimeCount !== null && {
       icon: <Clock className="w-4 h-4" />,
@@ -544,7 +559,7 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
       pct: nightTimePct,
       label: "Night-time",
       metricKey: "night_time" as AlertTrendKey,
-      trend: calcAlertTrend(daily, "night_time"),
+      trend: trends.night_time,
     },
     escalatedCount !== null && escalatedCount > 0 && {
       icon: <TrendingUp className="w-4 h-4" />,
@@ -552,7 +567,7 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
       pct: escalatedPct,
       label: "Escalated",
       metricKey: "escalated" as AlertTrendKey,
-      trend: calcAlertTrend(daily, "escalated"),
+      trend: trends.escalated,
     },
     retriggerCount !== null && retriggerCount > 0 && {
       icon: <RefreshCw className="w-4 h-4" />,
@@ -560,7 +575,7 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
       pct: retriggerPct,
       label: "Retriggered",
       metricKey: "retrigger" as AlertTrendKey,
-      trend: calcAlertTrend(daily, "retrigger"),
+      trend: trends.retrigger,
     },
   ].filter(Boolean) as { icon: React.ReactElement; count: number; pct: number | null; label: string; metricKey: AlertTrendKey; trend: number | null }[]
 
