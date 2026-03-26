@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 
 interface AlertsLeaderboardProps {
-  currentAnalysis: any
+  currentAnalysis?: any
+  topAlerts?: any[]
+  title?: string
 }
 
 type FilterKey = "total" | "noise" | "night_time" | "after_hours" | "no_incident" | "escalated" | "retriggered"
@@ -30,12 +32,13 @@ const BAR_COLORS: Record<FilterKey, string> = {
   retriggered: "bg-pink-400",
 }
 
-export function AlertsLeaderboard({ currentAnalysis }: AlertsLeaderboardProps) {
+export function AlertsLeaderboard({ currentAnalysis, topAlerts: topAlertsProp, title }: AlertsLeaderboardProps) {
   const [activeKey, setActiveKey] = useState<FilterKey>("total")
 
   const topAlerts: any[] = useMemo(() => {
+    if (topAlertsProp !== undefined) return topAlertsProp
     return currentAnalysis?.analysis_data?.metadata?.alerts?.top_alerts ?? []
-  }, [currentAnalysis])
+  }, [currentAnalysis, topAlertsProp])
 
   const activeFilter = FILTERS.find((f) => f.key === activeKey)!
 
@@ -51,7 +54,7 @@ export function AlertsLeaderboard({ currentAnalysis }: AlertsLeaderboardProps) {
     <Card className="bg-white flex flex-col h-full overflow-hidden">
       <CardHeader className="pb-2 shrink-0">
         <div className="space-y-1">
-          <CardTitle className="text-neutral-900">Alert Leaderboard</CardTitle>
+          <CardTitle className="text-neutral-900">{title ?? "Team Alert Leaderboard"}</CardTitle>
           <CardDescription>Top alerts ranked by negative impact criteria</CardDescription>
         </div>
       </CardHeader>

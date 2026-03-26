@@ -77,6 +77,7 @@ import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
 import { TeamRiskFactorsCard, FACTOR_DESCRIPTIONS } from "@/components/dashboard/TeamRiskFactorsCard"
 import { AlertsCountCard } from "@/components/dashboard/AlertsCountCard"
+import { AlertsLeaderboard } from "@/components/dashboard/AlertsLeaderboard"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
 import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
@@ -111,9 +112,9 @@ function AlertsCardsRow({ currentAnalysis }: { currentAnalysis: any }) {
       <div ref={teamAlertsRef}>
         <AlertsCountCard currentAnalysis={currentAnalysis} />
       </div>
-      {/* <div style={teamAlertsHeight ? { height: teamAlertsHeight } : undefined} className="flex flex-col">
+      <div style={teamAlertsHeight ? { height: teamAlertsHeight } : undefined} className="flex flex-col">
         <AlertsLeaderboard currentAnalysis={currentAnalysis} />
-      </div> */}
+      </div>
     </div>
   )
 }

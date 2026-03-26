@@ -172,7 +172,7 @@ function TrendTag({ change }: { change: number | null }) {
   )
 }
 
-type PopupTab = "breakdown" | "sources" | "leaderboard"
+type PopupTab = "breakdown" | "sources"
 type LeaderboardKey = "total" | "noise" | "night_time" | "after_hours" | "no_incident" | "escalated" | "retriggered"
 
 const LEADERBOARD_FILTERS: { key: LeaderboardKey; label: string; description: string; color: string }[] = [
@@ -286,7 +286,7 @@ function AlertBreakdownChart({
 
         {/* Tabs */}
         <div className="flex gap-1 mb-4 border-b border-neutral-200">
-          {(["breakdown", "sources", "leaderboard"] as const).map((t) => (
+          {(["breakdown", "sources"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -296,7 +296,7 @@ function AlertBreakdownChart({
                   : "text-neutral-400 hover:text-neutral-600"
               }`}
             >
-              {t === "breakdown" ? "Alert Breakdown" : t === "leaderboard" ? "Leaderboard" : "Alert Sources"}
+              {t === "breakdown" ? "Alert Breakdown" : "Alert Sources"}
             </button>
           ))}
         </div>
@@ -403,55 +403,6 @@ function AlertBreakdownChart({
             </svg>
           </>
         )}
-
-        {tab === "leaderboard" && (() => {
-          const activeFilter = LEADERBOARD_FILTERS.find((f) => f.key === leaderboardKey)!
-          const sorted = [...topAlerts]
-            .filter((a) => (a[leaderboardKey] ?? 0) > 0)
-            .sort((a, b) => (b[leaderboardKey] ?? 0) - (a[leaderboardKey] ?? 0))
-          const maxVal = sorted.length > 0 ? (sorted[0][leaderboardKey] ?? 0) : 1
-          return (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-1.5">
-                {LEADERBOARD_FILTERS.map((f) => (
-                  <button
-                    key={f.key}
-                    onClick={() => setLeaderboardKey(f.key)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                      leaderboardKey === f.key ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[11px] text-neutral-400">{activeFilter.description}</p>
-              {sorted.length === 0 ? (
-                <p className="text-sm text-neutral-400 text-center py-4">No alerts match this filter</p>
-              ) : (
-                <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
-                  {sorted.map((alert, i) => {
-                    const val = alert[leaderboardKey] ?? 0
-                    const barPct = Math.max(maxVal > 0 ? (val / maxVal) * 100 : 0, 2)
-                    return (
-                      <div key={alert.title + i}>
-                        <div className="flex items-start justify-between gap-2 mb-0.5">
-                          <span className="text-xs text-neutral-700 font-medium leading-tight flex-1 min-w-0 truncate" title={alert.title}>{alert.title}</span>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-xs font-semibold text-neutral-800">{val}</span>
-                          </div>
-                        </div>
-                        <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${activeFilter.color}`} style={{ width: `${barPct}%` }} />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })()}
 
         {tab === "sources" && (
           <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
@@ -609,6 +560,14 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
               {alerts.truncated && (
                 <div className="text-xs text-yellow-700">Alert count may be partial (page limit reached)</div>
               )}
+
+              {/* Total count */}
+              <div className="flex flex-col gap-0.5">
+                <span className="text-4xl font-bold text-neutral-900 leading-tight">
+                  {typeof total === "number" ? total : "N/A"}
+                </span>
+                <span className="text-xs text-neutral-400">{dateRange}</span>
+              </div>
 
               {/* Urgency + Signal Quality */}
               {(urgencyEntries.length > 0 || notNoisePct !== null) && (

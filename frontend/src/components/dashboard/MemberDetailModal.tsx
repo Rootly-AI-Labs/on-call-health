@@ -15,6 +15,7 @@ import { UserIncidentCard } from "@/components/dashboard/UserIncidentCard"
 import { SurveyResultsCard } from "@/components/dashboard/SurveyResultsCard"
 import { TicketingCard } from "@/components/dashboard/TicketingCard"
 import { UserAlertsCard } from "@/components/dashboard/UserAlertsCard"
+import { AlertsLeaderboard } from "@/components/dashboard/AlertsLeaderboard"
 
 // OCH risk level helpers
 function getOCHRiskInfo(score: number | undefined | null): { level: string; label: string } {
@@ -468,18 +469,33 @@ export function MemberDetailModal({
                         />
                       )
                     },
-                    ...(isRootly ? [{
-                      id: 'userAlerts',
-                      order: 2,
-                      hasData: true,
-                      component: (
-                        <UserAlertsCard
-                          key="userAlerts"
-                          memberData={memberData || selectedMember}
-                          alertsMeta={currentAnalysis?.analysis_data?.metadata?.alerts}
-                        />
-                      )
-                    }] : []),
+                    ...(isRootly ? [
+                      {
+                        id: 'userAlerts',
+                        order: 2,
+                        hasData: true,
+                        component: (
+                          <UserAlertsCard
+                            key="userAlerts"
+                            memberData={memberData || selectedMember}
+                            alertsMeta={currentAnalysis?.analysis_data?.metadata?.alerts}
+                          />
+                        )
+                      },
+                      {
+                        id: 'userLeaderboard',
+                        order: 2.5,
+                        hasData: (memberData?.alerts_top_alerts?.length || 0) > 0,
+                        component: (
+                          <div key="userLeaderboard" className="h-[480px]">
+                            <AlertsLeaderboard
+                              topAlerts={memberData?.alerts_top_alerts ?? []}
+                              title="User Alert Leaderboard"
+                            />
+                          </div>
+                        )
+                      }
+                    ] : []),
                     {
                       id: 'riskFactors',
                       order: 3,
