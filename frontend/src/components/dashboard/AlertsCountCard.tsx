@@ -446,6 +446,21 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
     }
   }, [currentAnalysis])
 
+  if (currentAnalysis?.platform === 'pagerduty') {
+    return (
+      <Card className="bg-white flex flex-col overflow-hidden">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-neutral-900">Team Alerts</CardTitle>
+          <CardDescription>Volume, signal quality and breakdown trends</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center py-10 text-center gap-2">
+          <p className="text-sm font-medium text-neutral-600">Alert data is not available for PagerDuty</p>
+          <p className="text-xs text-neutral-400">Connect Rootly to access alert insights</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   const alerts = currentAnalysis?.analysis_data?.metadata?.alerts
   if (!alerts) return null
 

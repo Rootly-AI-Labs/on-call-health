@@ -107,9 +107,10 @@ const LEADERBOARD_FILTERS: { key: LeaderboardKey; label: string; description: st
 interface UserAlertsCardProps {
   memberData: any
   alertsMeta?: any
+  platform?: string
 }
 
-export function UserAlertsCard({ memberData, alertsMeta }: UserAlertsCardProps): React.ReactElement {
+export function UserAlertsCard({ memberData, alertsMeta, platform }: UserAlertsCardProps): React.ReactElement {
   const [showPopup, setShowPopup] = useState(false)
   const [tab, setTab] = useState<UserPopupTab>("breakdown")
 
@@ -123,6 +124,21 @@ export function UserAlertsCard({ memberData, alertsMeta }: UserAlertsCardProps):
       retrigger:   calcAlertTrend(d, "retrigger"),
     }
   }, [memberData])
+
+  if (platform === 'pagerduty') {
+    return (
+      <Card className="bg-white">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-neutral-900">User Alerts</CardTitle>
+          <CardDescription>Volume, signal quality and breakdown trends</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center py-10 text-center gap-2">
+          <p className="text-sm font-medium text-neutral-600">Alert data is not available for PagerDuty</p>
+          <p className="text-xs text-neutral-400">Connect Rootly to access alert insights</p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   const count = memberData?.alerts_count
   const dateRange = alertsMeta ? `${formatDate(alertsMeta.start)} - ${formatDate(alertsMeta.end)}` : "unknown"

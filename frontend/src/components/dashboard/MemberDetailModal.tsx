@@ -454,6 +454,8 @@ export function MemberDetailModal({
                 {(() => {
                   // Define all tiles with their data availability checks
                   const isRootly = currentAnalysis?.platform === 'rootly'
+                  const isPagerDuty = currentAnalysis?.platform === 'pagerduty'
+                  const platform = currentAnalysis?.platform
                   const tiles = [
                     {
                       id: 'userTrends',
@@ -469,7 +471,7 @@ export function MemberDetailModal({
                         />
                       )
                     },
-                    ...(isRootly ? [
+                    ...(isRootly || isPagerDuty ? [
                       {
                         id: 'userAlerts',
                         order: 2,
@@ -479,18 +481,20 @@ export function MemberDetailModal({
                             key="userAlerts"
                             memberData={memberData || selectedMember}
                             alertsMeta={currentAnalysis?.analysis_data?.metadata?.alerts}
+                            platform={platform}
                           />
                         )
                       },
                       {
                         id: 'userLeaderboard',
                         order: 2.5,
-                        hasData: (memberData?.alerts_top_alerts?.length || 0) > 0,
+                        hasData: true,
                         component: (
-                          <div key="userLeaderboard" className="h-[480px]">
+                          <div key="userLeaderboard" className={isRootly ? "h-[480px]" : undefined}>
                             <AlertsLeaderboard
                               topAlerts={memberData?.alerts_top_alerts ?? []}
                               title="User Alert Leaderboard"
+                              platform={platform}
                             />
                           </div>
                         )

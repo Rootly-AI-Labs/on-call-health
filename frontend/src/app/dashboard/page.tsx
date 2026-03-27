@@ -1170,8 +1170,8 @@ function DashboardContent() {
                 }}
               />
 
-              {/* Show Alerts cards only for Rootly (not implemented for PagerDuty) */}
-              {currentAnalysis?.platform === 'rootly' && (
+              {/* Show Alerts cards for Rootly and PagerDuty (PagerDuty shows no-data state) */}
+              {(currentAnalysis?.platform === 'rootly' || currentAnalysis?.platform === 'pagerduty') && (
                 <AlertsCardsRow currentAnalysis={currentAnalysis} />
               )}
 

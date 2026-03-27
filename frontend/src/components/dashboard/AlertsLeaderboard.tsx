@@ -8,6 +8,7 @@ interface AlertsLeaderboardProps {
   currentAnalysis?: any
   topAlerts?: any[]
   title?: string
+  platform?: string
 }
 
 type FilterKey = "total" | "noise" | "night_time" | "after_hours" | "no_incident" | "escalated" | "retriggered"
@@ -17,7 +18,7 @@ const FILTERS: { key: FilterKey; label: string; description: string }[] = [
   { key: "noise",       label: "Noisiest",        description: "Alerts classified as noise (firing without being actionable)." },
   { key: "night_time",  label: "Night-Time",      description: "Alerts firing during deep night hours (10pm–6am)." },
   { key: "after_hours", label: "After-Hours",     description: "Alerts firing outside business hours (6pm–9am), evenings and weekends." },
-  { key: "no_incident", label: "No Incident",     description: "Alerts that fired but never escalated into a full incident — potential noise or misconfiguration." },
+  { key: "no_incident", label: "No Incident",     description: "Alerts that fired but never escalated into a full incident (potential noise or misconfiguration)." },
   { key: "escalated",   label: "Escalated",       description: "Alerts that were escalated to another responder or level." },
   { key: "retriggered", label: "Retriggered",     description: "Alerts that fired again after being acknowledged or resolved." },
 ]
@@ -32,13 +33,32 @@ const BAR_COLORS: Record<FilterKey, string> = {
   retriggered: "bg-pink-400",
 }
 
-export function AlertsLeaderboard({ currentAnalysis, topAlerts: topAlertsProp, title }: AlertsLeaderboardProps) {
+export function AlertsLeaderboard({ currentAnalysis, topAlerts: topAlertsProp, title, platform }: AlertsLeaderboardProps) {
   const [activeKey, setActiveKey] = useState<FilterKey>("total")
+
+  const resolvedPlatform = platform ?? currentAnalysis?.platform
 
   const topAlerts: any[] = useMemo(() => {
     if (topAlertsProp !== undefined) return topAlertsProp
     return currentAnalysis?.analysis_data?.metadata?.alerts?.top_alerts ?? []
   }, [currentAnalysis, topAlertsProp])
+
+  if (resolvedPlatform === 'pagerduty') {
+    return (
+      <Card className="bg-white flex flex-col h-full overflow-hidden">
+        <CardHeader className="pb-2 shrink-0">
+          <div className="space-y-1">
+            <CardTitle className="text-neutral-900">{title ?? "Team Alert Leaderboard"}</CardTitle>
+            <CardDescription>Top alerts ranked by negative impact criteria</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center py-10 text-center gap-2">
+          <p className="text-sm font-medium text-neutral-600">Alert data is not available for PagerDuty</p>
+          <p className="text-xs text-neutral-400">Connect Rootly to access alert insights</p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   const activeFilter = FILTERS.find((f) => f.key === activeKey)!
 
