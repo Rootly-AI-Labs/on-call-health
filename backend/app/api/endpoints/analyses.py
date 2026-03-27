@@ -13,9 +13,10 @@ from sqlalchemy import func, over
 from sqlalchemy.orm import Session, defer, load_only
 from sqlalchemy.exc import OperationalError
 
-from ...models import get_db, User, Analysis, RootlyIntegration, SlackIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
+from ...models import get_db, User, Analysis, RootlyIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
 from ...auth.dependencies import get_current_active_user, get_current_user_flexible
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
+from ...services.slack_token_service import SlackTokenService
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
 from ...core.alert_health_calculator import calculate_alert_health_score
@@ -3035,17 +3036,23 @@ async def run_analysis_task(
 
             if include_slack:
                 logger.info(f"BACKGROUND_TASK: Looking for Slack integration for user {user_id}")
-                slack_integration = db.query(SlackIntegration).filter(
-                    SlackIntegration.user_id == user_id
-                ).first()
-                logger.info(f"BACKGROUND_TASK: Slack integration query result: {slack_integration}")
-                if slack_integration and slack_integration.slack_token:
-                    # Decrypt the token
-                    from ...api.endpoints.slack import decrypt_token
-                    slack_token = decrypt_token(slack_integration.slack_token)
-                    logger.info(f"BACKGROUND_TASK: Found Slack integration for user {user_id} with token: {slack_token[:10]}...")
+                if 'user' not in locals() or user is None:
+                    user = db.query(User).filter(User.id == user_id).first()
+
+                if user:
+                    slack_service = SlackTokenService(db)
+                    slack_token = slack_service.get_oauth_token_for_user(user)
+
+                if slack_token:
+                    logger.info(
+                        f"BACKGROUND_TASK: Found Slack integration for user {user_id} "
+                        f"(org {user.organization_id})"
+                    )
                 else:
-                    logger.warning(f"BACKGROUND_TASK: No Slack integration found for user {user_id}")
+                    logger.warning(
+                        f"BACKGROUND_TASK: No usable Slack token available for user {user_id}; "
+                        "continuing without Slack data"
+                    )
 
             if include_github:
                 logger.info(f"BACKGROUND_TASK: Looking for GitHub integration for user {user_id}")
@@ -3539,6 +3546,10 @@ async def run_analysis_task(
                         per_user_after_hours_emails = alerts_counts.get("per_user_after_hours_by_email") or {}
                         per_user_night_time_ids = alerts_counts.get("per_user_night_time_by_id") or {}
                         per_user_night_time_emails = alerts_counts.get("per_user_night_time_by_email") or {}
+                        per_user_daily_ids = alerts_counts.get("per_user_daily_by_id") or {}
+                        per_user_daily_emails = alerts_counts.get("per_user_daily_by_email") or {}
+                        per_user_alert_title_ids = alerts_counts.get("per_user_alert_title_by_id") or {}
+                        per_user_alert_title_emails = alerts_counts.get("per_user_alert_title_by_email") or {}
                         per_user_urgency_ids = alerts_counts.get("per_user_urgency_by_id") or {}
                         per_user_urgency_emails = alerts_counts.get("per_user_urgency_by_email") or {}
                         per_user_acked_ids = alerts_counts.get("per_user_acked_by_id") or {}
@@ -3573,6 +3584,8 @@ async def run_analysis_task(
                             retriggered_count = 0
                             avg_mtta_seconds = None
                             avg_mttr_seconds = None
+                            daily_breakdown = {}
+                            top_alerts_breakdown = []
                             member_rootly_id = member.get("rootly_user_id")
                             member_user_id = member.get("user_id")
                             member_email = member.get("user_email")
@@ -3595,6 +3608,8 @@ async def run_analysis_task(
                                 retriggered_count = per_user_retriggered_ids.get(k, 0)
                                 avg_mtta_seconds = per_user_mtta_avg_ids.get(k)
                                 avg_mttr_seconds = per_user_mttr_avg_ids.get(k)
+                                daily_breakdown = per_user_daily_ids.get(k, {})
+                                top_alerts_breakdown = per_user_alert_title_ids.get(k, [])
                             elif member_user_id and str(member_user_id) in per_user_ids:
                                 k = str(member_user_id)
                                 count = per_user_ids.get(k, 0)
@@ -3614,6 +3629,8 @@ async def run_analysis_task(
                                 retriggered_count = per_user_retriggered_ids.get(k, 0)
                                 avg_mtta_seconds = per_user_mtta_avg_ids.get(k)
                                 avg_mttr_seconds = per_user_mttr_avg_ids.get(k)
+                                daily_breakdown = per_user_daily_ids.get(k, {})
+                                top_alerts_breakdown = per_user_alert_title_ids.get(k, [])
                             elif member_email and str(member_email).lower() in per_user_emails:
                                 k = str(member_email).lower()
                                 count = per_user_emails.get(k, 0)
@@ -3633,6 +3650,8 @@ async def run_analysis_task(
                                 retriggered_count = per_user_retriggered_emails.get(k, 0)
                                 avg_mtta_seconds = per_user_mtta_avg_emails.get(k)
                                 avg_mttr_seconds = per_user_mttr_avg_emails.get(k)
+                                daily_breakdown = per_user_daily_emails.get(k, {})
+                                top_alerts_breakdown = per_user_alert_title_emails.get(k, [])
                             if count is None:
                                 count = 0
                             member["alerts_count"] = count
@@ -3652,6 +3671,8 @@ async def run_analysis_task(
                             member["alerts_retriggered_count"] = retriggered_count
                             member["alerts_avg_mtta_seconds"] = avg_mtta_seconds
                             member["alerts_avg_mttr_seconds"] = avg_mttr_seconds
+                            member["alerts_daily_breakdown"] = daily_breakdown
+                            member["alerts_top_alerts"] = top_alerts_breakdown
 
                             # Calculate alert health score (0-100) for OCH integration
                             signal_quality_pct = 100.0

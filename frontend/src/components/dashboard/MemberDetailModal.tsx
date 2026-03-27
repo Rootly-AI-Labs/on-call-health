@@ -16,6 +16,7 @@ import { SurveyResultsCard } from "@/components/dashboard/SurveyResultsCard"
 import { TicketingCard } from "@/components/dashboard/TicketingCard"
 import { UserAlertsCard } from "@/components/dashboard/UserAlertsCard"
 import { getRiskScore100FromDailyHealth, getRiskScore100FromMember } from "@/lib/scoring"
+import { AlertsLeaderboard } from "@/components/dashboard/AlertsLeaderboard"
 
 // OCH risk level helpers
 function getOCHRiskInfo(score: number | undefined | null): { level: string; label: string } {
@@ -454,6 +455,8 @@ export function MemberDetailModal({
                 {(() => {
                   // Define all tiles with their data availability checks
                   const isRootly = currentAnalysis?.platform === 'rootly'
+                  const isPagerDuty = currentAnalysis?.platform === 'pagerduty'
+                  const platform = currentAnalysis?.platform
                   const tiles = [
                     {
                       id: 'userTrends',
@@ -469,18 +472,35 @@ export function MemberDetailModal({
                         />
                       )
                     },
-                    ...(isRootly ? [{
-                      id: 'userAlerts',
-                      order: 2,
-                      hasData: true,
-                      component: (
-                        <UserAlertsCard
-                          key="userAlerts"
-                          memberData={memberData || selectedMember}
-                          alertsMeta={currentAnalysis?.analysis_data?.metadata?.alerts}
-                        />
-                      )
-                    }] : []),
+                    ...(isRootly || isPagerDuty ? [
+                      {
+                        id: 'userAlerts',
+                        order: 2,
+                        hasData: true,
+                        component: (
+                          <UserAlertsCard
+                            key="userAlerts"
+                            memberData={memberData || selectedMember}
+                            alertsMeta={currentAnalysis?.analysis_data?.metadata?.alerts}
+                            platform={platform}
+                          />
+                        )
+                      },
+                      {
+                        id: 'userLeaderboard',
+                        order: 2.5,
+                        hasData: true,
+                        component: (
+                          <div key="userLeaderboard" className={isRootly ? "h-[480px]" : undefined}>
+                            <AlertsLeaderboard
+                              topAlerts={memberData?.alerts_top_alerts ?? []}
+                              title="User Alert Leaderboard"
+                              platform={platform}
+                            />
+                          </div>
+                        )
+                      }
+                    ] : []),
                     {
                       id: 'riskFactors',
                       order: 3,

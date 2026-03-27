@@ -793,6 +793,10 @@ class RootlyAPIClient:
         per_user_after_hours_by_email: Dict[str, int] = {}
         per_user_night_time_by_id: Dict[str, int] = {}
         per_user_night_time_by_email: Dict[str, int] = {}
+        per_user_daily_by_id: Dict[str, Dict[str, Dict[str, int]]] = {}
+        per_user_daily_by_email: Dict[str, Dict[str, Dict[str, int]]] = {}
+        per_user_alert_title_by_id: Dict[str, Dict[str, Dict[str, int]]] = {}
+        per_user_alert_title_by_email: Dict[str, Dict[str, Dict[str, int]]] = {}
         per_user_urgency_by_id: Dict[str, Dict[str, int]] = {}
         per_user_urgency_by_email: Dict[str, Dict[str, int]] = {}
         per_user_related_by_id: Dict[str, Dict[str, Set[str]]] = {}
@@ -878,6 +882,8 @@ class RootlyAPIClient:
                             "night_time_count": night_time_count,
                             "per_user_night_time_by_id": per_user_night_time_by_id,
                             "per_user_night_time_by_email": per_user_night_time_by_email,
+                            "per_user_daily_by_id": per_user_daily_by_id,
+                            "per_user_daily_by_email": per_user_daily_by_email,
                             "urgency_counts": urgency_counts,
                             "per_user_urgency_by_id": per_user_urgency_by_id,
                             "per_user_urgency_by_email": per_user_urgency_by_email,
@@ -1036,10 +1042,6 @@ class RootlyAPIClient:
                             per_alert_title[alert_title]["total"] += 1
                             if noise_value == "noise":
                                 per_alert_title[alert_title]["noise"] += 1
-                            if alert_dt and _is_night_time(alert_dt, None):
-                                per_alert_title[alert_title]["night_time"] += 1
-                            if alert_dt and _is_after_hours(alert_dt, None):
-                                per_alert_title[alert_title]["after_hours"] += 1
                             if not has_incident:
                                 per_alert_title[alert_title]["no_incident"] += 1
                             if is_escalated:
@@ -1191,6 +1193,22 @@ class RootlyAPIClient:
                                 per_user_source[source_value] = per_user_source.get(source_value, 0) + 1
                                 per_user_derived_source = per_user_derived_source_by_id.setdefault(uid, {})
                                 per_user_derived_source[derived_source] = per_user_derived_source.get(derived_source, 0) + 1
+                                if _day_key:
+                                    user_day = per_user_daily_by_id.setdefault(uid, {}).setdefault(_day_key, {"total": 0, "incidents": 0, "after_hours": 0, "night_time": 0, "escalated": 0, "retrigger": 0})
+                                    user_day["total"] += 1
+                                    if has_incident: user_day["incidents"] += 1
+                                    if alert_dt and _is_after_hours(alert_dt, user_tz_by_id.get(uid)): user_day["after_hours"] += 1
+                                    if alert_dt and _is_night_time(alert_dt, user_tz_by_id.get(uid)): user_day["night_time"] += 1
+                                    if is_escalated: user_day["escalated"] += 1
+                                    if is_retriggered: user_day["retrigger"] += 1
+                                user_title = per_user_alert_title_by_id.setdefault(uid, {}).setdefault(alert_title, {"total": 0, "noise": 0, "night_time": 0, "after_hours": 0, "no_incident": 0, "escalated": 0, "retriggered": 0})
+                                user_title["total"] += 1
+                                if noise_value == "noise": user_title["noise"] += 1
+                                if alert_dt and _is_night_time(alert_dt, user_tz_by_id.get(uid)): user_title["night_time"] += 1
+                                if alert_dt and _is_after_hours(alert_dt, user_tz_by_id.get(uid)): user_title["after_hours"] += 1
+                                if not has_incident: user_title["no_incident"] += 1
+                                if is_escalated: user_title["escalated"] += 1
+                                if is_retriggered: user_title["retriggered"] += 1
 
                             for email in matched_emails:
                                 per_user_email_counts[email] = per_user_email_counts.get(email, 0) + 1
@@ -1219,6 +1237,22 @@ class RootlyAPIClient:
                                 per_user_source[source_value] = per_user_source.get(source_value, 0) + 1
                                 per_user_derived_source = per_user_derived_source_by_email.setdefault(email, {})
                                 per_user_derived_source[derived_source] = per_user_derived_source.get(derived_source, 0) + 1
+                                if _day_key:
+                                    user_day = per_user_daily_by_email.setdefault(email, {}).setdefault(_day_key, {"total": 0, "incidents": 0, "after_hours": 0, "night_time": 0, "escalated": 0, "retrigger": 0})
+                                    user_day["total"] += 1
+                                    if has_incident: user_day["incidents"] += 1
+                                    if alert_dt and _is_after_hours(alert_dt, user_tz_by_email.get(email)): user_day["after_hours"] += 1
+                                    if alert_dt and _is_night_time(alert_dt, user_tz_by_email.get(email)): user_day["night_time"] += 1
+                                    if is_escalated: user_day["escalated"] += 1
+                                    if is_retriggered: user_day["retrigger"] += 1
+                                user_title = per_user_alert_title_by_email.setdefault(email, {}).setdefault(alert_title, {"total": 0, "noise": 0, "night_time": 0, "after_hours": 0, "no_incident": 0, "escalated": 0, "retriggered": 0})
+                                user_title["total"] += 1
+                                if noise_value == "noise": user_title["noise"] += 1
+                                if alert_dt and _is_night_time(alert_dt, user_tz_by_email.get(email)): user_title["night_time"] += 1
+                                if alert_dt and _is_after_hours(alert_dt, user_tz_by_email.get(email)): user_title["after_hours"] += 1
+                                if not has_incident: user_title["no_incident"] += 1
+                                if is_escalated: user_title["escalated"] += 1
+                                if is_retriggered: user_title["retriggered"] += 1
 
                             for uid in matched_responded_ids:
                                 per_user_responded_by_id[uid] = per_user_responded_by_id.get(uid, 0) + 1
@@ -1270,8 +1304,10 @@ class RootlyAPIClient:
 
                             if alert_after_hours_any:
                                 after_hours_count += 1
+                                per_alert_title[alert_title]["after_hours"] += 1
                             if alert_night_time_any:
                                 night_time_count += 1
+                                per_alert_title[alert_title]["night_time"] += 1
 
                         # Team-level after-hours/night-time counters: computed for all
                         # in-scope alerts regardless of whether user filtering is active.
@@ -1280,8 +1316,10 @@ class RootlyAPIClient:
                         elif in_scope and alert_dt is not None:
                             if _is_after_hours(alert_dt, None):
                                 after_hours_count += 1
+                                per_alert_title[alert_title]["after_hours"] += 1
                             if _is_night_time(alert_dt, None):
                                 night_time_count += 1
+                                per_alert_title[alert_title]["night_time"] += 1
 
                     if total_pages is None:
                         if not data.get("data"):
@@ -1330,6 +1368,8 @@ class RootlyAPIClient:
                 "night_time_count": night_time_count,
                 "per_user_night_time_by_id": per_user_night_time_by_id,
                 "per_user_night_time_by_email": per_user_night_time_by_email,
+                "per_user_daily_by_id": per_user_daily_by_id,
+                "per_user_daily_by_email": per_user_daily_by_email,
                 "urgency_counts": urgency_counts,
                 "per_user_urgency_by_id": per_user_urgency_by_id,
                 "per_user_urgency_by_email": per_user_urgency_by_email,
@@ -1357,6 +1397,14 @@ class RootlyAPIClient:
                     key=lambda x: x["total"], reverse=True
                 )[:50],
                 "daily_alert_breakdown": daily_alert_breakdown,
+                "per_user_alert_title_by_id": {
+                    uid: sorted([{"title": t, **c} for t, c in titles.items()], key=lambda x: x["total"], reverse=True)[:50]
+                    for uid, titles in per_user_alert_title_by_id.items()
+                },
+                "per_user_alert_title_by_email": {
+                    email: sorted([{"title": t, **c} for t, c in titles.items()], key=lambda x: x["total"], reverse=True)[:50]
+                    for email, titles in per_user_alert_title_by_email.items()
+                },
             }
 
         return {
@@ -1392,6 +1440,8 @@ class RootlyAPIClient:
             "night_time_count": night_time_count,
             "per_user_night_time_by_id": per_user_night_time_by_id,
             "per_user_night_time_by_email": per_user_night_time_by_email,
+            "per_user_daily_by_id": per_user_daily_by_id,
+            "per_user_daily_by_email": per_user_daily_by_email,
             "urgency_counts": urgency_counts,
             "per_user_urgency_by_id": per_user_urgency_by_id,
             "per_user_urgency_by_email": per_user_urgency_by_email,
@@ -1419,6 +1469,14 @@ class RootlyAPIClient:
                 key=lambda x: x["total"], reverse=True
             )[:50],
             "daily_alert_breakdown": daily_alert_breakdown,
+            "per_user_alert_title_by_id": {
+                uid: sorted([{"title": t, **c} for t, c in titles.items()], key=lambda x: x["total"], reverse=True)[:50]
+                for uid, titles in per_user_alert_title_by_id.items()
+            },
+            "per_user_alert_title_by_email": {
+                email: sorted([{"title": t, **c} for t, c in titles.items()], key=lambda x: x["total"], reverse=True)[:50]
+                for email, titles in per_user_alert_title_by_email.items()
+            },
         }
 
     async def get_team_member_emails(self, team_name: str) -> set:
