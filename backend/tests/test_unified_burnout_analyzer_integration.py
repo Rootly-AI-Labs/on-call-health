@@ -418,7 +418,7 @@ class TestCalculationMethods:
         # Check correct key names
         assert "overall_score" in result
         assert "scoring_method" in result
-        assert "average_health_score" in result  # NOT "average_burnout"
+        assert "average_risk_score_100" in result
         assert "health_status" in result
         assert "risk_distribution" in result
         assert "members_at_risk" in result
@@ -1114,12 +1114,9 @@ class TestOffHoursContribution:
 
         # Moderate work-related factors
         work_metrics = {
-            'sprint_completion': 25,
-            'code_review_speed': 30,
-            'pr_frequency': 40,
-            'deployment_frequency': 35,
-            'meeting_load': 25,
-            'oncall_burden': 50
+            'sprint_completion': 7,
+            'oncall_burden': 50,
+            'alert_health': 60,
         }
 
         personal_result = calculate_personal_burnout(personal_metrics)
