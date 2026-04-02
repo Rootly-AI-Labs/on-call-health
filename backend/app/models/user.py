@@ -58,6 +58,7 @@ class User(Base):
     owned_jira_workspaces = relationship("JiraWorkspaceMapping", back_populates="owner")
     linear_integrations = relationship("LinearIntegration", back_populates="user", cascade="all, delete-orphan")
     owned_linear_workspaces = relationship("LinearWorkspaceMapping", back_populates="owner")
+    ai_usage_integrations = relationship("AIUsageIntegration", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', providers={len(self.oauth_providers)})>"

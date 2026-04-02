@@ -310,6 +310,7 @@ class AnalysisRequest(BaseValidatedModel):
     include_slack: bool = Field(False, description="Include Slack data")
     include_jira: bool = Field(False, description="Include Jira data")
     include_linear: bool = Field(False, description="Include Linear data")
+    include_ai_usage: bool = Field(True, description="Include AI usage tracking data")
     enable_ai: bool = Field(False, description="Enable AI insights")
     auto_refresh_enabled: bool = Field(False, description="Enable auto-refresh mode")
     auto_refresh_interval: Optional[str] = Field(None, description="Auto-refresh interval: 24h, 3d, or 7d")

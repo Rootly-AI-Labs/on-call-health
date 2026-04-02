@@ -101,6 +101,7 @@ class RunAnalysisRequest(BaseModel):
     include_slack: bool = False
     include_jira: bool = False
     include_linear: bool = False
+    include_ai_usage: bool = True
     enable_ai: bool = False
 
 
@@ -409,7 +410,8 @@ async def run_burnout_analysis(
                 include_jira=request.include_jira,
                 include_linear=request.include_linear,
                 user_id=current_user.id,
-                enable_ai=request.enable_ai
+                enable_ai=request.enable_ai,
+                include_ai_usage=request.include_ai_usage
             )
             logger.info(f"ENDPOINT: Successfully added background task for analysis {analysis.id}")
         except Exception as e:
@@ -2920,7 +2922,8 @@ async def run_analysis_task(
     include_jira: bool = False,
     include_linear: bool = False,
     user_id: int = None,
-    enable_ai: bool = False
+    enable_ai: bool = False,
+    include_ai_usage: bool = True
 ):
     """Background task to run the actual burnout analysis."""
     import asyncio
@@ -3676,6 +3679,67 @@ async def run_analysis_task(
                             apply_alert_health_to_och(member, adjusted_score)
                 except Exception as alerts_err:
                     logger.warning(f"BACKGROUND_TASK: Failed to attach alert metadata for analysis {analysis_ref}: {alerts_err}")
+
+            # ------------------------------------------------------------------ #
+            #  AI Usage collection (non-blocking — failures silently skipped)    #
+            # ------------------------------------------------------------------ #
+            logger.info(f"[AI_USAGE] include_ai_usage flag={include_ai_usage} for analysis {analysis_ref}")
+            if include_ai_usage:
+                try:
+                    from ...models import AIUsageIntegration
+                    from ...services.ai_usage_collector import collect_ai_usage
+                    from cryptography.fernet import Fernet
+                    import base64
+
+                    if not user_id:
+                        logger.warning(f"[AI_USAGE] Skipping — no user_id on task for analysis {analysis_ref}")
+                    else:
+                        task_user = db.query(User).filter(User.id == user_id).first()
+                        org_id = task_user.organization_id if task_user else None
+                        logger.info(f"[AI_USAGE] user_id={user_id} org_id={org_id} for analysis {analysis_ref}")
+
+                        if not org_id:
+                            logger.warning(f"[AI_USAGE] Skipping — user has no organization for analysis {analysis_ref}")
+                        else:
+                            ai_integration = db.query(AIUsageIntegration).filter(
+                                AIUsageIntegration.organization_id == org_id
+                            ).first()
+                            logger.info(
+                                f"[AI_USAGE] Integration found={ai_integration is not None} "
+                                f"is_connected={ai_integration.is_connected if ai_integration else 'N/A'} "
+                                f"openai_enabled={ai_integration.openai_enabled if ai_integration else 'N/A'} "
+                                f"anthropic_enabled={ai_integration.anthropic_enabled if ai_integration else 'N/A'} "
+                                f"for analysis {analysis_ref}"
+                            )
+
+                            if not ai_integration or not ai_integration.is_connected:
+                                logger.warning(f"[AI_USAGE] Skipping — no connected integration for org {org_id} analysis {analysis_ref}")
+                            else:
+                                _jwt_secret = os.environ.get("JWT_SECRET_KEY", "default-secret-key-change-me")
+                                _fernet_key = base64.urlsafe_b64encode(
+                                    _jwt_secret.encode()[:32].ljust(32, b"\0")
+                                )
+                                _f = Fernet(_fernet_key)
+                                openai_key = _f.decrypt(ai_integration.openai_api_key.encode()).decode() if ai_integration.has_openai else None
+                                anthropic_key = _f.decrypt(ai_integration.anthropic_api_key.encode()).decode() if ai_integration.has_anthropic else None
+                                logger.info(
+                                    f"[AI_USAGE] Fetching usage: openai={'yes (key length=' + str(len(openai_key)) + ')' if openai_key else 'no'} "
+                                    f"anthropic={'yes' if anthropic_key else 'no'} days={time_range}"
+                                )
+                                ai_usage_data = await collect_ai_usage(
+                                    openai_api_key=openai_key,
+                                    openai_org_id=ai_integration.openai_org_id,
+                                    anthropic_api_key=anthropic_key,
+                                    anthropic_workspace_id=ai_integration.anthropic_workspace_id,
+                                    days=time_range,
+                                )
+                                logger.info(f"[AI_USAGE] Collected {len(ai_usage_data)} days of data: {list(ai_usage_data.keys())[:5]} for analysis {analysis_ref}")
+                                if "metadata" not in results:
+                                    results["metadata"] = {}
+                                results["metadata"]["ai_usage"] = ai_usage_data
+                                logger.info(f"[AI_USAGE] Stored ai_usage in results.metadata — keys in metadata now: {list(results.get('metadata', {}).keys())}")
+                except Exception as ai_err:
+                    logger.warning(f"[AI_USAGE] Failed to collect AI usage for analysis {analysis_ref}: {ai_err}", exc_info=True)
 
             logger.info(f"🔍 DEBUG: About to save results for analysis {analysis_ref}")
 

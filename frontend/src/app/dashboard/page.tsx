@@ -49,6 +49,7 @@ import {
   ChevronLeft,
   Bookmark,
   Timer,
+  Bot,
 } from "lucide-react"
 
 // Helper function for platform-based colors
@@ -77,6 +78,7 @@ import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
 import { TeamRiskFactorsCard, FACTOR_DESCRIPTIONS } from "@/components/dashboard/TeamRiskFactorsCard"
 import { AlertsCountCard } from "@/components/dashboard/AlertsCountCard"
+import { AIUsageCard } from "@/components/dashboard/AIUsageCard"
 import { AlertsLeaderboard } from "@/components/dashboard/AlertsLeaderboard"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
@@ -197,6 +199,9 @@ function DashboardContent() {
   setIncludeJira,
   includeLinear,
   setIncludeLinear,
+  includeAIUsage,
+  setIncludeAIUsage,
+  aiUsageConnected,
   enableAI,
   setEnableAI,
   llmConfig,
@@ -1175,6 +1180,9 @@ function DashboardContent() {
                 <AlertsCardsRow currentAnalysis={currentAnalysis} />
               )}
 
+              {/* AI Coding Assistant Usage (shown when AI usage data is present in analysis) */}
+              <AIUsageCard currentAnalysis={currentAnalysis} />
+
               <TeamMembersList
                 currentAnalysis={currentAnalysis}
                 setSelectedMember={setSelectedMember}
@@ -1783,6 +1791,39 @@ function DashboardContent() {
                   )}
                 </div>
                 )}
+              </div>
+            )}
+
+            {/* AI Usage Toggle */}
+            {aiUsageConnected && (
+              <div>
+                <label className="text-sm font-medium text-neutral-700 mb-2 block">
+                  AI Usage Tracking
+                </label>
+                <div
+                  className={`border rounded-lg p-4 transition-all cursor-pointer ${includeAIUsage ? 'border-indigo-500 bg-indigo-50' : 'border-neutral-200 bg-white'}`}
+                  onClick={() => setIncludeAIUsage(!includeAIUsage)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                        <Bot className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-neutral-900">AI Usage</h3>
+                        <p className="text-xs text-neutral-700">Token consumption tracking</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={includeAIUsage}
+                      onCheckedChange={setIncludeAIUsage}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-xs font-medium text-green-700">Connected</span>
+                  </div>
+                </div>
               </div>
             )}
 
