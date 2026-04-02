@@ -346,7 +346,7 @@ def _build_email_content(
     critical_trend, worsening_trend = _build_member_lists(members, individual_daily_data)
     risk = _get_risk_summary(members)
 
-    # ─ Sort all members by risk level (och_score) descending, take top 6 ─
+    # ─ Sort by worst trends first, then by risk level ─
     critical_emails = {m.get("user_email") for m in critical_trend}
     worsening_emails = {m.get("user_email") for m in worsening_trend}
 
@@ -355,17 +355,22 @@ def _build_email_content(
         email = member.get("user_email")
         if email in critical_emails:
             member["trend_type"] = "significantly_worsening"
+            member["trend_priority"] = 0
         elif email in worsening_emails:
             member["trend_type"] = "worsening"
+            member["trend_priority"] = 1
         else:
             member["trend_type"] = "worsening"
+            member["trend_priority"] = 2
         combined_trends.append(member)
 
     combined_trends = sorted(
         combined_trends,
-        key=lambda m: m.get("och_score", 0),
-        reverse=True
-    )[:6]  # Top 6 by risk level
+        key=lambda m: (
+            m.get("trend_priority", 999),
+            -m.get("och_score", 0)
+        )
+    )[:6]  # Top 6 by worst trends first, then highest risk level
 
     completed_at = analysis.completed_at
     if completed_at and completed_at.tzinfo is None:
