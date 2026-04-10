@@ -43,6 +43,12 @@ export function AlertsLeaderboard({ currentAnalysis, topAlerts: topAlertsProp, t
     return currentAnalysis?.analysis_data?.metadata?.alerts?.top_alerts ?? []
   }, [currentAnalysis, topAlertsProp])
 
+  const sorted = useMemo(() => {
+    return [...topAlerts]
+      .filter((a) => (a[activeKey] ?? 0) > 0)
+      .sort((a, b) => (b[activeKey] ?? 0) - (a[activeKey] ?? 0))
+  }, [topAlerts, activeKey])
+
   if (resolvedPlatform === 'pagerduty') {
     return (
       <Card className="bg-white flex flex-col h-full overflow-hidden">
@@ -61,12 +67,6 @@ export function AlertsLeaderboard({ currentAnalysis, topAlerts: topAlertsProp, t
   }
 
   const activeFilter = FILTERS.find((f) => f.key === activeKey)!
-
-  const sorted = useMemo(() => {
-    return [...topAlerts]
-      .filter((a) => (a[activeKey] ?? 0) > 0)
-      .sort((a, b) => (b[activeKey] ?? 0) - (a[activeKey] ?? 0))
-  }, [topAlerts, activeKey])
 
   const maxVal = sorted.length > 0 ? (sorted[0][activeKey] ?? 0) : 1
 
