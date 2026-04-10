@@ -715,7 +715,7 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
       metricKey: "night_time" as AlertTrendKey,
       trend: trends.night_time,
     },
-    escalatedCount !== null && escalatedCount > 0 && {
+    escalatedCount !== null && {
       icon: <TrendingUp className="w-4 h-4" />,
       count: escalatedCount,
       pct: escalatedPct,
@@ -723,7 +723,7 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
       metricKey: "escalated" as AlertTrendKey,
       trend: trends.escalated,
     },
-    retriggerCount !== null && retriggerCount > 0 && {
+    retriggerCount !== null && {
       icon: <RefreshCw className="w-4 h-4" />,
       count: retriggerCount,
       pct: retriggerPct,
@@ -800,7 +800,7 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
               {breakdownItems.length > 0 && (
                 <div>
                   <div className="text-[13px] font-semibold text-neutral-800 mb-1">Alert Breakdown</div>
-                  <div className="grid grid-cols-5 gap-x-2">
+                  <div className="flex justify-between items-start w-full">
                     {breakdownItems.map((item) => {
                       return (
                         <div
