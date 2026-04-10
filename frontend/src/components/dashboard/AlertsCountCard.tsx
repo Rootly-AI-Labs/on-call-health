@@ -283,6 +283,7 @@ function AlertBreakdownChart({
   const [hidden, setHidden] = useState<Set<AlertTrendKey>>(new Set())
   const [hoveredChip, setHoveredChip] = useState<AlertTrendKey | null>(null)
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null)
   const [overlayMode, setOverlayMode] = useState<"none" | "wow" | "mom">("none")
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -363,6 +364,7 @@ function AlertBreakdownChart({
     const fraction = plotX / plotW
     const idx = Math.round(fraction * (chartDays.length - 1))
     setHoverIndex(Math.max(0, Math.min(chartDays.length - 1, idx)))
+    setMousePos({ x: e.clientX, y: e.clientY })
   }
 
   const hoverX = hoverIndex !== null ? xOf(hoverIndex) : null
@@ -465,7 +467,7 @@ function AlertBreakdownChart({
               viewBox={`0 0 ${VW} ${VH}`}
               className="w-full cursor-crosshair"
               onMouseMove={handleMouseMove}
-              onMouseLeave={() => setHoverIndex(null)}
+              onMouseLeave={() => { setHoverIndex(null); setMousePos(null) }}
             >
               {yTicks.map((v, i) => (
                 <g key={`ytick-${i}-${v}`}>
@@ -519,75 +521,75 @@ function AlertBreakdownChart({
                       const v = (chartData[chartDays[hoverIndex]]?.[m.key] ?? 0) as number
                       return <circle key={m.key} cx={hoverX} cy={yOf(v)} r="3.5" fill={m.color} stroke="white" strokeWidth="1.5" />
                     })}
-                  {hoverLabel && hoverDay && (() => {
-                    const visibleMetrics = activeMetrics.filter((m) => !hidden.has(m.key))
-                    const hasOverlay = overlayOffset > 0
-                    const histIdx = hoverIndex - overlayOffset
-                    const histDay = hasOverlay && histIdx >= 0 ? chartDays[histIdx] : null
-                    const histLabel = histDay
-                      ? overlayMode === "wow"
-                        ? `Week of ${new Date(histDay).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`
-                        : new Date(histDay).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
-                      : null
-                    const boxW = hasOverlay ? 148 : 100
-                    const boxH = hasOverlay
-                      ? 12 + visibleMetrics.length * 13 + 8 + 11 + visibleMetrics.length * 13 + 6
-                      : 12 + visibleMetrics.length * 13 + 6
-                    const boxX = tooltipOnLeft ? hoverX - boxW - 10 : hoverX + 10
-                    const boxY = MT
-                    const histRowStart = 12 + visibleMetrics.length * 13 + 16
-                    return (
-                      <g>
-                        <rect x={boxX} y={boxY} width={boxW} height={boxH} rx="3" fill="white" stroke="#e5e7eb" strokeWidth="1" filter="drop-shadow(0 1px 3px rgba(0,0,0,0.12))" />
-
-                        {/* Current date header */}
-                        <text x={boxX + 6} y={boxY + 10} fontSize="6" fontWeight="700" fill="#374151">{hoverLabel}</text>
-
-                        {/* Current values */}
-                        {visibleMetrics.map((m, idx) => {
-                          const v = (chartData[hoverDay]?.[m.key] ?? 0) as number
-                          return (
-                            <g key={m.key}>
-                              <circle cx={boxX + 9} cy={boxY + 18 + idx * 13} r="2.5" fill={m.color} />
-                              <text x={boxX + 16} y={boxY + 22 + idx * 13} fontSize="6" fill="#6b7280">{m.label}</text>
-                              <text x={boxX + boxW - 6} y={boxY + 22 + idx * 13} fontSize="6" fontWeight="600" fill="#111827" textAnchor="end">{v}</text>
-                            </g>
-                          )
-                        })}
-
-                        {/* Overlay section */}
-                        {hasOverlay && histLabel && (
-                          <>
-                            <line x1={boxX + 4} y1={boxY + histRowStart - 7} x2={boxX + boxW - 4} y2={boxY + histRowStart - 7} stroke="#e5e7eb" strokeWidth="0.75" />
-                            {/* Historical date header — same style as current */}
-                            <text x={boxX + 6} y={boxY + histRowStart + 2} fontSize="6" fontWeight="700" fill="#374151">{histLabel}</text>
-
-                            {/* Historical values — faded circle swatch + delta */}
-                            {visibleMetrics.map((m, idx) => {
-                              const v = (chartData[hoverDay]?.[m.key] ?? 0) as number
-                              const histV = histDay ? (chartData[histDay]?.[m.key] ?? 0) as number : null
-                              const pct = histV !== null ? (histV > 0 ? Math.round(((v - histV) / histV) * 100) : v > 0 ? 100 : 0) : null
-                              return (
-                                <g key={`hist-${m.key}`}>
-                                  <circle cx={boxX + 9} cy={boxY + histRowStart + 9 + idx * 13} r="2.5" fill={m.color} opacity={0.35} />
-                                  <text x={boxX + 16} y={boxY + histRowStart + 13 + idx * 13} fontSize="6" fill="#6b7280">{m.label}</text>
-                                  {pct !== null && (
-                                    <text x={boxX + boxW - 20} y={boxY + histRowStart + 13 + idx * 13} fontSize="5.5" fontWeight="600" fill={pct > 0 ? "#ef4444" : pct < 0 ? "#22c55e" : "#9ca3af"} textAnchor="end">
-                                      {pct > 0 ? `+${pct}%` : pct < 0 ? `${pct}%` : "—"}
-                                    </text>
-                                  )}
-                                  <text x={boxX + boxW - 4} y={boxY + histRowStart + 13 + idx * 13} fontSize="6" fontWeight="600" fill="#374151" textAnchor="end">{histV ?? "—"}</text>
-                                </g>
-                              )
-                            })}
-                          </>
-                        )}
-                      </g>
-                    )
-                  })()}
                 </g>
               )}
             </svg>
+            {mousePos && hoverIndex !== null && hoverDay && hoverLabel && (() => {
+              const visibleMetrics = activeMetrics.filter((m) => !hidden.has(m.key))
+              const hasOverlay = overlayOffset > 0
+              const histIdx = hoverIndex - overlayOffset
+              const histDay = hasOverlay && histIdx >= 0 ? chartDays[histIdx] : null
+              const histLabel = histDay
+                ? overlayMode === "wow"
+                  ? `Week of ${new Date(histDay + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`
+                  : overlayMode === "mom"
+                  ? new Date(histDay + "T00:00:00").toLocaleDateString([], { month: "long", year: "numeric" })
+                  : new Date(histDay + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+                : null
+              return (
+                <div
+                  className="fixed z-50 pointer-events-none"
+                  style={{ left: tooltipOnLeft ? mousePos.x - 180 : mousePos.x + 16, top: mousePos.y - 10 }}
+                >
+                  <div className="bg-white border border-neutral-200 rounded-lg shadow-lg text-xs p-2.5 min-w-[160px]">
+                    <div className="font-semibold text-neutral-800 mb-1.5 text-[11px]">{hoverLabel}</div>
+                    <div className="space-y-1">
+                      {visibleMetrics.map((m) => {
+                        const v = (chartData[hoverDay]?.[m.key] ?? 0) as number
+                        return (
+                          <div key={m.key} className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ backgroundColor: m.color }} />
+                              <span className="text-neutral-500">{m.label}</span>
+                            </div>
+                            <span className="font-semibold text-neutral-900">{v}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {hasOverlay && histLabel && (
+                      <>
+                        <div className="border-t border-neutral-100 my-1.5" />
+                        <div className="font-semibold text-neutral-800 mb-1.5 text-[11px]">{histLabel}</div>
+                        <div className="space-y-1">
+                          {visibleMetrics.map((m) => {
+                            const v = (chartData[hoverDay]?.[m.key] ?? 0) as number
+                            const histV = histDay ? (chartData[histDay]?.[m.key] ?? 0) as number : null
+                            const pct = histV !== null ? (histV > 0 ? Math.round(((v - histV) / histV) * 100) : v > 0 ? 100 : 0) : null
+                            return (
+                              <div key={m.key} className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full inline-block shrink-0 opacity-40" style={{ backgroundColor: m.color }} />
+                                  <span className="text-neutral-500">{m.label}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  {pct !== null && (
+                                    <span className={`text-[10px] font-semibold ${pct > 0 ? "text-red-500" : pct < 0 ? "text-green-500" : "text-neutral-400"}`}>
+                                      {pct > 0 ? `+${pct}%` : pct < 0 ? `${pct}%` : "—"}
+                                    </span>
+                                  )}
+                                  <span className="font-semibold text-neutral-700">{histV ?? "—"}</span>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
           </>
         )}
 
