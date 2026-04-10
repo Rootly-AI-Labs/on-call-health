@@ -438,7 +438,7 @@ function AlertBreakdownChart({
             {/* Compare row */}
             <div className="flex items-center gap-2 mb-3">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Compare:</span>
-              {(["wow", ...(days.length > 31 ? ["mom"] : [])] as const).map((mode) => (
+              {(["wow", ...(days.length > 31 ? ["mom"] : [])] as ("wow" | "mom")[]).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setOverlayMode((prev) => prev === mode ? "none" : mode)}
