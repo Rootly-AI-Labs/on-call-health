@@ -40,9 +40,10 @@ const URGENCY_DOT_COLORS: Record<string, string> = {
   low: "bg-gray-400",
 }
 
-type AlertTrendKey = "incidents" | "after_hours" | "night_time" | "escalated" | "retrigger"
+type AlertTrendKey = "total" | "incidents" | "after_hours" | "night_time" | "escalated" | "retrigger"
 
 const METRIC_CONFIGS: { key: AlertTrendKey; label: string; color: string }[] = [
+  { key: "total",       label: "All Alerts",     color: "#6b7280" },
   { key: "incidents",   label: "With incidents", color: "#3b82f6" },
   { key: "after_hours", label: "After-hours",    color: "#f97316" },
   { key: "night_time",  label: "Night-time",     color: "#a855f7" },
@@ -157,6 +158,22 @@ function getTrendConfig(change: number): { label: string; icon: React.ReactNode;
   }
 }
 
+function buildMonthlyData(daily: Record<string, any>): Record<string, any> {
+  const monthData: Record<string, any> = {}
+  Object.keys(daily).sort().forEach((day) => {
+    const key = day.slice(0, 7) + "-01" // YYYY-MM-01
+    if (!monthData[key]) monthData[key] = { total: 0, incidents: 0, after_hours: 0, night_time: 0, escalated: 0, retrigger: 0 }
+    const d = daily[day] || {}
+    monthData[key].total      += d.total      ?? 0
+    monthData[key].incidents  += d.incidents  ?? 0
+    monthData[key].after_hours+= d.after_hours?? 0
+    monthData[key].night_time += d.night_time ?? 0
+    monthData[key].escalated  += d.escalated  ?? 0
+    monthData[key].retrigger  += d.retrigger  ?? 0
+  })
+  return monthData
+}
+
 function buildWeeklyData(daily: Record<string, any>): Record<string, any> {
   const weekData: Record<string, any> = {}
   Object.keys(daily).sort().forEach((day) => {
@@ -266,14 +283,14 @@ function AlertBreakdownChart({
   const [hidden, setHidden] = useState<Set<AlertTrendKey>>(new Set())
   const [hoveredChip, setHoveredChip] = useState<AlertTrendKey | null>(null)
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
-  const [overlayMode, setOverlayMode] = useState<"none" | "dod" | "wow">("none")
+  const [overlayMode, setOverlayMode] = useState<"none" | "wow" | "mom">("none")
   const svgRef = useRef<SVGSVGElement>(null)
 
   const days = Object.keys(daily).sort()
   if (days.length === 0) return null
 
   const overlayOffset = overlayMode !== "none" ? 1 : 0
-  const chartData = overlayMode === "wow" ? buildWeeklyData(daily) : daily
+  const chartData = overlayMode === "wow" ? buildWeeklyData(daily) : overlayMode === "mom" ? buildMonthlyData(daily) : daily
   const chartDays = Object.keys(chartData).sort()
 
   const toggle = (key: AlertTrendKey) => {
@@ -313,8 +330,10 @@ function AlertBreakdownChart({
     .filter(({ i }) => i % xLabelStep === 0 || i === chartDays.length - 1)
 
   const xLabelFormat = (d: string) => overlayMode === "wow"
-    ? `Wk ${new Date(d).toLocaleDateString([], { month: "short", day: "numeric" })}`
-    : new Date(d).toLocaleDateString([], { month: "short", day: "numeric" })
+    ? `Wk ${new Date(d + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric" })}`
+    : overlayMode === "mom"
+    ? new Date(d + "T00:00:00").toLocaleDateString([], { month: "short", year: "numeric" })
+    : new Date(d + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric" })
 
   const pathFor = (key: AlertTrendKey) =>
     chartDays.map((d, i) => {
@@ -350,8 +369,10 @@ function AlertBreakdownChart({
   const hoverDay = hoverIndex !== null ? chartDays[hoverIndex] : null
   const hoverLabel = hoverDay
     ? overlayMode === "wow"
-      ? `Week of ${new Date(hoverDay).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`
-      : new Date(hoverDay).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+      ? `Week of ${new Date(hoverDay + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`
+      : overlayMode === "mom"
+      ? new Date(hoverDay + "T00:00:00").toLocaleDateString([], { month: "long", year: "numeric" })
+      : new Date(hoverDay + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
     : null
 
   // Flip tooltip to left side if near right edge
@@ -389,8 +410,8 @@ function AlertBreakdownChart({
 
         {tab === "breakdown" && (
           <>
-            {/* Toggle chips + overlay toggles */}
-            <div className="flex flex-wrap items-center gap-2 mb-4">
+            {/* Toggle chips */}
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               {activeMetrics.map((m) => {
                 const isHidden = hidden.has(m.key)
                 return (
@@ -413,28 +434,30 @@ function AlertBreakdownChart({
                   </button>
                 )
               })}
-              <div className="flex gap-1.5 ml-auto">
-                {(["dod", "wow"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setOverlayMode((prev) => prev === mode ? "none" : mode)}
-                    className={`text-[10px] px-2.5 py-0.5 rounded border transition-colors ${
-                      overlayMode === mode
-                        ? "bg-neutral-800 text-white border-neutral-800"
-                        : "bg-white text-neutral-400 border-neutral-200 hover:border-neutral-400 hover:text-neutral-600"
-                    }`}
-                  >
-                    {mode === "dod" ? "Day-over-Day" : "Week-over-Week"}
-                  </button>
-                ))}
-              </div>
             </div>
-            {overlayMode !== "none" && (
-              <div className="flex items-center gap-1.5 mb-2 text-[10px] text-neutral-400">
-                <svg width="20" height="8" viewBox="0 0 20 8"><line x1="0" y1="4" x2="20" y2="4" stroke="#9ca3af" strokeWidth="1.5" strokeDasharray="3 2" /></svg>
-                {overlayMode === "dod" ? "Dotted line = previous day" : "Dotted line = same day 1 week ago"}
-              </div>
-            )}
+            {/* Compare row */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Compare:</span>
+              {(["wow", ...(days.length > 31 ? ["mom"] : [])] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setOverlayMode((prev) => prev === mode ? "none" : mode)}
+                  className={`text-[10px] px-2.5 py-0.5 rounded border transition-colors ${
+                    overlayMode === mode
+                      ? "bg-neutral-800 text-white border-neutral-800"
+                      : "bg-white text-neutral-400 border-neutral-200 hover:border-neutral-400 hover:text-neutral-600"
+                  }`}
+                >
+                  {mode === "wow" ? "Week-over-Week" : "Month-over-Month"}
+                </button>
+              ))}
+              {overlayMode !== "none" && (
+                <span className="flex items-center gap-1 text-[10px] text-neutral-400 ml-1">
+                  <svg width="20" height="8" viewBox="0 0 20 8"><line x1="0" y1="4" x2="20" y2="4" stroke="#9ca3af" strokeWidth="1.5" strokeDasharray="3 2" /></svg>
+                  {overlayMode === "mom" ? "Dotted line = same month last period" : "Dotted line = same day 1 week ago"}
+                </span>
+              )}
+            </div>
 
             {/* SVG chart */}
             <svg
@@ -710,7 +733,7 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
     },
   ].filter(Boolean) as { icon: React.ReactElement; count: number; pct: number | null; label: string; metricKey: AlertTrendKey; trend: number | null }[]
 
-  const visibleKeys = new Set(breakdownItems.map((i) => i.metricKey))
+  const visibleKeys = new Set<AlertTrendKey>(["total", ...breakdownItems.map((i) => i.metricKey)])
 
   return (
     <>
@@ -777,14 +800,14 @@ export function AlertsCountCard({ currentAnalysis }: AlertsCountCardProps): Reac
               {breakdownItems.length > 0 && (
                 <div>
                   <div className="text-[13px] font-semibold text-neutral-800 mb-1">Alert Breakdown</div>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-4 sm:gap-x-4 xl:gap-x-5">
+                  <div className="grid grid-cols-5 gap-x-2">
                     {breakdownItems.map((item) => {
                       return (
                         <div
                           key={item.label}
-                          className="flex min-w-0 flex-col items-start p-2 text-left"
+                          className="flex min-w-0 flex-col items-start text-left"
                         >
-                          <div className="mb-1 min-h-6 self-start">
+                          <div className="mb-0.5 self-start">
                             <TrendTag change={item.trend} />
                           </div>
                           <div className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
