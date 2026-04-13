@@ -105,8 +105,6 @@ def get_cors_origins() -> list[str]:
 
     # Production domains
     origins.extend([
-        "https://www.oncallburnout.com",
-        "https://oncallburnout.com",
         "https://oncallhealth.ai",
         "https://www.oncallhealth.ai",
         "https://testing.oncallhealth.ai",
@@ -223,7 +221,7 @@ async def startup_event():
     from app.services.weekly_digest_service import weekly_digest_scheduler
     if settings.WEEKLY_DIGEST_ENABLED:
         weekly_digest_scheduler.start()
-        print("Weekly digest scheduler started (fires :40 of every hour; sends Monday 2am per user's local timezone — TODO: revert to 10am before deploying)")
+        print("Weekly digest scheduler started (fires */30; sends Tuesday 10am per user's local timezone)")
     else:
         print("Weekly digest scheduler disabled (WEEKLY_DIGEST_ENABLED=false)")
 

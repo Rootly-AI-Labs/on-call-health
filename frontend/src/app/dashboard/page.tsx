@@ -109,12 +109,16 @@ function AlertsCardsRow({ currentAnalysis }: { currentAnalysis: any }) {
     return () => observer.disconnect()
   }, [])
 
+  const isPagerDuty = currentAnalysis?.platform === 'pagerduty'
+  const hasAlertsData = !!currentAnalysis?.analysis_data?.metadata?.alerts
+  if (!isPagerDuty && !hasAlertsData) return null
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
       <div ref={teamAlertsRef}>
         <AlertsCountCard currentAnalysis={currentAnalysis} />
       </div>
-      <div style={teamAlertsHeight ? { height: teamAlertsHeight } : undefined} className="flex flex-col">
+      <div style={teamAlertsHeight ? { height: teamAlertsHeight } : undefined} className="flex flex-col overflow-hidden">
         <AlertsLeaderboard currentAnalysis={currentAnalysis} />
       </div>
     </div>
@@ -215,8 +219,6 @@ function DashboardContent() {
 
   // helpers
   getTrendIcon,
-  getRiskColor,
-  getProgressColor,
   getAnalysisStages,
   getAnalysisDescription,
 
@@ -1186,8 +1188,6 @@ function DashboardContent() {
               <TeamMembersList
                 currentAnalysis={currentAnalysis}
                 setSelectedMember={setSelectedMember}
-                getRiskColor={getRiskColor}
-                getProgressColor={getProgressColor}
                 connectedIntegrations={connectedIntegrations}
               />
             </>

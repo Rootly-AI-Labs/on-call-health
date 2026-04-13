@@ -13,11 +13,12 @@ import secrets
 from pydantic import EmailStr, field_validator, Field, BaseModel
 
 from ...models import get_db, User, OAuthProvider, UserEmail, OrganizationInvitation
-from ...auth.oauth import google_oauth, github_oauth
+from ...auth.oauth import google_oauth, github_oauth, okta_oauth
 from ...auth.jwt import create_access_token
 from ...auth.dependencies import get_current_active_user
 from ...services.account_linking import AccountLinkingService
 from ...services.demo_analysis_service import create_demo_analysis_for_new_user
+from ...services.login_audit_service import LoginAuditService
 from ...services.organization_auto_assignment import assign_user_to_organization
 from ...core.config import settings
 from ...core.rate_limiting import auth_rate_limit
@@ -36,8 +37,6 @@ ALLOWED_OAUTH_ORIGINS = [
     "http://127.0.0.1:3001",
     "http://127.0.0.1:3002",
     settings.FRONTEND_URL,
-    "https://www.oncallburnout.com",
-    "https://oncallburnout.com",
     "https://oncallhealth.ai",
     "https://www.oncallhealth.ai",
     "https://testing.oncallhealth.ai",
@@ -55,18 +54,19 @@ def build_error_redirect(frontend_url: str, error_msg: str) -> str:
     return f"{frontend_url}/auth/error?message={quote(safe_error_msg)}"
 
 # Helper functions for database-backed OAuth code storage
-def store_oauth_code(db: Session, code: str, jwt_token: str, user_id: int) -> None:
+def store_oauth_code(db: Session, code: str, jwt_token: str, user_id: int, auth_method: str) -> None:
     """Store OAuth temporary code in database."""
     try:
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
         db.execute(text("""
-            INSERT INTO oauth_temp_codes (code, jwt_token, user_id, expires_at)
-            VALUES (:code, :jwt_token, :user_id, :expires_at)
+            INSERT INTO oauth_temp_codes (code, jwt_token, user_id, expires_at, auth_method)
+            VALUES (:code, :jwt_token, :user_id, :expires_at, :auth_method)
         """), {
             "code": code,
             "jwt_token": jwt_token,
             "user_id": user_id,
-            "expires_at": expires_at
+            "expires_at": expires_at,
+            "auth_method": auth_method,
         })
         db.commit()
     except Exception as e:
@@ -86,7 +86,7 @@ def get_oauth_code(db: Session, code: str) -> Optional[Dict[str, Any]]:
 
         # Get the code
         result = db.execute(text("""
-            SELECT jwt_token, user_id, expires_at
+            SELECT jwt_token, user_id, expires_at, auth_method
             FROM oauth_temp_codes
             WHERE code = :code
         """), {"code": code})
@@ -105,7 +105,8 @@ def get_oauth_code(db: Session, code: str) -> Optional[Dict[str, Any]]:
         return {
             "jwt_token": row[0],
             "user_id": row[1],
-            "expires_at": row[2]
+            "expires_at": row[2],
+            "auth_method": row[3],
         }
     except Exception as e:
         db.rollback()
@@ -259,7 +260,7 @@ async def google_callback(
         logger.info(f"🔐 Storing OAuth code for user {user.id}: {auth_code[:10]}...")
 
         # Store JWT in database (works across multiple Railway instances)
-        store_oauth_code(db, auth_code, jwt_token, user.id)
+        store_oauth_code(db, auth_code, jwt_token, user.id, "google")
 
         logger.info(f"✅ OAuth code stored successfully")
 
@@ -389,7 +390,7 @@ async def github_callback(
         logger.info(f"🔐 Storing OAuth code for user {user.id}: {auth_code[:10]}...")
 
         # Store JWT in database (works across multiple Railway instances)
-        store_oauth_code(db, auth_code, jwt_token, user.id)
+        store_oauth_code(db, auth_code, jwt_token, user.id, "github")
 
         logger.info(f"✅ OAuth code stored successfully")
 
@@ -402,6 +403,113 @@ async def github_callback(
         error_msg = str(e) if str(e) else "Unknown authentication error"
         logger.error(f"GitHub OAuth callback error: {error_msg}")
         # Use state for error redirect too
+        frontend_url = settings.FRONTEND_URL
+        if state and state in ALLOWED_OAUTH_ORIGINS:
+            frontend_url = state
+        error_url = build_error_redirect(frontend_url, error_msg)
+        return RedirectResponse(url=error_url)
+
+@router.get("/okta")
+@auth_rate_limit("auth_login")
+async def okta_login(request: Request, redirect_origin: str = Query(None)):
+    """Initiate Okta OIDC login."""
+    if not settings.okta_auth_available:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Okta OAuth not enabled"
+        )
+
+    state = None
+    if redirect_origin and redirect_origin in ALLOWED_OAUTH_ORIGINS:
+        state = redirect_origin
+
+    authorization_url = okta_oauth.get_authorization_url(state=state)
+
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and "application/json" not in accept:
+        return RedirectResponse(url=authorization_url)
+
+    return {"authorization_url": authorization_url}
+
+@router.get("/okta/callback")
+async def okta_callback(
+    code: str = Query(None),
+    error: str = Query(None),
+    state: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Handle Okta OIDC callback."""
+    if not settings.okta_auth_available:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Okta OAuth not enabled"
+        )
+
+    if error:
+        if error == "access_denied":
+            return RedirectResponse(url=settings.FRONTEND_URL)
+        else:
+            error_url = build_error_redirect(settings.FRONTEND_URL, f'OAuth error: {error}')
+            return RedirectResponse(url=error_url)
+
+    if not code:
+        logger.warning("Okta OAuth callback received without authorization code")
+        return RedirectResponse(url=settings.FRONTEND_URL)
+
+    try:
+        token_data = await okta_oauth.exchange_code_for_token(code)
+        access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
+
+        if not access_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No access token received"
+            )
+
+        user_info = await okta_oauth.get_user_info(access_token)
+
+        linking_service = AccountLinkingService(db)
+        user, is_new_user = await linking_service.link_or_create_user(
+            provider="okta",
+            user_info=user_info,
+            access_token=access_token,
+            refresh_token=refresh_token
+        )
+
+        if is_new_user:
+            try:
+                assign_user_to_organization(db, user)
+            except Exception as e:
+                logger.error(f"Failed to auto-assign organization for new user {user.id}: {e}")
+
+        if is_new_user:
+            try:
+                create_demo_analysis_for_new_user(db, user)
+            except Exception as e:
+                logger.error(f"Failed to create demo analysis for new user {user.id}: {e}")
+
+        jwt_token = create_access_token(data={"sub": user.id})
+
+        frontend_url = settings.FRONTEND_URL
+        if state and state in ALLOWED_OAUTH_ORIGINS:
+            frontend_url = state
+
+        auth_code = secrets.token_urlsafe(32)
+
+        logger.info(f"Storing OAuth code for user {user.id}: {auth_code[:10]}...")
+
+        store_oauth_code(db, auth_code, jwt_token, user.id, "okta")
+
+        logger.info("Okta OAuth code stored successfully")
+
+        success_url = f"{frontend_url}/auth/success?code={auth_code}"
+        response = RedirectResponse(url=success_url)
+        return response
+
+    except Exception as e:
+        error_msg = str(e) if str(e) else "Unknown authentication error"
+        logger.error("Okta OAuth callback error: %s", error_msg)
         frontend_url = settings.FRONTEND_URL
         if state and state in ALLOWED_OAUTH_ORIGINS:
             frontend_url = state
@@ -424,6 +532,8 @@ async def get_current_user_info(
         "is_verified": current_user.is_verified,
         "has_rootly_token": bool(current_user.rootly_token),
         "created_at": current_user.created_at,
+        "last_login_at": current_user.last_login_at,
+        "login_count": current_user.login_count or 0,
         "oauth_providers": linking_service.get_user_providers(current_user.id),
         "emails": linking_service.get_user_emails(current_user.id)
     }
@@ -485,7 +595,9 @@ async def get_current_user_basic_info(
         "role": current_user.role,
         "organization_id": current_user.organization_id,
         "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
-        "updated_at": current_user.updated_at.isoformat() if current_user.updated_at else None
+        "updated_at": current_user.updated_at.isoformat() if current_user.updated_at else None,
+        "last_login_at": current_user.last_login_at.isoformat() if current_user.last_login_at else None,
+        "login_count": current_user.login_count or 0,
     }
 
 @router.post("/exchange-token")
@@ -524,6 +636,16 @@ async def exchange_auth_code_for_token(
         )
 
     logger.info(f"✅ OAuth code valid, returning token for user {auth_data['user_id']}")
+
+    user = db.query(User).filter(User.id == auth_data["user_id"]).first()
+    if user:
+        LoginAuditService(db).record_login_success(
+            user=user,
+            auth_method=auth_data.get("auth_method") or "oauth",
+            request=request,
+        )
+    else:
+        logger.warning("OAuth token exchange succeeded but user %s was not found for audit logging", auth_data["user_id"])
 
     return {
         "access_token": auth_data['jwt_token'],
@@ -1095,12 +1217,20 @@ async def password_login(
     # Create JWT token
     access_token = create_access_token(data={"sub": str(user.id)})
 
+    LoginAuditService(db).record_login_success(
+        user=user,
+        auth_method="password",
+        request=request,
+    )
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "user": {
             "id": user.id,
             "email": user.email,
-            "name": user.name
+            "name": user.name,
+            "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+            "login_count": user.login_count or 0,
         }
     }

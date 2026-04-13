@@ -9,6 +9,7 @@ import { siX } from "simple-icons"
 import Image from "next/image"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const OKTA_SSO_ENABLED = process.env.NEXT_PUBLIC_ENABLE_OKTA_SSO === 'true'
 
 const ppMori = localFont({
   src: [
@@ -48,7 +49,7 @@ const ppMori = localFont({
 // TODO: set the meta title and description - what's the right way of doing it?
 
 export default function LandingPage() {
-  const [isLoading, setIsLoading] = useState<'google' | 'github' | null>(null)
+  const [isLoading, setIsLoading] = useState<'google' | 'github' | 'okta' | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Preload background images and autoplay video on mount
@@ -139,6 +140,38 @@ export default function LandingPage() {
     }
   }
 
+  const handleOktaLogin = async () => {
+    try {
+      setIsLoading('okta')
+      const currentOrigin = window.location.origin
+      const response = await fetch(`${API_BASE}/auth/okta?redirect_origin=${encodeURIComponent(currentOrigin)}`)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Okta auth API error:', response.status, errorText)
+        throw new Error(`Authentication failed: ${response.status}`)
+      }
+
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        const responseText = await response.text()
+        console.error('Expected JSON but got:', contentType, responseText)
+        throw new Error('Invalid response format from authentication server')
+      }
+
+      const data = await response.json()
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url
+      } else {
+        console.error('No authorization URL in response:', data)
+        throw new Error('Invalid authentication response')
+      }
+    } catch (error) {
+      console.error('Okta login error:', error)
+      setIsLoading(null)
+    }
+  }
+
   return (
     <div className={`${ppMori.className} min-h-screen bg-white overflow-x-hidden`}>
 
@@ -146,7 +179,7 @@ export default function LandingPage() {
       <section className="bg-[url(/images/landing/rootly-bg-hq.webp)] bg-cover bg-[position:50%_15%] lg:bg-[size:210%] lg:bg-[position:-1200px_-300px] relative lg:pb-[120px]" id="get-started">
         {/* Header */}
         <div className="px-4 pt-6 pb-2 lg:px-16 lg:pt-8">
-          <div className="flex items-start justify-between w-full">
+          <div className="flex items-start justify-between w-full gap-4">
             <div className="flex flex-col items-start -space-y-0.5">
               <div className="flex items-center gap-1.5">
                 <div className="text-xl leading-[1rem] lg:text-3xl font-normal text-black">On-Call Health</div>
@@ -171,15 +204,40 @@ export default function LandingPage() {
                 </a>
               </div>
             </div>
-            <a
-              href="https://github.com/Rootly-AI-Labs/On-Call-Health"
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-2xl bg-[#7b6db1] px-5 py-2 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] flex items-center gap-2"
-            >
-              <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} className="h-4 w-4 lg:h-5 lg:w-5" />
-              <span className="relative top-[2px]">View on GitHub</span>
-            </a>
+            <div className="flex items-center gap-3 self-start">
+              {OKTA_SSO_ENABLED && (
+                <Button
+                  size="lg"
+                  className="h-10 rounded-2xl border border-[#0f2f7c]/30 bg-[#00297A] px-4 text-sm font-semibold font-display text-white hover:bg-[#001f5c] flex items-center gap-2"
+                  onClick={handleOktaLogin}
+                  disabled={isLoading === "okta"}
+                  title="For self-hosted or dedicated enterprise deployments"
+                >
+                  <span className="flex items-center gap-2">
+                    {isLoading === "okta" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="relative top-[1px]">Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Image src="/images/okta-icon.png" alt="Okta" width={16} height={16} className="h-4 w-4" />
+                        <span className="relative top-[1px]">Okta SSO</span>
+                      </>
+                    )}
+                  </span>
+                </Button>
+              )}
+              <a
+                href="https://github.com/Rootly-AI-Labs/On-Call-Health"
+                target="_blank"
+                rel="noreferrer"
+                className="h-10 rounded-2xl bg-[#7b6db1] px-5 text-sm font-semibold font-display text-[color:var(--text-text-primary,_#100F12)] hover:bg-[#6f62a5] flex items-center gap-2"
+              >
+                <Image src="/images/github-logo.png" alt="GitHub" width={20} height={20} className="h-4 w-4 lg:h-5 lg:w-5" />
+                <span className="relative top-[2px]">View on GitHub</span>
+              </a>
+            </div>
           </div>
         </div>
         <div className="container flex flex-col lg:flex-row flex-grow mx-auto px-4">
@@ -244,7 +302,6 @@ export default function LandingPage() {
                 )}
               </span>
             </Button>
-
 
             </div>
           </main>

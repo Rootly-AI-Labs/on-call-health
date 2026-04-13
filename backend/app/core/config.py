@@ -43,6 +43,13 @@ class Settings:
     GITHUB_CLIENT_SECRET: Optional[str] = os.getenv("GITHUB_CLIENT_SECRET")
     GITHUB_REDIRECT_URI: str = os.getenv("GITHUB_REDIRECT_URI", "http://localhost:8000/auth/github/callback")
     
+    # OAuth - Okta (OIDC)
+    OKTA_AUTH_ENABLED: bool = os.getenv("OKTA_AUTH_ENABLED", "false").lower() == "true"
+    OKTA_CLIENT_ID: Optional[str] = os.getenv("OKTA_CLIENT_ID")
+    OKTA_CLIENT_SECRET: Optional[str] = os.getenv("OKTA_CLIENT_SECRET")
+    OKTA_ISSUER: Optional[str] = os.getenv("OKTA_ISSUER")
+    OKTA_REDIRECT_URI: str = os.getenv("OKTA_REDIRECT_URI", "http://localhost:8000/auth/okta/callback")
+    
     # OAuth - Slack
     SLACK_CLIENT_ID: Optional[str] = os.getenv("SLACK_CLIENT_ID")
     SLACK_CLIENT_SECRET: Optional[str] = os.getenv("SLACK_CLIENT_SECRET")
@@ -74,6 +81,7 @@ class Settings:
     RESEND_API_KEY: Optional[str] = os.getenv("RESEND_API_KEY")
     RESEND_FROM_EMAIL: Optional[str] = os.getenv("RESEND_FROM_EMAIL")
     RESEND_FROM_NAME: str = os.getenv("RESEND_FROM_NAME", "On-Call Health")
+    UNSUBSCRIBE_FEEDBACK_EMAIL: Optional[str] = os.getenv("UNSUBSCRIBE_FEEDBACK_EMAIL")
     #todo
     # API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:8000")
 
@@ -91,5 +99,16 @@ class Settings:
     # Token Refresh Distributed Lock Configuration
     TOKEN_REFRESH_LOCK_TTL: int = int(os.getenv("TOKEN_REFRESH_LOCK_TTL", "30"))  # seconds
     TOKEN_REFRESH_LOCK_TIMEOUT: float = float(os.getenv("TOKEN_REFRESH_LOCK_TIMEOUT", "10"))  # seconds
+
+    @property
+    def okta_auth_available(self) -> bool:
+        """Return True only when Okta auth is explicitly enabled and fully configured."""
+        return bool(
+            self.OKTA_AUTH_ENABLED
+            and self.OKTA_CLIENT_ID
+            and self.OKTA_CLIENT_SECRET
+            and self.OKTA_ISSUER
+            and self.OKTA_REDIRECT_URI
+        )
 
 settings = Settings()

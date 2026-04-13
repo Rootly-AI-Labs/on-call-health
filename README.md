@@ -15,22 +15,22 @@ Catch exhaustion before it burns out your incident responders.
 
 On-Call Health integrates with Rootly, PagerDuty, GitHub, Slack, Linear, and Jira to collect objective and self-reported data to identify signs of overload among on-call engineers. Free and open-source.
 
-Get started at [www.oncallhealth.ai](https://www.oncallhealth.ai/) or [self-host it.](#Installation)
+Get started at [www.oncallhealth.ai](https://www.oncallhealth.ai/) or [self-host it](#Installation).
 
 ![On-Call Health Dashboard](frontend/public/images/dashboard-screenshot.png)
 
-##  Methodology
+## Methodology
 
 On-call Health measures overwork risk in professional settings. On-call Health isn't a medical or diagnostic tool; it is designed to help identify patterns and trends that may suggest overwork.
 
-The tool is centered around 2 main metrics:
+The tool is centered around two main metrics:
 * **On-Call Health (OCH) Score** — A composite score derived from all collected signals, reflecting an individual's incident response workload.
 
 * **Score Trend** — How the OCH score evolves over time relative to each responder's own baseline.
 
 The OCH score measures workload, not well-being directly. People respond differently to incidents, after-hours work, and pressure; some thrive under high-severity incidents, while others don't. The score trend captures whether someone's workload is shifting from *their* normal, regardless of where that normal sits.
 
-##  Data Collection
+## Data Collection
 
 * **Incident Response:** Volume, severity, time-to-acknowledge, time-to-resolve, after-hours pages, consecutive on-call days (PagerDuty, Rootly)
 
@@ -48,7 +48,7 @@ The OCH score measures workload, not well-being directly. People respond differe
 * [Linear](https://linear.app/): For workload tracking
 * [Jira](https://www.atlassian.com/software/jira): For workload tracking
 
-If you are interested in integrating with On-call Health, [get in touch](mailto:sylvain@rootly.com)!
+If you are interested in integrating with On-Call Health, [get in touch](mailto:sylvain@rootly.com)!
 
 ## Installation
 
@@ -70,8 +70,8 @@ cp backend/.env.example backend/.env
 	* Set **Application type** to **Web application**
 	* Set **Authorized redirect URIs** to `http://localhost:8000/auth/google/callback`
 	* Keep the pop-up that contains your **Client ID** and **Client secret** open
-3. **Fill out the variable `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your `backend/.env` file**
-4. **Restart backend `docker compose restart backend`**
+3. **Fill out the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` variables in your `backend/.env` file**
+4. **Restart the backend with `docker compose restart backend`**
 </details>
 
 <details>
@@ -82,12 +82,38 @@ cp backend/.env.example backend/.env
 	* **Application name**: On-Call Health
 	- **Homepage URL**: http://localhost:3000
 	- **Authorization callback URL**: http://localhost:8000/auth/github/callback
-2. **Create the app:**
+2. **Create the app**
 	* Click **Register application**
 	* You'll see your **Client ID**
 	* Click **Generate a new client secret** to get your **Client Secret**
-3. **Add to `backend/.env:`**
-4. **Restart backend:**
+3. **Add `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` to `backend/.env`**
+4. **Restart the backend**
+</details>
+
+<details>
+<summary><b>Okta SSO (optional, self-hosted / enterprise only)</b></summary>
+
+Okta SSO is disabled by default. To enable it for a self-hosted or dedicated enterprise deployment:
+
+1. **Enable Okta auth in the backend**
+   Add the following to `backend/.env`:
+   ```env
+   OKTA_AUTH_ENABLED=true
+   OKTA_CLIENT_ID=<your Okta client id>
+   OKTA_CLIENT_SECRET=<your Okta client secret>
+   OKTA_ISSUER=https://your-org.okta.com/oauth2/default
+   OKTA_REDIRECT_URI=http://localhost:8000/auth/okta/callback
+   ```
+2. **Show the Okta button in the frontend**
+   Add the following to your frontend environment before starting local development or rebuilding your deployed frontend. You can also see the example entry in `frontend/.env.example`:
+   ```env
+   NEXT_PUBLIC_ENABLE_OKTA_SSO=true
+   ```
+3. **Create an Okta OIDC web app**
+   Configure the sign-in redirect URI to match your backend callback, for example:
+   `http://localhost:8000/auth/okta/callback`
+
+After restarting the backend and restarting or rebuilding the frontend, the landing page will show an `Okta SSO` button in the header.
 </details>
 
 ### 2) Docker Setup
@@ -141,7 +167,11 @@ The frontend will be available at `http://localhost:3000`
 On-call Health also offers [an API](https://api.oncallhealth.ai/docs) that can expose its findings. <br>
 [<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://god.gw.postman.com/run-collection/45004446-1074ba3c-44fe-40e3-a932-af7c071b96eb?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D45004446-1074ba3c-44fe-40e3-a932-af7c071b96eb%26entityType%3Dcollection%26workspaceId%3D4bec6e3c-50a0-4746-85f1-00a703c32f24)
 
-## 🔗 About the Rootly AI Labs
-On-call Health is built with ❤️ by the [Rootly AI Labs](https://rootly.com/ai-labs) for engineering teams everywhere. The Rootly AI Labs is a fellow-led community designed to redefine reliability engineering. We develop innovative prototypes, create open-source tools, and produce research that's shared to advance operational excellence standards. We want to thank Anthropic, Google Cloud, and Google DeepMind for their support.
+## 🔗 About Rootly AI Labs
+On-call Health is built with ❤️ by [Rootly AI Labs](https://rootly.com/ai-labs) for engineering teams everywhere. Rootly AI Labs is a fellow-led community designed to redefine reliability engineering. We develop innovative prototypes, create open-source tools, and produce research that's shared to advance operational excellence standards. We want to thank Anthropic, Google Cloud, and Google DeepMind for their support.
 
 This project is licensed under the Apache License 2.0.
+
+<p align="center">
+  <img src="frontend/public/images/rootly-ai-logo.png" alt="Rootly AI Labs" width="180" />
+</p>

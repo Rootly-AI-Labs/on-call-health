@@ -15,6 +15,7 @@ import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import and_, func
+from sqlalchemy.exc import IntegrityError
 
 from ..core.config import settings
 from ..models import Analysis, SessionLocal, User, UserCorrelation, WeeklyDigestLog
@@ -345,21 +346,31 @@ def _build_email_content(
     critical_trend, worsening_trend = _build_member_lists(members, individual_daily_data)
     risk = _get_risk_summary(members)
 
-    # ─ Combine and sort trends by severity, then by risk level ─
-    risk_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
-    combined_trends = []
-    for member in critical_trend:
-        combined_trends.append({**member, "trend_type": "significantly_worsening", "trend_priority": 0})
-    for member in worsening_trend:
-        combined_trends.append({**member, "trend_type": "worsening", "trend_priority": 1})
+    # ─ Sort by worst trends first, then by risk level ─
+    critical_emails = {m.get("user_email") for m in critical_trend}
+    worsening_emails = {m.get("user_email") for m in worsening_trend}
 
-    combined_trends.sort(
+    combined_trends = []
+    for member in members:
+        email = member.get("user_email")
+        if email in critical_emails:
+            member["trend_type"] = "significantly_worsening"
+            member["trend_priority"] = 0
+        elif email in worsening_emails:
+            member["trend_type"] = "worsening"
+            member["trend_priority"] = 1
+        else:
+            member["trend_type"] = "worsening"
+            member["trend_priority"] = 2
+        combined_trends.append(member)
+
+    combined_trends = sorted(
+        combined_trends,
         key=lambda m: (
             m.get("trend_priority", 999),
-            risk_order.get((m.get("risk_level") or "unknown").lower(), 999)
+            -m.get("och_score", 0)
         )
-    )
-    combined_trends = combined_trends[:6]  # Top 6
+    )[:6]  # Top 6 by worst trends first, then highest risk level
 
     completed_at = analysis.completed_at
     if completed_at and completed_at.tzinfo is None:
@@ -392,13 +403,17 @@ def _build_email_content(
         team_risk_label = "Low"
         team_risk_color = "#22c55e"
 
-    # PagerDuty → Rootly soft promotion
+    # Platform-specific promotions
     is_pagerduty = "pagerduty" in platform
+    is_rootly = "rootly" in platform
     rootly_promo_text = (
         "\n\nPagerDuty charges extra for what Rootly includes.\n"
         "Slack bot integration, alert grouping, and automated workflows — all built in, no add-ons. Teams switch in minutes.\n"
         "Try Rootly for free or book a demo: https://rootly.com/demo"
-        if is_pagerduty else ""
+        if is_pagerduty else
+        "\n\nYou track the load. Now let Rootly AI SRE reduce it.\n"
+        "Learn more: https://rootly.com/ai-sre"
+        if is_rootly else ""
     )
     rootly_promo_html = (
         f"""
@@ -409,7 +424,15 @@ def _build_email_content(
     </p>
     <a href="https://rootly.com/demo" style="display: inline-block; font-size: 12px; font-weight: 600; color: #7c3aed; text-decoration: underline;">Try Rootly for free or book a demo &rarr;</a>
   </div>"""
-        if is_pagerduty else ""
+        if is_pagerduty else
+        f"""
+  <div style="margin-top: 16px; margin-bottom: 16px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 8px 12px;">
+    <p style="margin: 0; font-size: 13px; color: #6b7280; line-height: 1.6;">
+      You track the load. Now let <strong style="color: #5b21b6;">Rootly AI SRE</strong> reduce it.
+      <a href="https://rootly.com/ai-sre" style="margin-left: 6px; font-size: 12px; font-weight: 600; color: #7c3aed; text-decoration: underline;">Learn more &rarr;</a>
+    </p>
+  </div>"""
+        if is_rootly else ""
     )
 
     blocked = _ensure_dict(analysis.config).get("auto_refresh_blocked") if analysis.config else None
@@ -610,6 +633,8 @@ def _build_email_content(
     </tr>
   </table>
 
+{rootly_promo_html}
+
   <table style="width: 100%; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; border-collapse: collapse; margin-bottom: 24px;">
     <tr>
       <td class="stats-cell" style="padding: 16px; text-align: center;">
@@ -645,8 +670,6 @@ def _build_email_content(
             padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; margin-bottom: 24px;">
     View Full Report &rarr;
   </a>
-
-{rootly_promo_html}
 
 {blocked_note_html}
 {unsubscribe_html}
@@ -708,6 +731,39 @@ async def _send_resend_email(
         return False
 
 
+async def send_unsubscribe_feedback(user_email: str, reason: str) -> None:
+    """Fire-and-forget: email unsubscribe feedback to the configured address."""
+    feedback_to = settings.UNSUBSCRIBE_FEEDBACK_EMAIL
+    if not feedback_to:
+        logger.info("[UNSUBSCRIBE_FEEDBACK] UNSUBSCRIBE_FEEDBACK_EMAIL not set — skipping feedback email")
+        return
+    if not reason.strip():
+        logger.info(f"[UNSUBSCRIBE_FEEDBACK] {user_email} unsubscribed with no reason — skipping feedback email")
+        return
+
+    logger.info(f"[UNSUBSCRIBE_FEEDBACK] Sending feedback from {user_email} to {feedback_to}: {reason[:80]}")
+
+    subject = f"Weekly digest unsubscribe feedback from {user_email}"
+    text_body = f"User: {user_email}\n\nReason:\n{reason.strip()}"
+    html_body = (
+        f"<p><strong>User:</strong> {user_email}</p>"
+        f"<p><strong>Reason:</strong></p>"
+        f"<p style='white-space:pre-wrap;'>{reason.strip()}</p>"
+    )
+
+    sent = await _send_resend_email(
+        to_email=feedback_to,
+        to_name=None,
+        subject=subject,
+        text_body=text_body,
+        html_body=html_body,
+    )
+    if sent:
+        logger.info(f"[UNSUBSCRIBE_FEEDBACK] Feedback email sent successfully to {feedback_to}")
+    else:
+        logger.warning(f"[UNSUBSCRIBE_FEEDBACK] Failed to send feedback email to {feedback_to}")
+
+
 def _get_latest_auto_refresh_analysis(db, user: User) -> Optional[Analysis]:
     return db.query(Analysis).filter(
         Analysis.user_id == user.id,
@@ -747,7 +803,7 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
     local_now = datetime.now(tz)
 
     unsubscribe_token = _generate_unsubscribe_token(user.id)
-    unsubscribe_url = f"{settings.FRONTEND_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
+    unsubscribe_url = f"{settings.FRONTEND_URL}/unsubscribe?token={unsubscribe_token}"
 
     content = _build_email_content(
         user=user,
@@ -844,25 +900,13 @@ async def check_and_send_weekly_digests() -> None:
                 tz = pytz.timezone(tz_name)
                 local_now = datetime.now(tz)
 
-                # TODO: revert to hour != 10 before deploying (currently set to 10am local for testing)
                 logger.info(f"📬 [WEEKLY_DIGEST] {user.email} timezone={tz_name} local_now={local_now.strftime('%A %H:%M')} (weekday={local_now.weekday()}, hour={local_now.hour})")
                 if not settings.WEEKLY_DIGEST_FORCE_SEND:
-                    if local_now.weekday() != 0 or local_now.hour != 11:
-                        logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: not Monday 11am local (weekday={local_now.weekday()}, hour={local_now.hour})")
+                    if local_now.weekday() != 0 or local_now.hour != 10:
+                        logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: not Monday 10am local (weekday={local_now.weekday()}, hour={local_now.hour})")
                         continue
 
                 week_start_date = _get_week_start_date(local_now)
-
-                # Skip dedup check when force-sending locally
-                if not settings.WEEKLY_DIGEST_FORCE_SEND:
-                    existing_log = db.query(WeeklyDigestLog).filter(
-                        WeeklyDigestLog.user_id == user.id,
-                        WeeklyDigestLog.week_start_date == week_start_date
-                    ).first()
-
-                    if existing_log:
-                        logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: already sent this week ({week_start_date})")
-                        continue
 
                 results = _ensure_dict(analysis.results)
                 logger.info(f"📬 [WEEKLY_DIGEST] analysis={analysis.id} results type={type(analysis.results).__name__} keys={list(results.keys())[:5] if results else 'EMPTY'}")
@@ -870,10 +914,26 @@ async def check_and_send_weekly_digests() -> None:
                     logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: analysis results are empty")
                     continue
 
-                logger.info(f"📬 [WEEKLY_DIGEST] Sending digest to {user.email} (analysis={analysis.id})...")
+                # Claim the send slot BEFORE sending — insert log row first.
+                # If another instance already inserted (race condition), the unique
+                # constraint fires here and we skip without sending a duplicate email.
+                if not settings.WEEKLY_DIGEST_FORCE_SEND:
+                    log_entry = WeeklyDigestLog(
+                        user_id=user.id,
+                        analysis_id=analysis.id,
+                        week_start_date=week_start_date,
+                        timezone=tz_name
+                    )
+                    db.add(log_entry)
+                    try:
+                        db.commit()
+                    except IntegrityError:
+                        db.rollback()
+                        logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: already sent this week ({week_start_date}) — race condition caught before send")
+                        continue
 
                 unsubscribe_token = _generate_unsubscribe_token(user.id)
-                unsubscribe_url = f"{settings.FRONTEND_URL}/api/digests/weekly/unsubscribe?token={unsubscribe_token}"
+                unsubscribe_url = f"{settings.FRONTEND_URL}/unsubscribe?token={unsubscribe_token}"
 
                 content = _build_email_content(
                     user=user,
@@ -883,6 +943,8 @@ async def check_and_send_weekly_digests() -> None:
                     tz_name=tz_name,
                     unsubscribe_url=unsubscribe_url,
                 )
+
+                logger.info(f"📬 [WEEKLY_DIGEST] Sending digest to {user.email} (analysis={analysis.id})...")
 
                 sent = await _send_resend_email(
                     to_email=user.email,
@@ -901,19 +963,7 @@ async def check_and_send_weekly_digests() -> None:
                     f"📧 [WEEKLY_DIGEST] Digest sent to {user.email} "
                     f"(user_id={user.id}, subject={content['subject']})"
                 )
-
-                log_entry = WeeklyDigestLog(
-                    user_id=user.id,
-                    analysis_id=analysis.id,
-                    week_start_date=week_start_date,
-                    timezone=tz_name
-                )
-                db.add(log_entry)
-                db.commit()
-
-                logger.info(
-                    f"Weekly digest sent to {user.email} for week starting {week_start_date}"
-                )
+                logger.info(f"Weekly digest sent to {user.email} for week starting {week_start_date}")
 
             except Exception as per_user_error:
                 logger.error(
@@ -955,7 +1005,7 @@ class WeeklyDigestScheduler:
                 "digest will send on next 10-min tick, countdown logged every 2 min"
             )
         self.scheduler.start()
-        logger.info("Weekly digest scheduler started (fires :02 of every hour; sends Monday 10am per user's local timezone — TODO: revert to minute=0 before deploying)")
+        logger.info("Weekly digest scheduler started (fires */30; sends Tuesday 10am per user's local timezone)")
 
 
 weekly_digest_scheduler = WeeklyDigestScheduler()

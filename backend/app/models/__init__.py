@@ -24,12 +24,13 @@ from .survey_period import SurveyPeriod
 from .api_key import APIKey
 from .weekly_digest_log import WeeklyDigestLog
 from .ai_usage_integration import AIUsageIntegration
+from .user_login_event import UserLoginEvent
 
 __all__ = [
     "Base", "get_db", "create_tables", "SessionLocal", "Organization", "OrganizationInvitation", "UserNotification", "User", "Analysis",
     "RootlyIntegration", "OAuthProvider", "UserEmail", "GitHubIntegration",
     "SlackIntegration", "UserCorrelation", "IntegrationMapping", "UserMapping",
     "UserBurnoutReport", "SlackWorkspaceMapping", "JiraIntegration", "JiraWorkspaceMapping",
-    "LinearIntegration", "LinearWorkspaceMapping", "SurveyPeriod", "APIKey", "WeeklyDigestLog",
-    "AIUsageIntegration"
+    "LinearIntegration", "LinearWorkspaceMapping", "SurveyPeriod", "APIKey", "WeeklyDigestLog", "AIUsageIntegration",
+    "UserLoginEvent"
 ]
