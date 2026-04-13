@@ -1,9 +1,10 @@
 import { useState } from "react"
+import Image from "next/image"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { HelpCircle, ChevronDown, ExternalLink, Eye, EyeOff, Loader2, Settings2 } from "lucide-react"
+import { HelpCircle, ChevronDown, ExternalLink, Eye, EyeOff, Loader2 } from "lucide-react"
 
 interface AIUsageIntegrationCardProps {
   onConnect: (
@@ -18,12 +19,10 @@ interface AIUsageIntegrationCardProps {
 export function AIUsageIntegrationCard({ onConnect, isConnecting }: AIUsageIntegrationCardProps) {
   const [showOpenaiInstructions, setShowOpenaiInstructions] = useState(false)
   const [showAnthropicInstructions, setShowAnthropicInstructions] = useState(false)
-  const [showOpenaiAdvanced, setShowOpenaiAdvanced] = useState(false)
-  const [showAnthropicAdvanced, setShowAnthropicAdvanced] = useState(false)
   const [openaiKey, setOpenaiKey] = useState("")
-  const [openaiOrgId, setOpenaiOrgId] = useState("")
+  const [openaiOrgId] = useState("")
   const [anthropicKey, setAnthropicKey] = useState("")
-  const [anthropicWorkspaceId, setAnthropicWorkspaceId] = useState("")
+  const [anthropicWorkspaceId] = useState("")
   const [showOpenai, setShowOpenai] = useState(false)
   const [showAnthropic, setShowAnthropic] = useState(false)
 
@@ -33,10 +32,10 @@ export function AIUsageIntegrationCard({ onConnect, isConnecting }: AIUsageInteg
     <Card className="border-neutral-200 max-w-2xl mx-auto">
       <CardHeader className="p-8">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
-            </svg>
+          <div className="flex items-center gap-1">
+            <Image src="/images/openai-logo.svg" alt="OpenAI" width={20} height={20} className="w-5 h-5" />
+            <span className="text-slate-300 text-sm">/</span>
+            <Image src="/images/anthropic-logo.svg" alt="Anthropic" width={20} height={20} className="w-5 h-5" />
           </div>
           <div>
             <CardTitle>Add AI Usage Tracking</CardTitle>
@@ -48,7 +47,10 @@ export function AIUsageIntegrationCard({ onConnect, isConnecting }: AIUsageInteg
 
         {/* ── OpenAI section ── */}
         <div className="space-y-3">
-          <label className="text-sm font-medium text-neutral-900">OpenAI Admin API Key</label>
+          <div className="flex items-center gap-2">
+            <Image src="/images/openai-logo.svg" alt="OpenAI" width={16} height={16} className="w-4 h-4" />
+            <label className="text-sm font-medium text-neutral-900">OpenAI Admin API Key</label>
+          </div>
 
           {/* Instructions dropdown */}
           <button
@@ -107,37 +109,16 @@ export function AIUsageIntegrationCard({ onConnect, isConnecting }: AIUsageInteg
             </Button>
           </div>
 
-          {/* Advanced toggle */}
-          <button
-            type="button"
-            onClick={() => setShowOpenaiAdvanced(!showOpenaiAdvanced)}
-            className="flex items-center space-x-2 text-xs text-neutral-400 hover:text-neutral-600"
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            <span>Advanced</span>
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showOpenaiAdvanced ? 'rotate-180' : ''}`} />
-          </button>
-
-          {showOpenaiAdvanced && (
-            <div className="space-y-1.5">
-              <p className="text-xs text-neutral-500">
-                <strong>Organization ID</strong> — only needed if your account has access to multiple OpenAI organizations and you want to scope usage data to a specific one. Leave blank in most cases; the key already determines which org is used.
-              </p>
-              <Input
-                type="text"
-                placeholder="org-... (leave blank unless multi-org)"
-                value={openaiOrgId}
-                onChange={e => setOpenaiOrgId(e.target.value.trim())}
-              />
-            </div>
-          )}
         </div>
 
         <hr className="border-neutral-200" />
 
         {/* ── Anthropic section ── */}
         <div className="space-y-3">
-          <label className="text-sm font-medium text-neutral-900">Anthropic Admin API Key</label>
+          <div className="flex items-center gap-2">
+            <Image src="/images/anthropic-logo.svg" alt="Anthropic" width={16} height={16} className="w-4 h-4" />
+            <label className="text-sm font-medium text-neutral-900">Anthropic Admin API Key</label>
+          </div>
 
           {/* Instructions dropdown */}
           <button
@@ -189,30 +170,6 @@ export function AIUsageIntegrationCard({ onConnect, isConnecting }: AIUsageInteg
             </Button>
           </div>
 
-          {/* Advanced toggle */}
-          <button
-            type="button"
-            onClick={() => setShowAnthropicAdvanced(!showAnthropicAdvanced)}
-            className="flex items-center space-x-2 text-xs text-neutral-400 hover:text-neutral-600"
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            <span>Advanced</span>
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAnthropicAdvanced ? 'rotate-180' : ''}`} />
-          </button>
-
-          {showAnthropicAdvanced && (
-            <div className="space-y-1.5">
-              <p className="text-xs text-neutral-500">
-                <strong>Workspace ID</strong> — only needed if your organization uses multiple Anthropic workspaces and you want to scope usage data to a specific one. Leave blank to use the default workspace associated with the key.
-              </p>
-              <Input
-                type="text"
-                placeholder="Workspace ID (leave blank unless multi-workspace)"
-                value={anthropicWorkspaceId}
-                onChange={e => setAnthropicWorkspaceId(e.target.value.trim())}
-              />
-            </div>
-          )}
         </div>
 
         <Button

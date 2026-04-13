@@ -2,9 +2,7 @@
 
 import { useState, useRef, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Bot, TrendingUp, TrendingDown, Minus } from "lucide-react"
-import { InfoTooltip } from "@/components/ui/info-tooltip"
 
 interface AIUsageCardProps {
   currentAnalysis: any
@@ -157,12 +155,12 @@ export function AIUsageCard({ currentAnalysis }: AIUsageCardProps) {
 
   if (Object.keys(usage).length === 0) {
     return (
-      <div className="mb-6">
+      <div>
         <Card className="bg-white flex flex-col">
           <CardHeader className="pb-2 shrink-0">
             <div className="space-y-1">
               <CardTitle className="text-neutral-900">Team AI Usage</CardTitle>
-              <CardDescription>Token consumption from OpenAI and/or Anthropic</CardDescription>
+              <CardDescription>Past {currentAnalysis?.time_range ?? 30} days of token consumption from OpenAI and/or Anthropic</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
@@ -188,20 +186,14 @@ export function AIUsageCard({ currentAnalysis }: AIUsageCardProps) {
   const trendColor = trend === null ? "text-neutral-400" : trend > 0 ? "text-green-600" : "text-red-500"
 
   return (
-    <div className="mb-6">
+    <div>
       <Card className="bg-white flex flex-col">
         <CardHeader className="pb-2 shrink-0">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-neutral-900">Team AI Usage</CardTitle>
-                <InfoTooltip content="Daily token consumption from OpenAI and/or Anthropic APIs. Configure API keys in Integrations → Enhanced Integrations." />
-              </div>
-              <CardDescription>Token consumption from OpenAI and/or Anthropic</CardDescription>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-neutral-900">Team AI Usage</CardTitle>
             </div>
-            <Badge variant="outline" className="text-xs text-neutral-400 border-neutral-200 mt-1">
-              {days.length} days
-            </Badge>
+            <CardDescription>Past {currentAnalysis?.time_range ?? days.length} days of token consumption from OpenAI and/or Anthropic</CardDescription>
           </div>
         </CardHeader>
 

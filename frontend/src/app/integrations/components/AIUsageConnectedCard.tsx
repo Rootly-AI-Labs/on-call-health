@@ -1,8 +1,15 @@
 import { useState } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Loader2, Trash2, Zap } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { CheckCircle, ChevronDown, Loader2, Trash2, Zap } from "lucide-react"
 
 interface AIUsageConnectedCardProps {
   status: {
@@ -33,58 +40,94 @@ export function AIUsageConnectedCard({ status, onDisconnect, onTest, isLoading }
   }
 
   return (
-    <Card className="border-2 border-green-200 max-w-2xl mx-auto">
-      <CardContent className="pt-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-semibold text-slate-900">AI Usage Connected</h3>
+    <Card className="border-2 border-green-200 bg-green-50/50 max-w-2xl mx-auto">
+      <CardHeader>
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-1">
+            <Image src="/images/openai-logo.svg" alt="OpenAI" width={20} height={20} className="w-5 h-5" />
+            <span className="text-slate-300 text-sm">/</span>
+            <Image src="/images/anthropic-logo.svg" alt="Anthropic" width={20} height={20} className="w-5 h-5" />
           </div>
-          <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
-            Active
-          </Badge>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className={`rounded-lg p-3 border ${status.openai_enabled ? 'bg-green-50 border-green-200' : 'bg-neutral-50 border-neutral-200'}`}>
-            <div className="text-sm font-medium text-neutral-700">OpenAI</div>
-            <div className={`text-xs mt-0.5 ${status.openai_enabled ? 'text-green-600' : 'text-neutral-400'}`}>
-              {status.openai_enabled ? "Connected" : "Not configured"}
-            </div>
-            {status.openai_enabled && (
-              <button
-                onClick={() => onDisconnect("openai")}
-                disabled={isLoading}
-                className="mt-2 text-xs text-red-500 hover:text-red-700 underline"
-              >
-                Remove
-              </button>
-            )}
-          </div>
-
-          <div className={`rounded-lg p-3 border ${status.anthropic_enabled ? 'bg-green-50 border-green-200' : 'bg-neutral-50 border-neutral-200'}`}>
-            <div className="text-sm font-medium text-neutral-700">Anthropic</div>
-            <div className={`text-xs mt-0.5 ${status.anthropic_enabled ? 'text-green-600' : 'text-neutral-400'}`}>
-              {status.anthropic_enabled ? "Connected" : "Not configured"}
-            </div>
-            {status.anthropic_enabled && (
-              <button
-                onClick={() => onDisconnect("anthropic")}
-                disabled={isLoading}
-                className="mt-2 text-xs text-red-500 hover:text-red-700 underline"
-              >
-                Remove
-              </button>
-            )}
+          <div>
+            <CardTitle className="text-lg flex items-center space-x-2">
+              <span>AI Usage</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Badge
+                    variant="secondary"
+                    className="bg-green-100 text-green-700 cursor-pointer hover:bg-green-200 transition-colors"
+                  >
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Connected
+                    <ChevronDown className="w-3 h-3 ml-1" />
+                  </Badge>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={handleTest} disabled={isTesting || isLoading}>
+                    {isTesting ? (
+                      <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                    ) : (
+                      <Zap className="w-3 h-3 mr-2" />
+                    )}
+                    Test Connection
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CardTitle>
+            <p className="text-sm text-slate-600">Token consumption tracking from OpenAI and/or Anthropic</p>
           </div>
         </div>
+      </CardHeader>
 
-        <p className="text-xs text-neutral-500">
-          AI usage data will be collected on the next analysis run and shown in the dashboard.
-        </p>
+      <CardContent className="space-y-4">
+        {/* Provider details */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center space-x-2">
+            <Image src="/images/openai-logo.svg" alt="OpenAI" width={16} height={16} className="w-4 h-4" />
+            <div>
+              <div className="font-medium">OpenAI</div>
+              <div className={status.openai_enabled ? "text-green-600" : "text-slate-400"}>
+                {status.openai_enabled ? "Connected" : "Not configured"}
+              </div>
+              {status.openai_enabled && (
+                <button
+                  onClick={() => onDisconnect("openai")}
+                  disabled={isLoading}
+                  className="mt-0.5 text-xs text-red-500 hover:text-red-700 underline disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
 
+          <div className="flex items-center space-x-2">
+            <Image src="/images/anthropic-logo.svg" alt="Anthropic" width={16} height={16} className="w-4 h-4" />
+            <div>
+              <div className="font-medium">Anthropic</div>
+              <div className={status.anthropic_enabled ? "text-green-600" : "text-slate-400"}>
+                {status.anthropic_enabled ? "Connected" : "Not configured"}
+              </div>
+              {status.anthropic_enabled && (
+                <button
+                  onClick={() => onDisconnect("anthropic")}
+                  disabled={isLoading}
+                  className="mt-0.5 text-xs text-red-500 hover:text-red-700 underline disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Test result */}
         {testResult && (
-          <div className={`flex items-center gap-2 text-xs rounded-lg px-3 py-2 ${testResult.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          <div className={`flex items-center gap-2 text-xs rounded-lg px-3 py-2 border ${
+            testResult.success
+              ? "bg-green-50 text-green-700 border-green-200"
+              : "bg-red-50 text-red-700 border-red-200"
+          }`}>
             {testResult.success
               ? <CheckCircle className="w-3.5 h-3.5 shrink-0" />
               : <span className="shrink-0">✕</span>}
@@ -92,31 +135,30 @@ export function AIUsageConnectedCard({ status, onDisconnect, onTest, isLoading }
           </div>
         )}
 
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleTest}
-            disabled={isTesting || isLoading}
-            className="flex-1 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
-          >
-            {isTesting ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testing...</>
-            ) : (
-              <><Zap className="w-4 h-4 mr-2" />Test Connection</>
-            )}
-          </Button>
+        {/* Data collection note */}
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
+          <div className="font-medium mb-1">Data Collection</div>
+          <div>
+            We collect daily token consumption and request counts from your connected AI providers.
+            Usage data is shown on the dashboard after each analysis run.
+          </div>
+        </div>
 
+        {/* Action buttons */}
+        <div className="flex items-center justify-end pt-4 border-t">
           <Button
-            variant="outline"
+            variant="ghost"
+            size="sm"
             onClick={() => onDisconnect()}
             disabled={isLoading || isTesting}
-            className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
           >
             {isLoading ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Disconnecting...</>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
-              <><Trash2 className="w-4 h-4 mr-2" />Disconnect All</>
+              <Trash2 className="w-4 h-4 mr-2" />
             )}
+            Disconnect All
           </Button>
         </div>
       </CardContent>
