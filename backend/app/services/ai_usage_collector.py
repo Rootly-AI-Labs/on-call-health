@@ -71,15 +71,23 @@ async def fetch_openai_usage(
         "limit": min(days, 31),
     }
 
+    _MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MB guard
     usage: DailyUsage = {}
     url = "https://api.openai.com/v1/organization/usage/completions"
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             while url:
-                resp = await client.get(url, headers=headers, params=params)
+                for attempt in range(2):
+                    resp = await client.get(url, headers=headers, params=params)
+                    if resp.status_code != 503 or attempt == 1:
+                        break
+                    logger.warning("[AI_USAGE] OpenAI 503 — retrying once")
                 if resp.status_code != 200:
                     logger.warning(f"[AI_USAGE] OpenAI returned {resp.status_code}: {resp.text[:200]}")
+                    break
+                if len(resp.content) > _MAX_RESPONSE_BYTES:
+                    logger.warning("[AI_USAGE] OpenAI response too large — skipping page")
                     break
                 data = resp.json()
                 for bucket in data.get("data", []):
@@ -138,6 +146,7 @@ async def fetch_anthropic_usage(
     chunk_start = start
 
     try:
+        _MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MB guard
         async with httpx.AsyncClient(timeout=30) as client:
             while chunk_start <= end:
                 chunk_end = min(chunk_start + timedelta(days=MAX_DAYS_PER_CHUNK - 1), end)
@@ -153,13 +162,20 @@ async def fetch_anthropic_usage(
 
                 # Paginate within this chunk
                 while True:
-                    resp = await client.get(
-                        "https://api.anthropic.com/v1/organizations/usage_report/messages",
-                        headers=headers,
-                        params=params,
-                    )
+                    for attempt in range(2):
+                        resp = await client.get(
+                            "https://api.anthropic.com/v1/organizations/usage_report/messages",
+                            headers=headers,
+                            params=params,
+                        )
+                        if resp.status_code != 503 or attempt == 1:
+                            break
+                        logger.warning("[AI_USAGE] Anthropic 503 — retrying once")
                     if resp.status_code != 200:
                         logger.warning(f"[AI_USAGE] Anthropic returned {resp.status_code}: {resp.text[:300]}")
+                        break
+                    if len(resp.content) > _MAX_RESPONSE_BYTES:
+                        logger.warning("[AI_USAGE] Anthropic response too large — skipping page")
                         break
 
                     data = resp.json()

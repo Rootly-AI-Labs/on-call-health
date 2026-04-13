@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useMemo } from "react"
+import { useState, useRef, useMemo, useId } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Bot, TrendingUp, TrendingDown, Minus } from "lucide-react"
 
@@ -74,6 +74,7 @@ function AISparkline({
 }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const gradId = useId()
 
   const values = days.map(d => usage[d]?.[metric] ?? 0)
   const maxVal = Math.max(...values, 1)
@@ -103,7 +104,7 @@ function AISparkline({
         onMouseLeave={() => setHoverIdx(null)}
       >
         <defs>
-          <linearGradient id="aiGrad" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.15" />
             <stop offset="100%" stopColor={color} stopOpacity="0.01" />
           </linearGradient>
@@ -111,7 +112,7 @@ function AISparkline({
         {values.length > 1 && (
           <path
             d={`${pathD} L${ptX(values.length - 1)},${CHART_H} L0,${CHART_H} Z`}
-            fill="url(#aiGrad)"
+            fill={`url(#${gradId})`}
           />
         )}
         <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />

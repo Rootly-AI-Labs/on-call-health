@@ -1,10 +1,12 @@
 """
 AI Usage integration endpoints — connect/status/test/disconnect for OpenAI and Anthropic.
 """
+import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import logging
 import base64
 from cryptography.fernet import Fernet
@@ -40,11 +42,29 @@ def _decrypt(value: str) -> str:
 #  Request / response models
 # --------------------------------------------------------------------------- #
 
+_OPENAI_ADMIN_RE = re.compile(r"^sk-admin-[A-Za-z0-9_-]{20,200}$")
+_ANTHROPIC_ADMIN_RE = re.compile(r"^sk-ant-admin-[A-Za-z0-9_-]{20,200}$")
+
+
 class AIUsageConnectRequest(BaseModel):
     openai_api_key: Optional[str] = None
     openai_org_id: Optional[str] = None
     anthropic_api_key: Optional[str] = None
     anthropic_workspace_id: Optional[str] = None
+
+    @field_validator("openai_api_key")
+    @classmethod
+    def validate_openai_key(cls, v: Optional[str]) -> Optional[str]:
+        if v and not _OPENAI_ADMIN_RE.match(v):
+            raise ValueError("OpenAI key must be an Admin API key (starts with sk-admin-)")
+        return v
+
+    @field_validator("anthropic_api_key")
+    @classmethod
+    def validate_anthropic_key(cls, v: Optional[str]) -> Optional[str]:
+        if v and not _ANTHROPIC_ADMIN_RE.match(v):
+            raise ValueError("Anthropic key must be an Admin API key (starts with sk-ant-admin-)")
+        return v
 
 
 class AIUsageStatusResponse(BaseModel):
@@ -113,7 +133,24 @@ async def connect(
         integration.anthropic_workspace_id = request.anthropic_workspace_id.strip() if request.anthropic_workspace_id and request.anthropic_workspace_id.strip() else None
         integration.anthropic_enabled = True
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Concurrent request already created the row — re-fetch and update
+        integration = _get_integration(current_user, db)
+        if not integration:
+            raise HTTPException(status_code=500, detail="Failed to save integration")
+        if request.openai_api_key:
+            integration.openai_api_key = _encrypt(request.openai_api_key)
+            integration.openai_org_id = request.openai_org_id.strip() if request.openai_org_id and request.openai_org_id.strip() else None
+            integration.openai_enabled = True
+        if request.anthropic_api_key:
+            integration.anthropic_api_key = _encrypt(request.anthropic_api_key)
+            integration.anthropic_workspace_id = request.anthropic_workspace_id.strip() if request.anthropic_workspace_id and request.anthropic_workspace_id.strip() else None
+            integration.anthropic_enabled = True
+        db.commit()
+
     db.refresh(integration)
     return {"success": True, "openai_enabled": integration.openai_enabled, "anthropic_enabled": integration.anthropic_enabled}
 
@@ -163,9 +200,7 @@ async def test_connection(
             elif resp.status_code == 429:
                 raise HTTPException(status_code=400, detail="OpenAI rate limit hit during test. The key is valid but you've exceeded the request limit.")
             else:
-                body = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
-                msg = body.get("error", {}).get("message", f"Unexpected response: HTTP {resp.status_code}")
-                raise HTTPException(status_code=400, detail=f"OpenAI test failed: {msg}")
+                raise HTTPException(status_code=400, detail=f"OpenAI test failed: unexpected response (HTTP {resp.status_code})")
         except HTTPException:
             raise
         except Exception as e:
@@ -202,9 +237,7 @@ async def test_connection(
             elif resp.status_code == 403:
                 raise HTTPException(status_code=400, detail="Anthropic key does not have Admin access. The usage API requires an Admin-level API key — standard keys are not supported.")
             else:
-                body = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
-                msg = body.get("error", {}).get("message", f"Unexpected response: HTTP {resp.status_code}")
-                raise HTTPException(status_code=400, detail=f"Anthropic test failed: {msg}")
+                raise HTTPException(status_code=400, detail=f"Anthropic test failed: unexpected response (HTTP {resp.status_code})")
         except HTTPException:
             raise
         except Exception as e:
@@ -219,6 +252,9 @@ async def disconnect(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if provider is not None and provider not in ("openai", "anthropic"):
+        raise HTTPException(status_code=400, detail="Invalid provider. Must be 'openai', 'anthropic', or omitted to disconnect all.")
+
     integration = _get_integration(current_user, db)
     if not integration:
         raise HTTPException(status_code=404, detail="No integration found")
