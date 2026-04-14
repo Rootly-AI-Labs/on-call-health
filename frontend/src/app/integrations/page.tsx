@@ -3443,6 +3443,46 @@ export default function IntegrationsPage() {
               </Card>
             )}
 
+            {/* Linear Card */}
+            {loadingLinear ? (
+              <Card className="border-2 border-neutral-200 p-4 flex items-center justify-center relative h-20 animate-pulse">
+                <div className="absolute top-2 right-2 w-16 h-5 bg-neutral-300 rounded"></div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-neutral-300 rounded"></div>
+                  <div className="h-6 w-20 bg-neutral-300 rounded"></div>
+                </div>
+              </Card>
+            ) : (
+              <Card
+                className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
+                  activeEnhancementTab === 'linear'
+                    ? 'border-neutral-800 shadow-md bg-neutral-100'
+                    : 'border-neutral-300 hover:border-neutral-400'
+                } p-4 flex items-center justify-center relative h-20`}
+                onClick={() => {
+                  setActiveEnhancementTab(activeEnhancementTab === 'linear' ? null : 'linear')
+                }}
+              >
+                {linearIntegration ? (
+                  <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
+                    <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 text-xs">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Connected
+                    </Badge>
+                  </div>
+                ) : null}
+                {activeEnhancementTab === 'linear' && (
+                  <div className="absolute top-2 left-2">
+                    <CheckCircle className="w-5 h-5 text-neutral-900" />
+                  </div>
+                )}
+                <div className="flex items-center space-x-2">
+                  <Image src="/images/linear-logo.png" alt="Linear" width={28} height={28} quality={100} />
+                  <span className="text-xl font-semibold text-neutral-900">Linear</span>
+                </div>
+              </Card>
+            )}
+
             {/* OpenAI Usage Card */}
             <Card
               className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
@@ -3498,46 +3538,6 @@ export default function IntegrationsPage() {
                 <span className="text-lg font-bold text-neutral-900">Anthropic</span>
               </div>
             </Card>
-
-            {/* Linear Card */}
-            {loadingLinear ? (
-              <Card className="border-2 border-neutral-200 p-4 flex items-center justify-center relative h-20 animate-pulse">
-                <div className="absolute top-2 right-2 w-16 h-5 bg-neutral-300 rounded"></div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-neutral-300 rounded"></div>
-                  <div className="h-6 w-20 bg-neutral-300 rounded"></div>
-                </div>
-              </Card>
-            ) : (
-              <Card
-                className={`border-2 border-solid transition-all cursor-pointer hover:shadow-md ${
-                  activeEnhancementTab === 'linear'
-                    ? 'border-neutral-800 shadow-md bg-neutral-100'
-                    : 'border-neutral-300 hover:border-neutral-400'
-                } p-4 flex items-center justify-center relative h-20`}
-                onClick={() => {
-                  setActiveEnhancementTab(activeEnhancementTab === 'linear' ? null : 'linear')
-                }}
-              >
-                {linearIntegration ? (
-                  <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
-                    <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 text-xs">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Connected
-                    </Badge>
-                  </div>
-                ) : null}
-                {activeEnhancementTab === 'linear' && (
-                  <div className="absolute top-2 left-2">
-                    <CheckCircle className="w-5 h-5 text-neutral-900" />
-                  </div>
-                )}
-                <div className="flex items-center space-x-2">
-                  <Image src="/images/linear-logo.png" alt="Linear" width={28} height={28} quality={100} />
-                  <span className="text-xl font-semibold text-neutral-900">Linear</span>
-                </div>
-              </Card>
-            )}
           </div>
 
           {/* Integration Forms */}
