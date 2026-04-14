@@ -3741,18 +3741,19 @@ async def run_analysis_task(
                                     f"[AI_USAGE] Fetching usage: openai={'yes (key length=' + str(len(openai_key)) + ')' if openai_key else 'no'} "
                                     f"anthropic={'yes' if anthropic_key else 'no'} days={time_range}"
                                 )
-                                ai_usage_data = await collect_ai_usage(
+                                ai_usage_result = await collect_ai_usage(
                                     openai_api_key=openai_key,
                                     openai_org_id=ai_integration.openai_org_id,
                                     anthropic_api_key=anthropic_key,
                                     anthropic_workspace_id=ai_integration.anthropic_workspace_id,
                                     days=time_range,
                                 )
-                                logger.info(f"[AI_USAGE] Collected {len(ai_usage_data)} days of data: {list(ai_usage_data.keys())[:5]} for analysis {analysis_ref}")
+                                logger.info(f"[AI_USAGE] Collected openai={len(ai_usage_result['openai'])} days, anthropic={len(ai_usage_result['anthropic'])} days for analysis {analysis_ref}")
                                 if "metadata" not in results:
                                     results["metadata"] = {}
-                                results["metadata"]["ai_usage"] = ai_usage_data
-                                logger.info(f"[AI_USAGE] Stored ai_usage in results.metadata — keys in metadata now: {list(results.get('metadata', {}).keys())}")
+                                results["metadata"]["openai_usage"] = ai_usage_result["openai"]
+                                results["metadata"]["anthropic_usage"] = ai_usage_result["anthropic"]
+                                logger.info(f"[AI_USAGE] Stored openai_usage + anthropic_usage in metadata for analysis {analysis_ref}")
                 except Exception as ai_err:
                     logger.warning(f"[AI_USAGE] Failed to collect AI usage for analysis {analysis_ref}: {ai_err}", exc_info=True)
 

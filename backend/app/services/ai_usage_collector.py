@@ -226,32 +226,30 @@ async def collect_ai_usage(
     anthropic_api_key: Optional[str] = None,
     anthropic_workspace_id: Optional[str] = None,
     days: int = 30,
-) -> DailyUsage:
+) -> dict:
     """
-    Fetch and merge usage from all configured providers.
-    Always fetches at least 30 days (or 90 if days > 30) to avoid gaps from
-    short API windows, then trims the result to the requested date range.
-    Returns combined DailyUsage keyed by ISO date string.
+    Fetch usage from each provider separately.
+    Always fetches at least 30 days (or 90 if days > 30) then trims to the
+    requested date range.
+    Returns {"openai": DailyUsage, "anthropic": DailyUsage}.
     """
     fetch_days = 90 if days > 30 else 30
-    combined: DailyUsage = {}
+    cutoff = (date.today() - timedelta(days=days - 1)).isoformat()
+
+    openai_data: DailyUsage = {}
+    anthropic_data: DailyUsage = {}
 
     if openai_api_key:
-        openai_data = await fetch_openai_usage(openai_api_key, openai_org_id, fetch_days)
-        combined = _merge(combined, openai_data)
-        logger.info(f"[AI_USAGE] OpenAI: {len(openai_data)} days collected (fetched {fetch_days}d, requested {days}d)")
+        raw = await fetch_openai_usage(openai_api_key, openai_org_id, fetch_days)
+        openai_data = {k: v for k, v in raw.items() if k >= cutoff}
+        logger.info(f"[AI_USAGE] OpenAI: {len(raw)} days fetched, {len(openai_data)} after trim to {days}d")
 
     if anthropic_api_key:
-        anthropic_data = await fetch_anthropic_usage(anthropic_api_key, anthropic_workspace_id, fetch_days)
-        combined = _merge(combined, anthropic_data)
-        logger.info(f"[AI_USAGE] Anthropic: {len(anthropic_data)} days collected (fetched {fetch_days}d, requested {days}d)")
+        raw = await fetch_anthropic_usage(anthropic_api_key, anthropic_workspace_id, fetch_days)
+        anthropic_data = {k: v for k, v in raw.items() if k >= cutoff}
+        logger.info(f"[AI_USAGE] Anthropic: {len(raw)} days fetched, {len(anthropic_data)} after trim to {days}d")
 
-    # Trim to the requested date range
-    cutoff = (date.today() - timedelta(days=days - 1)).isoformat()
-    combined = {k: v for k, v in combined.items() if k >= cutoff}
-    logger.info(f"[AI_USAGE] After trim to {days}d (cutoff {cutoff}): {len(combined)} days")
-
-    return combined
+    return {"openai": openai_data, "anthropic": anthropic_data}
 
 
 # --------------------------------------------------------------------------- #

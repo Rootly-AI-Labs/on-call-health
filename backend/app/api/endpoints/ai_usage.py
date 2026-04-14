@@ -291,11 +291,11 @@ async def get_usage(
     openai_key = _decrypt(integration.openai_api_key) if integration.has_openai else None
     anthropic_key = _decrypt(integration.anthropic_api_key) if integration.has_anthropic else None
 
-    data = await collect_ai_usage(
+    result = await collect_ai_usage(
         openai_api_key=openai_key,
         openai_org_id=integration.openai_org_id,
         anthropic_api_key=anthropic_key,
         anthropic_workspace_id=integration.anthropic_workspace_id,
         days=days,
     )
-    return {"usage": data}
+    return {"openai_usage": result["openai"], "anthropic_usage": result["anthropic"]}

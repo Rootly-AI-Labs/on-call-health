@@ -49,7 +49,6 @@ import {
   ChevronLeft,
   Bookmark,
   Timer,
-  Bot,
 } from "lucide-react"
 
 // Helper function for platform-based colors
@@ -78,7 +77,8 @@ import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
 import { TeamRiskFactorsCard, FACTOR_DESCRIPTIONS } from "@/components/dashboard/TeamRiskFactorsCard"
 import { AlertsCountCard } from "@/components/dashboard/AlertsCountCard"
-import { AIUsageCard } from "@/components/dashboard/AIUsageCard"
+import { OpenAIUsageCard } from "@/components/dashboard/OpenAIUsageCard"
+import { AnthropicUsageCard } from "@/components/dashboard/AnthropicUsageCard"
 import { AlertsLeaderboard } from "@/components/dashboard/AlertsLeaderboard"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
@@ -206,6 +206,8 @@ function DashboardContent() {
   includeAIUsage,
   setIncludeAIUsage,
   aiUsageConnected,
+  openaiUsageEnabled,
+  anthropicUsageEnabled,
   enableAI,
   setEnableAI,
   llmConfig,
@@ -1184,7 +1186,8 @@ function DashboardContent() {
 
               {/* AI Coding Assistant Usage (shown when AI usage data is present in analysis) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <AIUsageCard currentAnalysis={currentAnalysis} />
+                <OpenAIUsageCard currentAnalysis={currentAnalysis} />
+                <AnthropicUsageCard currentAnalysis={currentAnalysis} />
               </div>
 
               <TeamMembersList
@@ -1791,41 +1794,50 @@ function DashboardContent() {
                       )}
                     </div>
                   )}
+
+                  {/* OpenAI Usage Toggle Card */}
+                  {openaiUsageEnabled && (
+                    <div className={`border rounded-lg p-3 transition-all cursor-pointer ${includeAIUsage ? 'border-neutral-900 bg-neutral-100' : 'border-neutral-200 bg-white'}`}
+                      onClick={() => setIncludeAIUsage(!includeAIUsage)}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <Image src="/images/openai-logo.svg" alt="OpenAI" width={24} height={24} className="w-6 h-6" />
+                          <div>
+                            <h3 className="text-sm font-medium text-neutral-900">OpenAI</h3>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={includeAIUsage}
+                          onCheckedChange={setIncludeAIUsage}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <p className="text-xs text-neutral-700 mb-1">Token consumption</p>
+                    </div>
+                  )}
+
+                  {/* Anthropic Usage Toggle Card */}
+                  {anthropicUsageEnabled && (
+                    <div className={`border rounded-lg p-3 transition-all cursor-pointer ${includeAIUsage ? 'border-neutral-900 bg-neutral-100' : 'border-neutral-200 bg-white'}`}
+                      onClick={() => setIncludeAIUsage(!includeAIUsage)}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <Image src="/images/anthropic-logo.svg" alt="Anthropic" width={24} height={24} className="w-6 h-6" />
+                          <div>
+                            <h3 className="text-sm font-medium text-neutral-900">Anthropic</h3>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={includeAIUsage}
+                          onCheckedChange={setIncludeAIUsage}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <p className="text-xs text-neutral-700 mb-1">Token consumption</p>
+                    </div>
+                  )}
                 </div>
                 )}
-              </div>
-            )}
-
-            {/* AI Usage Toggle */}
-            {aiUsageConnected && (
-              <div>
-                <label className="text-sm font-medium text-neutral-700 mb-2 block">
-                  AI Usage Tracking
-                </label>
-                <div
-                  className={`border rounded-lg p-4 transition-all cursor-pointer ${includeAIUsage ? 'border-indigo-500 bg-indigo-50' : 'border-neutral-200 bg-white'}`}
-                  onClick={() => setIncludeAIUsage(!includeAIUsage)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                        <Bot className="w-5 h-5 text-indigo-600" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-neutral-900">AI Usage</h3>
-                        <p className="text-xs text-neutral-700">Token consumption tracking</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={includeAIUsage}
-                      onCheckedChange={setIncludeAIUsage}
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-xs font-medium text-green-700">Connected</span>
-                  </div>
-                </div>
               </div>
             )}
 

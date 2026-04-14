@@ -1466,6 +1466,8 @@ export default function useDashboard() {
 
       console.log("[useDashboard] aiUsageData from API:", aiUsageData)
       setAiUsageConnected(aiUsageData.connected ?? false)
+      setOpenaiUsageEnabled(aiUsageData.openai_enabled ?? false)
+      setAnthropicUsageEnabled(aiUsageData.anthropic_enabled ?? false)
 
       // Cache GitHub, Slack, Jira, and Linear integration status separately
       localStorage.setItem('github_integration', JSON.stringify(githubData))
@@ -1684,6 +1686,8 @@ export default function useDashboard() {
   const [includeLinear, setIncludeLinear] = useState(true)
   const [includeAIUsage, setIncludeAIUsage] = useState(true)
   const [aiUsageConnected, setAiUsageConnected] = useState(false)
+  const [openaiUsageEnabled, setOpenaiUsageEnabled] = useState(false)
+  const [anthropicUsageEnabled, setAnthropicUsageEnabled] = useState(false)
   const [enableAI, setEnableAI] = useState(false)
   const [llmConfig, setLlmConfig] = useState<{has_token: boolean, provider?: string} | null>(null)
   const [isLoadingGitHubSlack, setIsLoadingGitHubSlack] = useState(false)
@@ -2644,6 +2648,8 @@ return {
   includeAIUsage,
   setIncludeAIUsage,
   aiUsageConnected,
+  openaiUsageEnabled,
+  anthropicUsageEnabled,
   enableAI,
   setEnableAI,
   llmConfig,
