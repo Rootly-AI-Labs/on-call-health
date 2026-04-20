@@ -100,14 +100,17 @@ function AlertsCardsRow({ currentAnalysis }: { currentAnalysis: any }) {
 
   useEffect(() => {
     const el = teamAlertsRef.current
-    if (!el) return
+    if (!el) {
+      setTeamAlertsHeight(null)
+      return
+    }
     const observer = new ResizeObserver(() => {
       setTeamAlertsHeight(el.offsetHeight)
     })
     observer.observe(el)
     setTeamAlertsHeight(el.offsetHeight)
     return () => observer.disconnect()
-  }, [])
+  }, [currentAnalysis])
 
   const isPagerDuty = currentAnalysis?.platform === 'pagerduty'
   const hasAlertsData = !!currentAnalysis?.analysis_data?.metadata?.alerts
