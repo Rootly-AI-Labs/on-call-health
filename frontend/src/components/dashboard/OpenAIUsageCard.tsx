@@ -139,8 +139,8 @@ export function OpenAIUsageCard({
   const trendColor = trend === null ? "text-neutral-400" : trend > 0 ? "text-green-600" : "text-red-500"
 
   return (
-    <div>
-      <Card className="bg-white flex flex-col">
+    <div className="h-full">
+      <Card className="bg-white flex flex-col h-full">
         <CardHeader className="pb-2 shrink-0">
           <div className="flex items-center gap-2">
             <Image src="/images/openai-logo.svg" alt="OpenAI" width={16} height={16} className="w-4 h-4" />
@@ -161,12 +161,6 @@ export function OpenAIUsageCard({
               </button>
             ))}
           </div>
-          {trend !== null && (
-            <div className="flex items-center gap-1.5 text-xs">
-              <TrendIcon className={`h-3.5 w-3.5 ${trendColor}`} />
-              <span className={trendColor}>{trend > 0 ? "+" : ""}{trend}% vs prior 7 days</span>
-            </div>
-          )}
           <div>
             <span className="text-xs text-neutral-400">{activeConfig.label} / day</span>
             <Sparkline usage={usage} days={days} metric={activeMetric} color={activeConfig.color} />

@@ -361,16 +361,21 @@ function DashboardContent() {
     [currentAnalysis]
   )
 
+  const hasJiraSnapshot = !!(currentAnalysis?.analysis_data?.data_sources as any)?.jira_data
+  const hasLinearSnapshot = !!(currentAnalysis?.analysis_data?.data_sources as any)?.linear_data
+  const hasGithubSnapshot = !!(currentAnalysis?.analysis_data?.data_sources as any)?.github_data
+  const hasSlackSnapshot = !!(currentAnalysis?.analysis_data?.data_sources as any)?.slack_data
+
   // Derive connected integrations from useDashboard data (avoids 4 duplicate API calls)
   const connectedIntegrations = useMemo(() => {
     const connected = new Set<string>()
-    if (githubIntegration) connected.add('github')
-    if (slackIntegration) connected.add('slack')
-    if (jiraIntegration) connected.add('jira')
-    if (linearIntegration) connected.add('linear')
+    if (githubIntegration || hasGithubSnapshot) connected.add('github')
+    if (slackIntegration || hasSlackSnapshot) connected.add('slack')
+    if (jiraIntegration || hasJiraSnapshot) connected.add('jira')
+    if (linearIntegration || hasLinearSnapshot) connected.add('linear')
     if (openaiUsageEnabled || hasOpenAISnapshot) connected.add('openai-usage')
     return connected
-  }, [githubIntegration, slackIntegration, jiraIntegration, linearIntegration, openaiUsageEnabled, hasOpenAISnapshot])
+  }, [githubIntegration, slackIntegration, jiraIntegration, linearIntegration, openaiUsageEnabled, hasOpenAISnapshot, hasGithubSnapshot, hasSlackSnapshot, hasJiraSnapshot, hasLinearSnapshot])
 
   // GitHub All Metrics Popup State
   const [showAllMetricsPopup, setShowAllMetricsPopup] = useState(false)
@@ -1199,7 +1204,7 @@ function DashboardContent() {
               )}
 
               {/* AI Coding Assistant Usage (shown when AI usage data is present in analysis) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-stretch">
                 <OpenAIUsageCard currentAnalysis={currentAnalysis} enabled={openaiUsageEnabled || hasOpenAISnapshot} />
                 <AnthropicUsageCard currentAnalysis={currentAnalysis} enabled={anthropicUsageEnabled || hasAnthropicSnapshot} />
               </div>

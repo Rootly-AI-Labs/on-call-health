@@ -173,12 +173,6 @@ export function MemberOpenAIUsageCard({ email, analysisId, timeRange }: MemberOp
             </button>
           ))}
         </div>
-        {trend !== null && (
-          <div className="flex items-center gap-1.5 text-xs">
-            <TrendIcon className={`h-3.5 w-3.5 ${trendColor}`} />
-            <span className={trendColor}>{trend > 0 ? "+" : ""}{trend}% vs prior 7 days</span>
-          </div>
-        )}
         <div>
           <span className="text-xs text-neutral-400">{activeConfig.label} / day</span>
           <Sparkline usage={displayUsage} days={days} metric={activeMetric} color={activeConfig.color} />

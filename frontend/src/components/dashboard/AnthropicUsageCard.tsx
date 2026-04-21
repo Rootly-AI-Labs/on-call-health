@@ -109,10 +109,10 @@ export function AnthropicUsageCard({ currentAnalysis, enabled }: { currentAnalys
   if (!enabled) return null
 
   const metricOptions: { key: keyof DailyEntry; label: string; color: string }[] = [
-    { key: "total_tokens",  label: "Total tokens",  color: "#6366f1" },
-    { key: "input_tokens",  label: "Input tokens",  color: "#3b82f6" },
-    { key: "output_tokens", label: "Output tokens", color: "#10b981" },
-    { key: "requests",      label: "Requests",      color: "#f97316" },
+    { key: "total_tokens",  label: "Total tokens",  color: "#cc6b2c" },
+    { key: "input_tokens",  label: "Input tokens",  color: "#e8873a" },
+    { key: "output_tokens", label: "Output tokens", color: "#f5a55c" },
+    { key: "requests",      label: "Requests",      color: "#b85520" },
   ]
   const activeConfig = metricOptions.find(m => m.key === activeMetric)!
   const TrendIcon = trend === null ? Minus : trend > 0 ? TrendingUp : TrendingDown
@@ -121,8 +121,8 @@ export function AnthropicUsageCard({ currentAnalysis, enabled }: { currentAnalys
   const hasData = Object.keys(usage).length > 0
 
   return (
-    <div>
-      <Card className="bg-white flex flex-col">
+    <div className="h-full">
+      <Card className="bg-white flex flex-col h-full">
         <CardHeader className="pb-2 shrink-0">
           <div className="flex items-center gap-2">
             <Image src="/images/anthropic-logo.svg" alt="Anthropic" width={16} height={16} className="w-4 h-4" />
@@ -151,12 +151,6 @@ export function AnthropicUsageCard({ currentAnalysis, enabled }: { currentAnalys
                   </button>
                 ))}
               </div>
-              {trend !== null && (
-                <div className="flex items-center gap-1.5 text-xs">
-                  <TrendIcon className={`h-3.5 w-3.5 ${trendColor}`} />
-                  <span className={trendColor}>{trend > 0 ? "+" : ""}{trend}% vs prior 7 days</span>
-                </div>
-              )}
               <div>
                 <span className="text-xs text-neutral-400">{activeConfig.label} / day</span>
                 <Sparkline usage={usage} days={days} metric={activeMetric} color={activeConfig.color} />
