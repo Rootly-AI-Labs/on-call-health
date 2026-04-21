@@ -351,6 +351,16 @@ function DashboardContent() {
     }
   }, [mounted, searchParams, analysisRunning, startAnalysis, router])
 
+  // Snapshot-derived AI flags — stable once analysis loads, not subject to live-API race conditions
+  const hasOpenAISnapshot = useMemo(() =>
+    Object.keys(currentAnalysis?.analysis_data?.metadata?.openai_usage ?? {}).length > 0,
+    [currentAnalysis]
+  )
+  const hasAnthropicSnapshot = useMemo(() =>
+    Object.keys(currentAnalysis?.analysis_data?.metadata?.anthropic_usage ?? {}).length > 0,
+    [currentAnalysis]
+  )
+
   // Derive connected integrations from useDashboard data (avoids 4 duplicate API calls)
   const connectedIntegrations = useMemo(() => {
     const connected = new Set<string>()
@@ -358,9 +368,9 @@ function DashboardContent() {
     if (slackIntegration) connected.add('slack')
     if (jiraIntegration) connected.add('jira')
     if (linearIntegration) connected.add('linear')
-    if (openaiUsageEnabled) connected.add('openai-usage')
+    if (openaiUsageEnabled || hasOpenAISnapshot) connected.add('openai-usage')
     return connected
-  }, [githubIntegration, slackIntegration, jiraIntegration, linearIntegration, openaiUsageEnabled])
+  }, [githubIntegration, slackIntegration, jiraIntegration, linearIntegration, openaiUsageEnabled, hasOpenAISnapshot])
 
   // GitHub All Metrics Popup State
   const [showAllMetricsPopup, setShowAllMetricsPopup] = useState(false)
@@ -1190,8 +1200,8 @@ function DashboardContent() {
 
               {/* AI Coding Assistant Usage (shown when AI usage data is present in analysis) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <OpenAIUsageCard currentAnalysis={currentAnalysis} enabled={openaiUsageEnabled} />
-                <AnthropicUsageCard currentAnalysis={currentAnalysis} enabled={anthropicUsageEnabled} />
+                <OpenAIUsageCard currentAnalysis={currentAnalysis} enabled={openaiUsageEnabled || hasOpenAISnapshot} />
+                <AnthropicUsageCard currentAnalysis={currentAnalysis} enabled={anthropicUsageEnabled || hasAnthropicSnapshot} />
               </div>
 
               <TeamMembersList
@@ -2087,7 +2097,7 @@ function DashboardContent() {
         currentAnalysis={currentAnalysis}
         timeRange={currentAnalysis?.time_range || timeRange}
         integrations={integrations}
-        openaiUsageEnabled={openaiUsageEnabled}
+        openaiUsageEnabled={openaiUsageEnabled || hasOpenAISnapshot}
       />
 
       {/* Delete Analysis Dialog */}
