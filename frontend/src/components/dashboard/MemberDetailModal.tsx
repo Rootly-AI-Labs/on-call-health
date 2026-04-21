@@ -350,7 +350,7 @@ export function MemberDetailModal({
     <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
       <DialogContent
         ref={dialogContentRef}
-        className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-3rem)] md:w-auto md:max-w-6xl max-h-[80vh] overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6"
+        className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-3rem)] md:w-auto md:min-w-[720px] md:max-w-6xl max-h-[80vh] overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6"
         aria-describedby="member-detail-description"
       >
         {selectedMember && (() => {
@@ -480,7 +480,7 @@ export function MemberDetailModal({
                       {
                         id: 'userAlerts',
                         order: 2,
-                        hasData: isPagerDuty || typeof memberData?.alerts_count === 'number',
+                        hasData: (memberData?.alerts_count ?? 0) > 0,
                         component: (
                           <UserAlertsCard
                             key="userAlerts"
@@ -493,9 +493,9 @@ export function MemberDetailModal({
                       {
                         id: 'userLeaderboard',
                         order: 2.5,
-                        hasData: isPagerDuty || typeof memberData?.alerts_count === 'number',
+                        hasData: (memberData?.alerts_top_alerts?.length ?? 0) > 0,
                         component: (
-                          <div key="userLeaderboard" className={isRootly ? "h-[480px]" : undefined}>
+                          <div key="userLeaderboard">
                             <AlertsLeaderboard
                               topAlerts={memberData?.alerts_top_alerts ?? []}
                               title="User Alert Leaderboard"

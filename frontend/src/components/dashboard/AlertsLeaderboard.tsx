@@ -51,7 +51,7 @@ export function AlertsLeaderboard({ currentAnalysis, topAlerts: topAlertsProp, t
 
   if (resolvedPlatform === 'pagerduty') {
     return (
-      <Card className="bg-white flex flex-col h-full overflow-hidden">
+      <Card className="bg-white flex flex-col overflow-hidden">
         <CardHeader className="pb-2 shrink-0">
           <div className="space-y-1">
             <CardTitle className="text-neutral-900">{title ?? "Team Alert Leaderboard"}</CardTitle>
@@ -71,14 +71,14 @@ export function AlertsLeaderboard({ currentAnalysis, topAlerts: topAlertsProp, t
   const maxVal = sorted.length > 0 ? (sorted[0][activeKey] ?? 0) : 1
 
   return (
-    <Card className="bg-white flex flex-col h-full overflow-hidden">
+    <Card className="bg-white flex flex-col overflow-hidden">
       <CardHeader className="pb-2 shrink-0">
         <div className="space-y-1">
           <CardTitle className="text-neutral-900">{title ?? "Team Alert Leaderboard"}</CardTitle>
           <CardDescription>Top alerts ranked by negative impact criteria</CardDescription>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      <CardContent className="flex flex-col overflow-hidden">
         {/* Filter tabs */}
         <div className="flex flex-wrap gap-1.5 mb-2 shrink-0">
           {FILTERS.map(({ key, label }) => (
@@ -109,7 +109,7 @@ export function AlertsLeaderboard({ currentAnalysis, topAlerts: topAlertsProp, t
         ) : sorted.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-sm text-neutral-400">No alerts match this filter</div>
         ) : (
-          <div className="overflow-y-auto flex-1 space-y-2.5 pr-2 min-h-0">
+          <div className="overflow-y-auto max-h-[320px] space-y-2.5 pr-2">
             {sorted.map((alert, i) => {
               const val = alert[activeKey] ?? 0
               const total = alert.total ?? 0
