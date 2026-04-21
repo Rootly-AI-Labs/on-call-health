@@ -1947,6 +1947,37 @@ async def get_analysis_daily_trends(
     )
 
 
+@router.get("/users/{user_email}/openai-daily-usage")
+async def get_user_openai_daily_usage(
+    user_email: str,
+    analysis_id: int = Query(..., description="Analysis ID to read usage from"),
+    current_user: User = Depends(get_current_user_flexible),
+    db: Session = Depends(get_db)
+):
+    """
+    Return per-user OpenAI daily usage from a stored analysis.
+    Reads metadata.openai_usage_per_user[email] from the analysis result.
+    Returns null if the user has no OpenAI mapping or no data for this period.
+    """
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id,
+        Analysis.user_id == current_user.id,
+    ).first()
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    metadata = (analysis.results or {}).get("metadata", {})
+    per_user = metadata.get("openai_usage_per_user", {})
+
+    user_data = per_user.get(user_email.lower()) or per_user.get(user_email)
+
+    if not user_data:
+        return {"has_data": False, "usage": {}}
+
+    return {"has_data": True, "usage": user_data}
+
+
 @router.get("/users/{user_email}/github-daily-commits")
 async def get_user_github_daily_commits(
     user_email: str,
@@ -3238,6 +3269,7 @@ async def run_analysis_task(
                                 'slack_user_id': corr.slack_user_id,
                                 'jira_account_id': corr.jira_account_id,
                                 'linear_user_id': corr.linear_user_id,
+                                'openai_user_id': corr.openai_user_id,
                                 'rootly_user_id': corr.rootly_user_id,
                                 'pagerduty_user_id': corr.pagerduty_user_id,
                                 'avatar_url': corr.avatar_url,  # Profile image URL
@@ -3283,6 +3315,7 @@ async def run_analysis_task(
                                 'slack_user_id': corr.slack_user_id,
                                 'jira_account_id': corr.jira_account_id,
                                 'linear_user_id': corr.linear_user_id,
+                                'openai_user_id': corr.openai_user_id,
                                 'rootly_user_id': corr.rootly_user_id,
                                 'pagerduty_user_id': corr.pagerduty_user_id,
                                 'avatar_url': corr.avatar_url,  # Profile image URL
@@ -3713,47 +3746,68 @@ async def run_analysis_task(
                         org_id = task_user.organization_id if task_user else None
                         logger.info(f"[AI_USAGE] user_id={user_id} org_id={org_id} for analysis {analysis_ref}")
 
-                        if not org_id:
-                            logger.warning(f"[AI_USAGE] Skipping — user has no organization for analysis {analysis_ref}")
-                        else:
+                        if org_id:
                             ai_integration = db.query(AIUsageIntegration).filter(
                                 AIUsageIntegration.organization_id == org_id
                             ).first()
-                            logger.info(
-                                f"[AI_USAGE] Integration found={ai_integration is not None} "
-                                f"is_connected={ai_integration.is_connected if ai_integration else 'N/A'} "
-                                f"openai_enabled={ai_integration.openai_enabled if ai_integration else 'N/A'} "
-                                f"anthropic_enabled={ai_integration.anthropic_enabled if ai_integration else 'N/A'} "
-                                f"for analysis {analysis_ref}"
-                            )
+                        else:
+                            ai_integration = db.query(AIUsageIntegration).filter(
+                                AIUsageIntegration.user_id == user_id,
+                                AIUsageIntegration.organization_id.is_(None)
+                            ).first()
+                        logger.info(
+                            f"[AI_USAGE] Integration found={ai_integration is not None} "
+                            f"is_connected={ai_integration.is_connected if ai_integration else 'N/A'} "
+                            f"openai_enabled={ai_integration.openai_enabled if ai_integration else 'N/A'} "
+                            f"anthropic_enabled={ai_integration.anthropic_enabled if ai_integration else 'N/A'} "
+                            f"for analysis {analysis_ref}"
+                        )
 
-                            if not ai_integration or not ai_integration.is_connected:
-                                logger.warning(f"[AI_USAGE] Skipping — no connected integration for org {org_id} analysis {analysis_ref}")
-                            else:
-                                _jwt_secret = os.environ.get("JWT_SECRET_KEY", "default-secret-key-change-me")
-                                _fernet_key = base64.urlsafe_b64encode(
-                                    _jwt_secret.encode()[:32].ljust(32, b"\0")
-                                )
-                                _f = Fernet(_fernet_key)
-                                openai_key = _f.decrypt(ai_integration.openai_api_key.encode()).decode() if ai_integration.has_openai else None
-                                anthropic_key = _f.decrypt(ai_integration.anthropic_api_key.encode()).decode() if ai_integration.has_anthropic else None
-                                logger.info(
-                                    f"[AI_USAGE] Fetching usage: openai={'yes (key length=' + str(len(openai_key)) + ')' if openai_key else 'no'} "
-                                    f"anthropic={'yes' if anthropic_key else 'no'} days={time_range}"
-                                )
-                                ai_usage_result = await collect_ai_usage(
-                                    openai_api_key=openai_key,
-                                    openai_org_id=ai_integration.openai_org_id,
-                                    anthropic_api_key=anthropic_key,
-                                    anthropic_workspace_id=ai_integration.anthropic_workspace_id,
-                                    days=time_range,
-                                )
-                                logger.info(f"[AI_USAGE] Collected openai={len(ai_usage_result['openai'])} days, anthropic={len(ai_usage_result['anthropic'])} days for analysis {analysis_ref}")
-                                if "metadata" not in results:
-                                    results["metadata"] = {}
-                                results["metadata"]["openai_usage"] = ai_usage_result["openai"]
-                                results["metadata"]["anthropic_usage"] = ai_usage_result["anthropic"]
-                                logger.info(f"[AI_USAGE] Stored openai_usage + anthropic_usage in metadata for analysis {analysis_ref}")
+                        if not ai_integration or not ai_integration.is_connected:
+                            logger.warning(f"[AI_USAGE] Skipping — no connected integration for analysis {analysis_ref}")
+                        else:
+                            _jwt_secret = os.environ.get("JWT_SECRET_KEY", "default-secret-key-change-me")
+                            _fernet_key = base64.urlsafe_b64encode(
+                                _jwt_secret.encode()[:32].ljust(32, b"\0")
+                            )
+                            _f = Fernet(_fernet_key)
+                            openai_key = _f.decrypt(ai_integration.openai_api_key.encode()).decode() if ai_integration.has_openai else None
+                            anthropic_key = _f.decrypt(ai_integration.anthropic_api_key.encode()).decode() if ai_integration.has_anthropic else None
+                            logger.info(
+                                f"[AI_USAGE] Fetching usage: openai={'yes (key length=' + str(len(openai_key)) + ')' if openai_key else 'no'} "
+                                f"anthropic={'yes' if anthropic_key else 'no'} days={time_range}"
+                            )
+                            ai_usage_result = await collect_ai_usage(
+                                openai_api_key=openai_key,
+                                openai_org_id=ai_integration.openai_org_id,
+                                anthropic_api_key=anthropic_key,
+                                anthropic_workspace_id=ai_integration.anthropic_workspace_id,
+                                days=time_range,
+                            )
+                            logger.info(f"[AI_USAGE] Collected openai={len(ai_usage_result['openai'])} days, anthropic={len(ai_usage_result['anthropic'])} days for analysis {analysis_ref}")
+                            if "metadata" not in results:
+                                results["metadata"] = {}
+                            results["metadata"]["openai_usage"] = ai_usage_result["openai"]
+                            results["metadata"]["anthropic_usage"] = ai_usage_result["anthropic"]
+
+                            # Remap openai_per_user from OpenAI email -> app email via UserCorrelation
+                            openai_per_user_raw = ai_usage_result.get("openai_per_user", {})
+                            members_map = ai_usage_result.get("openai_members_map", {})  # uid -> openai_email
+                            email_to_uid = {v.lower(): k for k, v in members_map.items()}
+
+                            from ...models.user_correlation import UserCorrelation as UC
+                            correlations = db.query(UC).filter(UC.openai_user_id.isnot(None)).all()
+                            uid_to_app_email = {c.openai_user_id: (c.email or "").lower() for c in correlations if c.email}
+
+                            openai_per_user = {}
+                            for openai_email, usage in openai_per_user_raw.items():
+                                uid = email_to_uid.get(openai_email.lower())
+                                app_email = uid_to_app_email.get(uid) if uid else None
+                                key = app_email if app_email else openai_email.lower()
+                                openai_per_user[key] = usage
+
+                            results["metadata"]["openai_usage_per_user"] = openai_per_user
+                            logger.info(f"[AI_USAGE] Stored openai_usage + anthropic_usage + openai_usage_per_user ({len(openai_per_user)}) in metadata for analysis {analysis_ref}")
                 except Exception as ai_err:
                     logger.warning(f"[AI_USAGE] Failed to collect AI usage for analysis {analysis_ref}: {ai_err}", exc_info=True)
 

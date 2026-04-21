@@ -251,7 +251,8 @@ export function TeamMembersList({
       },
       metrics: member.metrics || {},
       github_activity: member.github_activity || null,
-      slack_activity: member.slack_activity || null
+      slack_activity: member.slack_activity || null,
+      openai_user_id: member.openai_user_id || null
     })
   }
 
@@ -364,6 +365,7 @@ export function TeamMembersList({
             const slackEnabled = connectedIntegrations.has('slack') && isDataSourceEnabled('slack');
             const jiraEnabled = connectedIntegrations.has('jira') && isDataSourceEnabled('jira');
             const linearEnabled = connectedIntegrations.has('linear') && isDataSourceEnabled('linear');
+            const openaiEnabled = connectedIntegrations.has('openai-usage');
 
             const hasSurvey = !!currentAnalysis?.analysis_data?.member_surveys?.[member.user_email];
 
@@ -372,10 +374,8 @@ export function TeamMembersList({
               ...(slackEnabled ? [{ key: 'slack', mapped: !!member.slack_user_id, title: member.slack_user_id ? 'Slack: mapped' : 'Slack: not mapped' }] : []),
               ...(jiraEnabled ? [{ key: 'jira', mapped: !!member.jira_account_id, title: member.jira_account_id ? 'Jira: mapped' : 'Jira: not mapped' }] : []),
               ...(linearEnabled ? [{ key: 'linear', mapped: !!member.linear_user_id, title: member.linear_user_id ? 'Linear: mapped' : 'Linear: not mapped' }] : []),
+              ...(openaiEnabled ? [{ key: 'openai', mapped: !!member.openai_user_id, title: member.openai_user_id ? 'OpenAI: mapped' : 'OpenAI: not mapped' }] : []),
             ];
-
-            // Mapped first, then unmapped
-            const sorted = [...integrations.filter(i => i.mapped), ...integrations.filter(i => !i.mapped)];
 
             const renderIcon = (key: string, mapped: boolean, title: string) => {
               const opacity = mapped ? '' : 'opacity-25';
@@ -417,6 +417,12 @@ export function TeamMembersList({
                       <Image src="/images/linear-logo.png" alt="Linear" width={14} height={14} />
                     </div>
                   );
+                case 'openai':
+                  return (
+                    <div key={key} className={`flex items-center justify-center w-5 h-5 ${opacity}`} title={title}>
+                      <Image src="/images/openai-logo.svg" alt="OpenAI" width={14} height={14} />
+                    </div>
+                  );
                 default:
                   return null;
               }
@@ -430,8 +436,8 @@ export function TeamMembersList({
                     <Image src="/images/rootly-logo-icon.jpg" alt="Rootly" width={14} height={14} className="rounded" />
                   </div>
                 )}
-                {/* Mapped integrations first, then unmapped */}
-                {sorted.map(i => <span key={i.key}>{renderIcon(i.key, i.mapped, i.title)}</span>)}
+                {/* Fixed order: github, slack, jira, linear, openai */}
+                {integrations.map(i => <span key={i.key}>{renderIcon(i.key, i.mapped, i.title)}</span>)}
                 {/* Survey */}
                 {hasSurvey && (
                   <div className="flex items-center justify-center w-5 h-5 bg-blue-50 rounded-full border border-blue-200" title="Survey Data Available">

@@ -80,8 +80,13 @@ class AIUsageStatusResponse(BaseModel):
 # --------------------------------------------------------------------------- #
 
 def _get_integration(user: User, db: Session) -> Optional[AIUsageIntegration]:
+    if user.organization_id:
+        return db.query(AIUsageIntegration).filter(
+            AIUsageIntegration.organization_id == user.organization_id
+        ).first()
     return db.query(AIUsageIntegration).filter(
-        AIUsageIntegration.organization_id == user.organization_id
+        AIUsageIntegration.user_id == user.id,
+        AIUsageIntegration.organization_id.is_(None),
     ).first()
 
 
@@ -112,14 +117,11 @@ async def connect(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not current_user.organization_id:
-        raise HTTPException(status_code=400, detail="User has no organization")
-
     integration = _get_integration(current_user, db)
     if not integration:
         integration = AIUsageIntegration(
             user_id=current_user.id,
-            organization_id=current_user.organization_id,
+            organization_id=current_user.organization_id,  # May be None
         )
         db.add(integration)
 
@@ -274,6 +276,23 @@ async def disconnect(
 
     db.commit()
     return {"success": True}
+
+
+@router.get("/openai-members")
+async def get_openai_members(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return list of OpenAI org members: [{id, email}]"""
+    from ...services.ai_usage_collector import fetch_openai_members
+    integration = _get_integration(current_user, db)
+    if not integration or not integration.has_openai:
+        return {"members": []}
+    api_key = _decrypt(integration.openai_api_key)
+    uid_to_email = await fetch_openai_members(api_key)
+    members = [{"id": uid, "email": email} for uid, email in uid_to_email.items()]
+    members.sort(key=lambda m: m["email"])
+    return {"members": members}
 
 
 @router.get("/usage")

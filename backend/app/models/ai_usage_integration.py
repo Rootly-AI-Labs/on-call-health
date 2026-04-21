@@ -12,7 +12,7 @@ class AIUsageIntegration(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
 
     # OpenAI
     openai_api_key = Column(Text, nullable=True)       # Encrypted
