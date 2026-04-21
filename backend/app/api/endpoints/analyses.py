@@ -977,50 +977,52 @@ async def get_analysis_by_identifier(  # noqa: C901
     db: Session = Depends(get_db)
 ):
     """Get a specific analysis result by UUID or integer ID."""
-    if not current_user.organization_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User must be part of an organization to view analyses"
-        )
-
     analysis = None
-    
+
+    # Build org-scoped or user-scoped filter depending on account type
+    if current_user.organization_id:
+        def _scope(q):
+            return q.filter(
+                Analysis.organization_id == current_user.organization_id,
+                Analysis.organization_id.isnot(None)
+            )
+    else:
+        def _scope(q):
+            return q.filter(
+                Analysis.user_id == current_user.id,
+                Analysis.organization_id.is_(None)
+            )
+
     # Try UUID first if it looks like a UUID
     if is_uuid(analysis_identifier):
         try:
-            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-            analysis = db.query(Analysis).options(defer(Analysis.results)).filter(
-                Analysis.uuid == analysis_identifier,
-                Analysis.organization_id == current_user.organization_id,
-                Analysis.organization_id.isnot(None)
+            analysis = _scope(
+                db.query(Analysis).options(defer(Analysis.results)).filter(
+                    Analysis.uuid == analysis_identifier
+                )
             ).first()
         except Exception:
             # UUID column might not exist yet, fall back to integer
             pass
-    
+
     # If not found by UUID or not a UUID, try integer ID
     if not analysis:
         try:
             analysis_id = int(analysis_identifier)
-            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-            analysis = db.query(Analysis).options(defer(Analysis.results)).filter(
-                Analysis.id == analysis_id,
-                Analysis.organization_id == current_user.organization_id,
-                Analysis.organization_id.isnot(None)
+            analysis = _scope(
+                db.query(Analysis).options(defer(Analysis.results)).filter(
+                    Analysis.id == analysis_id
+                )
             ).first()
         except ValueError:
-            # Not a valid integer either
             pass
 
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
-        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-        most_recent = db.query(Analysis).options(
-            load_only(Analysis.id, Analysis.uuid)
-        ).filter(
-            Analysis.organization_id == current_user.organization_id,
-            Analysis.organization_id.isnot(None),
-            Analysis.status == "completed"
+        most_recent = _scope(
+            db.query(Analysis).options(load_only(Analysis.id, Analysis.uuid)).filter(
+                Analysis.status == "completed"
+            )
         ).order_by(Analysis.created_at.desc()).first()
 
         error_detail = "Analysis not found"
@@ -1445,20 +1447,21 @@ async def get_historical_trends(
     db: Session = Depends(get_db)
 ):
     """Get daily incident trends from the most recent analysis period."""
-    if not current_user.organization_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User must be part of an organization to view analyses"
+    # Find the most recent completed analysis — scoped to org or personal user
+    if current_user.organization_id:
+        query = db.query(Analysis).filter(
+            Analysis.organization_id == current_user.organization_id,
+            Analysis.organization_id.isnot(None),
+            Analysis.status == "completed",
+            Analysis.results.isnot(None)
         )
-
-    # Find the most recent completed analysis
-    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-    query = db.query(Analysis).filter(
-        Analysis.organization_id == current_user.organization_id,
-        Analysis.organization_id.isnot(None),
-        Analysis.status == "completed",
-        Analysis.results.isnot(None)
-    )
+    else:
+        query = db.query(Analysis).filter(
+            Analysis.user_id == current_user.id,
+            Analysis.organization_id.is_(None),
+            Analysis.status == "completed",
+            Analysis.results.isnot(None)
+        )
     
     # Filter by integration if specified
     if integration_id:

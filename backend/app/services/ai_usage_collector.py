@@ -351,8 +351,8 @@ async def collect_ai_usage(
 
     openai_data: DailyUsage = {}
     anthropic_data: DailyUsage = {}
-
     openai_per_user: Dict[str, DailyUsage] = {}
+    members_map: Dict[str, str] = {}
 
     if openai_api_key:
         # Fetch member list once to reuse for both team-total and per-user calls

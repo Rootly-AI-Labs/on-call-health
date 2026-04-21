@@ -107,10 +107,24 @@ export function OpenAIUsageCard({
   const [activeMetric, setActiveMetric] = useState<keyof DailyEntry>("total_tokens")
 
   const metadata = currentAnalysis?.analysis_data?.metadata
-  const usage: UsageData = useMemo(() => (metadata?.openai_usage as UsageData | undefined) ?? {}, [metadata])
+  const rawUsage: UsageData = useMemo(() => (metadata?.openai_usage as UsageData | undefined) ?? {}, [metadata])
+
+  // Zero-fill the time range so the chart always renders even with no data
+  const usage: UsageData = useMemo(() => {
+    if (Object.keys(rawUsage).length > 0) return rawUsage
+    const n = Number(currentAnalysis?.time_range) || 30
+    const result: UsageData = {}
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date()
+      d.setUTCDate(d.getUTCDate() - i)
+      result[d.toISOString().slice(0, 10)] = { input_tokens: 0, output_tokens: 0, total_tokens: 0, requests: 0 }
+    }
+    return result
+  }, [rawUsage, currentAnalysis?.time_range])
+
   const days = useMemo(() => buildSortedDays(usage), [usage])
-  const totals = useMemo(() => sumUsage(usage), [usage])
-  const trend = useMemo(() => computeTrend(usage, 7), [usage])
+  const totals = useMemo(() => sumUsage(rawUsage), [rawUsage])
+  const trend = useMemo(() => computeTrend(rawUsage, 7), [rawUsage])
 
   if (!enabled) return null
 
@@ -124,8 +138,6 @@ export function OpenAIUsageCard({
   const TrendIcon = trend === null ? Minus : trend > 0 ? TrendingUp : TrendingDown
   const trendColor = trend === null ? "text-neutral-400" : trend > 0 ? "text-green-600" : "text-red-500"
 
-  const hasData = Object.keys(usage).length > 0
-
   return (
     <div>
       <Card className="bg-white flex flex-col">
@@ -137,42 +149,32 @@ export function OpenAIUsageCard({
           <CardDescription>Past {currentAnalysis?.time_range ?? days.length} days of token consumption</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!hasData ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
-              <div className="text-2xl">📊</div>
-              <p className="text-sm font-medium text-neutral-600">No usage data yet</p>
-              <p className="text-xs text-neutral-400">OpenAI is connected — usage will appear here after your team makes API calls during the analysis period.</p>
+          <div className="grid grid-cols-4 gap-3">
+            {metricOptions.map(m => (
+              <button key={m.key} onClick={() => setActiveMetric(m.key)}
+                className={`rounded-lg p-2.5 text-left transition-colors border ${activeMetric === m.key ? "border-neutral-300 bg-neutral-50" : "border-neutral-200 bg-white hover:border-neutral-300"}`}
+              >
+                <div className="text-xs text-neutral-400 mb-0.5">{m.label}</div>
+                <div className="text-base font-bold" style={{ color: activeMetric === m.key ? m.color : "#171717" }}>
+                  {formatTokens(totals[m.key])}
+                </div>
+              </button>
+            ))}
+          </div>
+          {trend !== null && (
+            <div className="flex items-center gap-1.5 text-xs">
+              <TrendIcon className={`h-3.5 w-3.5 ${trendColor}`} />
+              <span className={trendColor}>{trend > 0 ? "+" : ""}{trend}% vs prior 7 days</span>
             </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-4 gap-3">
-                {metricOptions.map(m => (
-                  <button key={m.key} onClick={() => setActiveMetric(m.key)}
-                    className={`rounded-lg p-2.5 text-left transition-colors border ${activeMetric === m.key ? "border-neutral-300 bg-neutral-50" : "border-neutral-200 bg-white hover:border-neutral-300"}`}
-                  >
-                    <div className="text-xs text-neutral-400 mb-0.5">{m.label}</div>
-                    <div className="text-base font-bold" style={{ color: activeMetric === m.key ? m.color : "#171717" }}>
-                      {formatTokens(totals[m.key])}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              {trend !== null && (
-                <div className="flex items-center gap-1.5 text-xs">
-                  <TrendIcon className={`h-3.5 w-3.5 ${trendColor}`} />
-                  <span className={trendColor}>{trend > 0 ? "+" : ""}{trend}% vs prior 7 days</span>
-                </div>
-              )}
-              <div>
-                <span className="text-xs text-neutral-400">{activeConfig.label} / day</span>
-                <Sparkline usage={usage} days={days} metric={activeMetric} color={activeConfig.color} />
-                <div className="flex justify-between mt-1">
-                  <span className="text-xs text-neutral-300">{days[0] ? formatDate(days[0]) : ""}</span>
-                  <span className="text-xs text-neutral-300">{days[days.length - 1] ? formatDate(days[days.length - 1]) : ""}</span>
-                </div>
-              </div>
-            </>
           )}
+          <div>
+            <span className="text-xs text-neutral-400">{activeConfig.label} / day</span>
+            <Sparkline usage={usage} days={days} metric={activeMetric} color={activeConfig.color} />
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-neutral-300">{days[0] ? formatDate(days[0]) : ""}</span>
+              <span className="text-xs text-neutral-300">{days[days.length - 1] ? formatDate(days[days.length - 1]) : ""}</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
