@@ -1190,7 +1190,7 @@ function DashboardContent() {
 
               {/* AI Coding Assistant Usage (shown when AI usage data is present in analysis) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <OpenAIUsageCard currentAnalysis={currentAnalysis} enabled={openaiUsageEnabled || !!currentAnalysis?.analysis_data?.metadata?.openai_usage} />
+                <OpenAIUsageCard currentAnalysis={currentAnalysis} enabled={openaiUsageEnabled} />
                 <AnthropicUsageCard currentAnalysis={currentAnalysis} enabled={anthropicUsageEnabled} />
               </div>
 
