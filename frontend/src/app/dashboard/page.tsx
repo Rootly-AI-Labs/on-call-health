@@ -358,8 +358,9 @@ function DashboardContent() {
     if (slackIntegration) connected.add('slack')
     if (jiraIntegration) connected.add('jira')
     if (linearIntegration) connected.add('linear')
+    if (openaiUsageEnabled) connected.add('openai-usage')
     return connected
-  }, [githubIntegration, slackIntegration, jiraIntegration, linearIntegration])
+  }, [githubIntegration, slackIntegration, jiraIntegration, linearIntegration, openaiUsageEnabled])
 
   // GitHub All Metrics Popup State
   const [showAllMetricsPopup, setShowAllMetricsPopup] = useState(false)
@@ -1189,8 +1190,8 @@ function DashboardContent() {
 
               {/* AI Coding Assistant Usage (shown when AI usage data is present in analysis) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <OpenAIUsageCard currentAnalysis={currentAnalysis} />
-                <AnthropicUsageCard currentAnalysis={currentAnalysis} />
+                <OpenAIUsageCard currentAnalysis={currentAnalysis} enabled={openaiUsageEnabled || !!currentAnalysis?.analysis_data?.metadata?.openai_usage} />
+                <AnthropicUsageCard currentAnalysis={currentAnalysis} enabled={anthropicUsageEnabled} />
               </div>
 
               <TeamMembersList
@@ -2086,6 +2087,7 @@ function DashboardContent() {
         currentAnalysis={currentAnalysis}
         timeRange={currentAnalysis?.time_range || timeRange}
         integrations={integrations}
+        openaiUsageEnabled={openaiUsageEnabled}
       />
 
       {/* Delete Analysis Dialog */}

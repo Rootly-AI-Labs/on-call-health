@@ -2,12 +2,13 @@
 AI Usage Collector — fetches daily token consumption from OpenAI and Anthropic.
 
 OpenAI:  GET /v1/organization/usage/completions  (grouped by day, up to 90 days)
+         GET /v1/organization/members             (to resolve user_id -> email)
 Anthropic: GET /v1/organizations/usage_report/messages (workspace-level, by day)
 """
 import logging
 import httpx
 from datetime import date, timedelta
-from typing import Optional
+from typing import Optional, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,118 @@ async def fetch_openai_usage(
         logger.error(f"[AI_USAGE] OpenAI fetch error: {e}")
 
     return usage
+
+
+async def fetch_openai_members(api_key: str) -> Dict[str, str]:
+    """Return {openai_user_id -> email} for all members of the OpenAI org.
+    Uses GET /v1/organization/users (Admin API).
+    """
+    result: Dict[str, str] = {}
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            after = None
+            for _ in range(20):
+                params: dict = {"limit": 100}
+                if after:
+                    params["after"] = after
+                resp = await client.get(
+                    "https://api.openai.com/v1/organization/users",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    params=params,
+                )
+                if resp.status_code != 200:
+                    logger.warning(f"[AI_USAGE] OpenAI members API {resp.status_code}: {resp.text[:200]}")
+                    break
+                data = resp.json()
+                for member in data.get("data", []):
+                    # /v1/organization/users returns flat objects: {id, email, name, role, ...}
+                    uid = member.get("id", "")
+                    email = (member.get("email") or "").lower().strip()
+                    if uid and email:
+                        result[uid] = email
+                if not data.get("has_more"):
+                    break
+                last = data.get("data", [])
+                after = last[-1]["id"] if last else None
+    except Exception as e:
+        logger.error(f"[AI_USAGE] OpenAI members fetch error: {e}")
+    return result
+
+
+async def fetch_openai_usage_per_user(
+    api_key: str,
+    org_id: Optional[str],
+    days: int = 30,
+    user_id_to_email: Optional[Dict[str, str]] = None,
+) -> Dict[str, DailyUsage]:
+    """
+    Fetch daily token usage from OpenAI grouped by user_id.
+    Returns {email -> DailyUsage}.
+    If user_id_to_email is not provided, fetches it automatically.
+    """
+    if user_id_to_email is None:
+        user_id_to_email = await fetch_openai_members(api_key)
+
+    if not user_id_to_email:
+        return {}
+
+    end = date.today()
+    start = end - timedelta(days=days - 1)
+
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    if org_id and org_id.strip():
+        headers["OpenAI-Organization"] = org_id.strip()
+
+    params = {
+        "start_time": _date_to_unix(start),
+        "end_time": _date_to_unix(end + timedelta(days=1)),
+        "bucket_width": "1d",
+        "limit": min(days, 31),
+        "group_by": "user_id",
+    }
+
+    _MAX_RESPONSE_BYTES = 5 * 1024 * 1024
+    per_user: Dict[str, DailyUsage] = {}  # email -> {date -> entry}
+    url = "https://api.openai.com/v1/organization/usage/completions"
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            while url:
+                for attempt in range(2):
+                    resp = await client.get(url, headers=headers, params=params)
+                    if resp.status_code != 503 or attempt == 1:
+                        break
+                    logger.warning("[AI_USAGE] OpenAI per-user 503 — retrying once")
+                if resp.status_code != 200:
+                    logger.warning(f"[AI_USAGE] OpenAI per-user returned {resp.status_code}: {resp.text[:200]}")
+                    break
+                if len(resp.content) > _MAX_RESPONSE_BYTES:
+                    logger.warning("[AI_USAGE] OpenAI per-user response too large — skipping")
+                    break
+                data = resp.json()
+                for bucket in data.get("data", []):
+                    day_str = _unix_to_date(bucket["start_time"])
+                    for result in bucket.get("results", []):
+                        uid = result.get("user_id") or ""
+                        email = user_id_to_email.get(uid, "")
+                        if not email:
+                            continue
+                        if email not in per_user:
+                            per_user[email] = {}
+                        if day_str not in per_user[email]:
+                            per_user[email][day_str] = _empty_day()
+                        per_user[email][day_str]["input_tokens"] += result.get("input_tokens", 0) or 0
+                        per_user[email][day_str]["output_tokens"] += result.get("output_tokens", 0) or 0
+                        per_user[email][day_str]["total_tokens"] += (result.get("input_tokens", 0) or 0) + (result.get("output_tokens", 0) or 0)
+                        per_user[email][day_str]["requests"] += result.get("num_model_requests", 0) or 0
+
+                next_page = data.get("next_page")
+                url = f"https://api.openai.com/v1/organization/usage/completions?cursor={next_page}" if next_page else None
+                params = {}
+    except Exception as e:
+        logger.error(f"[AI_USAGE] OpenAI per-user fetch error: {e}")
+
+    return per_user
 
 
 # --------------------------------------------------------------------------- #
@@ -239,17 +352,34 @@ async def collect_ai_usage(
     openai_data: DailyUsage = {}
     anthropic_data: DailyUsage = {}
 
+    openai_per_user: Dict[str, DailyUsage] = {}
+
     if openai_api_key:
+        # Fetch member list once to reuse for both team-total and per-user calls
+        members_map = await fetch_openai_members(openai_api_key)
+
         raw = await fetch_openai_usage(openai_api_key, openai_org_id, fetch_days)
         openai_data = {k: v for k, v in raw.items() if k >= cutoff}
         logger.info(f"[AI_USAGE] OpenAI: {len(raw)} days fetched, {len(openai_data)} after trim to {days}d")
+
+        raw_per_user = await fetch_openai_usage_per_user(openai_api_key, openai_org_id, fetch_days, members_map)
+        openai_per_user = {
+            email: {k: v for k, v in daily.items() if k >= cutoff}
+            for email, daily in raw_per_user.items()
+        }
+        logger.info(f"[AI_USAGE] OpenAI per-user: {len(openai_per_user)} users with data")
 
     if anthropic_api_key:
         raw = await fetch_anthropic_usage(anthropic_api_key, anthropic_workspace_id, fetch_days)
         anthropic_data = {k: v for k, v in raw.items() if k >= cutoff}
         logger.info(f"[AI_USAGE] Anthropic: {len(raw)} days fetched, {len(anthropic_data)} after trim to {days}d")
 
-    return {"openai": openai_data, "anthropic": anthropic_data}
+    return {
+        "openai": openai_data,
+        "anthropic": anthropic_data,
+        "openai_per_user": openai_per_user,
+        "openai_members_map": members_map,  # {openai_user_id -> openai_email}
+    }
 
 
 # --------------------------------------------------------------------------- #

@@ -2318,6 +2318,7 @@ export default function useDashboard() {
         include_slack: currentAnalysis.config?.include_slack ?? false,
         include_jira: currentAnalysis.config?.include_jira ?? false,
         include_linear: currentAnalysis.config?.include_linear ?? false,
+        include_ai_usage: aiUsageConnected ? (currentAnalysis.config?.include_ai_usage ?? true) : false,
         enable_ai: false,
         auto_refresh_enabled: currentAnalysis.is_auto_refresh === true,
         auto_refresh_interval: currentAnalysis.is_auto_refresh ? (currentAnalysis.auto_refresh_interval || "24h") : null,

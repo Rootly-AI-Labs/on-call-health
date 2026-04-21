@@ -17,6 +17,7 @@ import { TicketingCard } from "@/components/dashboard/TicketingCard"
 import { UserAlertsCard } from "@/components/dashboard/UserAlertsCard"
 import { getRiskScore100FromDailyHealth, getRiskScore100FromMember } from "@/lib/scoring"
 import { AlertsLeaderboard } from "@/components/dashboard/AlertsLeaderboard"
+import { MemberOpenAIUsageCard } from "@/components/dashboard/MemberOpenAIUsageCard"
 
 // OCH risk level helpers
 function getOCHRiskInfo(score: number | undefined | null): { level: string; label: string } {
@@ -280,6 +281,7 @@ interface MemberDetailModalProps {
   currentAnalysis?: any
   timeRange?: number | string
   integrations?: any[]
+  openaiUsageEnabled?: boolean
 }
 
 export function MemberDetailModal({
@@ -289,7 +291,8 @@ export function MemberDetailModal({
   analysisId,
   currentAnalysis,
   integrations = [],
-  timeRange
+  timeRange,
+  openaiUsageEnabled = false
 }: MemberDetailModalProps) {
   const [dailyCommitsData, setDailyCommitsData] = useState<any[]>([]);
   const [loadingCommits, setLoadingCommits] = useState(false);
@@ -355,6 +358,7 @@ export function MemberDetailModal({
           const memberData = members?.find(m => m.user_id && m.user_id === selectedMember.id)
             || members?.find(m => m.user_email && m.user_email === selectedMember.email)
             || members?.find(m => m.user_name && m.user_name === selectedMember.name);
+          const isOpenAIMapped = !!(memberData?.openai_user_id || selectedMember?.openai_user_id);
 
           return (
             <>
@@ -539,6 +543,19 @@ export function MemberDetailModal({
                       order: 7,
                       hasData: (memberData?.jira_tickets?.length || 0) > 0 || (memberData?.linear_issues?.length || 0) > 0,
                       component: <TicketingCard key="ticketing" memberData={memberData} />
+                    },
+                    {
+                      id: 'openaiUsage',
+                      order: 8,
+                      hasData: openaiUsageEnabled && isOpenAIMapped && !!analysisId,
+                      component: (
+                        <MemberOpenAIUsageCard
+                          key="openaiUsage"
+                          email={selectedMember.email}
+                          analysisId={analysisId}
+                          timeRange={timeRange ?? currentAnalysis?.time_range}
+                        />
+                      )
                     }
                   ]
 

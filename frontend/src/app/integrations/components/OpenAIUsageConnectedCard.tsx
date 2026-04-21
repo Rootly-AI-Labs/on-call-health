@@ -9,15 +9,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { CheckCircle, ChevronDown, Loader2, Trash2, Zap } from "lucide-react"
+import { CheckCircle, ChevronDown, Loader2, Trash2, Users, Zap } from "lucide-react"
 
 interface OpenAIUsageConnectedCardProps {
   onTest: () => Promise<void>
   onDisconnect: () => Promise<void>
+  onViewMappings?: () => void
   isLoading: boolean
 }
 
-export function OpenAIUsageConnectedCard({ onTest, onDisconnect, isLoading }: OpenAIUsageConnectedCardProps) {
+export function OpenAIUsageConnectedCard({ onTest, onDisconnect, onViewMappings, isLoading }: OpenAIUsageConnectedCardProps) {
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
 
@@ -78,13 +79,19 @@ export function OpenAIUsageConnectedCard({ onTest, onDisconnect, isLoading }: Op
           <div>We collect daily token consumption and request counts from your OpenAI organization. Usage data is shown on the dashboard after each analysis run.</div>
         </div>
 
-        <div className="flex items-center justify-end pt-4 border-t">
+        <div className="flex items-center justify-between pt-4 border-t">
+          {onViewMappings && (
+            <Button variant="outline" size="sm" onClick={onViewMappings}>
+              <Users className="w-4 h-4 mr-2" />
+              View Mappings
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
             onClick={onDisconnect}
             disabled={isLoading || isTesting}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-auto"
           >
             {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
             Disconnect

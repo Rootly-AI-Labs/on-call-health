@@ -218,7 +218,7 @@ export default function IntegrationsPage() {
   
   // MappingDrawer state (reusable component)
   const [mappingDrawerOpen, setMappingDrawerOpen] = useState(false)
-  const [mappingDrawerPlatform, setMappingDrawerPlatform] = useState<'github' | 'slack' | 'jira'>('github')
+  const [mappingDrawerPlatform, setMappingDrawerPlatform] = useState<'github' | 'slack' | 'jira' | 'linear' | 'openai'>('github')
 
   // Token error modal state
   const [tokenErrorModalOpen, setTokenErrorModalOpen] = useState(false)
