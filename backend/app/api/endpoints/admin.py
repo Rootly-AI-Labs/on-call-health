@@ -193,23 +193,16 @@ async def refresh_demo_analyses(
         logger.info(f"ADMIN: Using demo organization {demo_organization_id}")
 
         # DELETE all existing demo analyses first (clean slate approach)
-        demo_analyses = db.query(Analysis).filter(
-            Analysis.config['is_demo'].as_boolean() == True
-        ).all()
-
-        total_to_delete = len(demo_analyses)
-        for i, analysis in enumerate(demo_analyses, 1):
-            try:
-                logger.info(f"ADMIN: Deleting demo analysis {i}/{total_to_delete} (#{analysis.id} for user #{analysis.user_id})")
-                db.delete(analysis)
-                deleted_count += 1
-            except Exception as e:
-                logger.error(f"ADMIN: Failed to delete demo {i}/{total_to_delete} (#{analysis.id}): {str(e)}")
-                errors.append(f"Failed to delete analysis #{analysis.id}: {str(e)}")
-
-        if deleted_count > 0:
+        try:
+            deleted_count = db.query(Analysis).filter(
+                Analysis.config['is_demo'].as_boolean() == True
+            ).delete(synchronize_session=False)
             db.commit()
-            logger.info(f"ADMIN: Deleted {deleted_count} old demo analyses")
+            logger.info(f"ADMIN: Deleted {deleted_count} demo analyses")
+        except Exception as e:
+            logger.error(f"ADMIN: Failed to bulk delete demo analyses: {str(e)}")
+            db.rollback()
+            errors.append(f"Failed to delete demo analyses: {str(e)}")
 
         # DELETE all UserBurnoutReport records for the demo organization (clean slate)
         # This ensures health check-ins are refreshed with the latest mock data
