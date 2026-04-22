@@ -904,11 +904,19 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     if not member_emails:
         return {}
 
-    # For org-less demo analyses: scope by user_id, skip date filter (mock data has fixed timestamps)
+    is_demo = isinstance(analysis.config, dict) and analysis.config.get('is_demo') is True
+
+    # For org-less demos: scope by user_id, skip date filter (mock data has fixed timestamps)
+    # For org-scoped demos: scope by org_id, skip date filter for the same reason
     if not analysis.organization_id:
         all_surveys = db.query(UserBurnoutReport).filter(
             func.lower(UserBurnoutReport.email).in_(member_emails),
             UserBurnoutReport.user_id == analysis.user_id,
+        ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
+    elif is_demo:
+        all_surveys = db.query(UserBurnoutReport).filter(
+            func.lower(UserBurnoutReport.email).in_(member_emails),
+            UserBurnoutReport.organization_id == analysis.organization_id,
         ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
     else:
         all_surveys = db.query(UserBurnoutReport).filter(

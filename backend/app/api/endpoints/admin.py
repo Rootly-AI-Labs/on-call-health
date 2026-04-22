@@ -192,6 +192,7 @@ async def refresh_demo_analyses(
 
         created_count = 0
         deleted_count = 0
+        unverified_deleted = 0
         reports_deleted = 0
         checkins_loaded = 0
         errors = []
@@ -199,6 +200,24 @@ async def refresh_demo_analyses(
         # Get or create demo organization for health check-ins
         demo_organization_id = _get_or_create_demo_organization(db)
         logger.info(f"ADMIN: Using demo organization {demo_organization_id}")
+
+        # DELETE all analyses belonging to unverified (ghost) users
+        try:
+            unverified_user_ids = [
+                row[0] for row in db.query(User.id).filter(User.is_verified == False).all()
+            ]
+            if unverified_user_ids:
+                unverified_deleted = db.query(Analysis).filter(
+                    Analysis.user_id.in_(unverified_user_ids)
+                ).delete(synchronize_session=False)
+                db.commit()
+                logger.info(f"ADMIN: Deleted {unverified_deleted} analyses from {len(unverified_user_ids)} unverified users")
+            else:
+                logger.info("ADMIN: No unverified users found, skipping cleanup")
+        except Exception as e:
+            logger.error(f"ADMIN: Failed to delete unverified user analyses: {str(e)}")
+            db.rollback()
+            errors.append(f"Failed to delete unverified user analyses: {str(e)}")
 
         # DELETE all existing demo analyses first (clean slate approach)
         try:
@@ -283,6 +302,7 @@ async def refresh_demo_analyses(
         return {
             "status": "success",
             "message": "Demo analyses refreshed successfully",
+            "unverified_analyses_deleted": unverified_deleted,
             "deleted_count": deleted_count,
             "created_count": created_count,
             "reports_deleted": reports_deleted,
