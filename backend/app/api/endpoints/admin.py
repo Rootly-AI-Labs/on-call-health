@@ -193,10 +193,9 @@ async def refresh_demo_analyses(
         logger.info(f"ADMIN: Using demo organization {demo_organization_id}")
 
         # DELETE all existing demo analyses first (clean slate approach)
-        demo_analyses = [
-            a for a in db.query(Analysis).all()
-            if isinstance(a.config, dict) and a.config.get('is_demo') is True
-        ]
+        demo_analyses = db.query(Analysis).filter(
+            Analysis.config['is_demo'].as_boolean() == True
+        ).all()
 
         total_to_delete = len(demo_analyses)
         for i, analysis in enumerate(demo_analyses, 1):
