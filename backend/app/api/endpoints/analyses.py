@@ -895,9 +895,6 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     from datetime import timedelta, datetime
     from collections import defaultdict
     from ...models.user_burnout_report import UserBurnoutReport
-    if not analysis.organization_id:
-        return {}
-
     # Use current time as end date for live survey data (surveys update without re-running analysis)
     analysis_end_date = datetime.now(timezone.utc)
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
@@ -907,12 +904,18 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     if not member_emails:
         return {}
 
-    # Query 2: Bulk fetch all surveys for all members (instead of N queries)
-    all_surveys = db.query(UserBurnoutReport).filter(
-        func.lower(UserBurnoutReport.email).in_(member_emails),
-        UserBurnoutReport.submitted_at >= analysis_start_date,
-        UserBurnoutReport.submitted_at <= analysis_end_date
-    ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
+    # For org-less demo analyses: scope by user_id, skip date filter (mock data has fixed timestamps)
+    if not analysis.organization_id:
+        all_surveys = db.query(UserBurnoutReport).filter(
+            func.lower(UserBurnoutReport.email).in_(member_emails),
+            UserBurnoutReport.user_id == analysis.user_id,
+        ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
+    else:
+        all_surveys = db.query(UserBurnoutReport).filter(
+            func.lower(UserBurnoutReport.email).in_(member_emails),
+            UserBurnoutReport.submitted_at >= analysis_start_date,
+            UserBurnoutReport.submitted_at <= analysis_end_date
+        ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
 
     # Group surveys by email
     surveys_by_email = defaultdict(list)

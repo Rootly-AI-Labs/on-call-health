@@ -198,13 +198,14 @@ async def refresh_demo_analyses(
             if isinstance(a.config, dict) and a.config.get('is_demo') is True
         ]
 
-        for analysis in demo_analyses:
+        total_to_delete = len(demo_analyses)
+        for i, analysis in enumerate(demo_analyses, 1):
             try:
-                logger.info(f"ADMIN: Deleting old demo analysis #{analysis.id} for user #{analysis.user_id}")
+                logger.info(f"ADMIN: Deleting demo analysis {i}/{total_to_delete} (#{analysis.id} for user #{analysis.user_id})")
                 db.delete(analysis)
                 deleted_count += 1
             except Exception as e:
-                logger.error(f"ADMIN: Failed to delete demo #{analysis.id}: {str(e)}")
+                logger.error(f"ADMIN: Failed to delete demo {i}/{total_to_delete} (#{analysis.id}): {str(e)}")
                 errors.append(f"Failed to delete analysis #{analysis.id}: {str(e)}")
 
         if deleted_count > 0:
@@ -268,13 +269,14 @@ async def refresh_demo_analyses(
             db.commit()
             logger.info(f"ADMIN: Created {correlations_created} UserCorrelation records")
 
-        # Create fresh demo analyses for ALL users
-        users = db.query(User).all()
-        logger.info(f"ADMIN: Found {len(users)} total users, creating demos for all")
+        # Create fresh demo analyses only for verified users (those who signed up via OAuth)
+        users = db.query(User).filter(User.is_verified == True).all()
+        total_to_create = len(users)
+        logger.info(f"ADMIN: Found {total_to_create} verified users, creating demos for verified only")
 
-        for user in users:
+        for i, user in enumerate(users, 1):
             try:
-                logger.info(f"ADMIN: Creating demo for user #{user.id} ({user.email})")
+                logger.info(f"ADMIN: Creating demo analysis {i}/{total_to_create} for user #{user.id} ({user.email})")
                 config = original_analysis.get('config', {}).copy()
                 config['is_demo'] = True
                 config['demo_created_at'] = datetime.now().isoformat()
@@ -287,6 +289,7 @@ async def refresh_demo_analyses(
                     platform=original_analysis.get('platform', 'rootly'),
                     time_range=original_analysis.get('time_range', 30),
                     status="completed",
+                    is_saved=True,
                     config=config,
                     results=new_results,
                     error_message=None,
@@ -295,7 +298,7 @@ async def refresh_demo_analyses(
                 db.add(new_analysis)
                 db.flush()
                 created_count += 1
-                logger.info(f"ADMIN: Successfully created demo for user #{user.id}")
+                logger.info(f"ADMIN: Successfully created demo {i}/{total_to_create} for user #{user.id}")
 
                 # Load health check-ins for the user
                 try:
@@ -307,7 +310,7 @@ async def refresh_demo_analyses(
                     logger.warning(f"ADMIN: Failed to load health check-ins for user #{user.id}: {e}")
 
             except Exception as e:
-                logger.error(f"ADMIN: Failed to create demo for user #{user.id}: {str(e)}")
+                logger.error(f"ADMIN: Failed to create demo {i}/{total_to_create} for user #{user.id}: {str(e)}")
                 errors.append(f"Failed to create demo for user #{user.id} ({user.email}): {str(e)}")
                 db.rollback()
 
