@@ -38,4 +38,4 @@ Your team's On-Call Health administrator can explain which integrations are enab
 
 Introduce On-Call Health as a way to support the people doing incident response. Share this guide with every responder included in analyses before using individual results or enabling MCP access. Explain who can view the information, how it will inform workload planning, and whom responders can contact with questions or requests for support.
 
-Slack check-in messages link to this guide. Share it directly with responders who do not receive those messages so everyone included has the same information.
+Share a link to this guide in your team's Slack announcement, onboarding material, or check-in message. Include responders who do not receive check-ins so everyone whose workload is analyzed has the same information.
