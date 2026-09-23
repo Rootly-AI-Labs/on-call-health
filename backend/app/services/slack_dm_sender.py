@@ -8,10 +8,9 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 RESPONDER_NOTICE = (
-    "To help prevent overload, your workload scores and check-ins are visible "
-    "to authorized viewers. "
+    "To learn more about data collection and how it's used, see "
     "<https://github.com/Rootly-AI-Labs/On-Call-Health/blob/main/"
-    "RESPONDER_WORKLOAD_NOTICE.md|Learn more>."
+    "RESPONDER_WORKLOAD_NOTICE.md|our guide>."
 )
 
 
