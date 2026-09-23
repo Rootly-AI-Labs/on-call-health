@@ -2125,6 +2125,19 @@ function DashboardContent() {
               )
             })()}
 
+            <p className="text-xs leading-relaxed text-neutral-500">
+              Best practice: Before your first analysis, introduce On-Call Health to your team and explain how workload insights help prevent overload. Share the{" "}
+              <a
+                href="https://github.com/Rootly-AI-Labs/On-Call-Health/blob/main/RESPONDER_WORKLOAD_NOTICE.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-neutral-700"
+              >
+                team guide
+              </a>{" "}
+              so everyone understands what information is used and who can see it.
+            </p>
+
             <div className="flex justify-end space-x-2 pt-4">
               <Button variant="outline" onClick={() => setShowTimeRangeDialog(false)}>
                 Cancel
