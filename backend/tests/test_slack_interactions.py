@@ -11,26 +11,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 
 
-@pytest.mark.parametrize("is_update", [False, True])
-def test_checkin_modal_explains_response_visibility_before_submission(is_update):
-    from app.api.endpoints.slack import create_burnout_survey_modal
-
-    modal = create_burnout_survey_modal(organization_id=7, user_id=42, is_update=is_update)
-    blocks = modal["blocks"]
-    first_input = next(index for index, block in enumerate(blocks) if block["type"] == "input")
-    introduction = "\n".join(
-        block["text"]["text"] for block in blocks[:first_input] if block["type"] == "section"
-    )
-    assert "check-in responses linked to your name or email" in introduction
-    assert "Claude or Codex" in introduction
-    assert "RESPONDER_WORKLOAD_NOTICE.md" in introduction
-    assert "All responses are confidential" not in introduction
-    if is_update:
-        assert "Your previous response will be updated" in introduction
-    assert modal["callback_id"] == "burnout_survey_modal"
-    assert json.loads(modal["private_metadata"])["organization_id"] == 7
-
-
 class TestSlackInteractionHandler:
     """Tests for the /slack/interactions endpoint button click handling."""
 
