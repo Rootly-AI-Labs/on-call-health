@@ -5,6 +5,8 @@ import logging
 import httpx
 from typing import Optional
 
+from .responder_notice import RESPONDER_NOTICE
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,7 +25,7 @@ class SlackDMSender:
         user_email: Optional[str] = None
     ):
         """
-        Send a DM to a user with a button to open the burnout survey.
+        Send a DM with the responder notice and a button to open the check-in.
 
         Args:
             slack_token: Decrypted Slack bot token (ready to use)
@@ -42,7 +44,8 @@ class SlackDMSender:
                 message = (
                     "Hi there!\n\n"
                     "Quick check-in: How are you feeling today?\n\n"
-                    "Your feedback helps us support team well-being and workload balance."
+                    "Your feedback helps your team plan coverage and make room "
+                    "for recovery after busy shifts."
                 )
 
             # Validate required parameters
@@ -62,6 +65,13 @@ class SlackDMSender:
                     "text": {
                         "type": "mrkdwn",
                         "text": message
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": RESPONDER_NOTICE
                     }
                 },
                 {
@@ -103,7 +113,10 @@ class SlackDMSender:
                     json={
                         "channel": channel_id,
                         "blocks": blocks,
-                        "text": "On-call check-in"  # Fallback text
+                        # Include the notice for notifications and screen readers.
+                        "text": f"On-call check-in\n\n{message}\n\n{RESPONDER_NOTICE}",
+                        "unfurl_links": False,
+                        "unfurl_media": False
                     }
                 )
                 msg_data = msg_response.json()

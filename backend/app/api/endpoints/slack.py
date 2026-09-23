@@ -23,6 +23,7 @@ from ...auth.dependencies import get_current_user
 from ...auth.integration_oauth import slack_integration_oauth
 from ...core.config import settings
 from ...services.notification_service import NotificationService
+from ...services.responder_notice import RESPONDER_NOTICE
 from ...services.survey_response_service import (
     extract_analysis_member_emails,
     get_utc_day_bounds,
@@ -2080,7 +2081,14 @@ def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id:
     }
 
     modal_title = "Update Check-in" if is_update else "On-Call Health Check-in"
-    intro_text = "*Update your health check-in*\n\nYou already submitted today. Your previous response will be updated." if is_update else "*Quick health check-in*\n\nYour responses help improve team health and workload distribution. All responses are confidential."
+    intro_text = (
+        "*Update your check-in*\n\n"
+        "You already submitted today. Your previous response will be updated."
+        if is_update else
+        "*Quick check-in*\n\n"
+        "Your perspective helps your team plan coverage and make room for "
+        "recovery after busy shifts."
+    )
 
     return {
         "type": "modal",
@@ -2107,6 +2115,13 @@ def create_burnout_survey_modal(organization_id: int, user_id: int, analysis_id:
                 "text": {
                     "type": "mrkdwn",
                     "text": intro_text
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": RESPONDER_NOTICE
                 }
             },
             {
