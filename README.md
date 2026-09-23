@@ -40,8 +40,6 @@ The OCH score measures workload, not well-being directly. People respond differe
 
 * **Self-Reported Wellbeing**: Feeling and workload scores, stress factors, personal circumstances (Slack surveys)
 
-Read [Supporting sustainable on-call](RESPONDER_WORKLOAD_NOTICE.md) for a responder-facing explanation of how workload information supports better coverage, who can see individual results, and how the Rootly MCP integration can make those results available through assistants such as Claude or Codex. Share this guide with responders when introducing On-Call Health.
-
 ## Integrations ⚒️
 * [Rootly](https://rootly.com/): For incident management and on-call data
 * [PagerDuty](https://www.pagerduty.com/): For incident management and on-call data
