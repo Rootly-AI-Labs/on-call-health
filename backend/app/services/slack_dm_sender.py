@@ -7,6 +7,13 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+RESPONDER_NOTICE = (
+    "To help prevent overload, your workload scores and check-ins are visible "
+    "to authorized viewers. "
+    "<https://github.com/Rootly-AI-Labs/On-Call-Health/blob/main/"
+    "RESPONDER_WORKLOAD_NOTICE.md|Learn more>."
+)
+
 
 class SlackDMSender:
     """
@@ -65,6 +72,10 @@ class SlackDMSender:
                     }
                 },
                 {
+                    "type": "context",
+                    "elements": [{"type": "mrkdwn", "text": RESPONDER_NOTICE}]
+                },
+                {
                     "type": "actions",
                     "elements": [
                         {
@@ -103,7 +114,9 @@ class SlackDMSender:
                     json={
                         "channel": channel_id,
                         "blocks": blocks,
-                        "text": "On-call check-in"  # Fallback text
+                        "text": f"On-call check-in\n\n{message}\n\n{RESPONDER_NOTICE}",
+                        "unfurl_links": False,
+                        "unfurl_media": False
                     }
                 )
                 msg_data = msg_response.json()
