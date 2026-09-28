@@ -1782,7 +1782,6 @@ class UnifiedBurnoutAnalyzer:
                 'team_coordination': 0,
                 'escalation_frequency': 0,
                 'after_hours_work': 0,
-                'meeting_load': 0,
                 'oncall_burden': 0
             }
             
