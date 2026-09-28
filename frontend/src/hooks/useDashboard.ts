@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { getValidToken, clearAuthData, redirectToLogin } from "@/lib/auth"
+import { getVisibleOCHFactors } from "@/lib/riskFactorUtils"
 import {
   getRiskColor as getRiskFillColor,
   getRiskLevelKey,
@@ -2559,8 +2560,7 @@ export default function useDashboard() {
 
     for (const member of allActiveMembers) {
       const factors = (member as any)?.och_factors?.all;
-      if (!Array.isArray(factors)) continue;
-      for (const f of factors) {
+      for (const f of getVisibleOCHFactors<any>(factors)) {
         if (!f?.name || typeof f.percentage !== 'number') continue;
         if (!factorTotals[f.name]) factorTotals[f.name] = { sum: 0, count: 0, affected: 0 };
         factorTotals[f.name].sum += f.percentage;

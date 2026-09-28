@@ -18,6 +18,7 @@ import { UserAlertsCard } from "@/components/dashboard/UserAlertsCard"
 import { getRiskScore100FromDailyHealth, getRiskScore100FromMember } from "@/lib/scoring"
 import { AlertsLeaderboard } from "@/components/dashboard/AlertsLeaderboard"
 import { MemberOpenAIUsageCard } from "@/components/dashboard/MemberOpenAIUsageCard"
+import { getVisibleOCHFactors } from "@/lib/riskFactorUtils"
 
 // OCH risk level helpers
 function getOCHRiskInfo(score: number | undefined | null): { level: string; label: string } {
@@ -508,7 +509,7 @@ export function MemberDetailModal({
                     {
                       id: 'riskFactors',
                       order: 3,
-                      hasData: (memberData?.och_factors?.all?.length || 0) > 0,
+                      hasData: getVisibleOCHFactors(memberData?.och_factors?.all).length > 0,
                       component: (
                         <UserRiskFactorsCard key="riskFactors" selectedMember={memberData || selectedMember} />
                       )
