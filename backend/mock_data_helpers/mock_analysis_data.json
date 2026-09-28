@@ -2441,7 +2441,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 27 total incidents (35.0 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (8.0 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (7.5 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Critical production incident frequency: 19 sev2, 5 sev3, 2 unknown, 1 sev1 (1.2 points total for 27 incidents)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
@@ -2482,13 +2481,6 @@
                   "name": "Severity-weighted workload",
                   "points": 8.0,
                   "percentage": 4.5,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 7.5,
-                  "percentage": 4.2,
                   "dimension": "work_related"
                 },
                 {
@@ -2533,13 +2525,6 @@
                   "name": "Severity-weighted workload",
                   "points": 8.0,
                   "percentage": 4.5,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 7.5,
-                  "percentage": 4.2,
                   "dimension": "work_related"
                 },
                 {
@@ -3093,7 +3078,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 28 total incidents (35.0 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (8.0 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (7.5 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "och_factors": {
@@ -3134,13 +3118,6 @@
                   "points": 8.0,
                   "percentage": 6.0,
                   "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 7.5,
-                  "percentage": 5.6,
-                  "dimension": "work_related"
                 }
               ],
               "all": [
@@ -3177,13 +3154,6 @@
                   "name": "Severity-weighted workload",
                   "points": 8.0,
                   "percentage": 6.0,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 7.5,
-                  "percentage": 5.6,
                   "dimension": "work_related"
                 }
               ]
@@ -3657,7 +3627,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 11 total incidents (35.0 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (5.7 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (5.4 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "och_factors": {
@@ -3691,13 +3660,6 @@
                   "points": 5.7,
                   "percentage": 5.3,
                   "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 5.4,
-                  "percentage": 4.9,
-                  "dimension": "work_related"
                 }
               ],
               "all": [
@@ -3727,13 +3689,6 @@
                   "name": "Severity-weighted workload",
                   "points": 5.7,
                   "percentage": 5.3,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 5.4,
-                  "percentage": 4.9,
                   "dimension": "work_related"
                 }
               ]
@@ -3993,7 +3948,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 5 total incidents (32.1 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (3.2 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (3.0 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "och_factors": {
@@ -4034,13 +3988,6 @@
                   "points": 3.2,
                   "percentage": 1.9,
                   "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 3.0,
-                  "percentage": 1.8,
-                  "dimension": "work_related"
                 }
               ],
               "all": [
@@ -4077,13 +4024,6 @@
                   "name": "Severity-weighted workload",
                   "points": 3.2,
                   "percentage": 1.9,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 3.0,
-                  "percentage": 1.8,
                   "dimension": "work_related"
                 }
               ]
@@ -4551,7 +4491,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 3 total incidents (29.7 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (2.1 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (1.9 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Critical production incident frequency: 1 sev1, 2 sev4 (1.2 points total for 3 incidents)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
@@ -4592,13 +4531,6 @@
                   "name": "Severity-weighted workload",
                   "points": 2.1,
                   "percentage": 1.3,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 1.9,
-                  "percentage": 1.2,
                   "dimension": "work_related"
                 },
                 {
@@ -4643,13 +4575,6 @@
                   "name": "Severity-weighted workload",
                   "points": 2.1,
                   "percentage": 1.3,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 1.9,
-                  "percentage": 1.2,
                   "dimension": "work_related"
                 },
                 {
@@ -5013,7 +4938,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 6 total incidents (35.0 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (3.8 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (3.5 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Critical production incident frequency: 2 sev0, 4 unknown (2.4 points total for 6 incidents)"
             ],
             "och_factors": {
@@ -5046,13 +4970,6 @@
                   "name": "Severity-weighted workload",
                   "points": 3.8,
                   "percentage": 3.6,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 3.5,
-                  "percentage": 3.4,
                   "dimension": "work_related"
                 },
                 {
@@ -5090,13 +5007,6 @@
                   "name": "Severity-weighted workload",
                   "points": 3.8,
                   "percentage": 3.6,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 3.5,
-                  "percentage": 3.4,
                   "dimension": "work_related"
                 },
                 {
@@ -5250,7 +5160,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 6 total incidents (35.0 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (3.8 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (3.5 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Critical production incident frequency: 5 unknown, 1 sev0 (1.2 points total for 6 incidents)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
@@ -5284,13 +5193,6 @@
                   "name": "Severity-weighted workload",
                   "points": 3.8,
                   "percentage": 3.6,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 3.5,
-                  "percentage": 3.4,
                   "dimension": "work_related"
                 },
                 {
@@ -5328,13 +5230,6 @@
                   "name": "Severity-weighted workload",
                   "points": 3.8,
                   "percentage": 3.6,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 3.5,
-                  "percentage": 3.4,
                   "dimension": "work_related"
                 },
                 {
@@ -5597,7 +5492,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 3 total incidents (28.5 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (2.1 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (1.9 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "och_factors": {
@@ -5638,13 +5532,6 @@
                   "points": 2.1,
                   "percentage": 1.3,
                   "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 1.9,
-                  "percentage": 1.2,
-                  "dimension": "work_related"
                 }
               ],
               "all": [
@@ -5681,13 +5568,6 @@
                   "name": "Severity-weighted workload",
                   "points": 2.1,
                   "percentage": 1.3,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 1.9,
-                  "percentage": 1.2,
                   "dimension": "work_related"
                 }
               ]
@@ -6086,7 +5966,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 1 total incidents (4.9 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (0.7 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (0.7 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "och_factors": {
@@ -6127,13 +6006,6 @@
                   "points": 0.7,
                   "percentage": 0.8,
                   "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 0.7,
-                  "percentage": 0.7,
-                  "dimension": "work_related"
                 }
               ],
               "all": [
@@ -6170,13 +6042,6 @@
                   "name": "Severity-weighted workload",
                   "points": 0.7,
                   "percentage": 0.8,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 0.7,
-                  "percentage": 0.7,
                   "dimension": "work_related"
                 }
               ]
@@ -6432,7 +6297,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 4 total incidents (30.9 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (2.6 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (2.5 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "och_factors": {
@@ -6466,13 +6330,6 @@
                   "points": 2.6,
                   "percentage": 2.8,
                   "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 2.5,
-                  "percentage": 2.6,
-                  "dimension": "work_related"
                 }
               ],
               "all": [
@@ -6502,13 +6359,6 @@
                   "name": "Severity-weighted workload",
                   "points": 2.6,
                   "percentage": 2.8,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 2.5,
-                  "percentage": 2.6,
                   "dimension": "work_related"
                 }
               ]
@@ -6655,7 +6505,6 @@
               "WORK-RELATED:",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 On-call responsibility load: 2 total incidents (9.1 points)",
               "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident severity-weighted workload (1.5 points)",
-              "\u00c3\u00a2\u00e2\u201a\u00ac\u00c2\u00a2 Incident response meeting load (1.4 points)",
               "Personal stress significantly higher than work stress - focus on recovery and boundaries"
             ],
             "och_factors": {
@@ -6689,13 +6538,6 @@
                   "points": 1.5,
                   "percentage": 3.8,
                   "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 1.4,
-                  "percentage": 3.6,
-                  "dimension": "work_related"
                 }
               ],
               "all": [
@@ -6725,13 +6567,6 @@
                   "name": "Severity-weighted workload",
                   "points": 1.5,
                   "percentage": 3.8,
-                  "dimension": "work_related"
-                },
-                {
-                  "key": "meeting_load",
-                  "name": "Meeting load",
-                  "points": 1.4,
-                  "percentage": 3.6,
                   "dimension": "work_related"
                 }
               ]
