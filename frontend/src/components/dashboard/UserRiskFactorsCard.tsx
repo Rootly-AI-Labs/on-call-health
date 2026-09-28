@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2 } from "lucide-react"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { FACTOR_DESCRIPTIONS } from "./TeamRiskFactorsCard"
+import { getVisibleOCHFactors } from "@/lib/riskFactorUtils"
 
 interface OCHFactor {
   key: string
@@ -27,7 +28,7 @@ export function UserRiskFactorsCard({
   loading = false
 }: UserRiskFactorsCardProps): React.ReactElement {
   const memberName = selectedMember?.user_name || 'Team Member'
-  const factors = selectedMember?.och_factors?.all || []
+  const factors = getVisibleOCHFactors(selectedMember?.och_factors?.all)
 
   if (loading) {
     return (
