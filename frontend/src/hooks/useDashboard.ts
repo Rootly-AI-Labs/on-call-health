@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { getValidToken, clearAuthData, redirectToLogin } from "@/lib/auth"
+import { getVisibleOCHFactors } from "@/lib/riskFactorUtils"
 import {
   getRiskColor as getRiskFillColor,
   getRiskLevelKey,
@@ -1394,7 +1395,7 @@ export default function useDashboard() {
 
       // Load both Rootly, PagerDuty, GitHub, Slack, and Jira integrations
 
-      let rootlyResponse, pagerdutyResponse, githubResponse, slackResponse, jiraResponse, linearResponse
+      let rootlyResponse, pagerdutyResponse, githubResponse, slackResponse, jiraResponse, linearResponse, aiUsageResponse
       try {
         const settled = await Promise.allSettled([
           fetch(`${API_BASE}/rootly/integrations`, {
@@ -1414,6 +1415,9 @@ export default function useDashboard() {
           }),
           fetch(`${API_BASE}/integrations/linear/status`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
+          }),
+          fetch(`${API_BASE}/integrations/ai-usage/status`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
           })
         ])
         rootlyResponse = settled[0].status === 'fulfilled' ? settled[0].value : null
@@ -1422,6 +1426,7 @@ export default function useDashboard() {
         slackResponse = settled[3].status === 'fulfilled' ? settled[3].value : null
         jiraResponse = settled[4].status === 'fulfilled' ? settled[4].value : null
         linearResponse = settled[5].status === 'fulfilled' ? settled[5].value : null
+        aiUsageResponse = settled[6]?.status === 'fulfilled' ? settled[6].value : null
       } catch (networkError) {
         throw new Error('Cannot connect to backend server. Please check if the backend is running and try again.')
       }
@@ -1432,6 +1437,7 @@ export default function useDashboard() {
       const slackData = slackResponse?.ok ? await slackResponse.json() : { connected: false, integration: null }
       const jiraData = jiraResponse?.ok ? await jiraResponse.json() : { connected: false, integration: null }
       const linearData = linearResponse?.ok ? await linearResponse.json() : { connected: false, integration: null }
+      const aiUsageData = aiUsageResponse?.ok ? await aiUsageResponse.json() : { connected: false, openai_enabled: false, anthropic_enabled: false }
 
 
       // Set GitHub, Slack, and Jira integration states
@@ -1458,6 +1464,11 @@ export default function useDashboard() {
       } else {
         setLinearIntegration(null)
       }
+
+      console.log("[useDashboard] aiUsageData from API:", aiUsageData)
+      setAiUsageConnected(aiUsageData.connected ?? false)
+      setOpenaiUsageEnabled(aiUsageData.openai_enabled ?? false)
+      setAnthropicUsageEnabled(aiUsageData.anthropic_enabled ?? false)
 
       // Cache GitHub, Slack, Jira, and Linear integration status separately
       localStorage.setItem('github_integration', JSON.stringify(githubData))
@@ -1662,6 +1673,9 @@ export default function useDashboard() {
   const [isCustomRange, setIsCustomRange] = useState(false)
   const [dialogSelectedIntegration, setDialogSelectedIntegration] = useState<string>("")
   const [noIntegrationsFound, setNoIntegrationsFound] = useState(false)
+  const [availableTeams, setAvailableTeams] = useState<{id: string; name: string}[]>([])
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("")  // "" = whole org
+  const [loadingTeams, setLoadingTeams] = useState(false)
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
   const [autoRefreshInterval, setAutoRefreshInterval] = useState("24h")
   
@@ -1674,6 +1688,10 @@ export default function useDashboard() {
   const [includeSlack, setIncludeSlack] = useState(true)
   const [includeJira, setIncludeJira] = useState(true)
   const [includeLinear, setIncludeLinear] = useState(true)
+  const [includeAIUsage, setIncludeAIUsage] = useState(true)
+  const [aiUsageConnected, setAiUsageConnected] = useState(false)
+  const [openaiUsageEnabled, setOpenaiUsageEnabled] = useState(false)
+  const [anthropicUsageEnabled, setAnthropicUsageEnabled] = useState(false)
   const [enableAI, setEnableAI] = useState(false)
   const [llmConfig, setLlmConfig] = useState<{has_token: boolean, provider?: string} | null>(null)
   const [isLoadingGitHubSlack, setIsLoadingGitHubSlack] = useState(false)
@@ -1723,6 +1741,26 @@ export default function useDashboard() {
       if (isNetworkError) {
         toast.error("Cannot connect to backend")
       }
+    }
+  }
+
+  const fetchTeamsForIntegration = async (integrationId: string) => {
+    setLoadingTeams(true)
+    setAvailableTeams([])
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      if (!authToken) return
+      const response = await fetch(`${API_BASE}/rootly/integrations/${integrationId}/teams`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableTeams(data.teams || [])
+      }
+    } catch (e) {
+      console.warn('Could not fetch PagerDuty teams:', e)
+    } finally {
+      setLoadingTeams(false)
     }
   }
 
@@ -1822,7 +1860,16 @@ export default function useDashboard() {
 
     // Set the dialog integration to the currently selected one by default
     setDialogSelectedIntegration(integrationToUse)
+    setSelectedTeamId("")  // reset team selection on each dialog open
     setShowTimeRangeDialog(true)
+
+    // Fetch teams for PagerDuty integrations
+    const chosenIntegration = currentIntegrations.find(i => i.id.toString() === integrationToUse)
+    if (chosenIntegration?.platform === "pagerduty") {
+      fetchTeamsForIntegration(integrationToUse)
+    } else {
+      setAvailableTeams([])
+    }
 
     // Refresh permissions in background after modal opens
     // Modal will show loading state until permissions are loaded
@@ -1959,7 +2006,7 @@ export default function useDashboard() {
         }
       }
 
-      const requestData = {
+      const requestData: Record<string, any> = {
         integration_id: integrationId,
         time_range: parseInt(selectedTimeRange),
         include_weekends: true,
@@ -1967,11 +2014,20 @@ export default function useDashboard() {
         include_slack: slackIntegration ? includeSlack : false,
         include_jira: jiraIntegration ? includeJira : false,
         include_linear: linearIntegration ? includeLinear : false,
+        include_ai_usage: aiUsageConnected ? includeAIUsage : false,
         enable_ai: enableAI,  // User can toggle, uses Railway token when enabled
         auto_refresh_enabled: autoRefreshEnabled,
         auto_refresh_interval: autoRefreshEnabled ? autoRefreshInterval : null,
       }
-      
+      // Pass team scope for PagerDuty (empty string = whole org)
+      if (selectedTeamId) {
+        requestData.pagerduty_team_id = selectedTeamId
+      }
+      console.log("[useDashboard] runAnalysis payload:", {
+        include_ai_usage: requestData.include_ai_usage,
+        aiUsageConnected,
+        includeAIUsage,
+      })
 
       // Start the analysis
       let response
@@ -2126,11 +2182,17 @@ export default function useDashboard() {
             analysisData = await pollResponse.json()
             
             if (analysisData.status === 'completed') {
-              
+              console.log(
+                "[useDashboard] Analysis completed — analysis_data keys:", Object.keys(analysisData.analysis_data ?? {}),
+                "| metadata keys:", Object.keys(analysisData.analysis_data?.metadata ?? {}),
+                "| ai_usage days:", Object.keys(analysisData.analysis_data?.metadata?.ai_usage ?? {}).length,
+                "| ai_usage sample:", Object.keys(analysisData.analysis_data?.metadata?.ai_usage ?? {}).slice(0, 3),
+              )
+
               // Set progress to 95% first, then jump to 100% right before showing data
               setTargetProgress(95)
               setAnalysisStage("complete")
-              
+
               // Wait for progress to reach 95%, then show 100% briefly before showing data
               setTimeout(() => {
                 setTargetProgress(100)
@@ -2293,6 +2355,7 @@ export default function useDashboard() {
         include_slack: currentAnalysis.config?.include_slack ?? false,
         include_jira: currentAnalysis.config?.include_jira ?? false,
         include_linear: currentAnalysis.config?.include_linear ?? false,
+        include_ai_usage: aiUsageConnected ? (currentAnalysis.config?.include_ai_usage ?? true) : false,
         enable_ai: false,
         auto_refresh_enabled: currentAnalysis.is_auto_refresh === true,
         auto_refresh_interval: currentAnalysis.is_auto_refresh ? (currentAnalysis.auto_refresh_interval || "24h") : null,
@@ -2497,8 +2560,7 @@ export default function useDashboard() {
 
     for (const member of allActiveMembers) {
       const factors = (member as any)?.och_factors?.all;
-      if (!Array.isArray(factors)) continue;
-      for (const f of factors) {
+      for (const f of getVisibleOCHFactors<any>(factors)) {
         if (!f?.name || typeof f.percentage !== 'number') continue;
         if (!factorTotals[f.name]) factorTotals[f.name] = { sum: 0, count: 0, affected: 0 };
         factorTotals[f.name].sum += f.percentage;
@@ -2620,6 +2682,11 @@ return {
   setIncludeJira,
   includeLinear,
   setIncludeLinear,
+  includeAIUsage,
+  setIncludeAIUsage,
+  aiUsageConnected,
+  openaiUsageEnabled,
+  anthropicUsageEnabled,
   enableAI,
   setEnableAI,
   llmConfig,
@@ -2674,6 +2741,10 @@ return {
   setDialogSelectedIntegration,
   noIntegrationsFound,
   setNoIntegrationsFound,
+  availableTeams,
+  selectedTeamId,
+  setSelectedTeamId,
+  loadingTeams,
   autoRefreshEnabled,
   setAutoRefreshEnabled,
   autoRefreshInterval,

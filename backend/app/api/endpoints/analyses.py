@@ -104,6 +104,7 @@ class RunAnalysisRequest(BaseModel):
     include_slack: bool = False
     include_jira: bool = False
     include_linear: bool = False
+    include_ai_usage: bool = True
     enable_ai: bool = False
 
 
@@ -373,7 +374,8 @@ async def run_burnout_analysis(
                 "include_jira": request.include_jira,
                 "include_linear": request.include_linear,
                 "permission_warnings": permission_warnings,
-                "organization_name": integration.organization_name if hasattr(integration, 'organization_name') else integration.name
+                "organization_name": integration.organization_name if hasattr(integration, 'organization_name') else integration.name,
+                "pagerduty_team_id": getattr(request, 'pagerduty_team_id', None),
             }
         )
         db.add(analysis)
@@ -414,7 +416,9 @@ async def run_burnout_analysis(
                 include_jira=request.include_jira,
                 include_linear=request.include_linear,
                 user_id=current_user.id,
-                enable_ai=request.enable_ai
+                enable_ai=request.enable_ai,
+                pagerduty_team_id=getattr(request, 'pagerduty_team_id', None),
+                include_ai_usage=request.include_ai_usage
             )
             logger.info(f"ENDPOINT: Successfully added background task for analysis {analysis.id}")
         except Exception as e:
@@ -893,9 +897,6 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     from datetime import timedelta, datetime
     from collections import defaultdict
     from ...models.user_burnout_report import UserBurnoutReport
-    if not analysis.organization_id:
-        return {}
-
     # Use current time as end date for live survey data (surveys update without re-running analysis)
     analysis_end_date = datetime.now(timezone.utc)
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
@@ -905,12 +906,26 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     if not member_emails:
         return {}
 
-    # Query 2: Bulk fetch all surveys for all members (instead of N queries)
-    all_surveys = db.query(UserBurnoutReport).filter(
-        func.lower(UserBurnoutReport.email).in_(member_emails),
-        UserBurnoutReport.submitted_at >= analysis_start_date,
-        UserBurnoutReport.submitted_at <= analysis_end_date
-    ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
+    is_demo = isinstance(analysis.config, dict) and analysis.config.get('is_demo') is True
+
+    # For org-less demos: scope by user_id, skip date filter (mock data has fixed timestamps)
+    # For org-scoped demos: scope by org_id, skip date filter for the same reason
+    if not analysis.organization_id:
+        all_surveys = db.query(UserBurnoutReport).filter(
+            func.lower(UserBurnoutReport.email).in_(member_emails),
+            UserBurnoutReport.user_id == analysis.user_id,
+        ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
+    elif is_demo:
+        all_surveys = db.query(UserBurnoutReport).filter(
+            func.lower(UserBurnoutReport.email).in_(member_emails),
+            UserBurnoutReport.organization_id == analysis.organization_id,
+        ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
+    else:
+        all_surveys = db.query(UserBurnoutReport).filter(
+            func.lower(UserBurnoutReport.email).in_(member_emails),
+            UserBurnoutReport.submitted_at >= analysis_start_date,
+            UserBurnoutReport.submitted_at <= analysis_end_date
+        ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
 
     # Group surveys by email
     surveys_by_email = defaultdict(list)
@@ -975,50 +990,52 @@ async def get_analysis_by_identifier(  # noqa: C901
     db: Session = Depends(get_db)
 ):
     """Get a specific analysis result by UUID or integer ID."""
-    if not current_user.organization_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User must be part of an organization to view analyses"
-        )
-
     analysis = None
-    
+
+    # Build org-scoped or user-scoped filter depending on account type
+    if current_user.organization_id:
+        def _scope(q):
+            return q.filter(
+                Analysis.organization_id == current_user.organization_id,
+                Analysis.organization_id.isnot(None)
+            )
+    else:
+        def _scope(q):
+            return q.filter(
+                Analysis.user_id == current_user.id,
+                Analysis.organization_id.is_(None)
+            )
+
     # Try UUID first if it looks like a UUID
     if is_uuid(analysis_identifier):
         try:
-            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-            analysis = db.query(Analysis).options(defer(Analysis.results)).filter(
-                Analysis.uuid == analysis_identifier,
-                Analysis.organization_id == current_user.organization_id,
-                Analysis.organization_id.isnot(None)
+            analysis = _scope(
+                db.query(Analysis).options(defer(Analysis.results)).filter(
+                    Analysis.uuid == analysis_identifier
+                )
             ).first()
         except Exception:
             # UUID column might not exist yet, fall back to integer
             pass
-    
+
     # If not found by UUID or not a UUID, try integer ID
     if not analysis:
         try:
             analysis_id = int(analysis_identifier)
-            # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-            analysis = db.query(Analysis).options(defer(Analysis.results)).filter(
-                Analysis.id == analysis_id,
-                Analysis.organization_id == current_user.organization_id,
-                Analysis.organization_id.isnot(None)
+            analysis = _scope(
+                db.query(Analysis).options(defer(Analysis.results)).filter(
+                    Analysis.id == analysis_id
+                )
             ).first()
         except ValueError:
-            # Not a valid integer either
             pass
 
     if not analysis:
         # Get the most recent analysis for this user to suggest as alternative
-        # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-        most_recent = db.query(Analysis).options(
-            load_only(Analysis.id, Analysis.uuid)
-        ).filter(
-            Analysis.organization_id == current_user.organization_id,
-            Analysis.organization_id.isnot(None),
-            Analysis.status == "completed"
+        most_recent = _scope(
+            db.query(Analysis).options(load_only(Analysis.id, Analysis.uuid)).filter(
+                Analysis.status == "completed"
+            )
         ).order_by(Analysis.created_at.desc()).first()
 
         error_detail = "Analysis not found"
@@ -1443,20 +1460,21 @@ async def get_historical_trends(
     db: Session = Depends(get_db)
 ):
     """Get daily incident trends from the most recent analysis period."""
-    if not current_user.organization_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User must be part of an organization to view analyses"
+    # Find the most recent completed analysis — scoped to org or personal user
+    if current_user.organization_id:
+        query = db.query(Analysis).filter(
+            Analysis.organization_id == current_user.organization_id,
+            Analysis.organization_id.isnot(None),
+            Analysis.status == "completed",
+            Analysis.results.isnot(None)
         )
-
-    # Find the most recent completed analysis
-    # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching
-    query = db.query(Analysis).filter(
-        Analysis.organization_id == current_user.organization_id,
-        Analysis.organization_id.isnot(None),
-        Analysis.status == "completed",
-        Analysis.results.isnot(None)
-    )
+    else:
+        query = db.query(Analysis).filter(
+            Analysis.user_id == current_user.id,
+            Analysis.organization_id.is_(None),
+            Analysis.status == "completed",
+            Analysis.results.isnot(None)
+        )
     
     # Filter by integration if specified
     if integration_id:
@@ -1943,6 +1961,37 @@ async def get_analysis_daily_trends(
             "generated_at": datetime.now().isoformat()
         }
     )
+
+
+@router.get("/users/{user_email}/openai-daily-usage")
+async def get_user_openai_daily_usage(
+    user_email: str,
+    analysis_id: int = Query(..., description="Analysis ID to read usage from"),
+    current_user: User = Depends(get_current_user_flexible),
+    db: Session = Depends(get_db)
+):
+    """
+    Return per-user OpenAI daily usage from a stored analysis.
+    Reads metadata.openai_usage_per_user[email] from the analysis result.
+    Returns null if the user has no OpenAI mapping or no data for this period.
+    """
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id,
+        Analysis.user_id == current_user.id,
+    ).first()
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    metadata = (analysis.results or {}).get("metadata", {})
+    per_user = metadata.get("openai_usage_per_user", {})
+
+    user_data = per_user.get(user_email.lower()) or per_user.get(user_email)
+
+    if not user_data:
+        return {"has_data": False, "usage": {}}
+
+    return {"has_data": True, "usage": user_data}
 
 
 @router.get("/users/{user_email}/github-daily-commits")
@@ -2915,6 +2964,44 @@ async def get_member_daily_health(
     }
 
 
+def _persist_analysis_result(
+    analysis_id: int,
+    *,
+    status: str,
+    results=None,
+    error_message=None,
+) -> bool:
+    """Persist a terminal analysis state using a FRESH database session.
+
+    The burnout analysis runs for up to 15 minutes and spends most of that
+    time awaiting external APIs, not touching the DB. The connection the task
+    checked out at the start can be reaped server-side during that window (an
+    idle-in-transaction connection is closed after 60s by Postgres), so reusing
+    it to write the final status would raise and leave the analysis stuck in
+    "running". Writing through a brand-new session guarantees a healthy
+    connection (pool_pre_ping validates it on checkout) so the status is always
+    recorded. Returns True if the analysis row was found and updated.
+    """
+    from datetime import datetime
+    from ...models import SessionLocal
+
+    result_db = SessionLocal()
+    try:
+        analysis = result_db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            return False
+        analysis.status = status
+        if results is not None:
+            analysis.results = results
+        if error_message is not None:
+            analysis.error_message = error_message
+        analysis.completed_at = datetime.now()
+        result_db.commit()
+        return True
+    finally:
+        result_db.close()
+
+
 async def run_analysis_task(
     analysis_id: int,
     analysis_uuid: str,
@@ -2929,7 +3016,9 @@ async def run_analysis_task(
     include_jira: bool = False,
     include_linear: bool = False,
     user_id: int = None,
-    enable_ai: bool = False
+    enable_ai: bool = False,
+    pagerduty_team_id: str = None,
+    include_ai_usage: bool = True
 ):
     """Background task to run the actual burnout analysis."""
     import asyncio
@@ -2972,6 +3061,10 @@ async def run_analysis_task(
             rootly_team_name = getattr(integration_obj, 'team_name', None) if integration_obj else None
             if rootly_team_name:
                 logger.info(f"BACKGROUND_TASK [{node_id}]: Rootly integration {integration_id} has team_name={rootly_team_name!r} - analysis will be team-scoped")
+
+        # PagerDuty team scope
+        if pagerduty_team_id and platform == "pagerduty":
+            logger.info(f"BACKGROUND_TASK [{node_id}]: PagerDuty team scope requested: team_id={pagerduty_team_id!r}")
 
         # Row-level locking prevents duplicate execution across replicas
         try:
@@ -3235,6 +3328,7 @@ async def run_analysis_task(
                                 'slack_user_id': corr.slack_user_id,
                                 'jira_account_id': corr.jira_account_id,
                                 'linear_user_id': corr.linear_user_id,
+                                'openai_user_id': corr.openai_user_id,
                                 'rootly_user_id': corr.rootly_user_id,
                                 'pagerduty_user_id': corr.pagerduty_user_id,
                                 'avatar_url': corr.avatar_url,  # Profile image URL
@@ -3280,6 +3374,7 @@ async def run_analysis_task(
                                 'slack_user_id': corr.slack_user_id,
                                 'jira_account_id': corr.jira_account_id,
                                 'linear_user_id': corr.linear_user_id,
+                                'openai_user_id': corr.openai_user_id,
                                 'rootly_user_id': corr.rootly_user_id,
                                 'pagerduty_user_id': corr.pagerduty_user_id,
                                 'avatar_url': corr.avatar_url,  # Profile image URL
@@ -3312,6 +3407,58 @@ async def run_analysis_task(
             except Exception as team_filter_err:
                 logger.warning(f"BACKGROUND_TASK: Team scope filter failed: {team_filter_err} — keeping all synced users")
 
+        # Filter synced_users to PagerDuty team members when a team is selected.
+        # We fetch team members directly from the PD API so this works even if
+        # the pagerduty_teams DB column hasn't been populated by a re-sync yet.
+        if pagerduty_team_id and platform == "pagerduty" and synced_users:
+            before_count = len(synced_users)
+            try:
+                from ...core.pagerduty_client import PagerDutyAPIClient as _PDClient
+                _pd_client = _PDClient(effective_api_token)
+                team_members = await _pd_client.get_team_members(pagerduty_team_id)
+
+                # Build lookup sets: PD user IDs and emails of team members
+                team_pd_ids: set = set()
+                team_emails: set = set()
+                for m in team_members:
+                    if m.get("id"):
+                        team_pd_ids.add(str(m["id"]))
+                    if m.get("email"):
+                        team_emails.add(m["email"].lower())
+
+                if team_pd_ids or team_emails:
+                    def _user_in_team(u: dict) -> bool:
+                        pd_uid = str(u.get("pagerduty_user_id") or u.get("id") or "")
+                        email = (u.get("email") or "").lower()
+                        return pd_uid in team_pd_ids or email in team_emails
+
+                    synced_users = [u for u in synced_users if _user_in_team(u)]
+                    logger.info(
+                        f"BACKGROUND_TASK: PagerDuty team scope '{pagerduty_team_id}': "
+                        f"{before_count} → {len(synced_users)} synced users "
+                        f"(team has {len(team_members)} members)"
+                    )
+                else:
+                    logger.warning(
+                        f"BACKGROUND_TASK: PagerDuty team '{pagerduty_team_id}' returned "
+                        f"no members — keeping all synced users"
+                    )
+            except Exception as _team_err:
+                logger.warning(
+                    f"BACKGROUND_TASK: Failed to fetch PagerDuty team members: {_team_err} "
+                    f"— keeping all {before_count} synced users"
+                )
+
+        # Release any open read transaction before the long-running analysis
+        # await. All setup reads above run inside an uncommitted transaction;
+        # leaving it open would make this connection idle-in-transaction while
+        # analyze_burnout spends minutes awaiting external APIs, and Postgres
+        # reaps idle-in-transaction connections after 60s. Committing here keeps
+        # the connection merely idle (not reaped) during the await. Terminal
+        # status writes still go through _persist_analysis_result on a fresh
+        # session so a lost connection can never leave the analysis "running".
+        db.commit()
+
         # CRITICAL: Verify user_id hasn't been overwritten before passing to analyzer
         logger.info(f"BACKGROUND_TASK: Creating analyzer with current_user_id={user_id} (should match the logged-in user, NOT a team member ID)")
 
@@ -3328,7 +3475,8 @@ async def run_analysis_task(
             current_user_id=user_id,  # Pass the current user ID for Jira integration lookup
             organization_id=user.organization_id if user else None,  # Pass org_id for GitHub pre-filter scoping
             db=db,  # Reuse DB session to prevent connection pool exhaustion
-            team_name=rootly_team_name  # Team scope for incident filtering
+            team_name=rootly_team_name,  # Team scope for Rootly incident filtering
+            pagerduty_team_id=pagerduty_team_id,  # Team scope for PagerDuty analytics API
         )
         logger.info(f"BACKGROUND_TASK: UnifiedBurnoutAnalyzer initialized - Features: AI={use_ai_analyzer}, GitHub={include_github}, Slack={include_slack}, Jira={include_jira}, Linear={include_linear}, current_user_id={user_id}")
         
@@ -3692,17 +3840,96 @@ async def run_analysis_task(
                 except Exception as alerts_err:
                     logger.warning(f"BACKGROUND_TASK: Failed to attach alert metadata for analysis {analysis_ref}: {alerts_err}")
 
+            # ------------------------------------------------------------------ #
+            #  AI Usage collection (non-blocking — failures silently skipped)    #
+            # ------------------------------------------------------------------ #
+            logger.info(f"[AI_USAGE] include_ai_usage flag={include_ai_usage} for analysis {analysis_ref}")
+            if include_ai_usage:
+                try:
+                    from ...models import AIUsageIntegration
+                    from ...services.ai_usage_collector import collect_ai_usage
+                    from cryptography.fernet import Fernet
+                    import base64
+
+                    if not user_id:
+                        logger.warning(f"[AI_USAGE] Skipping — no user_id on task for analysis {analysis_ref}")
+                    else:
+                        task_user = db.query(User).filter(User.id == user_id).first()
+                        org_id = task_user.organization_id if task_user else None
+                        logger.info(f"[AI_USAGE] user_id={user_id} org_id={org_id} for analysis {analysis_ref}")
+
+                        if org_id:
+                            ai_integration = db.query(AIUsageIntegration).filter(
+                                AIUsageIntegration.organization_id == org_id
+                            ).first()
+                        else:
+                            ai_integration = db.query(AIUsageIntegration).filter(
+                                AIUsageIntegration.user_id == user_id,
+                                AIUsageIntegration.organization_id.is_(None)
+                            ).first()
+                        logger.info(
+                            f"[AI_USAGE] Integration found={ai_integration is not None} "
+                            f"is_connected={ai_integration.is_connected if ai_integration else 'N/A'} "
+                            f"openai_enabled={ai_integration.openai_enabled if ai_integration else 'N/A'} "
+                            f"anthropic_enabled={ai_integration.anthropic_enabled if ai_integration else 'N/A'} "
+                            f"for analysis {analysis_ref}"
+                        )
+
+                        if not ai_integration or not ai_integration.is_connected:
+                            logger.warning(f"[AI_USAGE] Skipping — no connected integration for analysis {analysis_ref}")
+                        else:
+                            _jwt_secret = os.environ.get("JWT_SECRET_KEY", "default-secret-key-change-me")
+                            _fernet_key = base64.urlsafe_b64encode(
+                                _jwt_secret.encode()[:32].ljust(32, b"\0")
+                            )
+                            _f = Fernet(_fernet_key)
+                            openai_key = _f.decrypt(ai_integration.openai_api_key.encode()).decode() if ai_integration.has_openai else None
+                            anthropic_key = _f.decrypt(ai_integration.anthropic_api_key.encode()).decode() if ai_integration.has_anthropic else None
+                            logger.info(
+                                f"[AI_USAGE] Fetching usage: openai={'yes (key length=' + str(len(openai_key)) + ')' if openai_key else 'no'} "
+                                f"anthropic={'yes' if anthropic_key else 'no'} days={time_range}"
+                            )
+                            ai_usage_result = await collect_ai_usage(
+                                openai_api_key=openai_key,
+                                openai_org_id=ai_integration.openai_org_id,
+                                anthropic_api_key=anthropic_key,
+                                anthropic_workspace_id=ai_integration.anthropic_workspace_id,
+                                days=time_range,
+                            )
+                            logger.info(f"[AI_USAGE] Collected openai={len(ai_usage_result['openai'])} days, anthropic={len(ai_usage_result['anthropic'])} days for analysis {analysis_ref}")
+                            if "metadata" not in results:
+                                results["metadata"] = {}
+                            results["metadata"]["openai_usage"] = ai_usage_result["openai"]
+                            results["metadata"]["anthropic_usage"] = ai_usage_result["anthropic"]
+
+                            # Remap openai_per_user from OpenAI email -> app email via UserCorrelation
+                            openai_per_user_raw = ai_usage_result.get("openai_per_user", {})
+                            members_map = ai_usage_result.get("openai_members_map", {})  # uid -> openai_email
+                            email_to_uid = {v.lower(): k for k, v in members_map.items()}
+
+                            from ...models.user_correlation import UserCorrelation as UC
+                            correlations = db.query(UC).filter(UC.openai_user_id.isnot(None)).all()
+                            uid_to_app_email = {c.openai_user_id: (c.email or "").lower() for c in correlations if c.email}
+
+                            openai_per_user = {}
+                            for openai_email, usage in openai_per_user_raw.items():
+                                uid = email_to_uid.get(openai_email.lower())
+                                app_email = uid_to_app_email.get(uid) if uid else None
+                                key = app_email if app_email else openai_email.lower()
+                                openai_per_user[key] = usage
+
+                            results["metadata"]["openai_usage_per_user"] = openai_per_user
+                            logger.info(f"[AI_USAGE] Stored openai_usage + anthropic_usage + openai_usage_per_user ({len(openai_per_user)}) in metadata for analysis {analysis_ref}")
+                except Exception as ai_err:
+                    logger.warning(f"[AI_USAGE] Failed to collect AI usage for analysis {analysis_ref}: {ai_err}", exc_info=True)
+
             logger.info(f"🔍 DEBUG: About to save results for analysis {analysis_ref}")
 
-            # Update analysis with results
+            # Update analysis with results using a fresh session (the task's
+            # original connection may have been reaped during the long await).
             logger.info(f"💾 Analysis {analysis_ref}: Saving results to database")
-            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-            if analysis:
-                analysis.status = "completed"
-                analysis.results = results
-                analysis.completed_at = datetime.now()
-                logger.info(f"💾 Analysis {analysis_ref}: Committing to database")
-                db.commit()
+            saved = _persist_analysis_result(analysis_id, status="completed", results=results)
+            if saved:
                 logger.info(f"✅ Analysis {analysis_ref}: Successfully saved and committed")
 
                 # Log task completion with visual markers
@@ -3723,139 +3950,129 @@ async def run_analysis_task(
             logger.error(f"BACKGROUND_TASK: Analysis was stuck - likely during incident data collection phase")
             logger.error(f"BACKGROUND_TASK: This typically happens when Rootly API is slow or experiencing connectivity issues")
 
-            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-            if not analysis:
+            # Fresh session: the original connection may be dead after the timeout.
+            if _persist_analysis_result(
+                analysis_id,
+                status="failed",
+                error_message="Analysis timed out after 15 minutes. This may be due to network connectivity issues or API slowness. Please try again.",
+            ):
+                logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_ref} status to failed due to timeout")
+            else:
                 logger.info(f"BACKGROUND_TASK: Analysis {analysis_ref} was deleted, not updating status")
-                return
-
-            analysis.status = "failed"
-            analysis.error_message = "Analysis timed out after 15 minutes. This may be due to network connectivity issues or API slowness. Please try again."
-            analysis.completed_at = datetime.now()
-            db.commit()
-            logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_ref} status to failed due to timeout")
                 
         except Exception as analysis_error:
             # Handle analysis-specific errors
             logger.error(f"BACKGROUND_TASK: Analysis {analysis_ref} failed: {analysis_error}")
             logger.error(f"🔍 DEBUG: Exception type: {type(analysis_error).__name__}, traceback:", exc_info=True)
 
-            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-            if not analysis:
-                logger.info(f"BACKGROUND_TASK: Analysis {analysis_ref} was deleted, not updating status")
+            # All terminal writes below go through _persist_analysis_result on a
+            # fresh session, since the task's connection may have been reaped
+            # during the long-running analysis await.
+            # Check if this is a permission error - if so, fail immediately
+            error_message = str(analysis_error)
+            if "Cannot access incidents endpoint" in error_message or "incidents:read" in error_message:
+                logger.error(f"BACKGROUND_TASK: Permission error detected for analysis {analysis_ref}, failing immediately")
+                _persist_analysis_result(analysis_id, status="failed", error_message=error_message)
                 return
 
-            if analysis:
-                # Check if this is a permission error - if so, fail immediately
-                error_message = str(analysis_error)
-                if "Cannot access incidents endpoint" in error_message or "incidents:read" in error_message:
-                    logger.error(f"BACKGROUND_TASK: Permission error detected for analysis {analysis_ref}, failing immediately")
-                    analysis.status = "failed"
-                    analysis.error_message = error_message
-                    analysis.completed_at = datetime.now()
-                    db.commit()
-                    return
-                
-                # For other errors, try to collect raw data even if analysis failed
+            # For other errors, try to collect raw data even if analysis failed
+            try:
+                logger.info(f"BACKGROUND_TASK: Attempting to save raw data for failed analysis {analysis_ref}")
+                raw_data = None
+
+                # Access the appropriate client based on platform with comprehensive error handling
                 try:
-                    logger.info(f"BACKGROUND_TASK: Attempting to save raw data for failed analysis {analysis_ref}")
-                    raw_data = None
-                    
-                    # Access the appropriate client based on platform with comprehensive error handling
-                    try:
-                        # Check if analyzer_service exists and is not None
-                        if analyzer_service is None:
-                            logger.warning(f"BACKGROUND_TASK: analyzer_service is None for analysis {analysis_ref}")
-                        elif hasattr(analyzer_service, 'client'):
-                            client = getattr(analyzer_service, 'client', None)
-                            if client is not None:
-                                try:
-                                    logger.info(f"BACKGROUND_TASK: Attempting raw data collection with client type: {type(client).__name__}")
-                                    raw_data = await client.collect_analysis_data(days_back=time_range)
-                                    logger.info(f"BACKGROUND_TASK: Successfully collected raw data for analysis {analysis_ref}")
-                                except Exception as client_error:
-                                    logger.warning(f"BACKGROUND_TASK: Failed to collect raw data for analysis {analysis_ref}: {client_error}")
-                            else:
-                                logger.warning(f"BACKGROUND_TASK: analyzer_service.client is None for analysis {analysis_ref}")
-                        else:
-                            logger.warning(f"BACKGROUND_TASK: analyzer_service has no 'client' attribute for analysis {analysis_ref} (type: {type(analyzer_service).__name__})")
-                            
-                            # Try alternative approaches for different analyzer types
-                            if hasattr(analyzer_service, 'api_token'):
-                                try:
-                                    # For SimpleBurnoutAnalyzer or similar, try to create a client
-                                    from ...core.rootly_client import RootlyAPIClient
-                                    temp_client = RootlyAPIClient(analyzer_service.api_token)
-                                    raw_data = await temp_client.collect_analysis_data(days_back=time_range)
-                                    logger.info(f"BACKGROUND_TASK: Successfully collected raw data using temporary client for analysis {analysis_ref}")
-                                except Exception as temp_client_error:
-                                    logger.warning(f"BACKGROUND_TASK: Failed to collect raw data using temporary client for analysis {analysis_ref}: {temp_client_error}")
-                    except Exception as client_access_error:
-                        logger.error(f"BACKGROUND_TASK: Error accessing client for raw data collection in analysis {analysis_ref}: {client_access_error}")
-                    
-                    # Save partial results with raw data (safely handle None raw_data)
-                    try:
-                        partial_results = {
-                            "error": f"Analysis failed: {str(analysis_error)}",
-                            "partial_data": {
-                                "users": [],
-                                "incidents": [],
-                                "metadata": {}
-                            },
-                            "data_collection_successful": False,
-                            "failure_stage": "analysis_processing"
-                        }
-                        
-                        # Safely extract data if raw_data exists
-                        if raw_data and isinstance(raw_data, dict):
+                    # Check if analyzer_service exists and is not None
+                    if analyzer_service is None:
+                        logger.warning(f"BACKGROUND_TASK: analyzer_service is None for analysis {analysis_ref}")
+                    elif hasattr(analyzer_service, 'client'):
+                        client = getattr(analyzer_service, 'client', None)
+                        if client is not None:
                             try:
-                                users_data = raw_data.get("users")
-                                if users_data and isinstance(users_data, list):
-                                    partial_results["partial_data"]["users"] = users_data
-                                    
-                                incidents_data = raw_data.get("incidents")
-                                if incidents_data and isinstance(incidents_data, list):
-                                    partial_results["partial_data"]["incidents"] = incidents_data
-                                    
-                                metadata_data = raw_data.get("collection_metadata")
-                                if metadata_data and isinstance(metadata_data, dict):
-                                    partial_results["partial_data"]["metadata"] = metadata_data
-                                    
-                                partial_results["data_collection_successful"] = True
-                            except Exception as extract_error:
-                                logger.warning(f"BACKGROUND_TASK: Error extracting partial data for analysis {analysis_ref}: {extract_error}")
-                    except Exception as partial_error:
-                        logger.error(f"BACKGROUND_TASK: Error creating partial results for analysis {analysis_ref}: {partial_error}")
-                        partial_results = {
-                            "error": f"Analysis failed: {str(analysis_error)}",
-                            "partial_data": {"users": [], "incidents": [], "metadata": {}},
-                            "data_collection_successful": False,
-                            "failure_stage": "analysis_processing"
-                        }
-                    
-                    analysis.status = "failed"
-                    analysis.error_message = f"Analysis failed: {str(analysis_error)}"
-                    analysis.results = partial_results
-                    analysis.completed_at = datetime.now()
-                    db.commit()
-                    logger.info(f"BACKGROUND_TASK: Saved partial data for failed analysis {analysis_ref}")
-                    
-                except Exception as data_error:
-                    logger.error(f"BACKGROUND_TASK: Could not save partial data for analysis {analysis_ref}: {data_error}")
-                    analysis.status = "failed"
-                    analysis.error_message = f"Analysis failed: {str(analysis_error)}"
-                    analysis.completed_at = datetime.now()
-                    db.commit()
-        
+                                logger.info(f"BACKGROUND_TASK: Attempting raw data collection with client type: {type(client).__name__}")
+                                raw_data = await client.collect_analysis_data(days_back=time_range)
+                                logger.info(f"BACKGROUND_TASK: Successfully collected raw data for analysis {analysis_ref}")
+                            except Exception as client_error:
+                                logger.warning(f"BACKGROUND_TASK: Failed to collect raw data for analysis {analysis_ref}: {client_error}")
+                        else:
+                            logger.warning(f"BACKGROUND_TASK: analyzer_service.client is None for analysis {analysis_ref}")
+                    else:
+                        logger.warning(f"BACKGROUND_TASK: analyzer_service has no 'client' attribute for analysis {analysis_ref} (type: {type(analyzer_service).__name__})")
+
+                        # Try alternative approaches for different analyzer types
+                        if hasattr(analyzer_service, 'api_token'):
+                            try:
+                                # For SimpleBurnoutAnalyzer or similar, try to create a client
+                                from ...core.rootly_client import RootlyAPIClient
+                                temp_client = RootlyAPIClient(analyzer_service.api_token)
+                                raw_data = await temp_client.collect_analysis_data(days_back=time_range)
+                                logger.info(f"BACKGROUND_TASK: Successfully collected raw data using temporary client for analysis {analysis_ref}")
+                            except Exception as temp_client_error:
+                                logger.warning(f"BACKGROUND_TASK: Failed to collect raw data using temporary client for analysis {analysis_ref}: {temp_client_error}")
+                except Exception as client_access_error:
+                    logger.error(f"BACKGROUND_TASK: Error accessing client for raw data collection in analysis {analysis_ref}: {client_access_error}")
+
+                # Save partial results with raw data (safely handle None raw_data)
+                try:
+                    partial_results = {
+                        "error": f"Analysis failed: {str(analysis_error)}",
+                        "partial_data": {
+                            "users": [],
+                            "incidents": [],
+                            "metadata": {}
+                        },
+                        "data_collection_successful": False,
+                        "failure_stage": "analysis_processing"
+                    }
+
+                    # Safely extract data if raw_data exists
+                    if raw_data and isinstance(raw_data, dict):
+                        try:
+                            users_data = raw_data.get("users")
+                            if users_data and isinstance(users_data, list):
+                                partial_results["partial_data"]["users"] = users_data
+
+                            incidents_data = raw_data.get("incidents")
+                            if incidents_data and isinstance(incidents_data, list):
+                                partial_results["partial_data"]["incidents"] = incidents_data
+
+                            metadata_data = raw_data.get("collection_metadata")
+                            if metadata_data and isinstance(metadata_data, dict):
+                                partial_results["partial_data"]["metadata"] = metadata_data
+
+                            partial_results["data_collection_successful"] = True
+                        except Exception as extract_error:
+                            logger.warning(f"BACKGROUND_TASK: Error extracting partial data for analysis {analysis_ref}: {extract_error}")
+                except Exception as partial_error:
+                    logger.error(f"BACKGROUND_TASK: Error creating partial results for analysis {analysis_ref}: {partial_error}")
+                    partial_results = {
+                        "error": f"Analysis failed: {str(analysis_error)}",
+                        "partial_data": {"users": [], "incidents": [], "metadata": {}},
+                        "data_collection_successful": False,
+                        "failure_stage": "analysis_processing"
+                    }
+
+                _persist_analysis_result(
+                    analysis_id,
+                    status="failed",
+                    results=partial_results,
+                    error_message=f"Analysis failed: {str(analysis_error)}",
+                )
+                logger.info(f"BACKGROUND_TASK: Saved partial data for failed analysis {analysis_ref}")
+
+            except Exception as data_error:
+                logger.error(f"BACKGROUND_TASK: Could not save partial data for analysis {analysis_ref}: {data_error}")
+                _persist_analysis_result(
+                    analysis_id,
+                    status="failed",
+                    error_message=f"Analysis failed: {str(analysis_error)}",
+                )
+
     except Exception as e:
         # Handle any other errors (DB, etc.)
         logger.error(f"BACKGROUND_TASK: Critical error in analysis {analysis_ref}: {str(e)}", exc_info=True)
         try:
-            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-            if analysis:
-                analysis.status = "failed"
-                analysis.error_message = f"Task failed: {str(e)}"
-                analysis.completed_at = datetime.now()
-                db.commit()
+            if _persist_analysis_result(analysis_id, status="failed", error_message=f"Task failed: {str(e)}"):
                 logger.info(f"BACKGROUND_TASK: Updated analysis {analysis_ref} status to failed due to critical error")
             else:
                 logger.error(f"BACKGROUND_TASK: Could not find analysis {analysis_ref} to update error status")

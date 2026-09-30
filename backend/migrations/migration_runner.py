@@ -1343,6 +1343,64 @@ class MigrationRunner:
                 "description": "Store scheduled Slack survey recipients on the org's active Slack workspace mapping",
                 "sql_file": "2026_03_13_add_survey_recipients_to_slack_workspace_mappings.sql"
             },
+            {
+                "name": "051_add_user_login_audit",
+                "description": "Track user login summaries and per-login audit events",
+                "sql": [
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP WITH TIME ZONE
+                    """,
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS login_count INTEGER NOT NULL DEFAULT 0
+                    """,
+                    """
+                    ALTER TABLE oauth_temp_codes
+                    ADD COLUMN IF NOT EXISTS auth_method VARCHAR(50)
+                    """,
+                    """
+                    CREATE TABLE IF NOT EXISTS user_login_events (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        organization_id INTEGER REFERENCES organizations(id) ON DELETE SET NULL,
+                        auth_method VARCHAR(50) NOT NULL,
+                        ip_address VARCHAR(64),
+                        user_agent VARCHAR(1000),
+                        logged_in_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_login_events_user_logged_in_at
+                    ON user_login_events(user_id, logged_in_at DESC)
+                    """,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_user_login_events_org_logged_in_at
+                    ON user_login_events(organization_id, logged_in_at DESC)
+                    """,
+                    """
+                    COMMENT ON TABLE user_login_events IS 'Audit log of successful user logins'
+                    """
+                ]
+            },
+            {
+                "name": "052_add_openai_user_id_to_user_correlations",
+                "description": "Add openai_user_id column to user_correlations for per-user OpenAI token usage tracking",
+                "sql_file": "2026_04_20_add_openai_user_id_to_user_correlations.sql"
+            },
+            {
+                "name": "053_ai_usage_nullable_org",
+                "description": "Make organization_id nullable in ai_usage_integrations and add partial unique indexes",
+                "sql_file": "2026_04_20_ai_usage_nullable_org.sql"
+            },
+            {
+                # New column: keep the original 052/053 names above unchanged so
+                # already-applied environments don't re-run them; add this as the
+                # next incrementing number instead.
+                "name": "054_add_pagerduty_teams_to_user_correlations",
+                "description": "Add pagerduty_teams JSONB column to user_correlations for storing team membership info",
+                "sql_file": "2026_07_24_add_pagerduty_teams_to_user_correlations.sql"
+            },
             # Add future migrations here with incrementing numbers
         ]
 
