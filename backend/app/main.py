@@ -16,6 +16,7 @@ from .middleware.security import security_middleware
 from .middleware.user_logging import user_logging_middleware
 from .middleware.logging_context import UserContextFilter
 from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, jira, linear, llm, mappings, manual_mappings, debug_mappings, admin, notifications, invitations, surveys, api_keys, digests, ai_usage
+from .api.endpoints import retention
 
 # Configure logging based on environment variable
 LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
@@ -251,6 +252,7 @@ async def shutdown_event():
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+app.include_router(retention.router, prefix="/auth/organizations/retention", tags=["retention"])
 app.include_router(rootly.router, prefix="/rootly", tags=["rootly"])
 app.include_router(pagerduty.router, prefix="/pagerduty", tags=["pagerduty"])
 app.include_router(analyses.router, prefix="/analyses", tags=["analyses"])
