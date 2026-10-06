@@ -17,7 +17,6 @@ export const FACTOR_DESCRIPTIONS: Record<string, string> = {
   'Consecutive incident days': 'Number of consecutive days with at least one incident. Longer streaks indicate sustained on-call pressure.',
   'Incident frequency': 'Rate of incidents over the analysis period regardless of severity or timing.',
   'Severity-weighted workload': 'Workload score weighted by incident severity. Critical incidents count more than lower severity ones.',
-  'Meeting load': 'Volume of meetings and synchronous obligations cutting into focus time.',
   'Review speed pressure': 'How quickly code reviews are expected to be completed, indicating urgency pressure.',
 }
 

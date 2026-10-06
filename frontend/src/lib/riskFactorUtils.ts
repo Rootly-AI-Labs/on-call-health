@@ -4,6 +4,16 @@
 
 export type RiskFactorType = 'workload' | 'after_hours' | 'incident_load'
 
+/** Hide the retired meeting estimate, including in older saved analyses. */
+export function getVisibleOCHFactors<T extends { key?: string; name?: string }>(
+  factors?: T[] | null
+): T[] {
+  if (!Array.isArray(factors)) return []
+  return factors.filter(factor =>
+    factor && factor.key !== 'meeting_load' && factor.name !== 'Meeting load'
+  )
+}
+
 export interface MemberWithRiskScore {
   [key: string]: any
   riskScore: number

@@ -77,6 +77,8 @@ import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
 import { TeamRiskFactorsCard, FACTOR_DESCRIPTIONS } from "@/components/dashboard/TeamRiskFactorsCard"
 import { AlertsCountCard } from "@/components/dashboard/AlertsCountCard"
+import { OpenAIUsageCard } from "@/components/dashboard/OpenAIUsageCard"
+import { AnthropicUsageCard } from "@/components/dashboard/AnthropicUsageCard"
 import { AlertsLeaderboard } from "@/components/dashboard/AlertsLeaderboard"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { MemberDetailModal } from "@/components/dashboard/MemberDetailModal"
@@ -98,21 +100,28 @@ function AlertsCardsRow({ currentAnalysis }: { currentAnalysis: any }) {
 
   useEffect(() => {
     const el = teamAlertsRef.current
-    if (!el) return
+    if (!el) {
+      setTeamAlertsHeight(null)
+      return
+    }
     const observer = new ResizeObserver(() => {
       setTeamAlertsHeight(el.offsetHeight)
     })
     observer.observe(el)
     setTeamAlertsHeight(el.offsetHeight)
     return () => observer.disconnect()
-  }, [])
+  }, [currentAnalysis])
+
+  const isPagerDuty = currentAnalysis?.platform === 'pagerduty'
+  const hasAlertsData = !!currentAnalysis?.analysis_data?.metadata?.alerts
+  if (!isPagerDuty && !hasAlertsData) return null
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
       <div ref={teamAlertsRef}>
         <AlertsCountCard currentAnalysis={currentAnalysis} />
       </div>
-      <div style={teamAlertsHeight ? { height: teamAlertsHeight } : undefined} className="flex flex-col">
+      <div style={teamAlertsHeight ? { height: teamAlertsHeight } : undefined} className="flex flex-col overflow-hidden">
         <AlertsLeaderboard currentAnalysis={currentAnalysis} />
       </div>
     </div>
@@ -197,6 +206,11 @@ function DashboardContent() {
   setIncludeJira,
   includeLinear,
   setIncludeLinear,
+  includeAIUsage,
+  setIncludeAIUsage,
+  aiUsageConnected,
+  openaiUsageEnabled,
+  anthropicUsageEnabled,
   enableAI,
   setEnableAI,
   llmConfig,
@@ -250,6 +264,10 @@ function DashboardContent() {
   setDialogSelectedIntegration,
   noIntegrationsFound,
   setNoIntegrationsFound,
+  availableTeams,
+  selectedTeamId,
+  setSelectedTeamId,
+  loadingTeams,
   autoRefreshEnabled,
   setAutoRefreshEnabled,
   autoRefreshInterval,
@@ -337,15 +355,31 @@ function DashboardContent() {
     }
   }, [mounted, searchParams, analysisRunning, startAnalysis, router])
 
+  // Snapshot-derived AI flags — stable once analysis loads, not subject to live-API race conditions
+  const hasOpenAISnapshot = useMemo(() =>
+    Object.keys(currentAnalysis?.analysis_data?.metadata?.openai_usage ?? {}).length > 0,
+    [currentAnalysis]
+  )
+  const hasAnthropicSnapshot = useMemo(() =>
+    Object.keys(currentAnalysis?.analysis_data?.metadata?.anthropic_usage ?? {}).length > 0,
+    [currentAnalysis]
+  )
+
+  const hasJiraSnapshot = !!(currentAnalysis?.analysis_data?.data_sources as any)?.jira_data
+  const hasLinearSnapshot = !!(currentAnalysis?.analysis_data?.data_sources as any)?.linear_data
+  const hasGithubSnapshot = !!(currentAnalysis?.analysis_data?.data_sources as any)?.github_data
+  const hasSlackSnapshot = !!(currentAnalysis?.analysis_data?.data_sources as any)?.slack_data
+
   // Derive connected integrations from useDashboard data (avoids 4 duplicate API calls)
   const connectedIntegrations = useMemo(() => {
     const connected = new Set<string>()
-    if (githubIntegration) connected.add('github')
-    if (slackIntegration) connected.add('slack')
-    if (jiraIntegration) connected.add('jira')
-    if (linearIntegration) connected.add('linear')
+    if (githubIntegration || hasGithubSnapshot) connected.add('github')
+    if (slackIntegration || hasSlackSnapshot) connected.add('slack')
+    if (jiraIntegration || hasJiraSnapshot) connected.add('jira')
+    if (linearIntegration || hasLinearSnapshot) connected.add('linear')
+    if (openaiUsageEnabled || hasOpenAISnapshot) connected.add('openai-usage')
     return connected
-  }, [githubIntegration, slackIntegration, jiraIntegration, linearIntegration])
+  }, [githubIntegration, slackIntegration, jiraIntegration, linearIntegration, openaiUsageEnabled, hasOpenAISnapshot, hasGithubSnapshot, hasSlackSnapshot, hasJiraSnapshot, hasLinearSnapshot])
 
   // GitHub All Metrics Popup State
   const [showAllMetricsPopup, setShowAllMetricsPopup] = useState(false)
@@ -378,6 +412,7 @@ function DashboardContent() {
           onNext={onboarding.nextStep}
           onPrev={onboarding.prevStep}
           onClose={onboarding.skipOnboarding}
+          onGoToStep={onboarding.goToStep}
         />
       )}
       <div className="flex flex-1 overflow-hidden">
@@ -614,6 +649,9 @@ function DashboardContent() {
                               <span className="font-medium truncate">{organizationName}</span>
                             </div>
                             <span className="text-neutral-500 flex-shrink-0">{analysis.time_range || 30}d</span>
+                          {(analysis as any).config?.pagerduty_team_id && (
+                            <span className="text-neutral-500 flex-shrink-0 text-[10px] bg-green-100 text-green-700 rounded px-1">team</span>
+                          )}
                           </div>
                           <div className="flex justify-between items-center w-full text-neutral-500">
                             <span>{dateStr}</span>
@@ -1173,6 +1211,12 @@ function DashboardContent() {
                 <AlertsCardsRow currentAnalysis={currentAnalysis} />
               )}
 
+              {/* AI Coding Assistant Usage (shown when AI usage data is present in analysis) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-stretch">
+                <OpenAIUsageCard currentAnalysis={currentAnalysis} enabled={openaiUsageEnabled || hasOpenAISnapshot} />
+                <AnthropicUsageCard currentAnalysis={currentAnalysis} enabled={anthropicUsageEnabled || hasAnthropicSnapshot} />
+              </div>
+
               <TeamMembersList
                 currentAnalysis={currentAnalysis}
                 setSelectedMember={setSelectedMember}
@@ -1569,6 +1613,49 @@ function DashboardContent() {
               );
             })()}
 
+            {/* Team Scope — PagerDuty only */}
+            {dialogSelectedIntegration && (() => {
+              const selInt = integrations.find(i => i.id.toString() === dialogSelectedIntegration)
+              if (selInt?.platform !== 'pagerduty') return null
+              return (
+                <div>
+                  <label className="text-sm font-medium text-neutral-700 mb-2 block">
+                    Team Scope
+                  </label>
+                  {loadingTeams ? (
+                    <div className="flex items-center gap-2 p-3 bg-neutral-100 rounded-md border border-neutral-200">
+                      <div className="w-4 h-4 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm text-neutral-500">Loading teams…</span>
+                    </div>
+                  ) : availableTeams.length === 0 ? (
+                    <div className="p-3 bg-neutral-100 rounded-md border border-neutral-200 text-sm text-neutral-500">
+                      No teams found — analysis will cover the whole org
+                    </div>
+                  ) : (
+                    <Select
+                      value={selectedTeamId || "__all__"}
+                      onValueChange={v => setSelectedTeamId(v === "__all__" ? "" : v)}
+                    >
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Whole organization (all teams)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Whole organization (all teams)</SelectItem>
+                        {availableTeams.map(t => (
+                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {selectedTeamId && (
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Only incidents and members from <strong>{availableTeams.find(t => t.id === selectedTeamId)?.name}</strong> will be included
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Permission Error Alert - Only for Rootly */}
             {dialogSelectedIntegration && (() => {
               const selectedIntegration = integrations.find(i => i.id.toString() === dialogSelectedIntegration);
@@ -1775,6 +1862,48 @@ function DashboardContent() {
                           <p className="text-xs text-neutral-700 mb-1">Issue tracking</p>
                         </>
                       )}
+                    </div>
+                  )}
+
+                  {/* OpenAI Usage Toggle Card */}
+                  {openaiUsageEnabled && (
+                    <div className={`border rounded-lg p-3 transition-all cursor-pointer ${includeAIUsage ? 'border-neutral-900 bg-neutral-100' : 'border-neutral-200 bg-white'}`}
+                      onClick={() => setIncludeAIUsage(!includeAIUsage)}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <Image src="/images/openai-logo.svg" alt="OpenAI" width={24} height={24} className="w-6 h-6" />
+                          <div>
+                            <h3 className="text-sm font-medium text-neutral-900">OpenAI</h3>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={includeAIUsage}
+                          onCheckedChange={setIncludeAIUsage}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <p className="text-xs text-neutral-700 mb-1">Token consumption</p>
+                    </div>
+                  )}
+
+                  {/* Anthropic Usage Toggle Card */}
+                  {anthropicUsageEnabled && (
+                    <div className={`border rounded-lg p-3 transition-all cursor-pointer ${includeAIUsage ? 'border-neutral-900 bg-neutral-100' : 'border-neutral-200 bg-white'}`}
+                      onClick={() => setIncludeAIUsage(!includeAIUsage)}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <Image src="/images/anthropic-logo.svg" alt="Anthropic" width={24} height={24} className="w-6 h-6" />
+                          <div>
+                            <h3 className="text-sm font-medium text-neutral-900">Anthropic</h3>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={includeAIUsage}
+                          onCheckedChange={setIncludeAIUsage}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <p className="text-xs text-neutral-700 mb-1">Token consumption</p>
                     </div>
                   )}
                 </div>
@@ -1996,6 +2125,19 @@ function DashboardContent() {
               )
             })()}
 
+            <p className="text-xs leading-relaxed text-neutral-500">
+              Best practice: Before your first analysis, introduce On-Call Health to your team and explain how workload insights help prevent overload. Share the{" "}
+              <a
+                href="https://github.com/Rootly-AI-Labs/On-Call-Health/blob/main/RESPONDER_WORKLOAD_NOTICE.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-neutral-700"
+              >
+                team guide
+              </a>{" "}
+              so everyone understands what information is used and who can see it.
+            </p>
+
             <div className="flex justify-end space-x-2 pt-4">
               <Button variant="outline" onClick={() => setShowTimeRangeDialog(false)}>
                 Cancel
@@ -2024,6 +2166,7 @@ function DashboardContent() {
         currentAnalysis={currentAnalysis}
         timeRange={currentAnalysis?.time_range || timeRange}
         integrations={integrations}
+        openaiUsageEnabled={openaiUsageEnabled || hasOpenAISnapshot}
       />
 
       {/* Delete Analysis Dialog */}
