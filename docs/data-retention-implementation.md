@@ -157,6 +157,16 @@ Testing complete: at the user's request, restored the original **03:00 UTC daily
 
 ## Implementation sequence
 
+### October 6 review follow-up: polling fallback and deleted-row reads
+
+Both Greptile findings are valid and were reproduced before the fixes. A running automatic report's 404 left the dashboard without a saved report; a pending saved report finishing unsuccessfully and being cleaned while its reader waited caused an unhandled `InvalidRequestError` during the polling metadata refresh.
+
+Polling terminal failures now create an explicitly owned fallback selection, exclude the failed automatic report and try saved candidates until an API read succeeds. Polling belongs to the same selection generation as other report reads; changing selection, cancelling or unmounting stops timers and makes late responses ineligible to change the displayed report. Opening/restoring a pending report continues its polling without duplicate loops.
+
+The metadata-only `_retention_refresh_status` path now uses the existing `_refresh_retention_analysis` helper, returning 404 when its row disappeared. It still exposes no retained result/error content while an analysis is active. Regression tests interleave the actual failed-result writer and cleanup with reads by numeric ID, UUID and the by-id endpoint, for both pending and running states, in rollback-only disposable PostgreSQL sessions.
+
+Verification: **103 related backend checks** and **12 dashboard browser scenarios** passed, including six new cases in each suite. Browser coverage includes polling 404, exhausted HTTP retries, unavailable saved candidates, resumed polling and late completed/404 responses after cancellation and a newer selection. TypeScript and whitespace checks passed; browser/provider APIs were mocked. Both services were restarted. Fixes are verified for publication on `feat/org-data-retention`.
+
 ### October 6 minimal cleanup history
 
 Simplified the optional Cleanup history disclosure to one row with **Last successful cleanup**, **Analyses cleared**, **Surveys deleted**, and **Survey links detached**. Desktop shows four columns; mobile wraps to two columns. The date stays explicitly UTC and omits seconds; its full timestamp remains available on hover. Before any success, the date displays Never. Counts remain those recorded for the last successful run, even after a later failure.

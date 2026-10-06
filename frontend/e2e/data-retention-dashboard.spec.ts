@@ -37,7 +37,7 @@ function report(id: string, label: string, memberName: string): AnalysisResult {
   };
 }
 
-type ReadOutcome = 200 | 410 | 'aborted';
+type ReadOutcome = 200 | 404 | 410 | 503 | 'aborted';
 type BlockedRead = { started: Promise<void>; release: (outcome: ReadOutcome) => void };
 
 type DashboardApi = {
@@ -45,6 +45,9 @@ type DashboardApi = {
   reads: string[];
   summariesIncludeResults: boolean;
   hasAutomaticReport: boolean;
+  automaticStatus: 'completed' | 'pending' | 'running';
+  automaticOutcomes: ReadOutcome[];
+  allowAutomaticCancel: boolean;
   holdRead: (id: string) => BlockedRead;
 };
 
@@ -57,6 +60,8 @@ const test = base.extend<{ api: DashboardApi }>({
     }>();
     const api: DashboardApi = {
       expired: new Set(), reads: [], summariesIncludeResults: false, hasAutomaticReport: false,
+      automaticStatus: 'completed', automaticOutcomes: [],
+      allowAutomaticCancel: false,
       holdRead: id => {
         let markStarted!: () => void;
         let release!: (outcome: ReadOutcome) => void;
@@ -108,6 +113,11 @@ const test = base.extend<{ api: DashboardApi }>({
         return;
       }
       if (apiPath && request.method() !== 'GET') {
+        if (api.allowAutomaticCancel && request.method() === 'DELETE'
+          && url.pathname === `/analyses/${AUTOMATIC_ID}`) {
+          await reply({ success: true });
+          return;
+        }
         unexpectedMutations.push(`${request.method()} ${url.pathname}`);
         await reply({ detail: 'Mutations are blocked in this browser test.' }, 405);
         return;
@@ -124,30 +134,37 @@ const test = base.extend<{ api: DashboardApi }>({
         return;
       }
       if (url.pathname === '/analyses/auto-refresh') {
-        await reply(api.hasAutomaticReport ? { ...automaticReport, analysis_data: undefined } : null);
+        await reply(api.hasAutomaticReport ? { ...automaticReport, status: api.automaticStatus, analysis_data: undefined } : null);
         return;
       }
       const analysisMatch = url.pathname.match(/^\/analyses\/(?:by-id\/)?([^/]+)$/);
       if (analysisMatch) {
-        const item = [...reports, automaticReport].find(value => value.id === analysisMatch[1] || value.uuid === analysisMatch[1]);
+        const automatic = { ...automaticReport, status: api.automaticStatus };
+        const item = [...reports, automatic].find(value => value.id === analysisMatch[1] || value.uuid === analysisMatch[1]);
         if (item) {
           api.reads.push(item.id);
+          const replyOutcome = async (outcome: ReadOutcome) => {
+            const body = item.id === AUTOMATIC_ID ? {
+              ...item, status: api.automaticStatus,
+              analysis_data: api.automaticStatus === 'completed' ? automaticReport.analysis_data : {},
+            } : item;
+            if (outcome === 'aborted') await route.abort();
+            else await reply(outcome === 200
+              ? body
+              : { detail: outcome === 404 ? 'Analysis not found' : 'Synthetic unavailable analysis' }, outcome);
+          };
           const held = heldReads.get(item.id);
           if (held) {
             held.markStarted();
             const outcome = await held.response;
-            if (outcome === 'aborted') {
-              await route.abort();
-            } else {
-              await reply(outcome === 410
-                ? { detail: 'Analysis results are unavailable under the organization data retention policy.' }
-                : item, outcome);
-            }
+            await replyOutcome(outcome);
             return;
           }
-          await reply(api.expired.has(item.id)
-            ? { detail: 'Analysis results are unavailable under the organization data retention policy.' }
-            : item, api.expired.has(item.id) ? 410 : 200);
+          if (item.id === AUTOMATIC_ID && api.automaticOutcomes.length) {
+            await replyOutcome(api.automaticOutcomes.shift()!);
+            return;
+          }
+          await replyOutcome(api.expired.has(item.id) ? 410 : 200);
           return;
         }
       }
@@ -211,6 +228,82 @@ async function expectUnavailableReport(page: Page) {
 }
 
 test.describe('Dashboard retention read enforcement', () => {
+  test('opens an available saved report when running automatic polling returns 404', async ({ page, api }) => {
+    api.hasAutomaticReport = true;
+    api.automaticStatus = 'running';
+    api.automaticOutcomes = [404];
+    await page.goto('/dashboard');
+    await expect(page.getByText(FIRST_MEMBER, { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page).toHaveURL(new RegExp(`analysis=${FIRST_ID}(?:&|$)`));
+    expect(api.reads.filter(id => id === AUTOMATIC_ID)).toHaveLength(1);
+  });
+
+  test('opens a saved report after automatic polling exhausts its error retries', async ({ page, api }) => {
+    api.hasAutomaticReport = true;
+    api.automaticStatus = 'pending';
+    api.automaticOutcomes = [503, 503, 503];
+    await page.goto('/dashboard');
+    await expect(page.getByText(FIRST_MEMBER, { exact: true })).toBeVisible({ timeout: 25000 });
+    await expect(page).toHaveURL(new RegExp(`analysis=${FIRST_ID}(?:&|$)`));
+    expect(api.reads.filter(id => id === AUTOMATIC_ID)).toHaveLength(3);
+    expect(await page.evaluate(() => localStorage.getItem('running_analysis_id'))).toBeNull();
+  });
+
+  test('fallback skips a saved result that has become unavailable', async ({ page, api }) => {
+    api.hasAutomaticReport = true;
+    api.automaticStatus = 'running';
+    api.automaticOutcomes = [404];
+    api.expired.add(FIRST_ID);
+    await page.goto('/dashboard');
+    await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`analysis=${SECOND_ID}(?:&|$)`));
+    expect(api.reads.filter(id => id === AUTOMATIC_ID)).toHaveLength(1);
+  });
+
+  test('a restored running report keeps polling through its initial URL read', async ({ page, api }) => {
+    api.hasAutomaticReport = true;
+    api.automaticStatus = 'pending';
+    await page.addInitScript(id => {
+      localStorage.setItem('running_analysis_id', id);
+      localStorage.setItem('running_analysis_start', Date.now().toString());
+    }, AUTOMATIC_ID);
+    await page.goto(`/dashboard?analysis=${AUTOMATIC_ID}`);
+    await expect.poll(() => api.reads.filter(id => id === AUTOMATIC_ID).length).toBeGreaterThanOrEqual(2);
+    api.automaticStatus = 'completed';
+    await expect(page.getByText(AUTOMATIC_MEMBER, { exact: true })).toBeVisible({ timeout: 12000 });
+    await expect(page).toHaveURL(new RegExp(`analysis=${AUTOMATIC_ID}(?:&|$)`));
+    expect(await page.evaluate(() => localStorage.getItem('running_analysis_id'))).toBeNull();
+  });
+
+  for (const outcome of [404, 200] as const) {
+    test(`late polling ${outcome} cannot replace a saved report selected after cancellation`, async ({ page, api }) => {
+      api.hasAutomaticReport = true;
+      api.automaticStatus = 'running';
+      api.allowAutomaticCancel = true;
+      const held = api.holdRead(AUTOMATIC_ID);
+      try {
+        await page.goto('/dashboard');
+        await held.started;
+        await page.getByRole('button', { name: 'Cancel Analysis', exact: true }).click();
+        await expect(savedReport(page, SECOND_LABEL)).toBeEnabled();
+        await savedReport(page, SECOND_LABEL).click();
+        await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
+        const late = page.waitForResponse(response => new URL(response.url()).pathname === `/analyses/${AUTOMATIC_ID}`
+          && response.status() === outcome).then(response => response.finished());
+        api.automaticStatus = 'completed';
+        held.release(outcome);
+        await late;
+        await page.evaluate(() => new Promise<void>(resolve => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }));
+        await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
+        await expect(page.getByText(AUTOMATIC_MEMBER, { exact: true })).toHaveCount(0);
+        await expect(page).toHaveURL(new RegExp(`analysis=${SECOND_ID}(?:&|$)`));
+        expect(api.reads.filter(id => id === FIRST_ID)).toHaveLength(0);
+      } finally { held.release('aborted'); }
+    });
+  }
+
   for (const outcome of [410, 200, 'aborted'] as const) {
     test(`keeps the manually opened report when an older automatic read returns ${outcome}`, async ({ page, api }) => {
       api.hasAutomaticReport = true;

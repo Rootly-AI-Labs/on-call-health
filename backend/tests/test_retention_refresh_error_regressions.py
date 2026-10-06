@@ -180,6 +180,46 @@ def test_active_refresh_returns_only_pollable_metadata_without_prior_content(
     assert record.error_message == "Synthetic prior private error"
 
 
+@pytest.mark.parametrize("active_status", ["pending", "running"])
+@pytest.mark.parametrize("reader", ["get_analysis", "get_analysis_by_uuid", "get_analysis_by_identifier"])
+def test_polling_read_returns_404_if_cleanup_deletes_row_before_metadata_refresh(
+    db, db_connection, users, enabled_policy, analysis_factory, monkeypatch, active_status, reader,
+):
+    from app.api.endpoints import analyses
+    from app.services.retention_cleanup import cleanup_organization_data
+
+    record = analysis_factory({"private_previous_result": True}, status=active_status,
+                              results_generated_at=OLD, is_saved=True)
+    record_id, record_uuid, org_id = record.id, record.uuid, record.organization_id
+    original_cutoff = analyses._retention_cutoff
+    interleaved = False
+
+    def finish_then_cleanup(session, organization_id, *, lock=False):
+        nonlocal interleaved
+        if not interleaved:
+            interleaved = True
+            assert analyses._persist_analysis_result(record_id, status="failed",
+                                                     error_message="Synthetic failed refresh")
+            # A separate session leaves the reader's pending instance stale.
+            # The shared connection is guarded by the rollback-only test fixture.
+            with Session(bind=db_connection, join_transaction_mode="create_savepoint") as worker:
+                result = cleanup_organization_data(worker, org_id, now=NOW)
+                assert result.analysis_results_expired == 1
+        return original_cutoff(session, organization_id, lock=lock)
+
+    monkeypatch.setattr(analyses, "_retention_cutoff", finish_then_cleanup)
+    kwargs = {"current_user": users[0], "db": db}
+    if reader == "get_analysis":
+        kwargs["analysis_id"] = record_id
+    elif reader == "get_analysis_by_uuid":
+        kwargs["analysis_uuid"] = record_uuid
+    else:
+        kwargs["analysis_identifier"] = record_uuid
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(getattr(analyses, reader)(**kwargs))
+    assert error.value.status_code == 404
+
+
 def test_error_timestamp_changes_invalidate_legacy_snapshot_approval(db, analysis_factory):
     from app.services.retention_legacy import fingerprint_analysis_result
 

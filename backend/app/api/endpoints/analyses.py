@@ -872,7 +872,7 @@ def _retention_refresh_status(db: Session, analysis: Analysis):
         return None
     if _retention_cutoff(db, analysis.organization_id, lock=True) is None:
         return None
-    db.refresh(analysis, attribute_names=["status", "config", "created_at", "completed_at"])
+    _refresh_retention_analysis(db, analysis, attribute_names=["status", "config", "created_at", "completed_at"])
     if analysis.status not in ("pending", "running"):
         return None
     return AnalysisResponse(
