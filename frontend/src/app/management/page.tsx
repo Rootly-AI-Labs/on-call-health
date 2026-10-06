@@ -42,6 +42,7 @@ import {
 } from "lucide-react"
 import { API_BASE, type Integration } from "@/app/integrations/types"
 import { UserMappingDrawer } from "./components/UserMappingDrawer"
+import { DataRetentionSettings } from "./components/DataRetentionSettings"
 import { OrganizationManagementDialog } from "@/app/integrations/dialogs/OrganizationManagementDialog"
 import * as OrganizationHandlers from "@/app/integrations/handlers/organization-handlers"
 import {
@@ -1170,6 +1171,8 @@ function TeamPageContent() {
               />
             </div>
           </div>
+
+          <DataRetentionSettings />
 
           {/* Organization Management Section */}
           {(selectedOrganization || !hasPrimaryIntegration) && !loadingIntegrations && (

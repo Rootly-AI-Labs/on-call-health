@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import func, over
+from sqlalchemy import Text, cast, func, over
 from sqlalchemy.orm import Session, defer, load_only
 from sqlalchemy.exc import OperationalError
 
@@ -22,6 +22,8 @@ from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest
 from ...core.alert_health_calculator import calculate_alert_health_score
 from ...core.och_config import apply_alert_health_to_och, OCHConfig
 from ...services.survey_response_service import extract_analysis_member_emails, normalize_survey_email
+from ...services.data_retention import read_retention_policy
+from ...services.retention_preview import classify_analysis_result, result_generation_time
 from ...utils.visual_logger import log_task_start, log_task_complete
 
 logger = logging.getLogger(__name__)
@@ -343,15 +345,21 @@ async def run_burnout_analysis(
         auto_refresh_interval = getattr(request, 'auto_refresh_interval', None) if auto_refresh_enabled else None
 
         if auto_refresh_enabled:
+            retention_enabled = _retention_cutoff(db, current_user.organization_id, lock=True) is not None
             existing_auto_refresh = db.query(Analysis).filter(
                 Analysis.user_id == current_user.id,
                 Analysis.organization_id == current_user.organization_id,
                 Analysis.is_auto_refresh == True
-            ).first()
+            ).with_for_update().first()
             if existing_auto_refresh:
-                logger.info(f"🔄 [AUTO_REFRESH] Deleting previous auto-refresh analysis {existing_auto_refresh.id} for user {current_user.id}")
-                db.delete(existing_auto_refresh)
-                db.commit()
+                logger.info(f"🔄 [AUTO_REFRESH] Replacing previous auto-refresh schedule for analysis {existing_auto_refresh.id} for user {current_user.id}")
+                if retention_enabled:
+                    # Keep historical results and recent survey links. Commit
+                    # retiring this schedule and creating the new carrier below
+                    # together; cleanup expires each result by generation age.
+                    existing_auto_refresh.is_auto_refresh = False
+                else:
+                    db.delete(existing_auto_refresh)
 
         analysis = Analysis(
             user_id=current_user.id,
@@ -827,6 +835,53 @@ def _get_redis_for_analysis():
 _ANALYSIS_CACHE_TTL = 3600  # 1 hour — results are immutable once completed
 
 
+def _retention_cutoff(db: Session, organization_id: int | None, *, lock: bool = False):
+    """Read the current policy; locks share cleanup's organization-first order."""
+    if organization_id is None:
+        return None
+    from ...models import Organization
+    query = db.query(Organization).filter(Organization.id == organization_id).populate_existing()
+    if lock:
+        query = query.with_for_update(read=True)
+    organization = query.first()
+    if organization is None:
+        raise HTTPException(status_code=410, detail="Analysis organization no longer exists")
+    days = read_retention_policy(organization).retention_days
+    return datetime.now(timezone.utc) - timedelta(days=days) if days is not None else None
+
+
+def _require_retained_result(db: Session, analysis: Analysis):
+    """Never serve expired or undated results, including before cleanup runs."""
+    cutoff = _retention_cutoff(db, analysis.organization_id, lock=True)
+    if cutoff is None:
+        return None
+    # Cleanup can clear a preserved auto-refresh row after it was first read.
+    db.refresh(analysis, attribute_names=[
+        "results", "status", "config", "results_generated_at", "completed_at",
+    ])
+    eligibility = classify_analysis_result(analysis, cutoff)
+    if eligibility.disposition in ("expired", "unverifiable") or (
+        eligibility.disposition == "deferred" and analysis.results
+    ):
+        raise HTTPException(
+            status_code=410,
+            detail={"code": "analysis_retention_unavailable", "reason": eligibility.reason,
+                    "message": "Analysis results are unavailable under the organization's data retention policy."},
+        )
+    return cutoff
+
+
+def _require_result_after_collection(db: Session, analysis: Analysis):
+    """A provider response cannot revive a cleared or newly expired parent."""
+    _retention_cutoff(db, analysis.organization_id, lock=True)
+    db.refresh(analysis, attribute_names=[
+        "results", "status", "config", "results_generated_at", "completed_at",
+    ])
+    _require_retained_result(db, analysis)
+    if not analysis.results:
+        raise HTTPException(status_code=410, detail="Analysis results were cleared during collection")
+
+
 def _load_analysis_data(db: Session, analysis_id: int) -> dict:
     """Load frontend-used keys from analysis results, with Redis cache.
 
@@ -837,6 +892,24 @@ def _load_analysis_data(db: Session, analysis_id: int) -> dict:
     """
     import json as _json
     cache_key = f"analysis_data:{analysis_id}"
+
+    analysis = db.query(Analysis).options(defer(Analysis.results)).filter(Analysis.id == analysis_id).first()
+    if analysis is None:
+        return {}
+    cutoff = _require_retained_result(db, analysis)
+    # A cached result must never resurrect a row cleared by cleanup. With an
+    # enabled policy serve the freshly verified database result and bypass Redis.
+    if cutoff is not None:
+        return _trim_analysis_data(analysis.results) if isinstance(analysis.results, dict) else {}
+    # JSON None is often stored as a JSON null rather than SQL NULL. Check
+    # result existence in the database without fetching the whole 30 MB value.
+    has_result = db.query(Analysis.id).filter(
+        Analysis.id == analysis_id,
+        Analysis.results.isnot(None),
+        cast(Analysis.results, Text).notin_(("null", "{}", '""')),
+    ).scalar()
+    if has_result is None:
+        return {}
 
     # Try Redis cache first
     redis_client = _get_redis_for_analysis()
@@ -901,6 +974,12 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
     analysis_end_date = datetime.now(timezone.utc)
     analysis_start_date = analysis.created_at - timedelta(days=analysis.time_range or 30)
 
+    cutoff = _require_retained_result(db, analysis)
+    if analysis_start_date.tzinfo is None:
+        analysis_start_date = analysis_start_date.replace(tzinfo=timezone.utc)
+    if cutoff is not None:
+        analysis_start_date = max(analysis_start_date, cutoff)
+
     # Only use the emails that are actually present in this analysis roster.
     member_emails = extract_analysis_member_emails(analysis.results)
     if not member_emails:
@@ -910,22 +989,20 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
 
     # For org-less demos: scope by user_id, skip date filter (mock data has fixed timestamps)
     # For org-scoped demos: scope by org_id, skip date filter for the same reason
+    query = db.query(UserBurnoutReport).filter(func.lower(UserBurnoutReport.email).in_(member_emails))
     if not analysis.organization_id:
-        all_surveys = db.query(UserBurnoutReport).filter(
-            func.lower(UserBurnoutReport.email).in_(member_emails),
-            UserBurnoutReport.user_id == analysis.user_id,
-        ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
-    elif is_demo:
-        all_surveys = db.query(UserBurnoutReport).filter(
-            func.lower(UserBurnoutReport.email).in_(member_emails),
-            UserBurnoutReport.organization_id == analysis.organization_id,
-        ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
+        query = query.filter(UserBurnoutReport.user_id == analysis.user_id,
+                             UserBurnoutReport.organization_id.is_(None))
     else:
-        all_surveys = db.query(UserBurnoutReport).filter(
-            func.lower(UserBurnoutReport.email).in_(member_emails),
-            UserBurnoutReport.submitted_at >= analysis_start_date,
-            UserBurnoutReport.submitted_at <= analysis_end_date
-        ).order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
+        query = query.filter(UserBurnoutReport.organization_id == analysis.organization_id)
+    if analysis.organization_id and not is_demo:
+        query = query.filter(UserBurnoutReport.submitted_at >= analysis_start_date,
+                             UserBurnoutReport.submitted_at <= analysis_end_date)
+    elif cutoff is not None:
+        # Demo exemptions never override an organization's saved policy.
+        query = query.filter(UserBurnoutReport.submitted_at >= cutoff,
+                             UserBurnoutReport.submitted_at <= analysis_end_date)
+    all_surveys = query.order_by(UserBurnoutReport.email, UserBurnoutReport.submitted_at.asc()).all()
 
     # Group surveys by email
     surveys_by_email = defaultdict(list)
@@ -1126,6 +1203,7 @@ async def regenerate_analysis_trends(
             detail="Analysis not found"
         )
     
+    _require_retained_result(db, analysis)
     if analysis.status != 'completed':
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1285,6 +1363,7 @@ async def verify_analysis_consistency(
             detail="Analysis not found"
         )
     
+    _require_retained_result(db, analysis)
     if analysis.status != 'completed':
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1514,6 +1593,7 @@ async def get_historical_trends(
             }
         )
     
+    _require_retained_result(db, analysis)
     # Extract daily trends from the analysis results
     results = analysis.results
     if not results or not isinstance(results, dict):
@@ -1873,6 +1953,7 @@ async def get_analysis_daily_trends(
             detail="Analysis not found"
         )
     
+    _require_retained_result(db, analysis)
     if analysis.status != "completed" or not analysis.results:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1983,6 +2064,7 @@ async def get_user_openai_daily_usage(
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
 
+    _require_retained_result(db, analysis)
     metadata = (analysis.results or {}).get("metadata", {})
     per_user = metadata.get("openai_usage_per_user", {})
 
@@ -2017,6 +2099,7 @@ async def get_user_github_daily_commits(
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
     
+    _require_retained_result(db, analysis)
     # Get the user's GitHub integration token or use beta token
     github_integration = db.query(GitHubIntegration).filter(
         GitHubIntegration.user_id == current_user.id
@@ -2086,6 +2169,10 @@ async def get_user_github_daily_commits(
         end_date=end_date,
         github_token=github_token
     )
+
+    # A policy change or cleanup during the provider request can expire the
+    # parent result. Historical source events remain valid within a fresh result.
+    _require_result_after_collection(db, analysis)
     
     if daily_commits is None:
         return {
@@ -2147,6 +2234,7 @@ async def get_analysis_github_commits_timeline(
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
     
+    _require_retained_result(db, analysis)
     if analysis.status != 'completed':
         return {
             "status": "error",
@@ -2283,6 +2371,8 @@ async def get_analysis_github_commits_timeline(
     
     # Execute all tasks concurrently
     results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
+
+    _require_result_after_collection(db, analysis)
     
     # Process results
     for i, (username, result) in enumerate(zip([t[0] for t in tasks], results)):
@@ -2460,6 +2550,7 @@ async def get_member_daily_health(
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
     
+    _require_retained_result(db, analysis)
     if analysis.status != 'completed':
         return {
             "status": "error",
@@ -2980,23 +3071,41 @@ def _persist_analysis_result(
     it to write the final status would raise and leave the analysis stuck in
     "running". Writing through a brand-new session guarantees a healthy
     connection (pool_pre_ping validates it on checkout) so the status is always
-    recorded. Returns True if the analysis row was found and updated.
+    recorded. Returns False when the row is missing. A newly stored result starts
+    its own retention lifetime, independently of the source events it contains.
+    Status-only failures preserve the previous result's generation time.
     """
-    from datetime import datetime
     from ...models import SessionLocal
 
     result_db = SessionLocal()
     try:
-        analysis = result_db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        organization_id = result_db.query(Analysis.organization_id).filter(Analysis.id == analysis_id).scalar()
+        # Serialize policy changes/cleanup and completion using their lock order:
+        # organization, then analysis. Re-read policy after long API waits.
+        _retention_cutoff(result_db, organization_id, lock=True)
+        analysis = result_db.query(Analysis).filter(Analysis.id == analysis_id).with_for_update().first()
         if not analysis:
             return False
+        previous_generation = result_generation_time(analysis)
         analysis.status = status
+        finished_at = datetime.now(timezone.utc)
         if results is not None:
             analysis.results = results
+            analysis.results_generated_at = finished_at
+        elif analysis.results and analysis.results_generated_at is None:
+            # Preserve a known legacy generation before changing its completed
+            # status or terminal bookkeeping. A failure cannot renew old data.
+            analysis.results_generated_at = previous_generation
         if error_message is not None:
             analysis.error_message = error_message
-        analysis.completed_at = datetime.now()
+        analysis.completed_at = finished_at
         result_db.commit()
+        redis_client = _get_redis_for_analysis()
+        if redis_client:
+            try:
+                redis_client.delete(f"analysis_data:{analysis_id}")
+            except Exception:
+                logger.warning("Could not invalidate analysis cache after result write for %s", analysis_id)
         return True
     finally:
         result_db.close()
@@ -3501,7 +3610,7 @@ async def run_analysis_task(
                         time_range_days=time_range,
                         include_weekends=include_weekends,
                         user_id=user_id,
-                        analysis_id=analysis_id
+                        analysis_id=analysis_id,
                     ),
                     timeout=900.0  # 15 minutes timeout
                 )
@@ -3941,7 +4050,7 @@ async def run_analysis_task(
                     result_size=len(str(results)) if results else 0
                 )
             else:
-                logger.error(f"❌ Analysis {analysis_ref}: Not found when trying to save results")
+                logger.error(f"❌ Analysis {analysis_ref}: Results were not saved because the analysis no longer exists")
                 
         except asyncio.TimeoutError:
             # Handle timeout

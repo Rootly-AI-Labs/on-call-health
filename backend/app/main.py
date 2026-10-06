@@ -156,10 +156,12 @@ async def health():
     monitoring before it turns into "too many clients already" errors.
     """
     from app.models.base import get_pool_status
+    retention_scheduler = getattr(app.state, "retention_scheduler", None)
     return {
         "status": "healthy",
         "service": "on-call-health",
         "db_pool": get_pool_status(),
+        "retention_scheduler_running": bool(retention_scheduler and retention_scheduler.scheduler.running),
     }
 
 @app.get('/favicon.ico', include_in_schema=False)
@@ -188,6 +190,13 @@ async def startup_event():
             print("⚠️  Some migrations failed - check logs")
     except Exception as e:
         print(f"⚠️  Migration runner failed: {e}")
+
+    # Daily retention is independent of report refresh and survey delivery.
+    # The job rechecks each current policy and takes a database claim per org.
+    from app.services.retention_scheduler import RetentionScheduler
+    app.state.retention_scheduler = RetentionScheduler()
+    app.state.retention_scheduler.start()
+    print("Retention cleanup scheduler started (daily at 03:00 UTC, with failure retries)")
 
     # Start survey scheduler
     from app.services.survey_scheduler import survey_scheduler
@@ -245,6 +254,9 @@ async def shutdown_event():
     where the old and new containers both hold full pools and can push the
     shared server over its connection limit.
     """
+    retention_scheduler = getattr(app.state, "retention_scheduler", None)
+    if retention_scheduler is not None:
+        await retention_scheduler.stop()
     from app.models.base import engine
     engine.dispose()
     logger.info("Database engine disposed on shutdown")

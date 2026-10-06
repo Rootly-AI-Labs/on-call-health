@@ -38,13 +38,16 @@ def put_organization_retention(
     update: RetentionPolicyUpdate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
+    now: datetime = Depends(retention_preview_now),
 ):
-    """Admins configure event-age retention; null disables the policy.
+    """Admins configure result-generation retention; null disables the policy.
 
     Enabling or shortening the period requires confirm_deletion=true.
-    This endpoint saves configuration; it does not execute cleanup.
+    Clearing results with unknown generation dates additionally requires a fresh signed
+    preview and confirm_legacy_deletion=true. This queues only reviewed results;
+    it does not execute cleanup when configuration is saved.
     """
-    return update_retention_policy(db, current_user, update)
+    return update_retention_policy(db, current_user, update, now=now)
 
 
 @router.post("/preview", response_model=RetentionPreviewResponse)
@@ -54,7 +57,7 @@ def preview_organization_retention(
     db: Session = Depends(get_db),
     now: datetime = Depends(retention_preview_now),
 ):
-    """Preview saved or proposed event-age retention without saving or deleting data.
+    """Preview result-generation and survey-submission retention without data changes.
 
     An empty object uses the saved policy. Explicit retention_days previews that
     proposed policy, including null for disabled. Only organization admins may preview.

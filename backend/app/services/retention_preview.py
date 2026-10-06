@@ -1,15 +1,15 @@
-"""Read-only event-age eligibility shared by retention previews and future cleanup.
+"""Read-only result-generation eligibility shared by preview and cleanup.
 
-An old event is sufficient to expire a whole result. Recent sampled events alone
-are insufficient to prove that its aggregate scores contain no older inputs.
+A report can contain any requested historical window. Its stored snapshot expires
+N days after generation; survey responses retain their separate submission age.
 """
-import json
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from fastapi import HTTPException
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -18,33 +18,21 @@ from ..models import (
     UserBurnoutReport, UserNotification, WeeklyDigestLog,
 )
 from .data_retention import RetentionDays, read_retention_policy
+from .retention_legacy import (
+    LegacyAnalysisEntry, create_legacy_preview_receipt,
+    fingerprint_analysis_result, pending_legacy_entries,
+)
 
 SAMPLE_LIMIT = 100
 QUERY_BATCH_SIZE = 500
 Disposition = Literal["expired", "retained", "unverifiable", "deferred", "empty"]
 _DATE_KEY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_EVENT_CONTAINERS = {
-    "raw_incident_data", "incidents", "commits", "messages", "daily_trends",
-    "survey_responses", "surveys", "responses",
-}
-_EVENT_KEYS = {
-    "created_at", "started_at", "occurred_at", "committed_at", "submitted_at",
-    "timestamp", "date", "ts",
-}
-_UNVERIFIED_SOURCE_FLAGS = (
-    "include_github", "include_slack", "include_jira", "include_linear", "include_ai_usage",
-)
-_ENRICHMENT_PAYLOAD_KEYS = {
-    "jira_tickets", "linear_issues", "jira_metrics", "linear_metrics",
-    "github_activity", "slack_activity", "github_metrics", "slack_metrics",
-    "github_burnout_breakdown", "github_insights", "slack_insights",
-    "openai_usage", "anthropic_usage", "openai_usage_per_user",
-}
 
 
 class RetentionPreviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     retention_days: RetentionDays | None = None
+    clear_unverifiable_analyses: StrictBool = False
 
 
 class AnalysisPreviewCounts(BaseModel):
@@ -76,10 +64,20 @@ class RelatedPreviewCounts(BaseModel):
 class AnalysisPreviewSample(BaseModel):
     analysis_id: int
     disposition: Disposition
-    oldest_event_at: datetime | None
+    generation_at: datetime | None
     reason: str
     is_saved: bool
     is_auto_refresh: bool
+    will_clear_as_legacy: bool = False
+
+
+class LegacyCleanupPreview(BaseModel):
+    requested: bool = False
+    analysis_candidates: int = 0
+    pending_analyses: int = 0
+    unverifiable_surveys: int = 0
+    preview_token: str | None = None
+    preview_expires_at: datetime | None = None
 
 
 class RetentionPreviewResponse(BaseModel):
@@ -97,12 +95,13 @@ class RetentionPreviewResponse(BaseModel):
     samples: list[AnalysisPreviewSample]
     samples_truncated: bool
     warnings: list[str]
+    legacy_cleanup: LegacyCleanupPreview = Field(default_factory=LegacyCleanupPreview)
 
 
 @dataclass(frozen=True)
 class AnalysisEligibility:
     disposition: Disposition
-    oldest_event_at: datetime | None
+    generation_at: datetime | None
     reason: str
 
 
@@ -128,141 +127,33 @@ def _event_time(value) -> datetime | None:
         return None
 
 
-def _collect_event_evidence(results: dict) -> tuple[list[datetime], bool, bool]:
-    """Return known event bounds, verified primary coverage, and uncertainty.
+def result_generation_time(analysis: Analysis) -> datetime | None:
+    """Trust the stored snapshot stamp, with successful legacy completion fallback.
 
-    Coverage ranges and event collections are recognized explicitly. User profile
-    timestamps, analysis timestamps and ticket due dates are not event-age evidence.
-    Date-keyed metrics use the earliest possible local day start as a lower bound.
+    Never infer report generation from row creation, source events or JSON fields.
+    A failed run's completion timestamp cannot renew an older result snapshot.
     """
-    evidence: list[datetime] = []
-    uncertain = False
-    primary_coverage = False
-
-    def add(value, *, slack_ts=False):
-        nonlocal uncertain
-        if slack_ts:
-            try:
-                if isinstance(value, bool):
-                    raise ValueError("A boolean is not a Slack event timestamp")
-                parsed = datetime.fromtimestamp(float(value), tz=timezone.utc)
-            except (TypeError, ValueError, OverflowError, OSError):
-                parsed = None
-        else:
-            parsed = _event_time(value)
-        if parsed is None:
-            uncertain = True
-        else:
-            evidence.append(parsed)
-        return parsed
-
-    def walk(value, path=()):
-        nonlocal uncertain, primary_coverage
-        if isinstance(value, list):
-            for entry in value:
-                walk(entry, path)
-            return
-        if not isinstance(value, dict):
-            return
-
-        # Read each event's own fields/attributes, avoiding nested user timestamps.
-        if path and path[-1] in _EVENT_CONTAINERS:
-            attrs = value.get("attributes")
-            event = attrs if isinstance(attrs, dict) else value
-            found = False
-            for key in _EVENT_KEYS:
-                if key in event and event[key] is not None:
-                    add(event[key], slack_ts=key == "ts")
-                    found = True
-            if not found:
-                uncertain = True
-
-        for key, entry in value.items():
-            if key == "date_range":
-                if isinstance(entry, dict):
-                    start = _event_time(entry.get("start", entry.get("start_date")))
-                    end = _event_time(entry.get("end", entry.get("end_date")))
-                    valid = start is not None and end is not None and start <= end
-                    if not valid:
-                        uncertain = True
-                    else:
-                        evidence.append(start)
-                        if path in (("metadata",), ("partial_data", "metadata")):
-                            primary_coverage = True
-                else:
-                    uncertain = True
-            elif path == ("metadata",) and key == "alerts" and isinstance(entry, dict):
-                start = _event_time(entry.get("start"))
-                end = _event_time(entry.get("end"))
-                if start is not None and end is not None and start <= end:
-                    evidence.append(start)
-                elif entry.get("start") is not None or entry.get("end") is not None:
-                    uncertain = True
-            elif isinstance(key, str) and _DATE_KEY.fullmatch(key):
-                add(key)
-            # Preserve the container context only for an event's own attributes;
-            # arbitrary fields such as nested responders are traversed separately.
-            walk(entry, path + (key,))
-
-    walk(results)
-    return evidence, primary_coverage, uncertain
-
-
-def _has_enrichment_payload(value) -> bool:
-    """Missing inclusion flags do not prove that legacy results lack enrichment."""
-    def populated(entry):
-        if isinstance(entry, dict):
-            return any(populated(item) for item in entry.values())
-        if isinstance(entry, list):
-            return any(populated(item) for item in entry)
-        return entry is not None and entry != "" and entry != 0 and entry is not False
-
-    if isinstance(value, list):
-        return any(_has_enrichment_payload(entry) for entry in value)
-    if isinstance(value, dict):
-        return any(
-            (key in _ENRICHMENT_PAYLOAD_KEYS and populated(entry)) or _has_enrichment_payload(entry)
-            for key, entry in value.items()
-        )
-    return False
+    value = getattr(analysis, "results_generated_at", None)
+    if value is None and analysis.status == "completed":
+        value = analysis.completed_at
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+        return None
+    return value.astimezone(timezone.utc)
 
 
 def classify_analysis_result(analysis: Analysis, cutoff: datetime) -> AnalysisEligibility:
-    """Evaluate a complete result without using its database creation timestamp."""
+    """Expire a whole stored result by generation age, independent of its inputs."""
     if analysis.status in ("pending", "running"):
         return AnalysisEligibility("deferred", None, "active_analysis")
     results = analysis.results
     if results is None or results == {} or results == "":
         return AnalysisEligibility("empty", None, "no_result_data")
-    if isinstance(results, str):
-        try:
-            results = json.loads(results)
-        except (ValueError, TypeError):
-            return AnalysisEligibility("unverifiable", None, "invalid_result_data")
-    if not isinstance(results, dict):
-        return AnalysisEligibility("unverifiable", None, "invalid_result_data")
-    if not results:
-        return AnalysisEligibility("empty", None, "no_result_data")
-
-    evidence, primary_coverage, uncertain = _collect_event_evidence(results)
-    oldest = min(evidence) if evidence else None
-    if oldest is not None and oldest < cutoff:
-        return AnalysisEligibility("expired", oldest, "event_before_cutoff")
-
-    # Legacy enrichment collectors do not reliably record aggregate provenance.
-    metadata = results.get("metadata") or {}
-    config = analysis.config or {}
-    enrichment = any(
-        isinstance(source, dict) and any(source.get(flag) for flag in _UNVERIFIED_SOURCE_FLAGS)
-        for source in (metadata, config)
-    )
-    if enrichment or _has_enrichment_payload(results):
-        return AnalysisEligibility("unverifiable", oldest, "unverified_source_coverage")
-    if uncertain:
-        return AnalysisEligibility("unverifiable", oldest, "invalid_event_timestamp")
-    if not primary_coverage:
-        return AnalysisEligibility("unverifiable", oldest, "missing_event_coverage")
-    return AnalysisEligibility("retained", oldest, "within_event_window")
+    generated = result_generation_time(analysis)
+    if generated is None:
+        return AnalysisEligibility("unverifiable", None, "missing_result_generation_time")
+    if generated < cutoff:
+        return AnalysisEligibility("expired", generated, "result_generated_before_cutoff")
+    return AnalysisEligibility("retained", generated, "within_result_retention_period")
 
 
 def _batches(ids):
@@ -314,10 +205,19 @@ def build_retention_preview(
     proposed = "retention_days" in request.model_fields_set
     days = request.retention_days if proposed else policy.retention_days
     cutoff = now - timedelta(days=days) if days is not None else None
+    if request.clear_unverifiable_analyses and cutoff is None:
+        raise HTTPException(status_code=422, detail="Legacy analysis cleanup requires an enabled retention period")
     analysis_counts = AnalysisPreviewCounts()
     survey_counts = SurveyPreviewCounts()
     samples = []
     expired_analysis_ids = []
+    legacy_analysis_ids = []
+    legacy_preview_entries = []
+    pending_entries = pending_legacy_entries(organization) if cutoff is not None else {}
+    legacy_preview = LegacyCleanupPreview(
+        requested=request.clear_unverifiable_analyses,
+        pending_analyses=len(pending_entries),
+    )
     expired_response_ids = []
     analyses = db.query(Analysis).filter(Analysis.organization_id == organization.id)
     surveys = db.query(UserBurnoutReport).filter(UserBurnoutReport.organization_id == organization.id)
@@ -334,11 +234,27 @@ def build_retention_preview(
             setattr(analysis_counts, name, getattr(analysis_counts, name) + 1)
             if name == "expired":
                 expired_analysis_ids.append(analysis.id)
+            will_clear_as_legacy = False
+            if name == "unverifiable" and (
+                request.clear_unverifiable_analyses or analysis.id in pending_entries
+            ):
+                fingerprint = fingerprint_analysis_result(analysis)
+                entry = pending_entries.get(analysis.id)
+                if request.clear_unverifiable_analyses or (
+                    entry is not None and entry.result_fingerprint == fingerprint
+                ):
+                    will_clear_as_legacy = True
+                    legacy_analysis_ids.append(analysis.id)
+                if request.clear_unverifiable_analyses:
+                    legacy_preview_entries.append(LegacyAnalysisEntry(
+                        analysis_id=analysis.id, result_fingerprint=fingerprint,
+                    ))
             if len(samples) < SAMPLE_LIMIT:
                 samples.append(AnalysisPreviewSample(
                     analysis_id=analysis.id, disposition=name,
-                    oldest_event_at=eligibility.oldest_event_at, reason=eligibility.reason,
+                    generation_at=eligibility.generation_at, reason=eligibility.reason,
                     is_saved=bool(analysis.is_saved), is_auto_refresh=bool(analysis.is_auto_refresh),
+                    will_clear_as_legacy=will_clear_as_legacy,
                 ))
         for response_id, submitted_at in surveys.with_entities(
             UserBurnoutReport.id, UserBurnoutReport.submitted_at
@@ -353,7 +269,14 @@ def build_retention_preview(
             else:
                 survey_counts.retained += 1
 
-    for batch in _batches(expired_analysis_ids):
+    legacy_preview.analysis_candidates = len(legacy_analysis_ids)
+    legacy_preview.unverifiable_surveys = survey_counts.unverifiable
+    if request.clear_unverifiable_analyses:
+        legacy_preview.preview_token, legacy_preview.preview_expires_at = create_legacy_preview_receipt(
+            organization, days, policy.updated_at, legacy_preview_entries, now=now,
+        )
+    affected_analysis_ids = expired_analysis_ids + legacy_analysis_ids
+    for batch in _batches(affected_analysis_ids):
         analysis_counts.regeneration_candidates += db.query(Analysis).join(
             RootlyIntegration, RootlyIntegration.id == Analysis.rootly_integration_id
         ).filter(
@@ -362,17 +285,22 @@ def build_retention_preview(
             RootlyIntegration.is_active.is_(True),
             func.length(func.trim(RootlyIntegration.api_token)) > 0,
         ).count()
-    related = _related_counts(db, organization.id, expired_analysis_ids, expired_response_ids, cutoff)
+    related = _related_counts(db, organization.id, affected_analysis_ids, expired_response_ids, cutoff)
     warnings = []
     if cutoff is not None:
-        warnings.append("Entire expired results include their scores and insights; regeneration must use only retained events.")
-        warnings.append("Date-only buckets use the earliest possible local day start (UTC+14); overlapping days can expire conservatively.")
+        warnings.append("Entire expired results include imported activity, historical metrics, scores and insights. Regeneration starts a new retention period and can use the requested historical window.")
         if analysis_counts.regeneration_candidates:
             warnings.append("Regeneration candidates have an active integration configured; provider access and regeneration are not guaranteed.")
     if analysis_counts.unverifiable or survey_counts.unverifiable:
-        warnings.append("Some event ages or source coverage cannot be verified; these records require review before enforcement.")
+        warnings.append("Some analysis generation dates or survey submission dates cannot be verified; these records require review before deletion.")
+    if request.clear_unverifiable_analyses:
+        warnings.append("Legacy cleanup clears only the unchanged analysis results in this preview after explicit confirmation; it does not authorize future unknown-age results.")
+    elif legacy_preview.analysis_candidates:
+        warnings.append("Previously approved unchanged legacy analysis results are included in cleanup; new or changed unknown-age results remain outside that approval.")
+    if legacy_preview.unverifiable_surveys:
+        warnings.append("Unknown-age survey responses are excluded from legacy analysis cleanup and require separate review; newer survey responses are preserved and unlinked.")
     if analysis_counts.deferred:
-        warnings.append("Running or pending analyses are deferred; their results must respect retention when stored.")
+        warnings.append("Running or pending analyses are deferred; newly stored results start their retention period when generated.")
     if related.references_requiring_review:
         warnings.append("Linked records have missing or different organization ownership and require review before deletion.")
     return RetentionPreviewResponse(
@@ -382,4 +310,5 @@ def build_retention_preview(
         related_records=related, samples=samples,
         samples_truncated=cutoff is not None and analysis_counts.total > SAMPLE_LIMIT,
         warnings=warnings,
+        legacy_cleanup=legacy_preview,
     )

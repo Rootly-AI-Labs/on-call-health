@@ -4,9 +4,9 @@ This document tracks implementation and verification of automatic deletion after
 
 Branch: `feat/org-data-retention`
 
-Last updated: October 4, 2026
+Last updated: October 5, 2026
 
-Current status: The user verified coverage, event age, the disabled default, and whole-result expiry for mixed-age analyses. Steps 1 through 3 are complete with 142 passing PostgreSQL tests across policy and preview. No retention deletion jobs have been implemented or run.
+Current status: **Steps 1 through 6 are implemented** with the user's approved result generation age rule and **one normal daily cleanup at 03:00 UTC**. Failed organizations receive separate targeted retries. The final targeted backend suite passed **649 tests**, and all **23** isolated browser scenarios passed; TypeScript passed. All local policies remain disabled, no application cleanup has run, and destructive tests used only the disposable test database. Step 7, full staging verification, remains.
 
 ## Agreed direction
 
@@ -16,27 +16,52 @@ Current status: The user verified coverage, event age, the disabled default, and
 - Support the same behavior in hosted and self-hosted installations.
 - Keep accounts, memberships, and integration credentials available for continued use.
 - Cover analysis results and historical metrics plus survey responses.
-- Determine expiry from underlying event age; survey responses use their submission timestamp.
+- Determine analysis expiry from when its stored result was generated; survey responses use their own submission timestamp.
 - Keep retention disabled until an organization admin explicitly enables it.
-- Expire the entire analysis result when it contains expired events, even if it also contains recent events; regeneration must use the retained window.
+- Expire the entire stored result once its generation date is older than the rolling cutoff, including embedded activity, metrics, insights and enrichments. Preserve analysis configuration.
+- Preserve the requested historical analysis window. A report generated today may cover four months of source activity and remain available for N days after generation. Successfully generating its replacement starts a new lifetime; a failed attempt without a new result does not renew the old snapshot.
+- Retention does not disable enrichment inputs. Existing feature settings and provider permissions continue to control collection; unrelated baseline feature limitations remain.
+
+The analysis window and retention period are independent. Four months is only the current demo's example, not a limit: a six-month analysis retains its six months of available source data, and its complete result expires N days after generation. Retention adds no analysis-window cap; the app's existing supported date-range limits still apply. The management explanation now uses general N-day wording and explicitly says retention does not shorten the requested window.
 
 The company requested automatic deletion after N days. Manual deletion by date range and deletion of the organization itself are separate features.
+
+## October 5 approved change: retain each generated result for N days
+
+The user explicitly asked to replace source event-age enforcement with report/result-age retention. This specification supersedes the original event-age decisions and source exclusions recorded in the historical findings below.
+
+- Store the server's generation timestamp in `Analysis.results_generated_at`. It is independent of the analysis row's creation date, source event dates, and terminal run-attempt bookkeeping in `completed_at`.
+- Each newly stored result snapshot receives the current UTC generation timestamp. Status-only failures preserve an existing result and its timestamp. Existing successful legacy completion dates are used when available; never invent a generation time from row creation or result JSON.
+- A 90-day policy allows a newly generated four-month report to retain its complete history for 90 days. Cleanup then clears the whole result and linked analysis diagnostics/caches. A new generated replacement may import older provider events again.
+- Surveys remain independently aged by submission date. Delete old responses, preserve newer or undated responses, and clear their links when the analysis expires. Delivery/send history and ongoing setup retain their existing treatment.
+- Remove the retention-specific incident-window clamp, event certification, and enrichment exclusions. GitHub, Slack, Jira, Linear, AI usage, and Rootly alerts use their existing settings and requested windows. Slack's unrelated pre-existing production limitation is unchanged.
+- Preview and reads use the same generation-date eligibility. Unknown generation dates require separate snapshot-bound approval for clearing; timestamps of the embedded source events no longer make a dated result unverifiable. The optional legacy receipt signing domain and result fingerprints changed so old event-age receipts cannot authorize this flow.
+- Policy responses report `age_basis: "analysis_generation"` and `survey_age_basis: "submission"`. Previously stored event-age draft settings normalize to the new basis without losing the configured period. Conditional saves still require a fresh policy version.
+- Enabling/shortening warnings now describe previously generated results, embedded data, preserved newer surveys/configuration, immediate read restrictions, and separate physical cleanup. The UI explains full requested history and displays generation dates in preview samples; it no longer claims enrichment is omitted.
+
+Migration **055**, `2026_10_05_add_analysis_results_generated_at.sql`, adds a nullable timezone-aware timestamp with no default. It backfills only existing completed results with known completion dates. Missing dates and failed legacy snapshots stay unknown. The startup migration runner registers it; it was also applied to the disposable test database. A regression test executes the actual SQL loader and migration twice, verifies backfill boundaries, and preserves payloads.
+
+Final verification: **577 backend checks**, **19 browser scenarios**, and TypeScript passed. Coverage includes full four-month windows and all configured enrichment inputs, expired generation dates despite recent source events, fresh results despite old source events, failures that cannot renew old snapshots, successful replacement, alternate result writers, legacy security, organization isolation, cache failures, dependencies, and migration idempotence. Provider/email calls and caches were mocked in destructive tests. The live management preview and member permissions passed with the policy still disabled.
+
+The existing local demo now has three 120-day-old generated results and one fresh result containing four months of source history. At 90 days it still previews **3 expired results, 1 old survey, and 2 detached survey links**; the fresh historical result remains retained. `upgrade --local-compose` updates only a marked disabled fixture, refuses unexpected dependencies, and is idempotent. The update preserved the organization, account membership, survey rows, credentials, and saved configuration.
 
 ## Implementation sequence
 
 | Step | Work | Status | Verification before moving on |
 | --- | --- | --- | --- |
-| 1 | Define covered data, age rules, and relationships | Complete | User verified coverage, event age, disabled default, and whole-result expiry |
+| 1 | Define covered data, age rules, and relationships | Complete | User approved result generation age, independent survey submission age, disabled default, and whole-result clearing |
 | 2 | Add the organization policy and admin API | Complete | 55 PostgreSQL integration tests passed; independent code review found no actionable issues |
 | 3 | Build a read-only cleanup preview | Complete | 87 preview tests passed, including cutoff boundaries, full-result expiry, and read-only behavior |
-| 4 | Implement deletion and dependency handling | Not started | Tests prove correct deletion, isolation, repeatability, and failure handling |
-| 5 | Add the admin settings UI | Not started | User checks saving, explanation, preview, and confirmation behavior |
-| 6 | Schedule daily cleanup and record outcomes | Not started | Tests cover overlap prevention, policy changes, failure reporting, and retry |
+| 4 | Implement deletion and dependency handling | Complete with result-age semantics | Final combined backend suite: 577 passed; retention-specific source exclusions removed |
+| 5 | Add the admin settings UI | Complete; ready for user review | 19 isolated browser scenarios, TypeScript, and live mock preview passed; generation-based copy and dates verified |
+| 6 | Schedule daily cleanup and record outcomes | Complete | 649 backend checks, 23 UI scenarios, TypeScript, fixed daily slots, targeted retries, PostgreSQL concurrency and shutdown drain passed |
 | 7 | Verify the full flow in staging | Not started | User verifies the feature with controlled data before pilot activation |
 
 Each step will update this document with changes, test results, unresolved issues, and the verification question for the next step. Ask for verification at meaningful product milestones, rather than for every routine code edit.
 
 ## Step 1 findings
+
+Historical note: the initial source event-age approach described in the original step 1 through 4 findings was superseded by the approved result-generation rule above. It no longer requires limiting source windows or disabling enrichment collectors.
 
 These findings come from source inspection. A read-only query also verified the five live foreign keys referencing analyses and survey responses in the local PostgreSQL database. No application data was changed.
 
@@ -76,7 +101,7 @@ An analysis combines incident data, survey scores, historical metrics, insights,
 
 Saved analyses would follow the same policy. Auto-refresh scheduling configuration must survive expiry separately from expired result content. Running jobs must recheck the policy when storing results. Missing or unreliable coverage bounds must be handled conservatively rather than by analysis creation time.
 
-The normal live survey query in `backend/app/api/endpoints/analyses.py` currently lacks an organization filter. This must be corrected before using those responses in organization-scoped retention results. Jira and Linear result payloads also lack sufficient event timestamps, so their collection and coverage handling need additional work before strict retention can be claimed. These are findings for the enforcement steps, not completed fixes.
+Initial inspection found a missing organization filter in the normal live survey query in `backend/app/api/endpoints/analyses.py`; step 4 corrected it. Jira and Linear result payloads also lack sufficient event timestamps, so their collection and coverage handling still need additional work before full integration coverage can be claimed.
 
 ## Step 2 implementation
 
@@ -87,7 +112,7 @@ Policy storage uses the existing `Organization.settings` JSON under `data_retent
 - Organization ownership comes from the authenticated user, not a client-supplied ID. Unknown request fields are rejected.
 - Enabling or shortening retention requires `confirm_deletion: true`; disabling or lengthening does not. This prepares the contract for later destructive enforcement.
 - Responses identify event age and both analysis and survey scope. Changes record time and actor; repeated identical saves preserve the original metadata.
-- These endpoints configure policy only. Cleanup, collection-window filtering, and the UI have not been implemented. No policy has been enabled on the current application database.
+- These endpoints configure policy without executing deletion. Enforcement and the UI are described in steps 4 and 5 below. No policy has been enabled on the current application database.
 
 Implementation files: `backend/app/services/data_retention.py`, `backend/app/api/endpoints/retention.py`, and router registration in `backend/app/main.py`.
 
@@ -127,23 +152,273 @@ Run both suites:
 docker compose exec -T -e RETENTION_TEST_DATABASE_URL=postgresql://postgres:password@postgres:5432/oncall_health_retention_test backend python -m pytest tests/test_retention_policy.py tests/test_retention_preview.py -q
 ```
 
+## Step 4 implementation
+
+`cleanup_organization_data` in `backend/app/services/retention_cleanup.py` applies the currently saved policy using a timezone-aware injected clock. It locks the organization before analyses and responses, verifies dependency ownership under row locks, and commits the organization cleanup atomically. A missing or mismatched organization reference aborts the whole transaction. Database or configured Redis failures roll back changes; retrying is safe.
+
+- Expire an entire analysis result by clearing `results` and its error text. Preserve its ID, saved flag, account links, credentials, requested configuration, and refresh settings.
+- Delete surveys strictly older than the cutoff by their own `submitted_at`, independently of their analysis.
+- Preserve newer or unknown-age surveys and clear only their expired analysis link.
+- Clear links from survey periods to deleted responses while preserving completion and delivery history, avoiding accidental resends.
+- Delete scoped analysis mappings and notifications; clear digest analysis links while preserving send history.
+- Invalidate every result-cache key belonging to the organization, including already-empty rows. Current provider roster and permission caches are configuration, not historical analysis data, and remain available.
+- Report unverifiable ages and defer pending/running jobs. Unverifiable content is not deleted based on analysis creation time. An explicit one-time legacy approval can clear reviewed, unchanged analysis results; unknown-age surveys remain separate.
+
+Read safeguards prevent an enabled policy from serving expired or unverifiable snapshots, even before the daily job runs. They bypass Redis while retention is enabled and check database result existence before using a cache while disabled. Analysis survey queries, Slack survey status, admin survey results, and connected-user survey counts now enforce organization ownership and the saved cutoff. Personal accounts remain scoped to their owner. Digest sends also require eligible results. Result writes re-read the saved policy after collection, rejecting inputs that are no longer eligible.
+
+Regeneration now filters primary incidents using exact timezone-aware event timestamps before any scoring, excludes older and future events, and rejects undated inputs. Worker provenance records the earliest timestamp across all scored inputs before raw incidents are capped for storage. Certified query boundaries and display-day labels are not mistaken for actual source events. Uncertified legacy results retain the conservative preview rules.
+
+**Current coverage limitation:** GitHub, Slack, Jira, Linear, AI usage and Rootly alert enrichment lack reliable exact event provenance in the existing collectors. Retention-enabled regeneration omits those sources with an explanatory metadata notice; GitHub detail refetches return unavailable rather than importing old activity. Requested integration settings are preserved. Unknown-age legacy results remain stored until their explicit one-time approval is processed and are unavailable through guarded analysis reads while retention is enabled. Unknown-age surveys still require separate review. Restoring full integration coverage is required before claiming complete historical-data deletion for the pilot.
+
+Retention-enabled auto-refresh preserves the analysis row and newer survey links, retains requested settings, and retries failed attempts at the configured interval. This step provides cleanup logic and safeguards; it does not enable retention, trigger cleanup against the current application database, introduce a manual deletion button, regenerate results automatically on cleanup, or add the daily schedule. The UI is step 5 and scheduling is step 6.
+
+Initial step 4 verification: **353 targeted tests passed**: 305 policy, preview, cleanup, provenance, collection, result/refresh, digest, and survey checks plus 48 existing regression checks. The October 5 extension raised the combined total to **482 passing tests**. All database cases used `oncall_health_retention_test`; provider and email calls were mocked. Only existing SQLAlchemy/Pydantic deprecation warnings appeared. Independent reviews prompted fixes for ownership races, manual reruns, lock ordering, Redis fallback, survey count leakage, and a digest failure that could stop later recipients. These regression cases now pass.
+
+A separate broader analyzer check produced 49 passes and 10 failures. Running that suite against the committed pre-step-4 analyzer source reproduced the identical 10 failures and 49 passes, confirming that the failures already existed. They reference removed helper methods and obsolete score fields; they remain outside this retention change.
+
+Repeat the final targeted suite:
+
+```powershell
+docker compose exec -T `
+  -e DATABASE_URL=postgresql://postgres:password@postgres:5432/oncall_health_retention_test `
+  -e RETENTION_TEST_DATABASE_URL=postgresql://postgres:password@postgres:5432/oncall_health_retention_test `
+  backend python -m pytest `
+  tests/test_retention_policy.py tests/test_retention_policy_version.py tests/test_retention_preview.py `
+  tests/test_retention_cleanup.py tests/test_retention_provenance.py `
+  tests/test_retention_collection_inputs.py tests/test_retention_analysis_guards.py `
+  tests/test_retention_digest_guards.py tests/test_retention_survey_guards.py `
+  tests/test_retention_legacy_cleanup.py tests/test_retention_legacy_receipts.py `
+  tests/test_retention_demo.py `
+  tests/test_retention_generation_migration.py `
+  tests/test_retention_status.py tests/test_retention_scheduler.py `
+  tests/test_analysis_trim.py tests/test_member_surveys.py `
+  tests/test_survey_response_service.py tests/test_pd_analytics_normalize_slim.py -q
+```
+
+## October 5 extension: existing data and unknown-age legacy history
+
+The user approved applying retention to both existing and future data as soon as an admin enables it. There is no additional N-day waiting period: the first cleanup processes eligible existing events and surveys older than the current cutoff. Saving settings still does not execute deletion; step 6 will schedule cleanup.
+
+Unknown-age analysis history has a separate, optional one-time clearing flow:
+
+1. Preview the desired period with `clear_unverifiable_analyses: true`. The response distinguishes legacy analysis candidates, pending approved entries, and unknown-age survey counts. Samples mark which unknown-age results would be cleared. Related-record counts include those results.
+2. Confirm the policy using `confirm_deletion` where required, and separately confirm legacy clearing using `confirm_legacy_deletion: true` plus the returned `legacy_preview_token`. A normal policy confirmation never authorizes unknown-age deletion.
+3. The backend checks the organization's identity, requested days, saved policy revision, preview expiry, and the current result snapshot. Changed history requires a new preview. Preview receipts expire after 15 minutes and cannot be replayed as new approvals.
+4. The saved approval contains only specific analysis IDs and fingerprints of their result content and generation timestamps. It grants no ongoing permission to delete future unknown-age results. Confirming queues cleanup; it does not immediately clear application data.
+5. Cleanup clears matching unchanged unknown-age results and their scoped dependencies, preserving analysis configuration and newer surveys. Changed, regenerated, new, retained, empty, or deleted results are skipped. Unchanged snapshots in running jobs remain pending until eligible for another run. Approval consumption and data clearing commit together; failures preserve the approval for retry.
+6. Disabling retention cancels pending legacy approval. GET policy reports pending/completed/cancelled status and counts. Another approval cannot replace a pending batch accidentally.
+
+API example for step 5 to wire into the admin UI:
+
+`POST /auth/organizations/retention/preview`
+
+```json
+{"retention_days":90,"clear_unverifiable_analyses":true}
+```
+
+After reviewing the returned counts and samples:
+
+`PUT /auth/organizations/retention`
+
+```json
+{
+  "retention_days":90,
+  "confirm_deletion":true,
+  "clear_unverifiable_analyses":true,
+  "confirm_legacy_deletion":true,
+  "legacy_preview_token":"<legacy_cleanup.preview_token from the preview>"
+}
+```
+
+Omit the legacy fields for normal retention configuration. Preview and confirmation require organization admin permissions. Preview receipts are separate from login tokens, and confirmed receipt IDs are remembered through their 15-minute validity window. Cancellation reports the cancelled remainder separately from cleared and skipped records.
+
+Surveys retain their own submission-age rule. Missing submission timestamps are reported separately and never deleted under a legacy analysis approval. Newer surveys survive and lose only links to cleared analysis results.
+
+Implementation: `retention_legacy.py`, policy/preview endpoints and services, and cleanup integration. No database migration is needed; the one-time authorization uses a separate organization settings key. Step 5 now provides the admin UI; the daily scheduler remains step 6. This extension covers legacy handling; restoring each omitted integration is separate collector work.
+
+Suggested restoration order from source review: AI usage (preserve UTC bucket bounds and exclude overlapping buckets), Jira/Linear (fetch and filter created/updated timestamps before scores), Rootly alerts (filter alerts and related events before counters), and GitHub (replace or certify aggregates whose inputs differ from sampled commits). Slack is already disabled globally and needs a separate organization/workspace scoping and timestamp review. Every restored source must supply verified input provenance; grandfathering older analyses does not fix future collection of old events.
+
+Verification complete: **482 targeted tests passed** in the combined run: 434 retention checks plus 48 existing regressions. The extension adds 58 API/database cleanup tests and 71 receipt/security tests. These cover immediate application to existing expired data, separate admin confirmation, stale and replayed previews, exact approved generations, cancellation accounting, active-job deferral, safe retries, scoped dependencies, and newer/unknown-age survey preservation. Database tests use the disposable test database and mocked caches; pure receipt tests contact no external services. Independent review found no remaining actionable issue in the approval-to-cleanup flow. The API remains healthy, and the new confirmation fields are exposed in OpenAPI.
+
+## Step 5 implementation
+
+Organization Management at `/management` now includes a **Data retention** card above the integration-specific table. It applies to the authenticated user's On-Call Health organization and stays independent of the incident integration selector and team roles. Both management views show the same organization policy. The card also works without a primary integration.
+
+- Fetch current identity and role from `/auth/user/me`. Members can read the saved policy and cleanup status; only admins see editing or preview controls. Cached browser roles cannot grant access. Accounts without an organization receive a clear explanation.
+- Provide a disabled-by-default switch and a retention-days field with whole-number validation from 1 through 3650. The initial 90-day draft is not saved or enabled automatically.
+- Require a matching read-only preview before saving changed settings. Show analysis and survey expiry counts, legacy candidates, detached links, unknown ages, deferred jobs, related records, warnings, and capped analysis samples. Editing any setting invalidates the preview. Counts can change before cleanup as data and the rolling cutoff change.
+- Require confirmation of permanent deletion when enabling or shortening retention. Clearing unknown-age analyses requires its own checkbox and fresh receipt. Legacy receipt expiry disables saving, and errors discard the old receipt instead of automatically retrying it.
+- Show an explicit amber warning beside the draft controls and again in the confirmation dialog when enabling retention or shortening its period. Use the proposed number of days and explain that existing and future data are covered, entire mixed-age results are cleared, surveys expire by submission age, newer responses and configuration survive, and deleted content cannot be restored. Distinguish immediate result-read restrictions from physical cleanup; unknown-age deletion still requires separate approval. The dialog shows preview counts and explains that counts can change before cleanup. No destructive warning is shown for disabled drafts, invalid periods, or lengthening retention.
+- Show pending/completed/cancelled legacy status with cleared, skipped, and cancelled counts. Prevent approving another batch while one is pending. Disabling retention explains cancellation before saving.
+- Explain whole-result expiry by generation date, independent survey age, preserved configuration, requested historical windows and existing integration behavior. Normal automatic cleanup runs once daily at 03:00 UTC. Saving configures cleanup without running deletion during the request; only failed organizations get earlier retries.
+- Reload saved settings and status with **Refresh settings**. Verify current identity before each action, detect changed sessions and organization membership, cancel client requests on unmount, and keep controls disabled while a request runs.
+
+Conditional saves close a race between preview and confirmation. GET and PUT policy responses include a `policy_version` digest of the organization ID and complete policy revision. The UI sends it as `expected_policy_version`; the backend compares it under the organization row lock before staging changes. A different organization or newer policy returns `409 retention_policy_changed` and requires refreshed settings and a new preview. The digest contains no secrets and is not an authorization token. Existing API callers that omit this optional precondition remain compatible.
+
+Implementation files: `frontend/src/app/management/components/DataRetentionSettings.tsx`, `frontend/src/lib/data-retention.ts`, its mount in `frontend/src/app/management/page.tsx`, and the conditional-save guard in `backend/app/services/data_retention.py`.
+
+Initial verification passed 505 backend tests and 18 browser scenarios. The approved generation-age revision now passes **577 backend tests and 19 browser scenarios**, plus TypeScript. Tests in `frontend/e2e/data-retention.spec.ts` mock every off-origin request and never authenticate against or modify the application database. They cover permissions despite forged cached roles, days validation, enabling/shortening/lengthening, independent legacy consent, exact receipt and policy version payloads, changed settings and stale receipts, pending cancellation, reload/status, preview errors, changed membership and sessions (including changes during an awaited identity check), generation-date samples, four-month history, and mobile overflow. Desktop and 390-pixel mobile previews and confirmation dialogs were rendered and visually inspected.
+
+Repeat the isolated browser suite with frontend dependencies and a Playwright browser available:
+
+```powershell
+npx playwright test e2e/data-retention.spec.ts --project=chromium --no-deps --workers=1 --reporter=line
+```
+
+Run from `frontend`. The test overrides authentication storage and uses mocked identity; `--no-deps` skips the existing setup project's real login. The local Windows run used existing Playwright packages from the Docker dependency volume in a temporary folder and the cached Chromium executable via `RETENTION_E2E_CHROMIUM_PATH`, without installing dependencies or modifying configuration.
+
+To repeat using the temporary tooling already prepared on this computer:
+
+```powershell
+$retentionTools = Join-Path $env:TEMP 'oncall-retention-playwright'
+$env:NODE_PATH = Join-Path $retentionTools 'node_modules'
+$env:E2E_TEST_EMAIL = 'unused@example.test'
+$env:E2E_TEST_PASSWORD = 'unused-mocked-test'
+$env:RETENTION_E2E_CHROMIUM_PATH = Join-Path $env:LOCALAPPDATA 'ms-playwright\chromium_headless_shell-1234\chrome-headless-shell-win64\chrome-headless-shell.exe'
+node (Join-Path $retentionTools 'node_modules\@playwright\test\cli.js') test e2e/data-retention.spec.ts --project=chromium --no-deps --workers=1 --reporter=line
+```
+
+The email/password values are inert placeholders; the test suite makes no real login requests.
+
+Existing lint tooling is incompatible with the installed package versions: `bun run lint` invokes the removed `next lint` command, and a direct attempt with the installed Next ESLint configuration fails in `eslint-plugin-react` under ESLint 10. Dependency and lint configuration repairs are outside this retention step; TypeScript, backend tests, and browser checks provide the current verification.
+
+## Step 6: automatic cleanup and outcome reporting
+
+The user authorized moving on after verification of generation-based retention. Implemented `retention_scheduler.py` and `retention_status.py`, wired application startup/shutdown, and added cleanup outcomes to the policy API and Organization Management.
+
+- A UTC-aware background scheduler runs one normal **daily job at 03:00 UTC**. The user replaced the earlier 15-minute polling design with this daily schedule. Newly enabled settings, changed policies and new legacy approvals wait for the next daily slot, normally within 24 hours. A single startup recovery handles missed eligible daily work and rehydrates failed-organization retry timers; there is no recurring global 15-minute scan.
+- Eligibility is anchored to the daily UTC slot and the successful attempt's start, not its completion plus 24 hours. A 03:00 run that finishes at 03:03 does not skip the following day. Existing status records without a start timestamp use completion-day fallback. Policy/approval changes made after the latest slot wait for the next one. Finishing a legacy batch does not repeatedly trigger cleanup.
+- Scan active organization IDs in bounded pages without fetching every organization's settings or credentials. Resolve the current strict policy after claiming each organization. Disabled, inactive, locked, not-due and invalid policies do not delete data. One organization's failure does not stop the others.
+- Claim an organization with PostgreSQL `FOR UPDATE SKIP LOCKED` in the same session used through cleanup's commit. The policy, result writers and cleanup already share organization locks. Competing processes skip a claimed organization, and persisted success metadata prevents duplicate work after a restart. No Redis lease can expire while deletion is still running.
+- Store the last successful outcome and counts under the separate `Organization.settings.data_retention_cleanup` key **in the same transaction as deletion**. A database/commit failure rolls back both data changes and success metadata. This status does not alter the policy version or invalidate a reviewed policy merely because the job ran.
+- After a failed transaction, record only a fixed error code/message under a fresh organization lock. Reject stale failure reports if the policy, approved legacy batch, or newer attempt superseded them. Preserve previous successful counts. Queue a one-off timer for that failed organization after 15, 30, 60, 120, 240 and then at most 360 minutes, measured from the attempt's finish. The callback rechecks current failure state and revision under the same row lock; obsolete timers cannot process healthy work or newly changed settings. Locked retries do not repeatedly reschedule an overdue timer in a busy loop.
+- Perform synchronous database/cache work in the scheduler's worker executor. On shutdown, stop claiming organizations, finish the current atomic cleanup, await the executor drain, and only then dispose the database engine. Repeated start/stop and simultaneous stop callers are covered. This replaced an initial async-wrapper design that could leave a thread running during shutdown.
+- GET/PUT policy includes `cleanup_status`: state, last attempt/finish/success, future due/retry eligibility, consecutive failures and typed last-successful counts. Arbitrary saved error text is never returned. Revision identifiers are constrained to their hash/UUID formats. Unknown or invalid status is reported without echoing stored content.
+- The UI shows timing, paused/never/succeeded/failed/skipped states, last successful counts and related outcomes, and fixed failure/retry messages. Members can read and refresh these details without gaining editing or preview permissions. Scheduling text uses the **saved** policy, independently of unsaved draft switches. Due times describe eligibility, not an exact deletion appointment.
+
+Physical deletion follows expiry at a normal daily run, or a failure retry/recovery if applicable; result-read safeguards enforce expiry before physical cleanup. Saving does not execute deletion in that request. Newly enabled settings apply to cleanup at the next scheduled daily slot. This is the same application behavior for hosted and self-hosted deployment while the backend is running.
+
+No database migration is needed for step 6; validated status uses a separate existing JSON settings key. Health exposes `retention_scheduler_running` for operational verification. Normal automated cleanup applies the organization policy; the manual demo CLI additionally enforces its fixture manifest.
+
+Verification complete: **649 targeted backend tests passed**, including 54 scheduler and 18 status checks. PostgreSQL tests use the guarded `oncall_health_retention_test` database with mocked cache/provider effects. They verify actual independent-session concurrent workers, startup deduplication, fixed daily slots despite long completion, after-slot policy/approval changes, healthy/stale/locked retry safeguards, one-off retry restoration, rollback and commit failure, sanitized status, bounded retries, organization isolation, and a blocked cleanup that drains before shutdown without taking another organization. Existing repeat-cleanup tests allow only the target organization's outcome metadata/updated timestamp to change while requiring all business data and other organizations to remain identical.
+
+All **23 browser scenarios** and TypeScript passed, including successful outcomes, legacy counts, preserved counts after failure, retry display, member refresh and disabled scheduling. Desktop/mobile status panels were rendered and reviewed. The live mock management preview and member permissions pass, backend health reports the scheduler running, and there are **zero enabled local policies**. The mock policy remains disabled, its status is **Not run yet**, and no application results or surveys were deleted. Provider/email actions were not performed by verification.
+
+## Local mock organization for user verification
+
+Created October 5 at the user's request in the local Compose application database: **Retention Demo** (organization ID 3), with the selected existing local account as admin. Alex Morgan, Priya Shah, and Noah Chen are fictional members with reserved `.invalid` email addresses. Open `http://localhost:3000/management`; **Team Roles** shows all four accounts. Refresh an existing session to pick up the membership.
+
+The seed temporarily moves the selected existing account into this organization and disables its weekly digest. Its original organization, role, join date, and digest preference are stored in the demo manifest for restoration. Original analyses, other organizations, passwords, and real OAuth credentials are preserved. Fictional users have no passwords, provider tokens, or digest delivery. Their local provider markers only make them visible in Team Roles. No external integrations, refresh jobs or survey schedules are created, and retention starts disabled. The mock `running` analysis is deliberately deferred; no worker is executing it.
+
+Retention starts **disabled**. The seven analysis fixtures and four surveys cover these cases:
+
+| Fixture | Expected outcome at 90 days |
+| --- | --- |
+| Three results generated 120 days ago, including a saved result | 3 whole analysis results expire; rows and configuration remain |
+| Fresh result containing four months of historical activity | 1 result retained, including its older source data |
+| Legacy result with unknown generation date | 1 reported for separate approval; preserved by normal retention |
+| Mock running result | 1 deferred |
+| Empty result | 1 empty |
+| Old survey linked to an old result | 1 survey deleted by its own submission age |
+| Recent survey linked to the mixed result | Response preserved; analysis link cleared |
+| Unknown-age survey linked to the old result | Response preserved; analysis link cleared |
+| Recent survey linked to the recent result | Response and link preserved |
+
+### Simple manual test
+
+1. Open **Data retention**, turn on the draft switch, leave **90** days, and click **Preview deletion**. Expect **3 analysis results**, **1 survey response**, and **2 survey links**. Previewing changes no policy or data.
+2. Optionally select **Include results with unknown generation dates in this one-time cleanup**, then preview again. It adds **1 legacy result** and requires its separate confirmation. The unknown-age survey remains preserved.
+3. Click **Save retention policy**, review the confirmation, and save. Reload to verify the saved 90-day policy. Saving does not run cleanup during the request; the next normal daily run is at 03:00 UTC, normally within 24 hours while the backend is running.
+4. Wait for the daily run and click **Refresh settings** to inspect the saved outcome, or run the fixture-only cleanup command below to test immediately. The three expired payloads become empty, the old survey disappears, and two preserved survey links become null. If separately approved, the legacy payload also becomes empty. Repeat cleanup to verify it does not delete the preserved responses; its last-successful counts update to reflect the new no-op run.
+
+```powershell
+docker compose exec -T backend python scripts/retention_demo.py cleanup --local-compose
+docker compose exec -T backend python scripts/retention_demo.py status --local-compose
+```
+
+To start over, reset the recorded demo and seed it again. Reset also restores the original account membership and digest preference before removing the fictional accounts and fixture data. Replace the example email with an existing local account's email.
+
+```powershell
+docker compose exec -T backend python scripts/retention_demo.py reset --local-compose
+docker compose exec -T backend python scripts/retention_demo.py seed --local-compose --email you@example.com
+```
+
+Reset and cleanup refuse unexpected members, data, schedules, providers, or dependent records instead of cascading through them. If new data was added and reset refuses, use **restore** to restore the original account membership, disable demo retention, cancel pending legacy approval, and leave all demo history intact:
+
+```powershell
+docker compose exec -T backend python scripts/retention_demo.py restore --local-compose
+```
+
+An optional single-use local login link avoids changing passwords. Run the first command to sign in as the selected existing account, or the second to check Alex's read-only member view. Substitute `priya` or `noah` for other members. Links expire in five minutes and create a 30-minute session. Link creation refuses accounts with GitHub/Jira/Linear integrations because the existing login page warms their provider permissions; use an existing session for such accounts.
+
+```powershell
+docker compose exec -T backend python scripts/retention_demo.py login-link --local-compose
+docker compose exec -T backend python scripts/retention_demo.py login-link --local-compose --member alex
+```
+
+Implementation: `backend/scripts/retention_demo.py` and `backend/scripts/retention_demo_fixtures.py`. Commands require the explicit local flag, local PostgreSQL Compose database, DEBUG mode, and backend container. They add no web endpoint or scheduler. Repeated seed is idempotent and preserves an already configured policy. Status previews 90 days read-only even when the saved policy differs; its `saved_policy` reports the actual value.
+
+Verification: **67 demo safety tests passed** against the disposable test database with rollback transactions and mocked cache/provider effects. These cover seed atomicity/idempotence, original data preservation, both cleanup modes, restoration/reset, generation-date upgrades, unexpected dependencies, cache failures, single-use login, provider-free links, and permissions. Live API and browser checks then confirmed the disabled policy, expected preview counts, four visible members, read-only member UI, and forbidden member preview/save requests. The live checks saved no policy and ran no cleanup. No real provider or email calls were made.
+
+```powershell
+docker compose exec -T `
+  -e DATABASE_URL=postgresql://postgres:password@postgres:5432/oncall_health_retention_test `
+  -e RETENTION_TEST_DATABASE_URL=postgresql://postgres:password@postgres:5432/oncall_health_retention_test `
+  backend python -m pytest tests/test_retention_demo.py -q
+```
+
+## October 5 step 5 verification and scope clarification
+
+The user requested a fresh verification before scheduling and asked whether retention simply removes analyses created before the cutoff and all linked data. No age or deletion rules were changed during this review.
+
+During this earlier review the implementation measured **underlying event age**, rather than `Analysis.created_at`; the user subsequently replaced that rule with result-generation age in the approved change above. Whole-result clearing and preservation of configuration remain unchanged.
+
+| Data | Current treatment |
+| --- | --- |
+| Expired analysis content | Clear the whole result payload, including existing enrichments |
+| Analysis record and configuration | Preserve |
+| Linked analysis mappings and notifications | Delete within the organization |
+| Analysis result caches | Evict; retention-enabled reads recheck persisted eligibility |
+| Old surveys, including unlinked ones | Delete by their own submission age |
+| Recent or unknown-age surveys linked to expired results | Preserve responses and clear only their analysis links |
+| Unknown-age analysis results | Hide from analysis reads immediately when enabled; retain stored content unless separately approved for one-time clearing |
+| Running/pending analysis results | Defer cleanup; workers check the policy before persisting results |
+| Survey delivery periods and digest send history | Preserve history; clear references to removed responses/results |
+| Accounts, memberships, credentials, integration settings and rosters | Preserve |
+| Unrelated notifications, login/audit records, backups, operational logs and already-sent emails | Outside this cleanup |
+| Original records in external providers | Outside this application's deletion scope |
+| Records without organization ownership | Outside automatic organization cleanup; do not guess ownership |
+
+The earlier **Current analysis coverage** warning described source exclusions required by the old event-age rule. Those retention-specific exclusions have now been removed. The replacement **Analysis history and retention** explanation describes preserving requested windows and expiring each generated result as a unit.
+
+Saving a policy does not run physical cleanup during that request, but enabling it immediately changes result-read eligibility. The final generation-age implementation preserves requested collection windows and integration behavior. The retained operational metadata and daily cleanup timing must be understood before pilot activation. The company request specifies automatic deletion after N days; it does not itself define the age basis or require deletion of every linked record regardless of that record's own age.
+
+Fresh verification: **565 targeted backend tests passed**, **18 isolated browser scenarios passed**, and frontend TypeScript passed. The live mock API/browser check again confirmed the expected 90-day preview (3 expired analyses, 1 old survey, 2 detached links), four-member Team Roles, and read-only member access. No application policy was saved, no cleanup ran, and no provider/email calls were made. Independent read-only review confirmed the scope above. Source: `retention_preview.py`, `retention_cleanup.py`, `analyses.py`, and the management retention card.
+
+The user subsequently approved the explicit existing-data warning. Implemented it in the settings and confirmation dialog without changing deletion rules. Extended the existing enabling, shortening, lengthening and invalid-period browser cases to verify the warning, dynamic days, preservation, timing, preview counts, and unchanged confirmation gates. All 18 browser scenarios and TypeScript passed. Desktop/mobile dialogs were visually inspected; an additional mobile check confirmed that the longer dialog scrolls to both separate checkboxes and the save button. The live demo preview still passes and its saved policy remains disabled.
+
 ## Decisions awaiting verification
 
 | Decision | Proposal | Status |
 | --- | --- | --- |
 | Initial coverage | Analysis results and historical metrics plus survey responses | Confirmed by user |
-| How data age is measured | Underlying event age; survey submission age | Confirmed by user |
+| How data age is measured | Analysis result generation age; independent survey submission age | Approved change implemented October 5 |
 | Existing organization default | Disabled until an admin explicitly enables retention | Confirmed by user |
-| Mixed-age analysis results | Expire the complete result when its oldest covered event crosses the cutoff; regenerate from retained data | Confirmed by user |
-| Saved and auto-refresh analyses | Saved data should not bypass an enabled policy; retain scheduling configuration where needed | Awaiting design review |
-| Running analyses | Avoid deleting in-progress work; enforce the chosen age rule when results are stored | Awaiting design review |
-| Related metadata | Define handling of survey periods, notifications, digest records, and caches | Awaiting dependency review |
+| Historical events within a report | Keep the complete requested historical window; expire the whole result N days after generation | Approved change implemented October 5 |
+| Saved and auto-refresh analyses | Saved results expire; preserve analysis rows/configuration, and refresh in place when retention is enabled | Implemented in step 4; awaiting user verification |
+| Running analyses | Defer cleanup of active jobs; check the current policy before saving or returning any result | Implemented in step 4 |
+| Related metadata | Delete scoped mappings/notifications; detach newer surveys, survey periods and digest links; evict result caches | Implemented in step 4 |
+| Enrichment collection | Preserve existing integration behavior and requested windows; no retention-specific exclusions | Restored and tested October 5 |
+| Existing versus future data | Apply the same rolling cutoff to both from the first cleanup; no additional N-day wait | Confirmed by user October 5 |
+| Legacy analyses with unknown generation dates | Optional one-time clearing of reviewed, unchanged snapshots with separate confirmation | Generation-based approval implemented and verified |
+| Unknown-age surveys | Report separately for review; do not cascade-delete from analyses | Approved by user October 5 |
 | Allowed number of days | Strict whole number from 1 through 3650; null disables the policy | Implemented in step 2 |
+| Admin settings UI | Organization-wide card with preview, separate legacy confirmation, and status | Implemented in step 5; awaiting user wording/flow verification |
 | Backups and operational logs | Document a separate policy; database cleanup alone does not erase backups or logs | Awaiting deployment review |
 
 ## Test strategy
 
-Use a separate PostgreSQL database with disposable fixtures. Do not run destructive retention tests against the current local application database. A feature branch does not isolate Docker volumes.
+Use a separate PostgreSQL database with disposable fixtures for automated destructive tests. A feature branch does not isolate Docker volumes. The user-authorized, marked local demo above is the manual verification exception: its CLI refuses cleanup/reset when unexpected data or dependencies are present.
 
 Inject a fixed clock into cleanup tests. Seed data around the cutoff rather than waiting for days to pass.
 
@@ -157,10 +432,11 @@ Inject a fixed clock into cleanup tests. Seed data around the cutoff rather than
 | Dependencies | No broken references; newer linked records survive as designed |
 | Preserved configuration | Accounts, memberships, credentials, and future collection remain functional |
 | Saved and running data | Behavior matches the verified policy for saved, running, and auto-refresh analyses |
-| Event age | Old underlying data is excluded even from newly generated results |
+| Generation age | Old result generations expire; fresh reports retain older source history; successful replacement renews age and failed attempts do not |
 | Preview consistency | Preview and deletion use the same eligibility logic, with cutoff and policy recorded |
 | Repeated runs | Second cleanup safely finds nothing already deleted |
 | Failure handling | Transaction behavior is correct; failures are visible and retries are safe |
+| Legacy authorization | Separate confirmation authorizes only reviewed unchanged snapshots; receipts expire, cannot replay, and cancel cleanly |
 | Scheduler | Multiple processes cannot perform overlapping cleanup for the same organization |
 | UI flow | Admin sets policy, reviews consequences, confirms, reloads, and sees the saved value |
 
@@ -181,7 +457,36 @@ Inject a fixed clock into cleanup tests. Seed data around the cutoff rather than
 | October 4, 2026 | 3 | Reviewed eligibility and large-payload handling; corrected legacy source detection and malformed Slack timestamps | Review findings addressed; analysis result streaming reduced to one payload per batch |
 | October 4, 2026 | 3 | Ran combined policy and preview tests including regression cases | 142 passed: 55 policy plus 87 preview; only an existing SQLAlchemy deprecation warning |
 | October 4, 2026 | 3 | Checked preview registration and local API health | Preview appears in OpenAPI and backend remains healthy |
+| October 4, 2026 | 4 | Implemented atomic cleanup, scoped dependency locks, independent survey expiry, result-cache eviction and repeatability | Tested only in the disposable database; application data untouched |
+| October 4, 2026 | 4 | Added exact incident filtering, full-input provenance and policy checks on result writes/reads | Unsupported enrichment excluded; unknown-age legacy results reported for review |
+| October 4, 2026 | 4 | Corrected auto-refresh continuity, survey status/results/count ownership, and digest eligibility/failure handling | Newer responses and requested settings preserved; mocked email/provider calls only |
+| October 4, 2026 | 4 | Ran final targeted suite after independent reviews | 353 passed: 305 retention checks plus 48 existing regressions |
+| October 4, 2026 | 4 | Compared older analyzer suite with committed pre-change source | Identical 10 failures and 49 passes; failures predate step 4 |
+| October 4, 2026 | 4 | Checked Docker services, API health, branch and patch whitespace | App healthy on localhost:3000; branch feat/org-data-retention; no whitespace errors |
+| October 5, 2026 | 4 extension | Added signed legacy previews, separate snapshot-bound approval, cancellation status, and atomic cleanup consumption | Backend implemented; no policy enabled or cleanup run against application data |
+| October 5, 2026 | 4 extension | Ran 58 legacy API/database tests and 71 receipt/security tests | Passed; covers existing data, exact generations, replay, cancellation, failures, and survey preservation |
+| October 5, 2026 | 4 extension | Ran the combined targeted suite and independently reviewed approval-to-cleanup flow | 482 passed; only three existing deprecation warnings; no remaining actionable review issue |
+| October 5, 2026 | 4 extension | Checked API health, confirmation schema, and patch whitespace | Healthy local API; preview and legacy confirmation fields available |
+| October 5, 2026 | 5 | Added organization-wide retention settings, read-only member view, previews, confirmations, and cleanup status | Implemented without changing an application policy |
+| October 5, 2026 | 5 | Added server-checked conditional saves and independent identity/session checks | 23 new PostgreSQL tests passed, including organization changes and stale revisions |
+| October 5, 2026 | 5 | Ran full backend suite and frontend TypeScript check | 505 backend tests passed; TypeScript passed |
+| October 5, 2026 | 5 | Attempted existing and direct lint commands | Existing Next/ESLint version incompatibilities prevent lint execution; dependency setup unchanged |
+| October 5, 2026 | 5 | Ran isolated browser suite and reviewed desktop/mobile renders | 18 passed; member/admin, confirmations, cancellation, stale revisions, sessions, and mobile overflow verified |
+| October 5, 2026 | 5 | Checked running frontend, API health, OpenAPI and patch whitespace | Management returns 200; API healthy; conditional-save schema available; no whitespace errors |
+| October 5, 2026 | 5 user verification | Added reversible local demo CLI, seven analysis fixtures, four surveys and three fictional members | Selected local account is admin of Retention Demo; saved retention remains disabled; no cleanup run |
+| October 5, 2026 | 5 user verification | Ran disposable demo lifecycle, ownership, dependency, rollback and login checks | 60 passed; application data excluded from automated destructive tests |
+| October 5, 2026 | 5 user verification | Checked actual API and browser preview, four-member Team Roles and read-only member permissions | Expected 3 expired results, 1 survey and 2 detached links; member preview/save returns 403; policy unchanged |
+| October 5, 2026 | 5 scope review | Re-ran targeted backend, browser and TypeScript checks and repeated the live mock preview | 565 backend and 18 browser tests passed; TypeScript passed; demo policy remains disabled |
+| October 5, 2026 | 5 scope review | Independently audited age basis, payload clearing, dependencies, preserved data and source exclusions | Event-age rules confirmed; broader deletion scope and enrichment omissions require product verification before step 6 |
+| October 5, 2026 | 5 warning refinement | Added approved existing-data warning to draft controls and confirmation, with proposed days, preview counts, preservation and timing | 18 browser scenarios and TypeScript passed; additional mobile control/scroll check passed; live demo remains disabled |
+| October 5, 2026 | Approved age-rule change | Switched analysis retention to stored result generation timestamps; restored full requested windows and enrichment behavior | Migration 055 applied; failed attempts preserve old snapshot age; no application results deleted |
+| October 5, 2026 | Approved age-rule change | Updated backend/UI/legacy security and upgraded the existing marked local demo | 577 backend and 19 browser checks passed; TypeScript passed; live demo remains disabled with 3/1/2 preview counts |
+| October 5, 2026 | Window clarification | Confirmed six-month/custom analysis windows remain independent of N-day retention; removed the fixed four-month UI example | Focused generation/history UI check passed; no retention-window logic changed |
+| October 5, 2026 | 6 | Added daily cleanup polling, atomic outcome status, bounded retry, same-session claims and sanitized API/UI reporting | Scheduler wired; local enabled-policy count is zero |
+| October 5, 2026 | 6 | Fixed shutdown to drain the current organization and prevent new claims before engine disposal | Real blocked-worker lifecycle test passed; independent review found no remaining blocker |
+| October 5, 2026 | 6 | Ran final backend/UI/type checks and live mock/health verification | 625 backend, 23 UI and TypeScript passed; scheduler running; mock still disabled and never cleaned |
+| October 5, 2026 | 6 schedule refinement | Replaced the 15-minute routine poll with daily 03:00 UTC cleanup and failure-only one-off timers | 649 backend and 23 UI tests passed; TypeScript passed; no application policy enabled or data deleted |
 
 ## Next action
 
-Implement step 4 cleanup with explicit dependency handling and retained-window regeneration safeguards. Do not claim event-age enforcement until collection paths, missing provenance, caches, running jobs, and auto-refresh continuity are handled. Continue using normal chat for verification questions because the terminal question widget was inaccessible.
+Next is **step 7: verify the complete automatic flow in staging** with a controlled organization and synthetic data before pilot activation. The local implementation through step 6 is complete and verified. Have the user review the new timing/outcome panel at `http://localhost:3000/management`; the mock remains disabled unless explicitly enabled for verification. Confirm separate policies for delivery/security history and backups before describing the feature as deletion of every organization record. Continue using normal chat for verification questions because the terminal question widget was inaccessible.
