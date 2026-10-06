@@ -25,7 +25,7 @@ from .retention_legacy import (
 
 SAMPLE_LIMIT = 100
 QUERY_BATCH_SIZE = 500
-Disposition = Literal["expired", "retained", "unverifiable", "deferred", "empty"]
+Disposition = Literal["expired", "retained", "unverifiable", "deferred", "empty", "excluded"]
 _DATE_KEY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -37,6 +37,7 @@ class RetentionPreviewRequest(BaseModel):
 
 class AnalysisPreviewCounts(BaseModel):
     total: int = 0
+    excluded: int = 0
     expired: int = 0
     retained: int = 0
     unverifiable: int = 0
@@ -141,8 +142,25 @@ def result_generation_time(analysis: Analysis) -> datetime | None:
     return value.astimezone(timezone.utc)
 
 
+def is_retention_exempt_demo(analysis: Analysis) -> bool:
+    """Identify server-created sample reports, never real integrated results.
+
+    Deliberate local retention fixtures remain eligible to exercise cleanup.
+    Do not trust display names, source JSON or truthy values as demo markers.
+    """
+    config = getattr(analysis, "config", None)
+    return (
+        isinstance(config, dict)
+        and config.get("is_demo") is True
+        and getattr(analysis, "rootly_integration_id", None) is None
+        and not config.get("local_retention_demo")
+    )
+
+
 def classify_analysis_result(analysis: Analysis, cutoff: datetime) -> AnalysisEligibility:
     """Expire a whole stored result by generation age, independent of its inputs."""
+    if is_retention_exempt_demo(analysis):
+        return AnalysisEligibility("excluded", None, "mock_demo_analysis")
     if analysis.status in ("pending", "running"):
         return AnalysisEligibility("deferred", None, "active_analysis")
     results = analysis.results
@@ -222,14 +240,17 @@ def build_retention_preview(
     analyses = db.query(Analysis).filter(Analysis.organization_id == organization.id)
     surveys = db.query(UserBurnoutReport).filter(UserBurnoutReport.organization_id == organization.id)
 
-    if cutoff is None:
-        analysis_counts.total = analyses.count()
-        survey_counts.total = surveys.count()
-    else:
-        # Result JSON can exceed 30 MB; never prefetch 100 payloads at once.
-        for analysis in analyses.order_by(Analysis.id).yield_per(1):
+    # Result JSON can exceed 30 MB; disabled previews need only identity/config.
+    preview_analyses = analyses if cutoff is not None else analyses.with_entities(
+        Analysis.id, Analysis.config, Analysis.rootly_integration_id,
+    )
+    for analysis in preview_analyses.order_by(Analysis.id).yield_per(1):
+        if is_retention_exempt_demo(analysis):
+            analysis_counts.excluded += 1
+            continue
+        analysis_counts.total += 1
+        if cutoff is not None:
             eligibility = classify_analysis_result(analysis, cutoff)
-            analysis_counts.total += 1
             name = eligibility.disposition
             setattr(analysis_counts, name, getattr(analysis_counts, name) + 1)
             if name == "expired":
@@ -256,6 +277,9 @@ def build_retention_preview(
                     is_saved=bool(analysis.is_saved), is_auto_refresh=bool(analysis.is_auto_refresh),
                     will_clear_as_legacy=will_clear_as_legacy,
                 ))
+    if cutoff is None:
+        survey_counts.total = surveys.count()
+    else:
         for response_id, submitted_at in surveys.with_entities(
             UserBurnoutReport.id, UserBurnoutReport.submitted_at
         ).yield_per(100):
@@ -292,13 +316,13 @@ def build_retention_preview(
         if analysis_counts.regeneration_candidates:
             warnings.append("Regeneration candidates have an active integration configured; provider access and regeneration are not guaranteed.")
     if analysis_counts.unverifiable or survey_counts.unverifiable:
-        warnings.append("Some analysis generation dates or survey submission dates cannot be verified; these records require review before deletion.")
+        warnings.append("Some analysis generation dates or survey submission dates cannot be verified. Ordinary retention preserves those records rather than guessing their age.")
     if request.clear_unverifiable_analyses:
         warnings.append("Legacy cleanup clears only the unchanged analysis results in this preview after explicit confirmation; it does not authorize future unknown-age results.")
     elif legacy_preview.analysis_candidates:
         warnings.append("Previously approved unchanged legacy analysis results are included in cleanup; new or changed unknown-age results remain outside that approval.")
     if legacy_preview.unverifiable_surveys:
-        warnings.append("Unknown-age survey responses are excluded from legacy analysis cleanup and require separate review; newer survey responses are preserved and unlinked.")
+        warnings.append("Survey responses without reliable submission dates are preserved. Newer responses survive and lose only their links to cleared results.")
     if analysis_counts.deferred:
         warnings.append("Running or pending analyses are deferred; newly stored results start their retention period when generated.")
     if related.references_requiring_review:

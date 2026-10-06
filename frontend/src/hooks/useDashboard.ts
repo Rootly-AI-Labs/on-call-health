@@ -338,6 +338,17 @@ export default function useDashboard() {
 
   const isNumericId = (value: string) => /^[0-9]+$/.test(value)
 
+  const clearUnavailableAnalysis = () => {
+    setCurrentAnalysis(null)
+    setSelectedMember(null)
+    setHistoricalTrends(null)
+    setAnalysisMappings(null)
+    setAnalysisCache(new Map())
+    setTrendsCache(new Map())
+    setGithubTimelineCache(new Map())
+    setRedirectingToSuggested(false)
+  }
+
   // Helper function to check if analysis has no incidents in time period
   function hasNoIncidentsInPeriod(): boolean {
     const data = currentAnalysis?.analysis_data
@@ -817,27 +828,9 @@ export default function useDashboard() {
           if (!analysisId && data.analyses && data.analyses.length > 0) {
             const mostRecentAnalysis = data.analyses[0]
 
-            const teamAnalysis = mostRecentAnalysis.analysis_data?.team_analysis
-            const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
-
-            if (members && Array.isArray(members) && members.length > 0) {
-              setCurrentAnalysis(mostRecentAnalysis)
-            } else {
-              // Summary only — fetch full data
-              const analysisKey = mostRecentAnalysis.uuid || mostRecentAnalysis.id.toString()
-              try {
-                const fullResp = await fetch(`${API_BASE}/analyses/by-id/${analysisKey}`, {
-                  headers: { 'Authorization': `Bearer ${authToken}` }
-                })
-                if (fullResp.ok) {
-                  const fullAnalysis = await fullResp.json()
-                  setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
-                  setCurrentAnalysis(fullAnalysis)
-                }
-              } catch {
-                // Non-critical: loadInitialData's priority selection is the primary path
-              }
-            }
+            // A saved summary cannot establish current retention eligibility.
+            const analysisKey = mostRecentAnalysis.uuid || mostRecentAnalysis.id.toString()
+            await fetchFullAnalysisById(analysisKey)
           }
         }
 
@@ -946,27 +939,18 @@ export default function useDashboard() {
     try {
       const authToken = checkAuthToken()
       if (!authToken) {
+        clearUnavailableAnalysis()
         return
       }
 
-      // Check cache first - only use if it has full analysis data with members
-      const cachedAnalysis = analysisCache.get(analysisId)
-      if (cachedAnalysis && cachedAnalysis.analysis_data) {
-        const teamAnalysis = cachedAnalysis.analysis_data.team_analysis
-        const members = Array.isArray(teamAnalysis) ? teamAnalysis : teamAnalysis?.members
-
-        // Only use cache if it has actual member data
-        if (members && Array.isArray(members) && members.length > 0) {
-          setCurrentAnalysis(cachedAnalysis)
-          setRedirectingToSuggested(false)
-          return
-        }
-      }
+      // Every open must recheck the server: a cached result may have expired or
+      // become unavailable after an organization changes its retention policy.
       const endpoint = isNumericId(analysisId)
         ? `${API_BASE}/analyses/${analysisId}`
         : `${API_BASE}/analyses/by-id/${analysisId}`
       
       const response = await fetch(endpoint, {
+        cache: 'no-store',
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -984,7 +968,13 @@ export default function useDashboard() {
         // Keep URL in numeric form for consistency and to avoid org-mismatch issues
         updateURLWithAnalysis(String(analysis.id))
       } else {
-        
+        clearUnavailableAnalysis()
+        if (response.status === 410) {
+          updateURLWithAnalysis(null)
+          toast.error("Analysis results are unavailable under your organization's data retention policy.")
+          return
+        }
+
         // Show user-friendly error message and handle suggested redirect
         if (response.status === 404) {
           try {
@@ -1012,27 +1002,30 @@ export default function useDashboard() {
         }
         
         // Only clear analysis state if we couldn't auto-redirect
-        setCurrentAnalysis(null)
-        setHistoricalTrends(null)
         // Remove invalid analysis ID from URL
         updateURLWithAnalysis(null)
         // Fall back to default selection (auto-refresh -> saved -> empty)
         selectDefaultAnalysis({ force: true })
       }
     } catch (error) {
+      clearUnavailableAnalysis()
     }
   }
 
   const fetchFullAnalysisById = async (analysisId: string): Promise<AnalysisResult | null> => {
     try {
       const authToken = checkAuthToken()
-      if (!authToken) return null
+      if (!authToken) {
+        clearUnavailableAnalysis()
+        return null
+      }
 
       const endpoint = isNumericId(analysisId)
         ? `${API_BASE}/analyses/${analysisId}`
         : `${API_BASE}/analyses/by-id/${analysisId}`
 
       const response = await fetch(endpoint, {
+        cache: 'no-store',
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -1045,8 +1038,10 @@ export default function useDashboard() {
         setCurrentAnalysis(analysis)
         return analysis
       }
+      clearUnavailableAnalysis()
     } catch (error) {
       // Non-critical: return null to allow fallback
+      clearUnavailableAnalysis()
     }
     return null
   }

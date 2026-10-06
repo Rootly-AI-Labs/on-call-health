@@ -114,6 +114,8 @@ def cleanup_organization_data(
 
     Unknown-age analyses clear only under a snapshot-bound admin approval. Active
     unchanged approved snapshots remain pending. Unknown-age surveys remain.
+    Built-in sample reports are excluded by the shared classifier, including
+    from prior unknown-date approvals; deliberate retention test fixtures are not.
     References with missing or different ownership abort the whole organization
     transaction. Cache eviction can precede a rollback, which is harmless; no
     successful outcome is reported before the database commit succeeds.
