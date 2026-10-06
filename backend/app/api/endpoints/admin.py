@@ -192,6 +192,8 @@ async def refresh_demo_analyses(
 
         created_count = 0
         deleted_count = 0
+        # Keep the response field for existing clients. Verification status is
+        # unrelated to whether an analysis contains disposable demo data.
         unverified_deleted = 0
         reports_deleted = 0
         checkins_loaded = 0
@@ -200,24 +202,6 @@ async def refresh_demo_analyses(
         # Get or create demo organization for health check-ins
         demo_organization_id = _get_or_create_demo_organization(db)
         logger.info(f"ADMIN: Using demo organization {demo_organization_id}")
-
-        # DELETE all analyses belonging to unverified (ghost) users
-        try:
-            unverified_user_ids = [
-                row[0] for row in db.query(User.id).filter(User.is_verified == False).all()
-            ]
-            if unverified_user_ids:
-                unverified_deleted = db.query(Analysis).filter(
-                    Analysis.user_id.in_(unverified_user_ids)
-                ).delete(synchronize_session=False)
-                db.commit()
-                logger.info(f"ADMIN: Deleted {unverified_deleted} analyses from {len(unverified_user_ids)} unverified users")
-            else:
-                logger.info("ADMIN: No unverified users found, skipping cleanup")
-        except Exception as e:
-            logger.error(f"ADMIN: Failed to delete unverified user analyses: {str(e)}")
-            db.rollback()
-            errors.append(f"Failed to delete unverified user analyses: {str(e)}")
 
         # DELETE all existing demo analyses first (clean slate approach)
         try:
@@ -268,6 +252,7 @@ async def refresh_demo_analyses(
                 config['is_demo'] = True
                 config['demo_created_at'] = datetime.now().isoformat()
 
+                generated_at = datetime.now(timezone.utc)
                 new_analysis = Analysis(
                     user_id=user.id,
                     organization_id=demo_organization_id,
@@ -280,7 +265,8 @@ async def refresh_demo_analyses(
                     config=config,
                     results=new_results,
                     error_message=None,
-                    completed_at=datetime.now()
+                    completed_at=generated_at,
+                    results_generated_at=generated_at,
                 )
                 db.add(new_analysis)
                 db.flush()

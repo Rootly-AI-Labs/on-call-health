@@ -1389,6 +1389,14 @@ class MigrationRunner:
                 "sql_file": "2026_04_20_add_openai_user_id_to_user_correlations.sql"
             },
             {
+                # Register the existing creation SQL before its alteration.
+                # Keep applied migration names intact; ordering, not numbering,
+                # establishes this missing prerequisite on fresh databases.
+                "name": "056_create_ai_usage_integrations",
+                "description": "Create AI usage integrations before applying its nullable organization migration",
+                "sql_file": "2026_03_31_add_ai_usage_integrations.sql"
+            },
+            {
                 "name": "053_ai_usage_nullable_org",
                 "description": "Make organization_id nullable in ai_usage_integrations and add partial unique indexes",
                 "sql_file": "2026_04_20_ai_usage_nullable_org.sql"
@@ -1402,6 +1410,16 @@ class MigrationRunner:
                 "sql_file": "2026_07_24_add_pagerduty_teams_to_user_correlations.sql"
             },
             # Add future migrations here with incrementing numbers
+            {
+                "name": "055_add_analysis_results_generated_at",
+                "description": "Track analysis result generation separately from run completion for retention",
+                "sql_file": "2026_10_05_add_analysis_results_generated_at.sql"
+            },
+            {
+                "name": "057_add_analysis_error_generated_at",
+                "description": "Track stored analysis error content age independently of status updates",
+                "sql_file": "2026_10_06_add_analysis_error_generated_at.sql"
+            },
         ]
 
         success_count = 0

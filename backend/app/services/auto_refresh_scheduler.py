@@ -55,7 +55,8 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
     and re-run them.  Pass interval_filter=None to process all intervals.
     """
     from ..models import SessionLocal, Analysis, RootlyIntegration, User
-    from ..api.endpoints.analyses import run_analysis_task
+    from ..api.endpoints.analyses import _retention_cutoff, run_analysis_task
+    from .retention_preview import result_generation_time
     from ..services.integration_validator import IntegrationValidator
     from ..services.notification_service import NotificationService
     from ..core.rootly_client import RootlyAPIClient
@@ -71,7 +72,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
         # Fetch completed auto-refresh analyses, optionally scoped to one interval
         candidates = db.query(Analysis).filter(
             Analysis.is_auto_refresh == True,
-            Analysis.status == "completed",
+            Analysis.status.in_(("completed", "failed")),
             Analysis.auto_refresh_interval != None,
             Analysis.completed_at != None,
         )
@@ -82,6 +83,9 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
         now = datetime.now(timezone.utc)
 
         for analysis in candidates:
+            if analysis.status == "failed" and _retention_cutoff(db, analysis.organization_id) is None:
+                db.rollback()
+                continue
             interval = _parse_interval(analysis.auto_refresh_interval)
             completed_at = analysis.completed_at
             # Ensure timezone-aware comparison
@@ -108,6 +112,10 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                         # Non-critical: lock_timeout not supported on all DBs
                         pass
 
+                    # Cleanup and policy writes take the organization first.
+                    # Hold its shared lock through validation/replacement so a
+                    # concurrent policy change cannot select unsafe behavior.
+                    retention_enabled = _retention_cutoff(db, old_analysis.organization_id, lock=True) is not None
                     locked_analysis = (
                         db.query(Analysis)
                         .filter(Analysis.id == old_analysis.id)
@@ -121,14 +129,20 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                             f"🔄 [AUTO_REFRESH_SCHEDULER] Skipping analysis {old_analysis.id}: "
                             f"locked by another worker"
                         )
+                        db.rollback()
                         continue
 
                     old_analysis = locked_analysis
 
                     # Re-check due state under lock (avoids TOCTOU duplicates)
-                    if not old_analysis.is_auto_refresh or old_analysis.status != "completed":
+                    if not old_analysis.is_auto_refresh or old_analysis.status not in ("completed", "failed"):
+                        db.rollback()
+                        continue
+                    if old_analysis.status == "failed" and not retention_enabled:
+                        db.rollback()
                         continue
                     if not old_analysis.auto_refresh_interval or not old_analysis.completed_at:
+                        db.rollback()
                         continue
 
                     interval = _parse_interval(old_analysis.auto_refresh_interval)
@@ -136,6 +150,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                     if completed_at.tzinfo is None:
                         completed_at = completed_at.replace(tzinfo=timezone.utc)
                     if now < completed_at + interval:
+                        db.rollback()
                         continue
 
                     # Look up integration to get api_token
@@ -174,6 +189,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                             message="Primary integration is not connected.",
                             provider="primary integration",
                         )
+                        db.rollback()
                         continue
                     
                     if not integration.is_active:
@@ -182,6 +198,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                             message="Primary integration is inactive or disconnected.",
                             provider=integration.platform,
                         )
+                        db.rollback()
                         continue
                     
                     if not integration.api_token or not integration.api_token.strip():
@@ -190,6 +207,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                             message="Primary integration token is missing. Reconnect to resume auto-refresh.",
                             provider=integration.platform,
                         )
+                        db.rollback()
                         continue
     
                     # Validate primary integration (Rootly/PagerDuty) before running auto-refresh.
@@ -253,6 +271,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                                 f"ðŸ”„ [AUTO_REFRESH_SCHEDULER] Failed to create notification for user "
                                 f"{old_analysis.user_id}: {notify_error}"
                             )
+                        db.rollback()
                         continue
     
                     # Clear any previous blocked state now that primary integration is valid
@@ -264,7 +283,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                     include_jira = bool(config.get("include_jira", False))
                     include_linear = bool(config.get("include_linear", False))
                     include_slack = bool(config.get("include_slack", False))
-    
+
                     invalid_secondary = []
                     if include_github or include_jira or include_linear:
                         validator = IntegrationValidator(db)
@@ -302,27 +321,44 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                     config["include_slack"] = include_slack
     
                     # Create new analysis record with same params
-                    new_analysis = Analysis(
-                        user_id=old_analysis.user_id,
-                        organization_id=old_analysis.organization_id,
-                        rootly_integration_id=old_analysis.rootly_integration_id,
-                        integration_name=old_analysis.integration_name,
-                        platform=old_analysis.platform,
-                        time_range=old_analysis.time_range,
-                        status="pending",
-                        is_saved=False,
-                        is_auto_refresh=True,
-                        auto_refresh_interval=old_analysis.auto_refresh_interval,
-                        config=config,
-                    )
-                    db.add(new_analysis)
+                    if retention_enabled:
+                        # Keep the configuration carrier and its foreign keys.
+                        # Cleanup deliberately preserves recent survey links;
+                        # replacing this row would risk deleting those surveys
+                        # or failing the FK check after a fresh response arrives.
+                        new_analysis = old_analysis
+                        # Preserve the snapshot until a replacement is written.
+                        # Capture a reliable legacy completion before resetting
+                        # attempt bookkeeping, so a failed run cannot lose it.
+                        if new_analysis.results and new_analysis.results_generated_at is None:
+                            new_analysis.results_generated_at = result_generation_time(new_analysis)
+                        new_analysis.status = "pending"
+                        new_analysis.created_at = now
+                        new_analysis.completed_at = None
+                        new_analysis.config = config
+                    else:
+                        new_analysis = Analysis(
+                            user_id=old_analysis.user_id,
+                            organization_id=old_analysis.organization_id,
+                            rootly_integration_id=old_analysis.rootly_integration_id,
+                            integration_name=old_analysis.integration_name,
+                            platform=old_analysis.platform,
+                            time_range=old_analysis.time_range,
+                            status="pending",
+                            is_saved=False,
+                            is_auto_refresh=True,
+                            auto_refresh_interval=old_analysis.auto_refresh_interval,
+                            config=config,
+                        )
+                        db.add(new_analysis)
                     db.flush()  # Get the new ID without committing yet
     
                     new_id = new_analysis.id
                     new_uuid = new_analysis.uuid
     
                     # Delete the old analysis
-                    db.delete(old_analysis)
+                    if not retention_enabled:
+                        db.delete(old_analysis)
                     db.commit()
     
                     user_obj = db.query(User).filter(User.id == old_analysis.user_id).first()

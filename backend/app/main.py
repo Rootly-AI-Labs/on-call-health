@@ -16,6 +16,7 @@ from .middleware.security import security_middleware
 from .middleware.user_logging import user_logging_middleware
 from .middleware.logging_context import UserContextFilter
 from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, jira, linear, llm, mappings, manual_mappings, debug_mappings, admin, notifications, invitations, surveys, api_keys, digests, ai_usage
+from .api.endpoints import retention
 
 # Configure logging based on environment variable
 LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
@@ -155,10 +156,12 @@ async def health():
     monitoring before it turns into "too many clients already" errors.
     """
     from app.models.base import get_pool_status
+    retention_scheduler = getattr(app.state, "retention_scheduler", None)
     return {
         "status": "healthy",
         "service": "on-call-health",
         "db_pool": get_pool_status(),
+        "retention_scheduler_running": bool(retention_scheduler and retention_scheduler.scheduler.running),
     }
 
 @app.get('/favicon.ico', include_in_schema=False)
@@ -187,6 +190,13 @@ async def startup_event():
             print("⚠️  Some migrations failed - check logs")
     except Exception as e:
         print(f"⚠️  Migration runner failed: {e}")
+
+    # Daily retention is independent of report refresh and survey delivery.
+    # The job rechecks each current policy and takes a database claim per org.
+    from app.services.retention_scheduler import RetentionScheduler
+    app.state.retention_scheduler = RetentionScheduler()
+    app.state.retention_scheduler.start()
+    print("Retention cleanup scheduler started (daily at 03:00 UTC, with failure retries)")
 
     # Start survey scheduler
     from app.services.survey_scheduler import survey_scheduler
@@ -244,6 +254,9 @@ async def shutdown_event():
     where the old and new containers both hold full pools and can push the
     shared server over its connection limit.
     """
+    retention_scheduler = getattr(app.state, "retention_scheduler", None)
+    if retention_scheduler is not None:
+        await retention_scheduler.stop()
     from app.models.base import engine
     engine.dispose()
     logger.info("Database engine disposed on shutdown")
@@ -251,6 +264,7 @@ async def shutdown_event():
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+app.include_router(retention.router, prefix="/auth/organizations/retention", tags=["retention"])
 app.include_router(rootly.router, prefix="/rootly", tags=["rootly"])
 app.include_router(pagerduty.router, prefix="/pagerduty", tags=["pagerduty"])
 app.include_router(analyses.router, prefix="/analyses", tags=["analyses"])

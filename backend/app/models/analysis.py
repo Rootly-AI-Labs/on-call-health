@@ -27,6 +27,11 @@ class Analysis(Base):
     error_message = Column(Text, nullable=True)  # Error details if failed
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+    # Age the stored snapshot independently from run attempts and source events.
+    results_generated_at = Column(DateTime(timezone=True), nullable=True)
+    # Error-only failures also contain retained content; attempt status alone
+    # must not renew its lifetime.
+    error_generated_at = Column(DateTime(timezone=True), nullable=True)
 
     # Save and auto-refresh support
     is_saved = Column(Boolean, default=False, nullable=False)

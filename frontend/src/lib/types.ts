@@ -229,6 +229,7 @@ export interface AnalysisResult {
   time_range: number
   error_message?: string
   completed_at?: string
+  results_generated_at?: string | null
   is_saved?: boolean
   is_auto_refresh?: boolean
   auto_refresh_interval?: string

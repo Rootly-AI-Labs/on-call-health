@@ -1977,7 +1977,8 @@ async def get_team_survey_status(
         # Validate analysis exists and belongs to current user
         analysis = db.query(Analysis).filter(
             Analysis.id == analysis_id,
-            Analysis.user_id == current_user.id
+            Analysis.user_id == current_user.id,
+            Analysis.organization_id == current_user.organization_id,
         ).first()
 
         if not analysis:
@@ -1985,6 +1986,11 @@ async def get_team_survey_status(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Analysis not found"
             )
+
+        # Use the same verified snapshot boundary as analysis reads. The runtime
+        # import avoids a cycle between integration and analysis endpoint modules.
+        from .analyses import _require_retained_result
+        cutoff = _require_retained_result(db, analysis)
 
         # Get team members from the analysis results. A scheduled survey response
         # should count anywhere this member appears, not only on a single
@@ -1994,7 +2000,8 @@ async def get_team_survey_status(
 
         survey_responses = []
         if team_members:
-            raw_responses = db.query(UserBurnoutReport).filter(
+            query = db.query(UserBurnoutReport).filter(
+                UserBurnoutReport.organization_id == analysis.organization_id,
                 or_(
                     UserBurnoutReport.analysis_id == analysis_id,
                     (
@@ -2002,7 +2009,16 @@ async def get_team_survey_status(
                         (UserBurnoutReport.submitted_at >= today_start)
                     )
                 )
-            ).order_by(
+            )
+            if analysis.organization_id is None:
+                query = query.filter(UserBurnoutReport.user_id == analysis.user_id)
+            if cutoff is not None:
+                # An analysis link cannot bypass a response's independent age.
+                query = query.filter(
+                    UserBurnoutReport.submitted_at >= cutoff,
+                    UserBurnoutReport.submitted_at <= datetime.now(timezone.utc),
+                )
+            raw_responses = query.order_by(
                 UserBurnoutReport.email.asc(),
                 UserBurnoutReport.submitted_at.desc()
             ).all()
