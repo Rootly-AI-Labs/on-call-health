@@ -20,6 +20,13 @@ function readableDate(value: string | null) {
   return value ? new Date(value).toLocaleString(undefined, { timeZone: "UTC" }) + " UTC" : "Unknown"
 }
 
+function readableCleanupDate(value: string | null) {
+  return value ? new Date(value).toLocaleString(undefined, {
+    timeZone: "UTC", month: "short", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit",
+  }) + " UTC" : "Never"
+}
+
 function messageFrom(error: unknown) {
   return error instanceof Error ? error.message : "Unable to update data retention. Please try again."
 }
@@ -40,6 +47,12 @@ export function DataRetentionSettings() {
   const [confirmPolicy, setConfirmPolicy] = useState(false)
   const sessionToken = useRef<string | null>(null)
   const actionController = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    if (!success) return
+    const timer = setTimeout(() => setSuccess(null), 5000)
+    return () => clearTimeout(timer)
+  }, [success])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -91,7 +104,7 @@ export function DataRetentionSettings() {
   const needsPolicyConfirmation = days !== null && policy !== null && (
     policy.retention_days === null || days < policy.retention_days
   )
-  const canSave = isAdmin && !busy && !invalidDays && previewMatches && policyChanged
+  const canSave = isAdmin && !busy && !invalidDays && (!enabled || previewMatches) && policyChanged
 
   function invalidatePreview() {
     setPreview(null)
@@ -168,7 +181,7 @@ export function DataRetentionSettings() {
     } catch (failure) {
       if (controller.signal.aborted) return
       setError(messageFrom(failure))
-      // A failed or ambiguous save requires a fresh preview before another attempt.
+      // Discard the previous preview and consent after a failed or ambiguous save.
       setPreview(null)
       setDialogOpen(false)
       setConfirmPolicy(false)
@@ -234,7 +247,11 @@ export function DataRetentionSettings() {
             {pendingLegacy && <p role="status" className="rounded-md bg-amber-50 p-3 text-xs leading-relaxed text-amber-950">An earlier approval to clear {policy.legacy_cleanup.pending_count} results with unknown generation dates is still pending. These unchanged results may be cleared at cleanup. Turn retention off and save to cancel the remaining approval.</p>}
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => void requestPreview()} disabled={Boolean(busy) || invalidDays}>{busy === "preview" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Preview deletion</Button>
-              <Button className="bg-purple-700 text-white hover:bg-purple-800" disabled={!canSave} onClick={() => { setConfirmPolicy(false); setDialogOpen(true) }}>Save retention policy</Button>
+              <Button className="bg-purple-700 text-white hover:bg-purple-800" disabled={!canSave} onClick={() => {
+                setConfirmPolicy(false)
+                if (!enabled) { void savePolicy(); return }
+                setDialogOpen(true)
+              }}>Save retention policy</Button>
               <Button variant="ghost" disabled={Boolean(busy)} onClick={() => { setSuccess(null); setReload((value) => value + 1) }}>Refresh settings</Button>
             </div>
           </> : <div className="space-y-3">{policy.enabled && <p className="text-sm text-neutral-700">Retention period: <span className="font-medium">{policy.retention_days} days</span></p>}<p className="text-sm text-neutral-500">Only organization admins can change this policy or preview deletion.</p><Button variant="ghost" onClick={() => setReload((value) => value + 1)}>Refresh settings</Button></div>}
@@ -244,35 +261,15 @@ export function DataRetentionSettings() {
             <summary className="cursor-pointer font-medium text-neutral-800">Cleanup history<span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-normal ${cleanup.state === "failed" ? "bg-red-50 text-red-700" : "bg-neutral-100 text-neutral-500"}`}>{cleanupState}</span></summary>
             <div className="mt-3 space-y-3">
               <h3 className="sr-only">Automatic cleanup status: {cleanupState}</h3>
-              {cleanup.state === "never" && <p className="text-xs text-neutral-600">No cleanup has run for this organization yet.{policy.enabled && <> Next cleanup: {cleanup.next_cleanup_due_at ? readableDate(cleanup.next_cleanup_due_at) : "the next daily run at 03:00 UTC"}.</>}</p>}
-              {cleanup.state === "failed" && <p role="alert" className="rounded-md bg-red-50 p-3 leading-relaxed text-red-800">{cleanup.message || "Cleanup could not finish. The organization will be retried automatically while retention remains enabled."}</p>}
-              {cleanup.state === "skipped" && cleanup.message && <p className="text-neutral-600">{cleanup.message}</p>}
-              {cleanup.state !== "never" && <dl className="grid gap-2 text-xs text-neutral-600 sm:grid-cols-2">
-                <div><dt className="font-medium">Last attempt</dt><dd>{cleanup.last_attempt_at ? readableDate(cleanup.last_attempt_at) : "Never"}</dd></div>
-                <div><dt className="font-medium">Last attempt finished</dt><dd>{cleanup.last_finished_at ? readableDate(cleanup.last_finished_at) : "Never"}</dd></div>
-                <div><dt className="font-medium">Last successful cleanup</dt><dd>{cleanup.last_success_at ? readableDate(cleanup.last_success_at) : "Never"}</dd></div>
-                <div><dt className="font-medium">{cleanup.next_retry_at && policy.enabled ? "Next retry eligible" : "Next cleanup due"}</dt><dd>{policy.enabled
-                  ? cleanup.next_retry_at ? readableDate(cleanup.next_retry_at) : cleanup.next_cleanup_due_at ? readableDate(cleanup.next_cleanup_due_at) : "At the next daily cleanup"
-                  : "Not scheduled while retention is disabled"}</dd></div>
-              </dl>}
-              {policy.enabled && cleanup.state !== "never" && <p className="text-xs text-neutral-500">Cleanup runs daily at 03:00 UTC, or at the displayed retry time after a failure. It may finish later if another run is in progress.</p>}
-              {cleanup.state !== "never" && <>
-                <p className="text-xs text-neutral-500">Counts below are from the last successful cleanup. A failed attempt does not replace those counts.</p>
-                <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {[
-                    ["Analysis results cleared", cleanup.counts.analysis_results_expired + cleanup.counts.legacy_analysis_results_cleared],
-                    ["Survey responses deleted", cleanup.counts.survey_responses_deleted],
-                    ["Survey links detached", cleanup.counts.survey_links_cleared],
-                  ].map(([label, count]) => <div key={label} className="rounded-md bg-neutral-50 p-3"><dt className="text-xs leading-5 text-neutral-600">{label}</dt><dd className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">{count}</dd></div>)}
-                </dl>
-                <details className="rounded-md border border-neutral-200 p-3 text-xs leading-relaxed text-neutral-600">
-                  <summary className="cursor-pointer font-medium">Related cleanup outcomes</summary>
-                  <p className="mt-2">Mappings removed: {cleanup.counts.mappings_deleted}; notifications removed: {cleanup.counts.notifications_deleted}; survey-period links cleared: {cleanup.counts.survey_period_links_cleared}; digest links cleared: {cleanup.counts.digest_links_cleared}.</p>
-                  <p className="mt-2">Results with unknown generation dates found: {cleanup.counts.analyses_unverifiable}; running or pending results deferred: {cleanup.counts.analyses_deferred}; surveys with unknown submission dates preserved: {cleanup.counts.surveys_unverifiable}.</p>
-                </details>
-              </>}
-              {cleanup.state === "failed" && <p className="text-xs text-neutral-500">Consecutive failed attempts: {cleanup.consecutive_failures}.</p>}
-              {policy.updated_at && <p className="text-xs text-neutral-500">Policy last changed {readableDate(policy.updated_at)}.</p>}
+              {cleanup.state === "failed" && <p role="alert" className="rounded-md bg-red-50 p-3 text-xs leading-relaxed text-red-800">{cleanup.message || "Cleanup could not finish. The organization will be retried automatically while retention remains enabled."}</p>}
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs text-neutral-600 sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+                <div className="min-w-0"><dt>Last successful cleanup</dt><dd className="mt-1 font-medium text-neutral-900" title={cleanup.last_success_at ? readableDate(cleanup.last_success_at) : undefined}>{readableCleanupDate(cleanup.last_success_at)}</dd></div>
+                {[
+                  ["Analyses cleared", cleanup.counts.analysis_results_expired + cleanup.counts.legacy_analysis_results_cleared],
+                  ["Surveys deleted", cleanup.counts.survey_responses_deleted],
+                  ["Survey links detached", cleanup.counts.survey_links_cleared],
+                ].map(([label, count]) => <div key={label} className="min-w-0"><dt>{label}</dt><dd className="mt-1 font-medium tabular-nums text-neutral-900">{count}</dd></div>)}
+              </dl>
             </div>
           </details>}
         </>}
@@ -288,7 +285,6 @@ export function DataRetentionSettings() {
           {preview.enabled ? <p className="text-xs text-neutral-500">Newer reports and surveys are kept. Demo reports are excluded. {preview.legacy_cleanup.analysis_candidates > 0 ? "Previously approved undated results are included." : "Undated records are skipped."}</p> : <p className="text-xs text-neutral-500">These settings turn off automatic cleanup.</p>}
           {preview.legacy_cleanup.analysis_candidates > 0 && <p className="text-xs text-amber-900">Includes {preview.legacy_cleanup.analysis_candidates} previously approved results.</p>}
           {preview.related_records.references_requiring_review > 0 && <p role="alert" className="text-xs text-amber-900">Some linked records need review before cleanup can proceed.</p>}
-          {preview.samples.length > 0 && <details className="rounded-md border border-neutral-200 p-3 text-sm"><summary className="cursor-pointer font-medium">Analysis samples ({preview.samples.length})</summary><div className="mt-3 max-h-72 overflow-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b"><th className="p-2">Analysis</th><th className="p-2">Generated</th><th className="p-2">Outcome</th><th className="p-2">Reason</th></tr></thead><tbody>{preview.samples.map((sample) => <tr key={sample.analysis_id} className="border-b last:border-0"><td className="whitespace-nowrap p-2 align-top">#{sample.analysis_id}{sample.is_saved ? " · Saved" : ""}{sample.is_auto_refresh ? " · Auto-refresh" : ""}</td><td className="p-2 align-top">{readableDate(sample.generation_at)}</td><td className="p-2 align-top">{sample.will_clear_as_legacy ? "Previously approved" : sample.disposition}</td><td className="p-2 align-top">{sample.reason}</td></tr>)}</tbody></table></div>{preview.samples_truncated && <p className="mt-2 text-xs text-neutral-500">Only the first 100 analyses are shown. Counts include all organization data.</p>}</details>}
         </div>}
       </div>
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (busy !== "save") setDialogOpen(open) }}>
