@@ -19,7 +19,10 @@ from ...services.slack_token_service import get_slack_token_for_user, SlackToken
 from ...core.rate_limiting import analysis_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest
 from ...middleware.logging_context import set_analysis_context, clear_analysis_context
-from .analyses import sanitize_burnout_score_from_response
+from .analyses import (
+    _persist_analysis_result, _require_retained_result,
+    sanitize_burnout_score_from_response,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -87,6 +90,7 @@ async def start_analysis(
     # Create analysis record
     analysis = Analysis(
         user_id=current_user.id,
+        organization_id=current_user.organization_id,
         rootly_integration_id=integration.id,
         status="pending",
         config={
@@ -144,6 +148,7 @@ async def get_analysis_status(
     if analysis.error_message:
         response["error"] = analysis.error_message
     
+    _require_retained_result(db, analysis)
     if analysis.results:
         response["results_summary"] = {
             "total_users": len(analysis.results.get("team_analysis", [])),
@@ -174,6 +179,7 @@ async def get_analysis_results(
             detail="Analysis not found"
         )
     
+    _require_retained_result(db, analysis)
     if analysis.status != "completed":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -207,6 +213,7 @@ async def get_current_analysis(
         "config": analysis.config
     }
     
+    _require_retained_result(db, analysis)
     if analysis.status == "completed" and analysis.results:
         response["results"] = analysis.results
     elif analysis.error_message:
@@ -262,6 +269,7 @@ async def start_github_only_analysis(
     # Create analysis record with GitHub-only flag
     analysis = Analysis(
         user_id=current_user.id,
+        organization_id=current_user.organization_id,
         rootly_integration_id=None,  # No Rootly integration for GitHub-only
         status="pending",
         config={
@@ -593,11 +601,9 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
                 analysis_id=analysis_id
             )
         
-        # Update analysis with results
-        analysis.status = "completed"
-        analysis.results = results
-        analysis.completed_at = datetime.now()
-        db.commit()
+        # All full-result writers share server generation stamps, policy locks
+        # and cache invalidation with the currently registered analysis route.
+        _persist_analysis_result(analysis_id, status="completed", results=results)
         
         logger.info(f"Analysis {analysis_ref} completed successfully")
 
@@ -680,11 +686,7 @@ async def run_github_only_analysis_task(analysis_id: int, days_back: int, team_e
         results["confidence_note"] = "Analysis based on GitHub activity patterns only"
         results["team_emails_analyzed"] = team_emails
         
-        # Update analysis with results
-        analysis.status = "completed"
-        analysis.results = results
-        analysis.completed_at = datetime.now()
-        db.commit()
+        _persist_analysis_result(analysis_id, status="completed", results=results)
         
         logger.info(f"GitHub-only analysis {analysis_ref} completed successfully")
 

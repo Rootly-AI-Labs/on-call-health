@@ -268,6 +268,7 @@ async def refresh_demo_analyses(
                 config['is_demo'] = True
                 config['demo_created_at'] = datetime.now().isoformat()
 
+                generated_at = datetime.now(timezone.utc)
                 new_analysis = Analysis(
                     user_id=user.id,
                     organization_id=demo_organization_id,
@@ -280,7 +281,8 @@ async def refresh_demo_analyses(
                     config=config,
                     results=new_results,
                     error_message=None,
-                    completed_at=datetime.now()
+                    completed_at=generated_at,
+                    results_generated_at=generated_at,
                 )
                 db.add(new_analysis)
                 db.flush()

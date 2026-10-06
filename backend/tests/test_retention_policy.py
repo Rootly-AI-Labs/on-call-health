@@ -118,13 +118,29 @@ def set_policy(client, retention_days, *, confirmed=True):
 def test_policy_defaults_to_disabled(client, organizations):
     response = client.get(PATH)
     assert response.status_code == 200
-    assert response.json() == {
+    result = response.json()
+    cleanup_status = result.pop("cleanup_status")
+    assert cleanup_status["state"] == "never"
+    assert cleanup_status["last_success_at"] is None
+    assert cleanup_status["next_cleanup_due_at"] is None
+    assert cleanup_status["next_retry_at"] is None
+    assert all(count == 0 for count in cleanup_status["counts"].values())
+    version = result.pop("policy_version")
+    assert len(version) == 64 and all(character in "0123456789abcdef" for character in version)
+    assert result == {
         "organization_id": organizations[0].id,
         "retention_days": None,
         "enabled": False,
-        "age_basis": "event",
+        "age_basis": "analysis_generation",
+        "survey_age_basis": "submission",
         "scope": ["analyses", "survey_responses"],
         "updated_at": None,
+        "legacy_cleanup": {
+            "state": "none", "requested_count": 0, "pending_count": 0,
+            "cleared_count": 0, "skipped_count": 0,
+            "cancelled_count": 0,
+            "approved_at": None, "finished_at": None,
+        },
     }
 
 
@@ -135,6 +151,19 @@ def test_null_organization_settings_defaults_to_disabled(client, db, organizatio
     assert response.status_code == 200
     assert response.json()["retention_days"] is None
     assert response.json()["enabled"] is False
+
+
+def test_pre_generation_policy_uses_new_basis_without_losing_period_or_mutating_settings(client, db, organizations):
+    stored = {"retention_days": 90, "age_basis": "event"}
+    organizations[0].settings = {"data_retention": stored, "unrelated": {"keep": True}}
+    db.commit()
+    response = client.get(PATH)
+    assert response.status_code == 200, response.text
+    assert response.json()["retention_days"] == 90
+    assert response.json()["age_basis"] == "analysis_generation"
+    assert response.json()["survey_age_basis"] == "submission"
+    db.expire_all()
+    assert organizations[0].settings == {"data_retention": stored, "unrelated": {"keep": True}}
 
 
 @pytest.mark.parametrize("method", ["get", "put"])
@@ -207,7 +236,8 @@ def test_valid_policy_persists_across_sessions_and_preserves_settings(
     assert result["organization_id"] == organizations[0].id
     assert result["retention_days"] == days
     assert result["enabled"] is True
-    assert result["age_basis"] == "event"
+    assert result["age_basis"] == "analysis_generation"
+    assert result["survey_age_basis"] == "submission"
     assert result["scope"] == ["analyses", "survey_responses"]
     assert datetime.fromisoformat(result["updated_at"].replace("Z", "+00:00")).tzinfo is not None
 

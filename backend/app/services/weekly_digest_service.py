@@ -18,8 +18,10 @@ from sqlalchemy import and_, func
 from sqlalchemy.exc import IntegrityError
 
 from ..core.config import settings
-from ..models import Analysis, SessionLocal, User, UserCorrelation, WeeklyDigestLog
+from ..models import Analysis, Organization, SessionLocal, User, UserCorrelation, WeeklyDigestLog
 from ..models.survey_schedule import SurveySchedule
+from .data_retention import read_retention_policy
+from .retention_preview import classify_analysis_result
 
 logger = logging.getLogger(__name__)
 
@@ -767,10 +769,55 @@ async def send_unsubscribe_feedback(user_email: str, reason: str) -> None:
 def _get_latest_auto_refresh_analysis(db, user: User) -> Optional[Analysis]:
     return db.query(Analysis).filter(
         Analysis.user_id == user.id,
+        Analysis.organization_id == user.organization_id,
         Analysis.is_auto_refresh == True,
         Analysis.status == "completed",
         Analysis.completed_at.isnot(None),
     ).order_by(Analysis.completed_at.desc()).first()
+
+
+def _get_digest_analysis_if_retained(db, user: User, analysis_id: int) -> Optional[Analysis]:
+    """Refresh policy and result immediately before preparing an outgoing digest.
+
+    The same organization-first lock order as cleanup prevents reading a stale
+    result while cleanup is clearing it. These read locks are released before
+    awaiting the mail provider, so provider latency cannot block cleanup.
+    """
+    user = db.query(User).populate_existing().filter(
+        User.id == user.id, User.status == "active",
+    ).first()
+    if user is None:
+        return None
+    organization = None
+    if user.organization_id is not None:
+        organization = db.query(Organization).populate_existing().filter(
+            Organization.id == user.organization_id, Organization.status == "active",
+        ).with_for_update(read=True).first()
+        if organization is None:
+            return None
+    analysis = db.query(Analysis).populate_existing().filter(
+        Analysis.id == analysis_id,
+        Analysis.user_id == user.id,
+        Analysis.organization_id == user.organization_id,
+        Analysis.status == "completed",
+        Analysis.is_auto_refresh.is_(True),
+    ).with_for_update(read=True).first()
+    if analysis is None or not _ensure_dict(analysis.results):
+        return None
+    if _ensure_dict(analysis.config).get("is_demo") is True:
+        return None
+    # Personal analyses have no organization retention policy. Ownership and an
+    # explicitly null organization still have to match the current account.
+    if organization is not None:
+        try:
+            policy = read_retention_policy(organization)
+        except (ValueError, TypeError):
+            return None
+        if policy.retention_days is not None:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=policy.retention_days)
+            if classify_analysis_result(analysis, cutoff).disposition != "retained":
+                return None
+    return analysis
 
 
 async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
@@ -789,6 +836,10 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
     analysis = _get_latest_auto_refresh_analysis(db, user)
     if not analysis:
         return {"sent": False, "message": "No completed auto-refresh analysis found"}
+
+    analysis = _get_digest_analysis_if_retained(db, user, analysis.id)
+    if analysis is None:
+        return {"sent": False, "message": "No analysis eligible for this organization's current retention policy"}
 
     config = _ensure_dict(analysis.config)
     if config.get("is_demo") is True:
@@ -814,6 +865,7 @@ async def send_weekly_digest_test(db, user_id: int) -> Dict[str, Any]:
         unsubscribe_url=unsubscribe_url,
     )
 
+    db.commit()
     sent = await _send_resend_email(
         to_email=user.email,
         to_name=user.name,
@@ -875,6 +927,7 @@ async def check_and_send_weekly_digests() -> None:
         logger.info(f"📬 [WEEKLY_DIGEST] Found {len(analyses)} auto-refresh analyses to process")
 
         for analysis in analyses:
+            analysis_id = analysis.id
             try:
                 user = db.query(User).filter(
                     User.id == analysis.user_id,
@@ -914,9 +967,16 @@ async def check_and_send_weekly_digests() -> None:
                     logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: analysis results are empty")
                     continue
 
+                analysis = _get_digest_analysis_if_retained(db, user, analysis.id)
+                if analysis is None:
+                    logger.info("Weekly digest skipped: result unavailable under current retention policy")
+                    db.rollback()
+                    continue
+
                 # Claim the send slot BEFORE sending — insert log row first.
                 # If another instance already inserted (race condition), the unique
                 # constraint fires here and we skip without sending a duplicate email.
+                log_entry = None
                 if not settings.WEEKLY_DIGEST_FORCE_SEND:
                     log_entry = WeeklyDigestLog(
                         user_id=user.id,
@@ -931,6 +991,19 @@ async def check_and_send_weekly_digests() -> None:
                         db.rollback()
                         logger.info(f"📬 [WEEKLY_DIGEST] SKIP {user.email}: already sent this week ({week_start_date}) — race condition caught before send")
                         continue
+
+                # Claiming a send slot commits and releases the policy lock.
+                # Refresh both policy and result again before building content.
+                analysis = _get_digest_analysis_if_retained(db, user, analysis.id)
+                if analysis is None:
+                    if log_entry is not None:
+                        db.delete(log_entry)
+                        db.commit()
+                    else:
+                        db.rollback()
+                    logger.info("Weekly digest skipped: retention eligibility changed before send")
+                    continue
+                results = _ensure_dict(analysis.results)
 
                 unsubscribe_token = _generate_unsubscribe_token(user.id)
                 unsubscribe_url = f"{settings.FRONTEND_URL}/unsubscribe?token={unsubscribe_token}"
@@ -974,7 +1047,7 @@ async def check_and_send_weekly_digests() -> None:
 
             except Exception as per_user_error:
                 logger.error(
-                    f"Weekly digest failed for analysis {analysis.id}: {per_user_error}",
+                    f"Weekly digest failed for analysis {analysis_id}: {per_user_error}",
                     exc_info=True
                 )
                 db.rollback()

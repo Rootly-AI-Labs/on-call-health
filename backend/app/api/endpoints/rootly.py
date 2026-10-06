@@ -52,6 +52,26 @@ def _is_upstream_token_auth_error(message: str) -> bool:
         or ("token" in normalized and "invalid" in normalized)
     )
 
+
+def _get_scoped_survey_count(db: Session, current_user: User, email: str, cutoff) -> int:
+    """Count only accessible surveys whose own submission age is retained."""
+    from sqlalchemy import func
+    from ...models.user_burnout_report import UserBurnoutReport
+
+    query = db.query(func.count(UserBurnoutReport.id)).filter(
+        UserBurnoutReport.email == email,
+        UserBurnoutReport.organization_id == current_user.organization_id,
+    )
+    if current_user.organization_id is None:
+        query = query.filter(UserBurnoutReport.user_id == current_user.id)
+    if cutoff is not None:
+        query = query.filter(
+            UserBurnoutReport.submitted_at >= cutoff,
+            UserBurnoutReport.submitted_at <= datetime.now(timezone.utc),
+        )
+    return query.scalar() or 0
+
+
 class RootlyTokenUpdate(BaseModel):
     token: str
 
@@ -1746,17 +1766,15 @@ async def get_synced_users(
                 # Continue without on-call status
 
         # Get survey counts for all users in this organization
-        from app.models.user_burnout_report import UserBurnoutReport
         from app.models.survey_schedule import SurveySchedule, UserSurveyPreference
         from app.models.slack_workspace_mapping import SlackWorkspaceMapping
+        from .analyses import _retention_cutoff
 
+        cutoff = _retention_cutoff(db, current_user.organization_id, lock=True)
         survey_counts = {}
         for corr in correlations:
             if corr.email:
-                count = db.query(func.count(UserBurnoutReport.id)).filter(
-                    UserBurnoutReport.email == corr.email
-                ).scalar() or 0
-                survey_counts[corr.id] = count
+                survey_counts[corr.id] = _get_scoped_survey_count(db, current_user, corr.email, cutoff)
 
         # Check if automated surveys are enabled for this organization
         # Only check survey schedule if user has an organization

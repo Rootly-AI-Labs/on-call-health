@@ -230,7 +230,7 @@ class UnifiedBurnoutAnalyzer:
         time_range_days: int = 30,
         include_weekends: bool = True,
         user_id: Optional[int] = None,
-        analysis_id: Optional[int] = None
+        analysis_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Analyze burnout for the team based on incident data.

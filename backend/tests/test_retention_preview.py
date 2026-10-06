@@ -14,7 +14,7 @@ from uuid import uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event, func, select
+from sqlalchemy import create_engine, event, func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
@@ -38,6 +38,12 @@ def retention_engine():
 
     engine = create_engine(database_url, pool_pre_ping=True)
     Base.metadata.create_all(engine)
+    # create_all does not upgrade a pre-existing disposable table. This mirrors
+    # migration 055 only after the explicit retention_test target guard above.
+    with engine.begin() as connection:
+        connection.execute(text(
+            "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS results_generated_at TIMESTAMPTZ"
+        ))
     yield engine
     engine.dispose()
 
@@ -140,7 +146,10 @@ def analysis_factory(db, organizations, users):
             "user_id": users[organization_index].id,
             "status": "completed",
             "created_at": NOW,
-            "completed_at": NOW,
+            # Generation belongs to the stored snapshot, independently of the
+            # row's creation/completion dates and its source event timestamps.
+            "completed_at": NOW if getattr(results, "fixture_generated_at", None) is not None else None,
+            "results_generated_at": getattr(results, "fixture_generated_at", None),
             "results": results,
         }
         defaults.update(fields)
@@ -175,11 +184,23 @@ def survey_factory(db, organizations, users):
     return make
 
 
-def coverage(start=RECENT, end=NOW, **data):
-    return {
+_INFER_GENERATION = object()
+
+
+class FixtureResult(dict):
+    """Carry a fixture generation clock without putting authority in JSON."""
+
+
+def coverage(start=RECENT, end=NOW, *, generated_at=_INFER_GENERATION, **data):
+    result = FixtureResult({
         "metadata": {"date_range": {"start": start.isoformat(), "end": end.isoformat()}},
         **data,
-    }
+    })
+    # Existing test callers use start as their fixture's age. This attribute is
+    # consumed ONLY by analysis_factory; JSON persisted by SQLAlchemy has no
+    # trusted generation date, and production classification never reads it.
+    result.fixture_generated_at = start if generated_at is _INFER_GENERATION else generated_at
+    return result
 
 
 def preview(client, body=None):
@@ -230,7 +251,7 @@ def test_saved_policy_and_proposed_disable(client, db, organizations, analysis_f
     organizations[0].settings = {
         "data_retention": {
             "retention_days": 30,
-            "age_basis": "event",
+            "age_basis": "analysis_generation",
             "updated_at": updated_at.isoformat(),
             "updated_by_user_id": 101,
         }
@@ -250,193 +271,161 @@ def test_saved_policy_and_proposed_disable(client, db, organizations, analysis_f
     assert organizations[0].settings["data_retention"]["retention_days"] == 30
 
 
-@pytest.mark.parametrize("start,expected", [(OLD, "expired"), (CUTOFF, "retained"), (RECENT, "retained")])
-def test_coverage_cutoff_is_strictly_older(client, analysis_factory, start, expected):
-    analysis = analysis_factory(coverage(start))
+@pytest.mark.parametrize("generated_at,expected", [(OLD, "expired"), (CUTOFF, "retained"), (RECENT, "retained")])
+def test_generation_cutoff_is_strictly_older(client, analysis_factory, generated_at, expected):
+    analysis = analysis_factory(coverage(RECENT, generated_at=generated_at))
     result = preview(client)
     assert result["analyses"][expected] == 1
-    assert sample_for(result, analysis)["disposition"] == expected
+    sample = sample_for(result, analysis)
+    assert sample["disposition"] == expected
+    assert parse_datetime(sample["generation_at"]) == generated_at
 
 
-def test_event_age_ignores_analysis_creation_age(client, analysis_factory):
-    analysis_factory(coverage(OLD), created_at=NOW)
-    analysis_factory(coverage(RECENT), created_at=CUTOFF - timedelta(days=100))
+def test_generation_age_ignores_creation_completion_and_event_age(client, analysis_factory):
+    old = analysis_factory(coverage(RECENT, generated_at=OLD), created_at=NOW, completed_at=NOW)
+    recent = analysis_factory(coverage(OLD, generated_at=NOW), created_at=OLD, completed_at=OLD)
     result = preview(client)
     assert result["analyses"]["expired"] == 1
     assert result["analyses"]["retained"] == 1
+    assert sample_for(result, old)["disposition"] == "expired"
+    assert sample_for(result, recent)["disposition"] == "retained"
 
 
-@pytest.mark.parametrize(
-    "evidence",
-    [
-        {"raw_incident_data": [{"attributes": {"created_at": OLD.isoformat()}}]},
-        {"raw_incident_data": [{"created_at": OLD.isoformat()}]},
-        {"partial_data": {"incidents": [{"attributes": {"created_at": OLD.isoformat()}}]}},
-        {"daily_trends": [{"date": (CUTOFF - timedelta(days=1)).date().isoformat()}]},
-        {"individual_daily_data": {"person@example.com": {(CUTOFF - timedelta(days=1)).date().isoformat(): {"score": 2}}}},
-        {"member_surveys": {"person@example.com": {"survey_responses": [{"submitted_at": OLD.isoformat()}]}}},
-    ],
-    ids=["rootly-incident", "flat-incident", "partial-incident", "daily-trend", "individual-day", "copied-survey"],
-)
-def test_any_expired_evidence_expires_entire_mixed_age_snapshot(client, analysis_factory, evidence):
-    analysis = analysis_factory(coverage(RECENT, **evidence))
+@pytest.mark.parametrize("evidence", [
+    {"raw_incident_data": [{"attributes": {"created_at": OLD.isoformat()}}]},
+    {"raw_incident_data": [{"created_at": OLD.isoformat()}]},
+    {"partial_data": {"incidents": [{"attributes": {"created_at": OLD.isoformat()}}]}},
+    {"daily_trends": [{"date": (CUTOFF - timedelta(days=1)).date().isoformat()}]},
+    {"individual_daily_data": {"person@example.com": {(CUTOFF - timedelta(days=1)).date().isoformat(): {"score": 2}}}},
+    {"member_surveys": {"person@example.com": {"survey_responses": [{"submitted_at": OLD.isoformat()}]}}},
+], ids=["rootly", "flat-incident", "partial", "daily-trend", "individual-day", "copied-survey"])
+def test_recent_generation_retains_all_old_and_mixed_source_content(client, analysis_factory, evidence):
+    analysis = analysis_factory(coverage(NOW - timedelta(days=120), generated_at=NOW, **evidence))
     result = preview(client)
-    assert result["analyses"]["expired"] == 1
-    assert sample_for(result, analysis)["disposition"] == "expired"
-
-
-def test_date_only_coverage_uses_conservative_earliest_local_day_start(client, analysis_factory):
-    analysis_factory({"metadata": {"date_range": {"start": CUTOFF.date().isoformat(), "end": NOW.date().isoformat()}}})
-    result = preview(client)
-    assert result["analyses"]["expired"] == 1
-
-
-def test_ambiguous_local_date_overlapping_cutoff_is_conservatively_expired(client, test_app, analysis_factory):
-    from app.api.endpoints.retention import retention_preview_now
-
-    midnight_now = NOW.replace(hour=0, minute=0)
-    test_app.dependency_overrides[retention_preview_now] = lambda: midnight_now
-    analysis_factory({"metadata": {"date_range": {"start": CUTOFF.date().isoformat(), "end": NOW.date().isoformat()}}})
-    analysis_factory({"metadata": {"date_range": {"start": (CUTOFF + timedelta(days=1)).date().isoformat(), "end": NOW.date().isoformat()}}})
-    result = preview(client)
-    assert result["analyses"]["expired"] == 1
-    assert result["analyses"]["retained"] == 1
-
-
-def test_partial_collection_metadata_can_verify_event_coverage(client, analysis_factory):
-    analysis = analysis_factory({"partial_data": {"metadata": {"date_range": {"start": RECENT.isoformat(), "end": NOW.isoformat()}}}})
-    result = preview(client)
-    assert result["analyses"]["retained"] == 1
+    assert result["analyses"]["expired"] == result["analyses"]["unverifiable"] == 0
     assert sample_for(result, analysis)["disposition"] == "retained"
-
-
-def test_timezone_offset_is_normalized_before_cutoff_comparison(client, analysis_factory):
-    offset = timezone(timedelta(hours=-4))
-    analysis_factory(coverage(CUTOFF.astimezone(offset)))
-    analysis_factory(coverage(OLD.astimezone(offset)))
-    result = preview(client)
-    assert result["analyses"]["expired"] == 1
-    assert result["analyses"]["retained"] == 1
-
-
-def test_nested_user_profile_creation_is_not_event_age(client, analysis_factory):
-    analysis = analysis_factory(coverage(RECENT, raw_incident_data=[{
-        "created_at": RECENT.isoformat(),
-        "responders": [{"created_at": OLD.isoformat(), "email": "sensitive@example.com"}],
-    }]))
-    result = preview(client)
-    assert result["analyses"]["expired"] == 0
-    assert sample_for(result, analysis)["disposition"] == "retained"
-    assert "sensitive@example.com" not in str(result)
-
-
-def test_legacy_serialized_json_results_can_be_evaluated(client, analysis_factory):
-    import json
-
-    analysis_factory(json.dumps(coverage(OLD)))
-    assert preview(client)["analyses"]["expired"] == 1
 
 
 @pytest.mark.parametrize("flag", ["include_github", "include_slack", "include_jira", "include_linear", "include_ai_usage"])
-def test_recent_primary_range_cannot_verify_legacy_enrichment_sources(client, analysis_factory, flag):
-    analysis = analysis_factory(coverage(RECENT), config={flag: True})
-    result = preview(client)
-    assert result["analyses"]["expired"] == 0
-    assert result["analyses"]["unverifiable"] == 1
-    assert sample_for(result, analysis)["reason"] == "unverified_source_coverage"
-
-
-def test_verified_old_event_overrules_unverifiable_enrichment(client, analysis_factory):
-    analysis = analysis_factory(coverage(RECENT, raw_incident_data=[{"created_at": OLD.isoformat()}]), config={"include_github": True})
-    result = preview(client)
-    assert result["analyses"]["expired"] == 1
-    assert result["analyses"]["unverifiable"] == 0
-    assert sample_for(result, analysis)["disposition"] == "expired"
-
-
-@pytest.mark.parametrize(
-    "field,payload,flag",
-    [
-        ("jira_tickets", [{"id": "JIRA-1", "created_at": RECENT.isoformat()}], "include_jira"),
-        ("linear_issues", [{"id": "LINEAR-1", "created_at": RECENT.isoformat()}], "include_linear"),
-        ("github_activity", {"commits": [{"committed_at": RECENT.isoformat()}]}, "include_github"),
-        ("slack_activity", {"message_count": 5}, "include_slack"),
-    ],
-    ids=["jira", "linear", "github", "slack"],
-)
-@pytest.mark.parametrize("flags_present", [False, True], ids=["missing-flag", "false-flag"])
-def test_legacy_enrichment_payload_requires_verified_age_even_without_enabled_flags(
-    client, analysis_factory, field, payload, flag, flags_present
-):
-    analysis = analysis_factory(coverage(RECENT, **{field: payload}), config={flag: False} if flags_present else {})
-    result = preview(client)
-    assert result["analyses"]["expired"] == 0
-    assert result["analyses"]["unverifiable"] == 1
-    assert sample_for(result, analysis)["reason"] == "unverified_source_coverage"
-
-
-def test_empty_or_zero_enrichment_placeholders_do_not_create_unknown_age(client, analysis_factory):
-    analysis = analysis_factory(coverage(
-        RECENT,
-        jira_tickets=[],
-        linear_issues={},
-        github_activity={"commits": 0},
-        slack_activity={"messages": None},
-        github_metrics={"commit_count": 0},
-        openai_usage=0,
-        anthropic_usage=False,
-    ))
+def test_recent_generation_keeps_enabled_enrichment_sources(client, analysis_factory, flag):
+    analysis = analysis_factory(coverage(OLD, generated_at=NOW), config={flag: True})
     result = preview(client)
     assert result["analyses"]["retained"] == 1
     assert result["analyses"]["unverifiable"] == 0
     assert sample_for(result, analysis)["disposition"] == "retained"
 
 
-@pytest.mark.parametrize("timestamp", [True, False])
-def test_boolean_slack_timestamp_is_unverifiable_instead_of_a_1970_event(client, analysis_factory, timestamp):
-    analysis = analysis_factory(coverage(RECENT, messages=[{"ts": timestamp}]))
+@pytest.mark.parametrize("field,payload", [
+    ("jira_tickets", [{"id": "JIRA-1", "created_at": OLD.isoformat()}]),
+    ("linear_issues", [{"id": "LINEAR-1", "created_at": OLD.isoformat()}]),
+    ("github_activity", {"commits": [{"committed_at": OLD.isoformat()}]}),
+    ("slack_activity", {"message_count": 5}),
+    ("openai_usage", {"total_tokens": 1234}),
+    ("anthropic_usage", {"tokens": 250}),
+    ("rootly_alerts", [{"created_at": OLD.isoformat()}]),
+])
+@pytest.mark.parametrize("generated_at,expected", [(OLD, "expired"), (NOW, "retained")])
+def test_enrichment_content_expires_with_its_generation(client, analysis_factory, field, payload, generated_at, expected):
+    analysis = analysis_factory(coverage(RECENT, generated_at=generated_at, **{field: payload}))
     result = preview(client)
-    assert result["analyses"]["expired"] == 0
+    assert result["analyses"][expected] == 1
+    assert result["analyses"]["unverifiable"] == 0
+    assert sample_for(result, analysis)["disposition"] == expected
+
+
+def test_timezone_offset_is_normalized_before_generation_cutoff_comparison(client, analysis_factory):
+    offset = timezone(timedelta(hours=-4))
+    analysis_factory(coverage(RECENT, generated_at=CUTOFF.astimezone(offset)))
+    analysis_factory(coverage(RECENT, generated_at=OLD.astimezone(offset)))
+    result = preview(client)
+    assert result["analyses"]["expired"] == result["analyses"]["retained"] == 1
+
+
+def test_legacy_serialized_json_uses_completed_generation_fallback(client, analysis_factory):
+    import json
+
+    analysis = analysis_factory(json.dumps(coverage(RECENT)), completed_at=OLD)
+    result = preview(client)
+    assert sample_for(result, analysis)["disposition"] == "expired"
+    assert parse_datetime(sample_for(result, analysis)["generation_at"]) == OLD
+
+
+@pytest.mark.parametrize("completed_at,expected", [(OLD, "expired"), (CUTOFF, "retained"), (NOW, "retained")])
+def test_successful_existing_report_uses_completion_when_canonical_stamp_is_missing(
+    client, analysis_factory, completed_at, expected
+):
+    analysis = analysis_factory(
+        {"github_activity": {"commit_count": 10}, "slack_activity": {"messages": 12}},
+        completed_at=completed_at,
+        results_generated_at=None,
+        created_at=OLD,
+    )
+    result = preview(client)
+    assert sample_for(result, analysis)["disposition"] == expected
+    assert parse_datetime(sample_for(result, analysis)["generation_at"]) == completed_at
+
+
+@pytest.mark.parametrize("results", [
+    {"team_health": {"score": 50}},
+    {"raw_incident_data": [{"created_at": RECENT.isoformat()}]},
+    {"metadata": {"date_range": {"start": "nonsense", "end": NOW.isoformat()}}},
+    {"metadata": {"date_range": {"start": OLD.isoformat(), "end": NOW.isoformat()}}},
+    {"metadata": {"generated_at": NOW.isoformat(), "completed_at": NOW.isoformat()}},
+    ["legacy unexpected format"],
+    coverage(RECENT, generated_at=None, raw_incident_data=[{"attributes": {"created_at": "invalid"}}]),
+])
+def test_unknown_generation_is_not_inferred_from_creation_source_or_metadata(client, analysis_factory, results):
+    analysis = analysis_factory(results, created_at=OLD, completed_at=None, results_generated_at=None)
+    result = preview(client)
     assert result["analyses"]["unverifiable"] == 1
-    assert sample_for(result, analysis)["reason"] == "invalid_event_timestamp"
+    assert result["analyses"]["expired"] == 0
+    assert sample_for(result, analysis)["generation_at"] is None
+    assert result["warnings"]
 
 
-@pytest.mark.parametrize("timestamp", [float("nan"), float("inf"), float("-inf")], ids=["nan", "infinity", "negative-infinity"])
-def test_nonfinite_slack_timestamp_is_unverifiable(timestamp):
+@pytest.mark.parametrize("results", [
+    {"team_health": {"score": 50}},
+    {"raw_incident_data": [{"created_at": "invalid"}]},
+    {"metadata": {"date_range": {"start": "nonsense"}}},
+    {"messages": [{"ts": True}]},
+    ["legacy unexpected format"],
+    "malformed historical result",
+])
+def test_known_generation_does_not_require_source_date_certification(client, analysis_factory, results):
+    analysis = analysis_factory(results, results_generated_at=NOW)
+    assert sample_for(preview(client), analysis)["disposition"] == "retained"
+
+
+@pytest.mark.parametrize("timestamp", [True, False, "nonsense", "2026-10-05", NOW.replace(tzinfo=None)])
+def test_invalid_canonical_generation_timestamp_fails_closed(timestamp):
     from app.services.retention_preview import classify_analysis_result
 
-    # PostgreSQL JSON and the HTTP JSON encoder reject nonfinite JSON numbers;
-    # exercise the pure parser to cover malformed in-memory legacy payloads.
-    analysis = SimpleNamespace(status="completed", results=coverage(RECENT, messages=[{"ts": timestamp}]), config={})
+    analysis = SimpleNamespace(status="completed", results={"score": 1}, results_generated_at=timestamp, completed_at=NOW, created_at=NOW)
     result = classify_analysis_result(analysis, CUTOFF)
     assert result.disposition == "unverifiable"
-    assert result.reason == "invalid_event_timestamp"
 
 
-@pytest.mark.parametrize(
-    "results",
-    [
-        {"team_health": {"score": 50}},
-        {"raw_incident_data": [{"created_at": RECENT.isoformat()}]},
-        {"metadata": {"date_range": {"start": "nonsense", "end": NOW.isoformat()}}},
-        {"metadata": {"date_range": {"start": RECENT.replace(tzinfo=None).isoformat(), "end": NOW.isoformat()}}},
-        {"metadata": {"date_range": {"start": NOW.isoformat(), "end": RECENT.isoformat()}}},
-        {"metadata": {"date_range": {"start": RECENT.isoformat()}}},
-        {"metadata": {"date_range": {"start": OLD.isoformat()}}},
-        {"metadata": {"date_range": {"start": OLD.isoformat(), "end": (OLD - timedelta(days=1)).isoformat()}}},
-        ["legacy unexpected format"],
-        coverage(RECENT, raw_incident_data=[{"attributes": {"created_at": "invalid"}}]),
-    ],
-    ids=["unknown-age", "raw-data-cap", "invalid-window", "naive-window", "reversed-window", "missing-end", "missing-old-end", "reversed-old-window", "malformed-results", "malformed-event"],
-)
-def test_unverifiable_age_is_reported_without_using_creation_age(client, analysis_factory, results):
-    analysis = analysis_factory(results, created_at=CUTOFF - timedelta(days=100))
+@pytest.mark.parametrize("status", ["completed", "failed"])
+def test_canonical_generation_survives_terminal_status_changes(client, analysis_factory, status):
+    analysis = analysis_factory(coverage(RECENT, generated_at=OLD), status=status, completed_at=NOW)
+    assert sample_for(preview(client), analysis)["disposition"] == "expired"
+
+
+def test_failed_legacy_rerun_completion_cannot_renew_unknown_snapshot(client, analysis_factory):
+    analysis = analysis_factory({"score": 1}, status="failed", completed_at=NOW)
+    assert sample_for(preview(client), analysis)["disposition"] == "unverifiable"
+
+
+def test_successful_regeneration_renews_same_saved_analysis(client, db, analysis_factory):
+    analysis = analysis_factory(coverage(OLD), created_at=OLD, completed_at=OLD, is_saved=True)
+    assert sample_for(preview(client), analysis)["disposition"] == "expired"
+    analysis.results = {"score": 2, "raw_incident_data": [{"created_at": OLD.isoformat()}]}
+    analysis.results_generated_at = NOW
+    analysis.completed_at = NOW
+    db.commit()
     result = preview(client)
-    assert result["analyses"]["unverifiable"] == 1
-    assert result["analyses"]["expired"] == 0
-    assert sample_for(result, analysis)["disposition"] == "unverifiable"
-    assert sample_for(result, analysis)["reason"]
-    assert result["warnings"]
+    assert sample_for(result, analysis)["disposition"] == "retained"
+    assert analysis.created_at == OLD
 
 
 @pytest.mark.parametrize("results", [None, {}])
@@ -630,7 +619,7 @@ def test_sample_cap_preserves_full_counts(client, db, organizations, users):
     from app.models import Analysis
 
     db.add_all([
-        Analysis(organization_id=organizations[0].id, user_id=users[0].id, results=coverage(OLD), status="completed", created_at=NOW)
+        Analysis(organization_id=organizations[0].id, user_id=users[0].id, results=coverage(OLD), status="completed", created_at=NOW, results_generated_at=OLD)
         for _ in range(105)
     ])
     db.commit()
