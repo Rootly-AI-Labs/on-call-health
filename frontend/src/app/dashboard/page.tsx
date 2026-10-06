@@ -130,7 +130,6 @@ function AlertsCardsRow({ currentAnalysis }: { currentAnalysis: any }) {
 
 function DashboardContent() {
   const {
-  API_BASE,
   router,
   searchParams,
 
@@ -175,10 +174,6 @@ function DashboardContent() {
   totalAnalysesCount,
   historicalTrends,
   analysisMappings,
-
-  // caches
-  analysisCache,
-  setAnalysisCache,
 
   // members
   members,
@@ -278,11 +273,7 @@ function DashboardContent() {
   setDeleteDialogOpen,
   deletingAnalysis,
   analysisToDelete,
-  setAnalysisToDelete,
-
-  // direct setters
-  setCurrentAnalysis,
-  setRedirectingToSuggested
+  setAnalysisToDelete
   } = useDashboard()
 
   // Helper function to safely sanitize untrusted strings to prevent XSS
@@ -493,17 +484,7 @@ function DashboardContent() {
                       onClick={async () => {
                         setLoadingAnalysisId(autoRefreshAnalysis.id)
                         try {
-                          const authToken = localStorage.getItem('auth_token')
-                          if (!authToken) return
-                          const resp = await fetch(`${API_BASE}/analyses/${autoRefreshAnalysis.id}`, {
-                            headers: { 'Authorization': `Bearer ${authToken}` }
-                          })
-                          if (resp.ok) {
-                            const full = await resp.json()
-                            setCurrentAnalysis(full)
-                            setRedirectingToSuggested(false)
-                            updateURLWithAnalysis(String(full.id))
-                          }
+                          await loadSpecificAnalysis(String(autoRefreshAnalysis.id))
                         } finally {
                           setLoadingAnalysisId(null)
                         }
@@ -593,49 +574,9 @@ function DashboardContent() {
                         className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isSelected ? 'bg-neutral-800 text-white' : ''} ${loadingAnalysisId === analysis.id ? 'bg-neutral-700 text-white' : ''} ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={async () => {
                           setLoadingAnalysisId(analysis.id)
-                          const analysisKey = analysis.uuid || analysis.id.toString()
-                          const teamAnalysis = analysis.analysis_data?.team_analysis
-                          const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis as any)?.members
-                          const cachedAnalysis = analysisCache.get(analysisKey)
-                          const cachedTeamAnalysis = cachedAnalysis?.analysis_data?.team_analysis
-                          const cachedMembers = Array.isArray(cachedTeamAnalysis) ? cachedTeamAnalysis : (cachedTeamAnalysis as any)?.members
-                          const hasCachedAnalysisData = cachedAnalysis?.analysis_data
-                          const hasCachedMembers = Array.isArray(cachedMembers) && cachedMembers.length > 0
-
-                          if (hasCachedAnalysisData && hasCachedMembers) {
-                            setCurrentAnalysis(cachedAnalysis)
-                            setRedirectingToSuggested(false)
-                            updateURLWithAnalysis(String(cachedAnalysis.id))
-                            setLoadingAnalysisId(null)
-                            return
-                          }
-
-                          if (!analysis.analysis_data || !members || !Array.isArray(members) || members.length === 0) {
-                            try {
-                              const authToken = localStorage.getItem('auth_token')
-                              if (!authToken) { setLoadingAnalysisId(null); return }
-                              const response = await fetch(`${API_BASE}/analyses/${analysis.id}`, {
-                                headers: { 'Authorization': `Bearer ${authToken}` }
-                              })
-                              if (response.ok) {
-                                const fullAnalysis = await response.json()
-                                setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
-                                setCurrentAnalysis(fullAnalysis)
-                                setRedirectingToSuggested(false)
-                                updateURLWithAnalysis(String(fullAnalysis.id))
-                              } else {
-                                setRedirectingToSuggested(false)
-                              }
-                            } catch (error) {
-                              setRedirectingToSuggested(false)
-                            } finally {
-                              setLoadingAnalysisId(null)
-                            }
-                          } else {
-                            setAnalysisCache(prev => new Map(prev.set(analysisKey, analysis)))
-                            setCurrentAnalysis(analysis)
-                            setRedirectingToSuggested(false)
-                            updateURLWithAnalysis(String(analysis.id))
+                          try {
+                            await loadSpecificAnalysis(String(analysis.id))
+                          } finally {
                             setLoadingAnalysisId(null)
                           }
                         }}
@@ -1296,11 +1237,10 @@ function DashboardContent() {
               {!redirectingToSuggested && (
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Button 
-                    onClick={() => {
+                    onClick={async () => {
                       updateURLWithAnalysis(null)
                       if (previousAnalyses.length > 0) {
-                        setCurrentAnalysis(previousAnalyses[0])
-                        updateURLWithAnalysis(String(previousAnalyses[0].id))
+                        await loadSpecificAnalysis(String(previousAnalyses[0].id))
                       }
                     }}
                     className="bg-red-600 hover:bg-red-700"

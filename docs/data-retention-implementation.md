@@ -6,7 +6,7 @@ Branch: `feat/org-data-retention`
 
 Last updated: October 5, 2026
 
-Current status: **Steps 1 through 6 are implemented** with the user's approved result generation age rule and **one normal daily cleanup at 03:00 UTC**. Failed organizations receive separate targeted retries. The final targeted backend suite passed **649 tests**, and all **23** isolated browser scenarios passed; TypeScript passed. All local policies remain disabled, no application cleanup has run, and destructive tests used only the disposable test database. Step 7, full staging verification, remains.
+Current status: **Steps 1 through 6 are implemented** with the user's approved result generation age rule and **one normal daily cleanup at 03:00 UTC**. Failed organizations receive separate targeted retries. The original backend suite passed **649 tests**, and subsequent mock-exclusion changes passed **441 related checks**. The current settings/dashboard UI passes **34 browser scenarios**, and TypeScript passes with the committed module-resolution configuration. The user enabled a **90-day policy for the local Retention Demo organization** at October 6, 03:21 UTC; its first cleanup is due October 7, 03:00 UTC. No application cleanup has run as of the read-only verification at 03:24 UTC, and destructive automated tests used only the disposable database. Step 7, full staging verification, remains.
 
 ## Agreed direction
 
@@ -21,6 +21,8 @@ Current status: **Steps 1 through 6 are implemented** with the user's approved r
 - Expire the entire stored result once its generation date is older than the rolling cutoff, including embedded activity, metrics, insights and enrichments. Preserve analysis configuration.
 - Preserve the requested historical analysis window. A report generated today may cover four months of source activity and remain available for N days after generation. Successfully generating its replacement starts a new lifetime; a failed attempt without a new result does not renew the old snapshot.
 - Retention does not disable enrichment inputs. Existing feature settings and provider permissions continue to control collection; unrelated baseline feature limitations remain.
+- Keep the settings simple: enable/disable, N days, preview, and one ordinary deletion confirmation. There is no Advanced cleanup option or new approval for deleting results with unknown dates.
+- Exclude the built-in sample/demo analyses from retention. Dedicated local retention test fixtures stay eligible so automatic cleanup can still be tested.
 
 The analysis window and retention period are independent. Four months is only the current demo's example, not a limit: a six-month analysis retains its six months of available source data, and its complete result expires N days after generation. Retention adds no analysis-window cap; the app's existing supported date-range limits still apply. The management explanation now uses general N-day wording and explicitly says retention does not shorten the requested window.
 
@@ -45,6 +47,54 @@ Final verification: **577 backend checks**, **19 browser scenarios**, and TypeSc
 
 The existing local demo now has three 120-day-old generated results and one fresh result containing four months of source history. At 90 days it still previews **3 expired results, 1 old survey, and 2 detached survey links**; the fresh historical result remains retained. `upgrade --local-compose` updates only a marked disabled fixture, refuses unexpected dependencies, and is idempotent. The update preserved the organization, account membership, survey rows, credentials, and saved configuration.
 
+## October 5 UI simplification: remove Advanced cleanup
+
+The user requested removal of the advanced option to keep retention easy to configure. The UI now sends only the proposed period for previews and the period, current policy version, and ordinary enabling/shortening consent for saves. The unknown-date checkbox, separate confirmation, receipt handling, and expiry timer have been removed. Preview and save still use authoritative organization/admin checks and session validation.
+
+Results without a reliable generation or successful completion timestamp are preserved, rather than assigned a guessed age. They remain unavailable while retention is enabled until successfully regenerated. Undated surveys remain preserved independently. Dated results continue to expire N days after generation without shortening their requested historical window.
+
+The backend retains its previous API for compatibility with already-issued approvals. A small notice appears only if an earlier unknown-date cleanup approval is still pending; turning retention off and saving cancels it. Preview and cleanup-history analysis totals include any such previously approved results so the simplified UI does not hide authorized deletion. Ordinary UI requests cannot create or renew those approvals.
+
+Verification: all **30 browser scenarios** passed (29 in the initial run; the remaining case passed after updating its assertion for the shortened retry explanation), **97 backend preview tests** passed, and TypeScript passed. Independent read-only review found no material issue. The actual local API/browser smoke confirmed admin previews, member read-only access, and the expected **3 expired results / 1 old survey / 2 detached links**. Desktop rendering was inspected; browser checks covered mobile overflow and single consent. No application policy was saved or cleanup run.
+
+## October 5 mock-analysis exclusion
+
+Built-in mock reports are excluded from retention previews, automatic clearing, unknown-date approval candidates, and result-age read restrictions. They remain viewable even if their generation date is old or missing. Excluded reports are omitted from deletion totals and samples; previews show a small excluded count when applicable.
+
+The exclusion uses the server-created strict `config.is_demo: true` marker and requires no real incident integration link. Report names, mock source events, truthy strings, and numeric markers do not create an exemption. Analysis reads refresh the integration link before allowing the exclusion. Prior unknown-date approvals skip exempt demos instead of clearing them.
+
+The separate local **Retention Demo** fixtures have an explicit `local_retention_demo` marker and remain eligible by design. This preserves the controlled old/recent/unknown test cases. Survey responses still follow their own submission age, even when linked to an exempt demo; this exemption does not protect real old survey responses.
+
+Verification: **25 new regression cases** passed alongside **65 demo tests**. The other related suites passed **351 checks**, giving **441 distinct backend checks** for this change after updating two expected response shapes for the new excluded count. TypeScript and **5 focused browser checks** passed. A read-only local check found **2 built-in demo reports excluded** and **7 retention fixtures eligible**; the actual management preview still reports **3 expired results / 1 old survey / 2 detached links**. No application policy was saved or cleanup run.
+
+## October 5 explanation copy refinement
+
+Removed the entire **How retention works** disclosure at the user's request. The preview helper is now one sentence: "Preview deletion before saving; previewing does not save settings or delete data." The controls, preview counts, cleanup history, and enabling/shortening confirmation remain; retention behavior is unchanged.
+
+Verification: TypeScript and all **6 affected browser scenarios** passed, including the absence of the disclosure, exact shortened helper, preview dates/counts, cleanup timing, demo exclusions, and mobile confirmation. The local frontend was restarted to load the edit.
+
+## October 5 short-description placement
+
+Removed the disabled cleanup sentence and the preview helper sentence. Moved the short generation/submission-age description above the enable/period controls, in the former cleanup-status text position. The period input retains its accessible description; invalid-day validation appears separately next to the controls. Cleanup history still provides scheduling information. Retention behavior is unchanged.
+
+Verification: TypeScript and **8 affected browser scenarios** passed, including exact description placement and uniqueness, removal of both sentences, separate accessible validation, member view, cleanup history, and mobile confirmation. The local frontend was restarted.
+
+## October 5 short-description wording
+
+The description above the controls now starts with the feature name and states the age rules: "Data retention, when enabled, automatically clears analysis results N days after generation and survey responses N days after submission." This is a wording-only change.
+
+Verification: all **3 affected existing browser scenarios** passed; local frontend restarted.
+
+## October 6 UTC: first enabled-policy diagnosis
+
+The user enabled the local Retention Demo policy at **October 6, 03:21 UTC**, after the day's 03:00 slot. The next normal cleanup is **October 7, 03:00 UTC**, or **October 6 at 11 p.m. Toronto time**. Saving the policy does not perform immediate physical deletion. The scheduler is running; its status correctly remains Not run yet.
+
+Read-only verification found **3 expired results and 1 expired survey**, with one retained result, one unknown-date result, one running result and one empty row. Guarded reads already reject expired results with HTTP 410. The sidebar's 130d/30d label is the requested analysis window, while its date is row creation; neither is the stored result-generation timestamp. Saved sidebar entries intentionally remain after content clearing because the saved configuration is preserved.
+
+The review also found frontend shortcuts that could display an in-memory result without another guarded API read. Saved, automatic and most-recent report selections now revalidate with the server rather than using full results from client caches or list summaries. Full reads use no-store; unavailable or failed reads clear displayed content and derived caches. HTTP 410 displays a retention-unavailable message without selecting an unvalidated fallback. This does not retract content that a browser has already displayed; selection/opening now requires a current server decision.
+
+Verification: frontend TypeScript passed and **3 isolated dashboard regressions** passed, covering cached-result revisits, list responses containing full results, and switching from a readable report to one rejected with HTTP 410. Positive readable reports still load, while rejected content and export access disappear and saved configuration remains. The local frontend was restarted. No manual cleanup was triggered against the application database.
+
 ## Implementation sequence
 
 | Step | Work | Status | Verification before moving on |
@@ -53,7 +103,7 @@ The existing local demo now has three 120-day-old generated results and one fres
 | 2 | Add the organization policy and admin API | Complete | 55 PostgreSQL integration tests passed; independent code review found no actionable issues |
 | 3 | Build a read-only cleanup preview | Complete | 87 preview tests passed, including cutoff boundaries, full-result expiry, and read-only behavior |
 | 4 | Implement deletion and dependency handling | Complete with result-age semantics | Final combined backend suite: 577 passed; retention-specific source exclusions removed |
-| 5 | Add the admin settings UI | Complete; ready for user review | 19 isolated browser scenarios, TypeScript, and live mock preview passed; generation-based copy and dates verified |
+| 5 | Add the admin settings UI | Complete; compact UI ready for review | 30 isolated browser scenarios, TypeScript, and live mock preview passed; compact desktop/mobile layout and confirmation guards verified |
 | 6 | Schedule daily cleanup and record outcomes | Complete | 649 backend checks, 23 UI scenarios, TypeScript, fixed daily slots, targeted retries, PostgreSQL concurrency and shutdown drain passed |
 | 7 | Verify the full flow in staging | Not started | User verifies the feature with controlled data before pilot activation |
 
@@ -304,6 +354,20 @@ Verification complete: **649 targeted backend tests passed**, including 54 sched
 
 All **23 browser scenarios** and TypeScript passed, including successful outcomes, legacy counts, preserved counts after failure, retry display, member refresh and disabled scheduling. Desktop/mobile status panels were rendered and reviewed. The live mock management preview and member permissions pass, backend health reports the scheduler running, and there are **zero enabled local policies**. The mock policy remains disabled, its status is **Not run yet**, and no application results or surveys were deleted. Provider/email actions were not performed by verification.
 
+## Compact UI refinement before staging (historical)
+
+This records the first compact layout and its verification. The subsequent UI simplification and description refinements above supersede its advanced disclosure, receipt timer and explanation controls; the current UI has no Advanced cleanup option.
+
+The user requested that optional retention settings stop occupying most of Organization Management. Retention now starts as a collapsed row containing its name, saved status, and **Configure** action (**View settings** for members). The integration section remains visible below it. The disclosure supports keyboard activation and exposes expanded state; its accessible name includes the action's visible label.
+
+The status badge is simply **Enabled** or **Disabled**, as requested. It represents the currently applied policy; unsaved edits keep their separate indicator. The period remains available inside settings, including a read-only value for members.
+
+Expanded settings show only the enable switch, period, short date-basis/schedule help, preview/save/refresh actions, and a concise existing-data warning. **Advanced cleanup** contains the optional unknown-generation-date choice and its explanation. **How retention works** contains the fuller preservation, timing and retry notes. **Cleanup history** contains outcomes and counts; a never-run organization gets one sentence rather than four empty timestamp rows. The complete permanent-deletion warning and separate legacy consent remain in the confirmation dialog.
+
+Unsaved changes, failed cleanup, pending legacy approval and expired previews remain discoverable in the collapsed header. Closing settings neither saves nor discards a draft and does not renew a preview receipt. The component stays mounted so expiry clocks continue. Busy requests prevent collapsing the panel. Cleanup history preserves its open state across refresh, and permissions/session/version checks are unchanged.
+
+Verification: **30 isolated browser scenarios passed** and TypeScript passed. New cases verify compact height at 1440px and 390px, keyboard expansion, unsaved collapse/reopen, visible attention states, opt-in advanced cleanup with independent confirmation, and receipt expiry while collapsed. Existing member/admin, changed session/organization, stale receipt, preview, scheduling and mobile checks still pass. Desktop/mobile images were reviewed. The live local preview and member permissions also passed; retention remains disabled and no application data changed. Backend logic was unchanged, so its prior 649-test validation remains applicable.
+
 ## Local mock organization for user verification
 
 Created October 5 at the user's request in the local Compose application database: **Retention Demo** (organization ID 3), with the selected existing local account as admin. Alex Morgan, Priya Shah, and Noah Chen are fictional members with reserved `.invalid` email addresses. Open `http://localhost:3000/management`; **Team Roles** shows all four accounts. Refresh an existing session to pick up the membership.
@@ -316,7 +380,7 @@ Retention starts **disabled**. The seven analysis fixtures and four surveys cove
 | --- | --- |
 | Three results generated 120 days ago, including a saved result | 3 whole analysis results expire; rows and configuration remain |
 | Fresh result containing four months of historical activity | 1 result retained, including its older source data |
-| Legacy result with unknown generation date | 1 reported for separate approval; preserved by normal retention |
+| Legacy result with unknown generation date | 1 reported as unknown; preserved by normal retention, with no advanced approval in the UI |
 | Mock running result | 1 deferred |
 | Empty result | 1 empty |
 | Old survey linked to an old result | 1 survey deleted by its own submission age |
@@ -326,10 +390,10 @@ Retention starts **disabled**. The seven analysis fixtures and four surveys cove
 
 ### Simple manual test
 
-1. Open **Data retention**, turn on the draft switch, leave **90** days, and click **Preview deletion**. Expect **3 analysis results**, **1 survey response**, and **2 survey links**. Previewing changes no policy or data.
-2. Optionally select **Include results with unknown generation dates in this one-time cleanup**, then preview again. It adds **1 legacy result** and requires its separate confirmation. The unknown-age survey remains preserved.
+1. Click **Configure** on the compact **Data retention** row, turn on the draft switch if disabled, leave **90** days, and click **Preview deletion**. Before the first cleanup, expect **3 analysis results**, **1 survey response**, and **2 survey links**. Previewing changes no policy or data. If the saved policy is already enabled at 90 days, skip step 3; there is no policy change to save.
+2. Review the generated dates and unknown-date counts in the preview. The legacy result is preserved and becomes unavailable while retention is enabled; a successful rerun gives its replacement a reliable date. The unknown-age survey remains preserved. There is no Advanced cleanup option or extra confirmation.
 3. Click **Save retention policy**, review the confirmation, and save. Reload to verify the saved 90-day policy. Saving does not run cleanup during the request; the next normal daily run is at 03:00 UTC, normally within 24 hours while the backend is running.
-4. Wait for the daily run and click **Refresh settings** to inspect the saved outcome, or run the fixture-only cleanup command below to test immediately. The three expired payloads become empty, the old survey disappears, and two preserved survey links become null. If separately approved, the legacy payload also becomes empty. Repeat cleanup to verify it does not delete the preserved responses; its last-successful counts update to reflect the new no-op run.
+4. Wait for the daily run and click **Refresh settings** to inspect the saved outcome, or run the fixture-only cleanup command below to test immediately. The three expired payloads become empty, the old survey disappears, and two preserved survey links become null. The unknown-date result and survey remain stored. Saved entries remain in the sidebar with their configuration, even after result content is cleared. Repeat cleanup to verify it does not delete the preserved responses; its last-successful counts update to reflect the new no-op run.
 
 ```powershell
 docker compose exec -T backend python scripts/retention_demo.py cleanup --local-compose
@@ -410,10 +474,10 @@ The user subsequently approved the explicit existing-data warning. Implemented i
 | Related metadata | Delete scoped mappings/notifications; detach newer surveys, survey periods and digest links; evict result caches | Implemented in step 4 |
 | Enrichment collection | Preserve existing integration behavior and requested windows; no retention-specific exclusions | Restored and tested October 5 |
 | Existing versus future data | Apply the same rolling cutoff to both from the first cleanup; no additional N-day wait | Confirmed by user October 5 |
-| Legacy analyses with unknown generation dates | Optional one-time clearing of reviewed, unchanged snapshots with separate confirmation | Generation-based approval implemented and verified |
+| Legacy analyses with unknown generation dates | Preserve undated results; no advanced approval in ordinary settings | Advanced UI removed; prior pending approvals remain visible and cancellable for API compatibility |
 | Unknown-age surveys | Report separately for review; do not cascade-delete from analyses | Approved by user October 5 |
 | Allowed number of days | Strict whole number from 1 through 3650; null disables the policy | Implemented in step 2 |
-| Admin settings UI | Organization-wide card with preview, separate legacy confirmation, and status | Implemented in step 5; awaiting user wording/flow verification |
+| Admin settings UI | Compact organization-wide card with period, preview, ordinary confirmation, and status | Advanced UI removed at the user's request; awaiting user flow verification |
 | Backups and operational logs | Document a separate policy; database cleanup alone does not erase backups or logs | Awaiting deployment review |
 
 ## Test strategy
@@ -436,7 +500,7 @@ Inject a fixed clock into cleanup tests. Seed data around the cutoff rather than
 | Preview consistency | Preview and deletion use the same eligibility logic, with cutoff and policy recorded |
 | Repeated runs | Second cleanup safely finds nothing already deleted |
 | Failure handling | Transaction behavior is correct; failures are visible and retries are safe |
-| Legacy authorization | Separate confirmation authorizes only reviewed unchanged snapshots; receipts expire, cannot replay, and cancel cleanly |
+| Prior legacy authorization | Existing backend approvals remain snapshot-bound; simplified UI cannot create or renew one and exposes pending cancellation/counts |
 | Scheduler | Multiple processes cannot perform overlapping cleanup for the same organization |
 | UI flow | Admin sets policy, reviews consequences, confirms, reloads, and sees the saved value |
 
@@ -486,7 +550,15 @@ Inject a fixed clock into cleanup tests. Seed data around the cutoff rather than
 | October 5, 2026 | 6 | Fixed shutdown to drain the current organization and prevent new claims before engine disposal | Real blocked-worker lifecycle test passed; independent review found no remaining blocker |
 | October 5, 2026 | 6 | Ran final backend/UI/type checks and live mock/health verification | 625 backend, 23 UI and TypeScript passed; scheduler running; mock still disabled and never cleaned |
 | October 5, 2026 | 6 schedule refinement | Replaced the 15-minute routine poll with daily 03:00 UTC cleanup and failure-only one-off timers | 649 backend and 23 UI tests passed; TypeScript passed; no application policy enabled or data deleted |
+| October 5, 2026 | Compact UI refinement | Collapsed optional retention by default; moved advanced options, explanations and history into disclosures | 30 browser cases and TypeScript passed; desktop/mobile reviewed; live preview passes; no policy/data changes |
+| October 5, 2026 | Simple retention UI | Removed Advanced cleanup, separate unknown-date consent and receipt handling; retained conditional prior-approval notice and accurate combined counts | 30 browser scenarios, 97 preview tests and TypeScript passed; live demo preview passed; retention remains disabled |
+| October 5, 2026 | Mock analysis exclusion | Excluded built-in sample reports from preview, cleanup, legacy candidates and result-age reads; dedicated retention fixtures remain eligible | 25 new cases and 416 existing related checks passed after two expected-shape updates; TypeScript and 5 browser checks passed; live mock preview unchanged |
+| October 5, 2026 | Explanation copy refinement | Removed How retention works and shortened the preview helper to one sentence | TypeScript and 6 affected browser scenarios passed; local frontend restarted |
+| October 5, 2026 | Short-description placement | Removed disabled-status and preview-helper sentences; moved age description above controls with separate validation | TypeScript and 8 affected browser scenarios passed; local frontend restarted |
+| October 5, 2026 | Short-description wording | Reworded the description to introduce Data retention and state generation/submission expiry | 3 affected browser scenarios passed; local frontend restarted |
+| October 6, 2026 UTC | Enabled-policy diagnosis and browser revalidation | Confirmed first daily run timing, window versus generation age and saved configuration preservation; removed client result-cache display shortcuts | Read-only preview 3 expired results/1 survey; expired server reads return410; TypeScript and 3 dashboard cases passed; no manual app cleanup |
+| October 6, 2026 UTC | Commit preparation | Reviewed final diff, corrected historical/manual instructions, and verified the current settings/dashboard UI | 34 browser scenarios passed (33 initially, 1 after synchronizing its refresh wait); TypeScript passed using committed node resolution; whitespace check passed; unrelated local tsconfig change excluded |
 
 ## Next action
 
-Next is **step 7: verify the complete automatic flow in staging** with a controlled organization and synthetic data before pilot activation. The local implementation through step 6 is complete and verified. Have the user review the new timing/outcome panel at `http://localhost:3000/management`; the mock remains disabled unless explicitly enabled for verification. Confirm separate policies for delivery/security history and backups before describing the feature as deletion of every organization record. Continue using normal chat for verification questions because the terminal question widget was inaccessible.
+Next is **step 7: verify the complete automatic flow in staging** with a controlled organization and synthetic data before pilot activation. The user has enabled the local mock's 90-day policy; its first scheduled cleanup is October 7, 03:00 UTC. Review the outcome panel at `http://localhost:3000/management` after that scheduled run. Confirm separate policies for delivery/security history and backups before describing the feature as deletion of every organization record. Continue using normal chat for verification questions because the terminal question widget was inaccessible.

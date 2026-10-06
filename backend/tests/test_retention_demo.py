@@ -201,7 +201,7 @@ def test_status_explains_expected_90_day_examples_without_enabling_policy(demo, 
 
     organization, _, result = seed(demo, db, users[0])
     assert result["preview_at_90_days"]["analyses"] == {
-        "total": 7, "expired": 3, "retained": 1, "unverifiable": 1, "deferred": 1, "empty": 1,
+        "total": 7, "excluded": 0, "expired": 3, "retained": 1, "unverifiable": 1, "deferred": 1, "empty": 1,
         "regeneration_candidates": 0,
     }
     assert result["preview_at_90_days"]["surveys"] == {
@@ -246,7 +246,7 @@ def test_upgrade_converts_prior_fixture_without_changing_members_surveys_or_conf
     assert original["organization_id"] != organization.id
     assert read_retention_policy(organization).retention_days is None
     assert result["preview_at_90_days"]["analyses"] == {
-        "total": 7, "expired": 3, "retained": 1, "unverifiable": 1, "deferred": 1, "empty": 1,
+        "total": 7, "excluded": 0, "expired": 3, "retained": 1, "unverifiable": 1, "deferred": 1, "empty": 1,
         "regeneration_candidates": 0,
     }
     assert result["preview_at_90_days"]["surveys"] == {

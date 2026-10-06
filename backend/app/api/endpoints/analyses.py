@@ -857,7 +857,7 @@ def _require_retained_result(db: Session, analysis: Analysis):
         return None
     # Cleanup can clear a preserved auto-refresh row after it was first read.
     db.refresh(analysis, attribute_names=[
-        "results", "status", "config", "results_generated_at", "completed_at",
+        "results", "status", "config", "rootly_integration_id", "results_generated_at", "completed_at",
     ])
     eligibility = classify_analysis_result(analysis, cutoff)
     if eligibility.disposition in ("expired", "unverifiable") or (

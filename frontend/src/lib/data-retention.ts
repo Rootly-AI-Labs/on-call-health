@@ -57,20 +57,17 @@ export interface RetentionPolicyResponse {
 export interface RetentionPreviewRequest {
   // Omit this field to preview the saved policy; null explicitly previews disabling it.
   retention_days?: number | null
-  clear_unverifiable_analyses?: boolean
 }
 
 export interface RetentionPolicyUpdate {
   retention_days: number | null
   expected_policy_version?: string | null
   confirm_deletion?: boolean
-  clear_unverifiable_analyses?: boolean
-  confirm_legacy_deletion?: boolean
-  legacy_preview_token?: string | null
 }
 
 export interface AnalysisPreviewCounts {
   total: number
+  excluded: number
   expired: number
   retained: number
   unverifiable: number
@@ -134,11 +131,6 @@ export interface RetentionPreviewResponse {
 
 const PREVIEW_ERROR_MESSAGES: Record<string, string> = {
   retention_policy_changed: "Your organization or retention policy changed. Refresh settings and review a new preview.",
-  legacy_preview_expired: "The legacy cleanup preview expired. Review a new preview before confirming.",
-  legacy_preview_stale: "The analysis history or retention policy changed. Review a new preview before confirming.",
-  legacy_preview_already_used: "This legacy cleanup preview has already been confirmed. Refresh the cleanup status before reviewing another preview.",
-  legacy_preview_invalid: "The legacy cleanup preview is invalid. Review a new preview before confirming.",
-  legacy_preview_required: "Review a legacy cleanup preview before confirming this one-time clear.",
 }
 
 export class RetentionApiError extends Error {
@@ -230,7 +222,6 @@ export function previewOrganizationRetention(
 ): Promise<RetentionPreviewResponse> {
   const body: RetentionPreviewRequest = {
     ...(request.retention_days === undefined ? {} : { retention_days: request.retention_days }),
-    ...(request.clear_unverifiable_analyses === undefined ? {} : { clear_unverifiable_analyses: request.clear_unverifiable_analyses }),
   }
   return retentionRequest<RetentionPreviewResponse>(token, "POST", body, signal)
 }
@@ -245,9 +236,6 @@ export function updateOrganizationRetention(
     retention_days: update.retention_days,
     ...(update.expected_policy_version === undefined ? {} : { expected_policy_version: update.expected_policy_version }),
     ...(update.confirm_deletion === undefined ? {} : { confirm_deletion: update.confirm_deletion }),
-    ...(update.clear_unverifiable_analyses === undefined ? {} : { clear_unverifiable_analyses: update.clear_unverifiable_analyses }),
-    ...(update.confirm_legacy_deletion === undefined ? {} : { confirm_legacy_deletion: update.confirm_legacy_deletion }),
-    ...(update.legacy_preview_token === undefined ? {} : { legacy_preview_token: update.legacy_preview_token }),
   }
   return retentionRequest<RetentionPolicyResponse>(token, "PUT", body, signal)
 }
