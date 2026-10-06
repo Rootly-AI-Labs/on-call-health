@@ -323,6 +323,13 @@ export default function useDashboard() {
             } else if (analysisData.status === 'failed') {
               cancelPolling()
               clearRunningAnalysisState()
+              const failedAnalysis = {
+                ...analysisData,
+                error_message: analysisData.error_message || "Analysis failed. Please try again.",
+              }
+              setCurrentAnalysis(failedAnalysis)
+              updateURLWithAnalysis(String(failedAnalysis.id))
+              if (failedAnalysis.is_auto_refresh) setAutoRefreshAnalysis(failedAnalysis)
               if (showToast) {
                 toast.error("Analysis failed")
               }

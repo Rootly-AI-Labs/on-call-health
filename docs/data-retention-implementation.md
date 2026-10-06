@@ -157,6 +157,14 @@ Testing complete: at the user's request, restored the original **03:00 UTC daily
 
 ## Implementation sequence
 
+### October 6 review follow-up: terminal failed polling state
+
+The finding is valid on the previously pushed branch and was reproduced with a pending report opened from its URL. A successful HTTP polling response with `status: failed` stopped the running indicator but left the pending snapshot displayed; notification-disabled polling provided no visible failure feedback.
+
+The failed-status branch now publishes the terminal response as the current report and updates its automatic-report state, so the sidebar no longer says Refreshing. It preserves the supplied error message or uses a generic failure message when no detail is provided. The failure card gives an explicit error precedence over a missing incident count, avoiding a misleading No Incidents heading. Existing polling ownership checks still prevent a late failed response from replacing a newer selected report.
+
+Verification: **17 dashboard browser scenarios** and TypeScript passed, including four new pending/running URL cases with/without error detail and a late failed response after cancellation and a different selection. The test cancellation route remains fully mocked, including its DELETE preflight; no application data or provider APIs were used. The local frontend was restarted. This follow-up is verified for publication on `feat/org-data-retention`.
+
 ### October 6 review follow-up: polling fallback and deleted-row reads
 
 Both Greptile findings are valid and were reproduced before the fixes. A running automatic report's 404 left the dashboard without a saved report; a pending saved report finishing unsuccessfully and being cleaned while its reader waited caused an unhandled `InvalidRequestError` during the polling metadata refresh.
