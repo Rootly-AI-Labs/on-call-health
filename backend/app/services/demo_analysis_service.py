@@ -355,7 +355,9 @@ def create_demo_analysis_for_new_user(db: Session, user: User) -> bool:
         # Demo analyses work fine with organization_id=NULL
         logger.info(f"Creating org-less demo analysis for new user {user.id}")
 
-        # Create the demo analysis
+        # A newly instantiated demo is a fresh stored result even though its
+        # sample source events intentionally cover a historical period.
+        generated_at = datetime.now(timezone.utc)
         analysis = Analysis(
             user_id=user.id,
             organization_id=None,  # Demo analyses are org-less
@@ -368,7 +370,8 @@ def create_demo_analysis_for_new_user(db: Session, user: User) -> bool:
             config=config,
             results=original_analysis.get('results'),
             error_message=None,
-            completed_at=datetime.now()
+            completed_at=generated_at,
+            results_generated_at=generated_at,
         )
 
         db.add(analysis)
