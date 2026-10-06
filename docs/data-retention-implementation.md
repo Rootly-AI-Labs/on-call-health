@@ -95,6 +95,20 @@ The review also found frontend shortcuts that could display an in-memory result 
 
 Verification: frontend TypeScript passed and **3 isolated dashboard regressions** passed, covering cached-result revisits, list responses containing full results, and switching from a readable report to one rejected with HTTP 410. Positive readable reports still load, while rejected content and export access disappear and saved configuration remains. The local frontend was restarted. No manual cleanup was triggered against the application database.
 
+## October 6: selected PR #530 review fixes
+
+The user approved fixes **1, 4-5, 7, 8 and 9** from the ranked review: demo refresh, PagerDuty team scoping, OpenAI directory permissions, OpenAI pagination and tracked AI usage table creation. Other review findings were explicitly excluded from this change.
+
+- Removed demo refresh's redundant deletion of all analyses owned by unverified users. Existing demo-only cleanup and authorization remain, and the compatibility response field stays zero.
+- Added an optional REST incident team filter and propagated it through both Analytics fallbacks and failed-analysis recovery. Selected-team analyses reject incomplete, unavailable, empty, malformed or unmatched membership instead of widening to the account. Member requests include full user profiles; unresolved reference-only profiles fail safely when no synced roster exists. Unscoped analyses keep their existing behavior.
+- Require organization user-management permission before retrieving the shared OpenAI directory; personal integration owners retain access.
+- Both OpenAI usage collectors preserve the original date/filter/grouping parameters and use the documented `page` cursor across all pages.
+- Register the existing table-creation SQL as **056_create_ai_usage_integrations**, before **053_ai_usage_nullable_org**, without renaming any existing migration. Fresh migration-only setup and existing nullable/personal rows are tested in isolated schemas.
+
+Verification: **140 targeted backend checks passed**, including **51 new regressions** and existing admin, PagerDuty, normalization and retention collection/result tests. Provider calls and cache effects are mocked. Destructive tests use only the explicitly guarded disposable PostgreSQL database and roll back their rows/schemas. Independent code review found no material blocker. The unrelated local frontend TypeScript configuration edit remains excluded.
+
+The local backend was restarted successfully. Read-only health reports healthy with the retention scheduler running, and migration metadata confirms 053, 055 and the newly registered 056 are completed. No manual demo refresh or retention cleanup was run against application data.
+
 ## Implementation sequence
 
 | Step | Work | Status | Verification before moving on |
@@ -558,6 +572,7 @@ Inject a fixed clock into cleanup tests. Seed data around the cutoff rather than
 | October 5, 2026 | Short-description wording | Reworded the description to introduce Data retention and state generation/submission expiry | 3 affected browser scenarios passed; local frontend restarted |
 | October 6, 2026 UTC | Enabled-policy diagnosis and browser revalidation | Confirmed first daily run timing, window versus generation age and saved configuration preservation; removed client result-cache display shortcuts | Read-only preview 3 expired results/1 survey; expired server reads return410; TypeScript and 3 dashboard cases passed; no manual app cleanup |
 | October 6, 2026 UTC | Commit preparation | Reviewed final diff, corrected historical/manual instructions, and verified the current settings/dashboard UI | 34 browser scenarios passed (33 initially, 1 after synchronizing its refresh wait); TypeScript passed using committed node resolution; whitespace check passed; unrelated local tsconfig change excluded |
+| October 6, 2026 | Selected PR #530 fixes | Fixed demo refresh, PagerDuty team scoping, directory permission, OpenAI pagination and tracked table creation | 140 backend checks passed, including 51 new regressions; provider calls mocked and destructive tests isolated; ignored findings unchanged |
 
 ## Next action
 

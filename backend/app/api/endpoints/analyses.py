@@ -3516,47 +3516,15 @@ async def run_analysis_task(
             except Exception as team_filter_err:
                 logger.warning(f"BACKGROUND_TASK: Team scope filter failed: {team_filter_err} — keeping all synced users")
 
-        # Filter synced_users to PagerDuty team members when a team is selected.
-        # We fetch team members directly from the PD API so this works even if
-        # the pagerduty_teams DB column hasn't been populated by a re-sync yet.
-        if pagerduty_team_id and platform == "pagerduty" and synced_users:
-            before_count = len(synced_users)
-            try:
-                from ...core.pagerduty_client import PagerDutyAPIClient as _PDClient
-                _pd_client = _PDClient(effective_api_token)
-                team_members = await _pd_client.get_team_members(pagerduty_team_id)
-
-                # Build lookup sets: PD user IDs and emails of team members
-                team_pd_ids: set = set()
-                team_emails: set = set()
-                for m in team_members:
-                    if m.get("id"):
-                        team_pd_ids.add(str(m["id"]))
-                    if m.get("email"):
-                        team_emails.add(m["email"].lower())
-
-                if team_pd_ids or team_emails:
-                    def _user_in_team(u: dict) -> bool:
-                        pd_uid = str(u.get("pagerduty_user_id") or u.get("id") or "")
-                        email = (u.get("email") or "").lower()
-                        return pd_uid in team_pd_ids or email in team_emails
-
-                    synced_users = [u for u in synced_users if _user_in_team(u)]
-                    logger.info(
-                        f"BACKGROUND_TASK: PagerDuty team scope '{pagerduty_team_id}': "
-                        f"{before_count} → {len(synced_users)} synced users "
-                        f"(team has {len(team_members)} members)"
-                    )
-                else:
-                    logger.warning(
-                        f"BACKGROUND_TASK: PagerDuty team '{pagerduty_team_id}' returned "
-                        f"no members — keeping all synced users"
-                    )
-            except Exception as _team_err:
-                logger.warning(
-                    f"BACKGROUND_TASK: Failed to fetch PagerDuty team members: {_team_err} "
-                    f"— keeping all {before_count} synced users"
-                )
+        # A selected PagerDuty team must have a verified, nonempty roster.
+        # Resolve it even without synced users so the API fallback cannot widen
+        # a team report to the whole account.
+        if pagerduty_team_id and platform == "pagerduty":
+            from ...core.pagerduty_client import PagerDutyAPIClient as _PDClient
+            _pd_client = _PDClient(effective_api_token)
+            synced_users = await _pd_client.get_team_scoped_users(
+                pagerduty_team_id, synced_users
+            )
 
         # Release any open read transaction before the long-running analysis
         # await. All setup reads above run inside an uncommitted transaction;
@@ -4079,6 +4047,10 @@ async def run_analysis_task(
             # during the long-running analysis await.
             # Check if this is a permission error - if so, fail immediately
             error_message = str(analysis_error)
+            from ...core.pagerduty_client import PagerDutyTeamScopeError
+            if isinstance(analysis_error, PagerDutyTeamScopeError):
+                _persist_analysis_result(analysis_id, status="failed", error_message=error_message)
+                return
             if "Cannot access incidents endpoint" in error_message or "incidents:read" in error_message:
                 logger.error(f"BACKGROUND_TASK: Permission error detected for analysis {analysis_ref}, failing immediately")
                 _persist_analysis_result(analysis_id, status="failed", error_message=error_message)
@@ -4099,7 +4071,10 @@ async def run_analysis_task(
                         if client is not None:
                             try:
                                 logger.info(f"BACKGROUND_TASK: Attempting raw data collection with client type: {type(client).__name__}")
-                                raw_data = await client.collect_analysis_data(days_back=time_range)
+                                collection_args = {"days_back": time_range}
+                                if platform == "pagerduty" and pagerduty_team_id:
+                                    collection_args["team_ids"] = [pagerduty_team_id]
+                                raw_data = await client.collect_analysis_data(**collection_args)
                                 logger.info(f"BACKGROUND_TASK: Successfully collected raw data for analysis {analysis_ref}")
                             except Exception as client_error:
                                 logger.warning(f"BACKGROUND_TASK: Failed to collect raw data for analysis {analysis_ref}: {client_error}")

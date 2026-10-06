@@ -1389,6 +1389,14 @@ class MigrationRunner:
                 "sql_file": "2026_04_20_add_openai_user_id_to_user_correlations.sql"
             },
             {
+                # Register the existing creation SQL before its alteration.
+                # Keep applied migration names intact; ordering, not numbering,
+                # establishes this missing prerequisite on fresh databases.
+                "name": "056_create_ai_usage_integrations",
+                "description": "Create AI usage integrations before applying its nullable organization migration",
+                "sql_file": "2026_03_31_add_ai_usage_integrations.sql"
+            },
+            {
                 "name": "053_ai_usage_nullable_org",
                 "description": "Make organization_id nullable in ai_usage_integrations and add partial unique indexes",
                 "sql_file": "2026_04_20_ai_usage_nullable_org.sql"
