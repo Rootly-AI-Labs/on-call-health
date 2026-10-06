@@ -157,6 +157,30 @@ Testing complete: at the user's request, restored the original **03:00 UTC daily
 
 ## Implementation sequence
 
+### October 6 minimal cleanup history
+
+Simplified the optional Cleanup history disclosure to one row with **Last successful cleanup**, **Analyses cleared**, **Surveys deleted**, and **Survey links detached**. Desktop shows four columns; mobile wraps to two columns. The date stays explicitly UTC and omits seconds; its full timestamp remains available on hover. Before any success, the date displays Never. Counts remain those recorded for the last successful run, even after a later failure.
+
+Removed attempt/finish timestamps, next-run/retry timestamps, schedule and count explanations, related-record/deferred/unknown-date details, failure-attempt totals and policy-change dates from this view. The status badge and actual failure message remain. Backend scheduling, deletion rules, stored outcomes and permissions are unchanged.
+
+Verification: **7 affected existing browser scenarios** and TypeScript passed, covering successful counts including legacy clears, no prior success, failure without replacing successful counts, read-only member refresh, disabled status, draft refresh, and mobile layout. Desktop/mobile summary renders were reviewed; the local frontend was restarted.
+
+The user subsequently requested removal of **Analysis samples** from the deletion preview. Removed the disclosure and its per-analysis table, including generation timestamps, eligibility outcomes/reasons and truncation text. The preview retains its two counts, short preservation note and conditional ownership/prior-approval notices. This is a UI-only change; API eligibility and cleanup are unchanged. **3 affected existing browser scenarios** and TypeScript passed; the local frontend was restarted.
+
+### October 6 preview-free disabling
+
+An admin can now turn off retention and click **Save retention policy** directly, without generating a deletion preview or opening a confirmation dialog. Saving an already-disabled, unchanged policy remains unavailable. Enabled policies still require a matching preview; enabling or shortening the period still requires deletion consent. Account/session verification, organization admin permissions, conditional policy versions and cancellation of prior cleanup approvals continue through the existing save API.
+
+Verification: **8 affected existing browser scenarios** and TypeScript passed, including direct disabling without preview requests, approval cancellation and disabled state after reload, enabling/shortening consent, lengthening, draft invalidation, stale-policy refresh, session changes and member restrictions. Provider/application data remained isolated behind mocked APIs; the local frontend was restarted.
+
+### October 6 retention placement and save feedback
+
+Moved the collapsed Data retention card below the main Organization Management/Team Management content. It remains outside both view modes, including when no primary integration is connected, and stays mounted when switching Synced Org/Team Roles so draft values are preserved. Added spacing above the card to match the page.
+
+Successful-save notices now disappear after **five seconds**. The saved Enabled/Disabled badge remains; actual errors and cleanup-attention indicators are not dismissed by this timer. The timer resets with a new notice and is cancelled when the notice changes or the component unmounts.
+
+Verification: **8 affected existing browser scenarios** and TypeScript passed. Checked desktop/mobile card placement after the management content, collapsed size, draft continuity across both tabs, absence of primary integrations, persistent failure/pending indicators, and automatic save-notice dismissal. Desktop and 390-pixel mobile renders were inspected; the local frontend was restarted.
+
 ### October 6 sidebar date clarification
 
 Saved and automatic report entries now show the report name, **Covers N days**, and **Generated [date]** when a stored generation timestamp is available. Otherwise they show **Created [date]** without relabeling row creation or failed-run completion as generation. Dates include the year; hovering shows the exact local date/time and identifies an unknown generation date when the creation fallback is used. Full truncated report names are also available on hover.

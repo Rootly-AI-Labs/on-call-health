@@ -1172,8 +1172,6 @@ function TeamPageContent() {
             </div>
           </div>
 
-          <DataRetentionSettings />
-
           {/* Organization Management Section */}
           {(selectedOrganization || !hasPrimaryIntegration) && !loadingIntegrations && (
               <div className="bg-white rounded-lg border border-neutral-200 shadow-sm">
@@ -1969,6 +1967,9 @@ function TeamPageContent() {
               )}
               </div>
           )}
+          <div className="mt-6">
+            <DataRetentionSettings />
+          </div>
             </div>  {/* Close max-w-4xl mx-auto */}
           </div>  {/* Close p-6 lg:p-8 */}
         </div>  {/* Close h-full overflow-y-auto */}
