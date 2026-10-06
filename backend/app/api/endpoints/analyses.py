@@ -9,8 +9,9 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import Text, cast, func, or_, over
+from sqlalchemy import Text, cast, func, inspect as sa_inspect, or_, over
 from sqlalchemy.orm import Session, defer, load_only
+from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from ...models import get_db, User, Analysis, RootlyIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
@@ -24,6 +25,7 @@ from ...core.och_config import apply_alert_health_to_och, OCHConfig
 from ...services.survey_response_service import extract_analysis_member_emails, normalize_survey_email
 from ...services.retention_access import RetentionOrganizationMissing, organization_retention_cutoff
 from ...services.retention_preview import classify_analysis_result, result_generation_time
+from ...services.retention_metadata import metadata_query, metadata_snapshot, result_present_expression
 from ...utils.visual_logger import log_task_start, log_task_complete
 
 logger = logging.getLogger(__name__)
@@ -359,6 +361,7 @@ async def run_burnout_analysis(
                     # retiring this schedule and creating the new carrier below
                     # together; cleanup expires each result by generation age.
                     existing_auto_refresh.is_auto_refresh = False
+                    existing_auto_refresh.config = {**(existing_auto_refresh.config or {}), "retired_auto_refresh": True}
                 else:
                     db.delete(existing_auto_refresh)
 
@@ -703,10 +706,8 @@ async def get_analysis_by_uuid(
         return refresh_status
 
     # Fetch survey data for team members within analysis timeline
-    member_surveys = get_member_surveys(analysis, db)
-
-    # Extract only frontend-used keys from results at DB level (avoids loading 30MB+ into Python)
     analysis_data = _load_analysis_data(db, analysis.id)
+    member_surveys = get_member_surveys(analysis, db, analysis_data=analysis_data)
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
 
@@ -770,10 +771,8 @@ async def get_analysis(
         return refresh_status
 
     # Fetch survey data for team members within analysis timeline
-    member_surveys = get_member_surveys(analysis, db)
-
-    # Extract only frontend-used keys from results at DB level (avoids loading 30MB+ into Python)
     analysis_data = _load_analysis_data(db, analysis.id)
+    member_surveys = get_member_surveys(analysis, db, analysis_data=analysis_data)
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
 
@@ -896,30 +895,33 @@ def _refresh_retention_analysis(db: Session, analysis: Analysis, attribute_names
 
 def _require_retained_result(db: Session, analysis: Analysis):
     """Never serve expired or undated results, including before cleanup runs."""
+    if sa_inspect(analysis).deleted or sa_inspect(analysis).detached:
+        raise HTTPException(status_code=404, detail="Analysis not found")
     cutoff = _retention_cutoff(db, analysis.organization_id, lock=True)
-    if cutoff is None:
-        # Disabling retention cannot restore a cleared snapshot. Read only
-        # presence/timestamp metadata here so Redis reads do not load full JSON.
-        snapshot = db.query(
-            Analysis.status, Analysis.results_generated_at, Analysis.error_message,
-            or_(Analysis.results.is_(None), cast(Analysis.results, Text) == "null"),
-        ).filter(Analysis.id == analysis.id).first()
-        if snapshot is None:
-            raise HTTPException(status_code=404, detail="Analysis not found")
-        _require_uncleared_snapshot(*snapshot)
-        return None
-    # Cleanup can clear a recurring result or delete a manual saved row after
-    # it was first read, while this request waits for the organization lock.
-    _refresh_retention_analysis(db, analysis, attribute_names=[
-        "results", "status", "config", "rootly_integration_id", "results_generated_at", "completed_at",
-        "error_message", "error_generated_at",
-    ])
+    # Readers follow organization -> analysis lock ordering. Keep a stable
+    # snapshot through projection/survey enrichment without transferring JSON.
+    row = metadata_query(db, include_error_content=True).filter(
+        Analysis.id == analysis.id,
+    ).with_for_update(read=True).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    snapshot = metadata_snapshot(row)
+    # The initial ORM read may predate acquiring the organization lock.
+    # Never reuse a report value loaded before this validated row snapshot.
+    if "results" in analysis.__dict__:
+        db.expire(analysis, ["results"])
+    for attribute in ("status", "config", "rootly_integration_id", "created_at", "completed_at",
+                      "results_generated_at", "error_generated_at", "error_message", "is_saved",
+                      "is_auto_refresh", "auto_refresh_interval"):
+        set_committed_value(analysis, attribute, getattr(snapshot, attribute))
     _require_uncleared_snapshot(
-        analysis.status, analysis.results_generated_at, analysis.error_message, analysis.results is None,
+        snapshot.status, snapshot.results_generated_at, snapshot.error_message, snapshot.result_missing,
     )
-    eligibility = classify_analysis_result(analysis, cutoff)
+    if cutoff is None:
+        return None
+    eligibility = classify_analysis_result(snapshot, cutoff)
     if eligibility.disposition in ("expired", "unverifiable") or (
-        eligibility.disposition == "deferred" and (analysis.results or analysis.error_message)
+        eligibility.disposition == "deferred" and (snapshot.results or snapshot.error_message)
     ):
         raise HTTPException(
             status_code=410,
@@ -941,13 +943,10 @@ def _require_uncleared_snapshot(status: str, generated_at, error_message, result
 
 def _require_result_after_collection(db: Session, analysis: Analysis):
     """A provider response cannot revive a cleared or newly expired parent."""
-    _retention_cutoff(db, analysis.organization_id, lock=True)
-    _refresh_retention_analysis(db, analysis, attribute_names=[
-        "results", "status", "config", "results_generated_at", "completed_at",
-        "error_message", "error_generated_at",
-    ])
     _require_retained_result(db, analysis)
-    if not analysis.results:
+    if db.query(Analysis.id).filter(
+        Analysis.id == analysis.id, result_present_expression(),
+    ).scalar() is None:
         raise HTTPException(status_code=410, detail="Analysis results were cleared during collection")
 
 
@@ -969,7 +968,9 @@ def _load_analysis_data(db: Session, analysis_id: int) -> dict:
     # A cached result must never resurrect a row cleared by cleanup. With an
     # enabled policy serve the freshly verified database result and bypass Redis.
     if cutoff is not None:
-        return _trim_analysis_data(analysis.results) if isinstance(analysis.results, dict) else {}
+        from sqlalchemy import text as sa_text
+        row = db.execute(sa_text(_RESULTS_EXTRACT_SQL), {"id": analysis_id}).first()
+        return {key: row[i] for i, key in enumerate(_ANALYSIS_DATA_KEYS) if row[i] is not None} if row else {}
     # JSON None is often stored as a JSON null rather than SQL NULL. Check
     # result existence in the database without fetching the whole 30 MB value.
     has_result = db.query(Analysis.id).filter(
@@ -1029,7 +1030,7 @@ def _calculate_trend(combined_scores: list[float]) -> str | None:
         return 'stable'
 
 
-def get_member_surveys(analysis: Analysis, db: Session) -> dict:
+def get_member_surveys(analysis: Analysis, db: Session, *, analysis_data: dict | None = None) -> dict:
     """
     Fetch survey responses for all team members within the analysis timeline.
     Returns a dict keyed by user email with survey data.
@@ -1050,7 +1051,7 @@ def get_member_surveys(analysis: Analysis, db: Session) -> dict:
         analysis_start_date = max(analysis_start_date, cutoff)
 
     # Only use the emails that are actually present in this analysis roster.
-    member_emails = extract_analysis_member_emails(analysis.results)
+    member_emails = extract_analysis_member_emails(analysis_data if analysis_data is not None else analysis.results)
     if not member_emails:
         return {}
 
@@ -1200,15 +1201,15 @@ async def get_analysis_by_identifier(  # noqa: C901
 
     import time as _time
     t0 = _time.time()
-    member_surveys = get_member_surveys(analysis, db)
-    t1 = _time.time()
     analysis_data = _load_analysis_data(db, analysis.id)
+    t1 = _time.time()
+    member_surveys = get_member_surveys(analysis, db, analysis_data=analysis_data)
     t2 = _time.time()
     if member_surveys:
         analysis_data['member_surveys'] = member_surveys
     logger.info(
-        f"get_analysis_by_identifier timing: surveys={t1-t0:.2f}s, "
-        f"results_extract={t2-t1:.2f}s, analysis_id={analysis.id}"
+        f"get_analysis_by_identifier timing: results_extract={t1-t0:.2f}s, "
+        f"surveys={t2-t1:.2f}s, analysis_id={analysis.id}"
     )
 
     return AnalysisResponse(

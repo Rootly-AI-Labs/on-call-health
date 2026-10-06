@@ -170,6 +170,20 @@ def is_manually_saved_analysis(analysis: Analysis) -> bool:
     return getattr(analysis, "is_saved", False) is True and getattr(analysis, "is_auto_refresh", False) is False
 
 
+def is_retired_auto_refresh(analysis: Analysis) -> bool:
+    """Server-marked retired carriers, including earlier interval-bearing rows."""
+    config = getattr(analysis, "config", None)
+    return getattr(analysis, "is_auto_refresh", False) is False and (
+        (isinstance(config, dict) and config.get("retired_auto_refresh") is True)
+        or (getattr(analysis, "is_saved", False) is False
+            and getattr(analysis, "auto_refresh_interval", None) in ("10m", "24h", "3d", "7d"))
+    )
+
+
+def delete_expired_analysis_row(analysis: Analysis) -> bool:
+    return is_manually_saved_analysis(analysis) or is_retired_auto_refresh(analysis)
+
+
 def classify_analysis_result(analysis: Analysis, cutoff: datetime) -> AnalysisEligibility:
     """Expire a whole stored result by generation age, independent of its inputs."""
     if is_retention_exempt_demo(analysis):
@@ -188,7 +202,7 @@ def classify_analysis_result(analysis: Analysis, cutoff: datetime) -> AnalysisEl
         # Earlier cleanup kept the row and its canonical snapshot timestamp.
         # Remove that expired saved entry too, without assigning an age to
         # configurations that never generated a result.
-        if is_manually_saved_analysis(analysis) and getattr(analysis, "results_generated_at", None) is not None:
+        if delete_expired_analysis_row(analysis) and getattr(analysis, "results_generated_at", None) is not None:
             generated = result_generation_time(analysis)
             if generated is not None and generated < cutoff:
                 return AnalysisEligibility("expired", generated, "cleared_saved_result_before_cutoff")

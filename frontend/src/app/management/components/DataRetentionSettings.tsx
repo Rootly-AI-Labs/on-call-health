@@ -299,7 +299,6 @@ export function DataRetentionSettings() {
               {preview.related_records.references_requiring_review > 0 && <p role="alert" className="text-xs text-amber-900">Some linked records need review before cleanup can proceed.</p>}
             </div>}
             {deletionWarning || <p>Saving schedules cleanup; it does not delete data immediately. Deletion is permanent.</p>}
-            {!enabled && pendingLegacy && <p className="rounded-md bg-amber-50 p-3 text-amber-900">Disabling retention will cancel the {policy?.legacy_cleanup.pending_count} remaining entries in the prior cleanup approval.</p>}
           </div>
           <DialogFooter><Button variant="outline" disabled={busy === "save"} onClick={closeDialog}>Cancel</Button><Button className="bg-purple-700 text-white hover:bg-purple-800" disabled={!canSave} onClick={() => void savePolicy(true)}>{busy === "save" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirm and save</Button></DialogFooter>
         </DialogContent>

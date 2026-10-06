@@ -489,7 +489,8 @@ def test_manual_auto_refresh_rerun_retires_old_schedule_without_deleting_surveys
     assert result.id != old_id
     assert result.is_auto_refresh
     assert existing.uuid == old_uuid and existing.results == coverage(RECENT)
-    assert not existing.is_auto_refresh and existing.config == original_config
+    assert not existing.is_auto_refresh
+    assert existing.config == {**original_config, "retired_auto_refresh": True}
     assert survey.analysis_id == old_id
     assert len(tasks.tasks) == 1
 

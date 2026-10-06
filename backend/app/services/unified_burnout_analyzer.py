@@ -1227,6 +1227,7 @@ class UnifiedBurnoutAnalyzer:
                             until=until,
                             limit=5000,
                             team_ids=pd_team_ids,
+                            complete_window=True,
                         )
                         normalized_data = collector._normalize_analytics_incidents(
                             analytics_incidents,
@@ -1245,7 +1246,7 @@ class UnifiedBurnoutAnalyzer:
                             f"falling back to REST /incidents endpoint"
                         )
                         raw_incidents = await self.client.get_incidents(
-                            since=since, until=until, limit=5000, team_ids=pd_team_ids
+                            since=since, until=until, limit=5000, team_ids=pd_team_ids, complete_window=True,
                         )
                         normalized_data = collector._normalize_with_enhanced_assignment_extraction(
                             raw_incidents,

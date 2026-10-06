@@ -731,7 +731,12 @@ def test_default_cache_eviction_covers_retained_and_empty_copies_without_other_o
     cached = {key: "disposable cached result" for key in own_keys | {other_key, api_key}}
     deleted_keys = []
 
+    closed = []
+
     class FakeRedis:
+        def close(self):
+            closed.append(True)
+
         def ping(self):
             return True
 
@@ -746,6 +751,7 @@ def test_default_cache_eviction_covers_retained_and_empty_copies_without_other_o
     assert result.analysis_results_expired == 1
     assert set(deleted_keys) == own_keys
     assert set(cached) == {other_key, api_key}
+    assert closed == [True]
 
 
 def test_default_cache_eviction_is_batched_and_does_not_use_preview_sample_limit(
@@ -769,7 +775,12 @@ def test_default_cache_eviction_is_batched_and_does_not_use_preview_sample_limit
     expected_keys = {f"analysis_data:{record.id}" for record in records}
     delete_batches = []
 
+    closed = []
+
     class FakeRedis:
+        def close(self):
+            closed.append(True)
+
         def ping(self):
             return True
 
@@ -781,6 +792,7 @@ def test_default_cache_eviction_is_batched_and_does_not_use_preview_sample_limit
     cleanup(db, enabled_policy, invalidate_cache=isolate_retention_cache)
     assert {key for batch in delete_batches for key in batch} == expected_keys
     assert all(0 < len(batch) <= 100 for batch in delete_batches)
+    assert closed == [True]
 
 
 @pytest.mark.parametrize("failure_stage", ["connect", "ping", "delete"])
@@ -794,7 +806,12 @@ def test_configured_redis_failure_rolls_back_database_cleanup(
     survey_factory(OLD)
     before = snapshot(db_connection)
 
+    closed = []
+
     class FakeRedis:
+        def close(self):
+            closed.append(True)
+
         def ping(self):
             if failure_stage == "ping":
                 raise redis.exceptions.ConnectionError("Disposable Redis unavailable")
@@ -814,6 +831,7 @@ def test_configured_redis_failure_rolls_back_database_cleanup(
     with pytest.raises(redis.exceptions.ConnectionError, match="Disposable Redis unavailable"):
         cleanup(db, enabled_policy, invalidate_cache=isolate_retention_cache)
     assert snapshot(db_connection) == before
+    assert closed == ([] if failure_stage == "connect" else [True])
 
 
 def test_cleanup_processes_all_expiry_candidates_across_query_batches(
