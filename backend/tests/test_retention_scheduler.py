@@ -313,6 +313,9 @@ class QueuedScheduler:
         self.removed = []
 
     def add_job(self, callback, **kwargs):
+        if kwargs["id"] in self.jobs and not kwargs.get("replace_existing", False):
+            from apscheduler.jobstores.base import ConflictingIdError
+            raise ConflictingIdError(kwargs["id"])
         self.jobs[kwargs["id"]] = (callback, kwargs)
 
     def remove_job(self, job_id):
@@ -373,10 +376,10 @@ def test_new_policy_does_not_reuse_old_failure_retry(scheduler, monkeypatch):
     assert not instance.scheduler.jobs
 
 
-def test_retry_callback_requeues_only_an_actual_failure(scheduler, monkeypatch):
+def test_retry_callback_rechecks_failure_and_skipped_claims(scheduler, monkeypatch):
     instance = scheduler.RetentionScheduler()
     scheduled = []
-    monkeypatch.setattr(instance, "_schedule_retry", lambda organization_id: scheduled.append(organization_id))
+    monkeypatch.setattr(instance, "_schedule_retry", lambda organization_id, **kwargs: scheduled.append((organization_id, kwargs)))
     seen = []
     outcomes = iter(["failed", "succeeded", "skipped"])
 
@@ -388,18 +391,120 @@ def test_retry_callback_requeues_only_an_actual_failure(scheduler, monkeypatch):
     assert instance._run_retry(7) == "failed"
     assert instance._run_retry(7) == "succeeded"
     assert instance._run_retry(7) == "skipped"
-    assert scheduled == [7]
+    assert scheduled == [(7, {}), (7, {"deferred": True})]
     assert all(organization_id == 7 and kwargs["mode"] == "retry" for organization_id, kwargs in seen)
 
 
-def test_locked_retry_is_skipped_without_rescheduling_overdue_failure(scheduler, monkeypatch):
+def test_locked_retry_requeues_overdue_current_failure_with_future_floor(scheduler, monkeypatch):
+    from copy import deepcopy
+
+    organization = failed_org()
+    before = deepcopy(organization.settings)
+    due_at = NOW + timedelta(minutes=15)
+    monkeypatch.setattr(scheduler, "utc_now", lambda: due_at)
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: FakeSession(organization))
     instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
     real_process = scheduler.process_organization_cleanup
     monkeypatch.setattr(scheduler, "process_organization_cleanup", lambda organization_id, **kwargs: real_process(
-        organization_id, session_factory=lambda: FakeSession(None), clock=lambda: NOW, **kwargs,
+        organization_id, session_factory=lambda: FakeSession(None), clock=lambda: due_at, **kwargs,
     ))
-    monkeypatch.setattr(instance, "_schedule_retry", lambda *args: pytest.fail("Locked retry was rescheduled"))
     assert instance._run_retry(7) == "skipped"
+    callback, options = instance.scheduler.jobs[f"{scheduler.RETRY_JOB_PREFIX}7"]
+    assert callback.__func__ is scheduler.RetentionScheduler._run_retry
+    assert options["trigger"].run_date == due_at + timedelta(minutes=15)
+    assert options["replace_existing"] is False
+    assert organization.settings == before
+
+
+@pytest.mark.parametrize("case", ["healthy", "disabled", "missing", "inactive", "changed_policy", "changed_legacy"])
+def test_skipped_retry_does_not_requeue_ineligible_or_changed_revision(scheduler, monkeypatch, case):
+    organization = failed_org()
+    if case == "healthy": organization = policy_org()
+    if case == "disabled":
+        organization.settings = {**organization.settings, "data_retention": {
+            **organization.settings["data_retention"], "retention_days": None,
+        }}
+    if case == "missing": organization = None
+    if case == "inactive": organization.status = "suspended"
+    if case == "changed_policy":
+        organization.settings = {**organization.settings, "data_retention": {
+            **organization.settings["data_retention"], "retention_days": 30,
+        }}
+    if case == "changed_legacy":
+        from app.services.retention_legacy import (
+            LegacyAnalysisEntry, LegacyCleanupAuthorization, save_legacy_authorization,
+        )
+        save_legacy_authorization(organization, LegacyCleanupAuthorization(
+            state="pending", request_id="a" * 32, approved_at=NOW,
+            approved_by_user_id=1, requested_count=1,
+            entries=[LegacyAnalysisEntry(analysis_id=1, result_fingerprint="b" * 64)],
+        ))
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: FakeSession(organization))
+    monkeypatch.setattr(scheduler, "utc_now", lambda: NOW + timedelta(minutes=15))
+    monkeypatch.setattr(scheduler, "process_organization_cleanup", lambda *args, **kwargs: "skipped")
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    assert instance._run_retry(7) == "skipped"
+    assert not instance.scheduler.jobs
+
+
+def test_skipped_retry_after_shutdown_does_not_open_session_or_queue(scheduler, monkeypatch):
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    instance._stop_event.set()
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: pytest.fail("Read failure state after stop"))
+    assert instance._run_retry(7) == "skipped"
+    assert not instance.scheduler.jobs
+
+
+def test_deferred_retry_honors_later_persisted_backoff(scheduler, monkeypatch):
+    organization = failed_org()
+    later_due = NOW + timedelta(hours=6)
+    organization.settings = {**organization.settings, "data_retention_cleanup": {
+        **organization.settings["data_retention_cleanup"], "next_retry_at": later_due.isoformat(),
+    }}
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: FakeSession(organization))
+    monkeypatch.setattr(scheduler, "utc_now", lambda: NOW + timedelta(minutes=15))
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    instance._schedule_retry(7, deferred=True)
+    _, options = instance.scheduler.jobs[f"{scheduler.RETRY_JOB_PREFIX}7"]
+    assert options["trigger"].run_date == later_due
+
+
+def test_deferred_retry_delay_starts_after_metadata_read(scheduler, monkeypatch):
+    organization = failed_org()
+    clock = [NOW + timedelta(minutes=15)]
+
+    class SlowSession(FakeSession):
+        def __exit__(self, *args):
+            clock[0] += timedelta(minutes=20)
+            return super().__exit__(*args)
+
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: SlowSession(organization))
+    monkeypatch.setattr(scheduler, "utc_now", lambda: clock[0])
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    instance._schedule_retry(7, deferred=True)
+    _, options = instance.scheduler.jobs[f"{scheduler.RETRY_JOB_PREFIX}7"]
+    assert options["trigger"].run_date == clock[0] + timedelta(minutes=15)
+
+
+@pytest.mark.parametrize("queued_delay", [20, 60])
+def test_deferred_retry_never_overwrites_an_existing_timer(scheduler, monkeypatch, queued_delay):
+    organization = failed_org()
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: FakeSession(organization))
+    monkeypatch.setattr(scheduler, "utc_now", lambda: NOW + timedelta(minutes=15))
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    job_id = f"{scheduler.RETRY_JOB_PREFIX}7"
+    instance.scheduler.add_job(instance._run_retry, args=[7], id=job_id,
+                               trigger=scheduler.DateTrigger(run_date=NOW + timedelta(minutes=queued_delay)),
+                               replace_existing=True)
+    existing = instance.scheduler.jobs[job_id]
+    instance._schedule_retry(7, deferred=True)
+    assert instance.scheduler.jobs[job_id] is existing
 
 
 def test_healthy_due_daily_policy_cannot_be_claimed_by_stale_retry(scheduler, monkeypatch):
@@ -958,5 +1063,82 @@ def test_postgres_claim_prevents_daily_retry_overlap_and_restart_duplication(
         release_cleanup.set()
         if worker.ident is not None:
             worker.join(timeout=10)
+        with retention_engine.begin() as connection:
+            connection.execute(delete(Organization).where(Organization.id == organization_id))
+
+
+def test_postgres_retry_survives_persistent_analysis_lock_then_succeeds_after_release(
+    scheduler, retention_engine, monkeypatch,
+):
+    """Only a guarded temporary test org is committed for independent sessions.
+
+    An analysis read's shared row lock cannot report cleanup success or arrange
+    another failure retry. Two skipped one-shot callbacks must therefore keep
+    a bounded future timer until the lock releases.
+    """
+    from uuid import uuid4
+    from sqlalchemy import delete, insert
+    from sqlalchemy.orm import sessionmaker
+    from app.models import Organization
+    from app.services.retention_status import (
+        policy_and_legacy_revision, read_cleanup_status, record_cleanup_failure,
+    )
+
+    suffix = uuid4().hex
+    with retention_engine.begin() as connection:
+        organization_id = connection.execute(insert(Organization).values(
+            name="Retention Retry Lock Test", domain=f"retry-lock-{suffix}.invalid",
+            slug=f"retry-lock-{suffix}", status="active", settings=policy_org().settings,
+        ).returning(Organization.id)).scalar_one()
+    factory = sessionmaker(bind=retention_engine)
+    with factory() as session:
+        organization = session.get(Organization, organization_id)
+        version, legacy_id = policy_and_legacy_revision(organization)
+        assert record_cleanup_failure(
+            organization, now=NOW, policy_version=version,
+            legacy_request_id=legacy_id, error_code="cache_unavailable",
+        )
+        session.commit()
+
+    # All sessions, including scheduling's metadata reads, use the guarded DB.
+    clock = [NOW + timedelta(minutes=15)]
+    real_process = scheduler.process_organization_cleanup
+    monkeypatch.setattr(scheduler, "SessionLocal", factory)
+    monkeypatch.setattr(scheduler, "utc_now", lambda: clock[0])
+    monkeypatch.setattr(scheduler, "process_organization_cleanup", lambda organization_id, **kwargs: real_process(
+        organization_id, session_factory=factory, clock=lambda: clock[0], **kwargs,
+    ))
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    job_id = f"{scheduler.RETRY_JOB_PREFIX}{organization_id}"
+    locker = factory()
+    try:
+        locker.query(Organization).filter_by(id=organization_id).with_for_update(read=True).one()
+        for _ in range(2):
+            assert instance._run_retry(organization_id) == "skipped"
+            _, queued = instance.scheduler.jobs[job_id]
+            assert queued["trigger"].run_date == clock[0] + timedelta(minutes=15)
+            with factory() as session:
+                status = read_cleanup_status(session.get(Organization, organization_id))
+                assert status.state == "failed" and status.consecutive_failures == 1
+                assert status.next_retry_at == NOW + timedelta(minutes=15)
+            clock[0] = queued["trigger"].run_date
+            # APScheduler removes each DateTrigger job before its callback.
+            instance.scheduler.jobs.pop(job_id)
+
+        locker.rollback()
+        assert instance._run_retry(organization_id) == "succeeded"
+        assert not instance.scheduler.jobs
+        with factory() as session:
+            status = read_cleanup_status(session.get(Organization, organization_id))
+            assert status.state == "succeeded" and status.consecutive_failures == 0
+            assert status.last_success_at == clock[0]
+            assert status.next_retry_at is None
+        # A stale timer cannot restart the chain after success.
+        assert instance._run_retry(organization_id) == "skipped"
+        assert not instance.scheduler.jobs
+    finally:
+        locker.rollback()
+        locker.close()
         with retention_engine.begin() as connection:
             connection.execute(delete(Organization).where(Organization.id == organization_id))

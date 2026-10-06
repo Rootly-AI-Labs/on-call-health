@@ -3,10 +3,12 @@ import type { AnalysisResult } from '../src/lib/types';
 
 const FIRST_ID = '201';
 const SECOND_ID = '202';
+const AUTOMATIC_ID = '203';
 const FIRST_LABEL = 'Retention cached report';
 const SECOND_LABEL = 'Retention current report';
 const FIRST_MEMBER = 'Cached Report Member';
 const SECOND_MEMBER = 'Current Report Member';
+const AUTOMATIC_MEMBER = 'Automatic Report Member';
 
 function report(id: string, label: string, memberName: string): AnalysisResult {
   const member = {
@@ -34,18 +36,39 @@ function report(id: string, label: string, memberName: string): AnalysisResult {
   };
 }
 
+type ReadOutcome = 200 | 410 | 'aborted';
+type BlockedRead = { started: Promise<void>; release: (outcome: ReadOutcome) => void };
+
 type DashboardApi = {
   expired: Set<string>;
   reads: string[];
   summariesIncludeResults: boolean;
+  hasAutomaticReport: boolean;
+  holdRead: (id: string) => BlockedRead;
 };
 
 // This suite uses a fabricated, locally decoded JWT and intercepts every API
 // request. It does not sign in, change retention policy, or reach application data.
 const test = base.extend<{ api: DashboardApi }>({
   api: async ({ page, baseURL }, use) => {
-    const api: DashboardApi = { expired: new Set(), reads: [], summariesIncludeResults: false };
+    const heldReads = new Map<string, BlockedRead & {
+      response: Promise<ReadOutcome>; markStarted: () => void;
+    }>();
+    const api: DashboardApi = {
+      expired: new Set(), reads: [], summariesIncludeResults: false, hasAutomaticReport: false,
+      holdRead: id => {
+        let markStarted!: () => void;
+        let release!: (outcome: ReadOutcome) => void;
+        const started = new Promise<void>(resolve => { markStarted = resolve; });
+        const response = new Promise<ReadOutcome>(resolve => { release = resolve; });
+        heldReads.set(id, { started, response, release, markStarted });
+        return { started, release };
+      },
+    };
     const reports = [report(FIRST_ID, FIRST_LABEL, FIRST_MEMBER), report(SECOND_ID, SECOND_LABEL, SECOND_MEMBER)];
+    const automaticReport = {
+      ...report(AUTOMATIC_ID, 'Retention automatic report', AUTOMATIC_MEMBER), is_auto_refresh: true,
+    };
     const origin = new URL(baseURL || 'http://localhost:3000').origin;
     const unexpectedMutations: string[] = [];
 
@@ -100,14 +123,27 @@ const test = base.extend<{ api: DashboardApi }>({
         return;
       }
       if (url.pathname === '/analyses/auto-refresh') {
-        await reply(null);
+        await reply(api.hasAutomaticReport ? { ...automaticReport, analysis_data: undefined } : null);
         return;
       }
       const analysisMatch = url.pathname.match(/^\/analyses\/(?:by-id\/)?([^/]+)$/);
       if (analysisMatch) {
-        const item = reports.find(value => value.id === analysisMatch[1] || value.uuid === analysisMatch[1]);
+        const item = [...reports, automaticReport].find(value => value.id === analysisMatch[1] || value.uuid === analysisMatch[1]);
         if (item) {
           api.reads.push(item.id);
+          const held = heldReads.get(item.id);
+          if (held) {
+            held.markStarted();
+            const outcome = await held.response;
+            if (outcome === 'aborted') {
+              await route.abort();
+            } else {
+              await reply(outcome === 410
+                ? { detail: 'Analysis results are unavailable under the organization data retention policy.' }
+                : item, outcome);
+            }
+            return;
+          }
           await reply(api.expired.has(item.id)
             ? { detail: 'Analysis results are unavailable under the organization data retention policy.' }
             : item, api.expired.has(item.id) ? 410 : 200);
@@ -139,6 +175,7 @@ const test = base.extend<{ api: DashboardApi }>({
     });
 
     await use(api);
+    for (const held of heldReads.values()) held.release('aborted');
     expect(unexpectedMutations, 'Dashboard report reads must not mutate application data').toEqual([]);
   },
 });
@@ -170,6 +207,46 @@ async function expectUnavailableReport(page: Page) {
 }
 
 test.describe('Dashboard retention read enforcement', () => {
+  for (const outcome of [410, 200, 'aborted'] as const) {
+    test(`keeps the manually opened report when an older automatic read returns ${outcome}`, async ({ page, api }) => {
+      api.hasAutomaticReport = true;
+      const automaticRead = api.holdRead(AUTOMATIC_ID);
+      try {
+        await page.goto('/dashboard');
+        await automaticRead.started;
+        await expect(savedReport(page, SECOND_LABEL)).toBeEnabled();
+        await savedReport(page, SECOND_LABEL).click();
+        await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
+        await expect(page).toHaveURL(new RegExp(`analysis=${SECOND_ID}(?:&|$)`));
+        await expect(savedReport(page, SECOND_LABEL)).toBeEnabled();
+
+        const lateResponse = outcome === 'aborted'
+          ? page.waitForEvent('requestfailed', {
+            predicate: request => new URL(request.url()).pathname === `/analyses/${AUTOMATIC_ID}`,
+          })
+          : page.waitForResponse(response => new URL(response.url()).pathname === `/analyses/${AUTOMATIC_ID}`
+            && response.status() === outcome).then(response => response.finished());
+        automaticRead.release(outcome);
+        await lateResponse;
+        // Let the response continuation and its React update finish before checking
+        // that neither the old report nor its default fallback replaced the user choice.
+        await page.evaluate(() => new Promise<void>(resolve => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }));
+
+        await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
+        await expect(page.getByText(FIRST_MEMBER, { exact: true })).toHaveCount(0);
+        await expect(page.getByText(AUTOMATIC_MEMBER, { exact: true })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeVisible();
+        await expect(page).toHaveURL(new RegExp(`analysis=${SECOND_ID}(?:&|$)`));
+        expect(api.reads.filter(id => id === FIRST_ID)).toHaveLength(0);
+        await expect(page.getByText("Analysis results are unavailable under your organization's data retention policy.", { exact: true })).toHaveCount(0);
+      } finally {
+        automaticRead.release('aborted');
+      }
+    });
+  }
+
   for (const summariesIncludeResults of [false, true]) {
     test(`revalidates a previously cached saved report before display (${summariesIncludeResults ? 'full list results' : 'summary list'})`, async ({ page, api }) => {
       api.summariesIncludeResults = summariesIncludeResults;

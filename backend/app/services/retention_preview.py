@@ -157,6 +157,14 @@ def is_retention_exempt_demo(analysis: Analysis) -> bool:
     )
 
 
+def error_generation_time(analysis: Analysis) -> datetime | None:
+    """Use only the stored error-content stamp, independent of run attempts."""
+    value = getattr(analysis, "error_generated_at", None)
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+        return None
+    return value.astimezone(timezone.utc)
+
+
 def classify_analysis_result(analysis: Analysis, cutoff: datetime) -> AnalysisEligibility:
     """Expire a whole stored result by generation age, independent of its inputs."""
     if is_retention_exempt_demo(analysis):
@@ -165,6 +173,13 @@ def classify_analysis_result(analysis: Analysis, cutoff: datetime) -> AnalysisEl
         return AnalysisEligibility("deferred", None, "active_analysis")
     results = analysis.results
     if results is None or results == {} or results == "":
+        if getattr(analysis, "error_message", None):
+            error_at = error_generation_time(analysis)
+            if error_at is None:
+                return AnalysisEligibility("unverifiable", None, "missing_error_generation_time")
+            if error_at < cutoff:
+                return AnalysisEligibility("expired", error_at, "error_generated_before_cutoff")
+            return AnalysisEligibility("retained", error_at, "within_error_retention_period")
         return AnalysisEligibility("empty", None, "no_result_data")
     generated = result_generation_time(analysis)
     if generated is None:

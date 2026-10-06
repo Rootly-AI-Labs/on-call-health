@@ -692,6 +692,10 @@ async def get_analysis_by_uuid(
             detail=error_detail
         )
 
+    refresh_status = _retention_refresh_status(db, analysis)
+    if refresh_status is not None:
+        return refresh_status
+
     # Fetch survey data for team members within analysis timeline
     member_surveys = get_member_surveys(analysis, db)
 
@@ -753,6 +757,10 @@ async def get_analysis(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_detail
         )
+
+    refresh_status = _retention_refresh_status(db, analysis)
+    if refresh_status is not None:
+        return refresh_status
 
     # Fetch survey data for team members within analysis timeline
     member_surveys = get_member_surveys(analysis, db)
@@ -850,6 +858,27 @@ def _retention_cutoff(db: Session, organization_id: int | None, *, lock: bool = 
     return datetime.now(timezone.utc) - timedelta(days=days) if days is not None else None
 
 
+def _retention_refresh_status(db: Session, analysis: Analysis):
+    """Allow refresh polling without exposing a preserved or expired snapshot."""
+    if analysis.status not in ("pending", "running"):
+        return None
+    if _retention_cutoff(db, analysis.organization_id, lock=True) is None:
+        return None
+    db.refresh(analysis, attribute_names=["status", "config", "created_at", "completed_at"])
+    if analysis.status not in ("pending", "running"):
+        return None
+    return AnalysisResponse(
+        id=analysis.id, uuid=analysis.uuid,
+        integration_id=analysis.rootly_integration_id,
+        integration_name=analysis.integration_name, platform=analysis.platform,
+        status=analysis.status, created_at=analysis.created_at,
+        completed_at=analysis.completed_at, time_range=analysis.time_range or 30,
+        analysis_data={}, config=analysis.config,
+        is_saved=analysis.is_saved, is_auto_refresh=analysis.is_auto_refresh,
+        auto_refresh_interval=analysis.auto_refresh_interval,
+    )
+
+
 def _require_retained_result(db: Session, analysis: Analysis):
     """Never serve expired or undated results, including before cleanup runs."""
     cutoff = _retention_cutoff(db, analysis.organization_id, lock=True)
@@ -858,10 +887,11 @@ def _require_retained_result(db: Session, analysis: Analysis):
     # Cleanup can clear a preserved auto-refresh row after it was first read.
     db.refresh(analysis, attribute_names=[
         "results", "status", "config", "rootly_integration_id", "results_generated_at", "completed_at",
+        "error_message", "error_generated_at",
     ])
     eligibility = classify_analysis_result(analysis, cutoff)
     if eligibility.disposition in ("expired", "unverifiable") or (
-        eligibility.disposition == "deferred" and analysis.results
+        eligibility.disposition == "deferred" and (analysis.results or analysis.error_message)
     ):
         raise HTTPException(
             status_code=410,
@@ -876,6 +906,7 @@ def _require_result_after_collection(db: Session, analysis: Analysis):
     _retention_cutoff(db, analysis.organization_id, lock=True)
     db.refresh(analysis, attribute_names=[
         "results", "status", "config", "results_generated_at", "completed_at",
+        "error_message", "error_generated_at",
     ])
     _require_retained_result(db, analysis)
     if not analysis.results:
@@ -1124,6 +1155,10 @@ async def get_analysis_by_identifier(  # noqa: C901
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_detail
         )
+
+    refresh_status = _retention_refresh_status(db, analysis)
+    if refresh_status is not None:
+        return refresh_status
 
     import time as _time
     t0 = _time.time()
@@ -3092,12 +3127,16 @@ def _persist_analysis_result(
         if results is not None:
             analysis.results = results
             analysis.results_generated_at = finished_at
+            if error_message is None:
+                analysis.error_message = None
+                analysis.error_generated_at = None
         elif analysis.results and analysis.results_generated_at is None:
             # Preserve a known legacy generation before changing its completed
             # status or terminal bookkeeping. A failure cannot renew old data.
             analysis.results_generated_at = previous_generation
         if error_message is not None:
             analysis.error_message = error_message
+            analysis.error_generated_at = finished_at if error_message else None
         analysis.completed_at = finished_at
         result_db.commit()
         redis_client = _get_redis_for_analysis()
@@ -4047,8 +4086,8 @@ async def run_analysis_task(
             # during the long-running analysis await.
             # Check if this is a permission error - if so, fail immediately
             error_message = str(analysis_error)
-            from ...core.pagerduty_client import PagerDutyTeamScopeError
-            if isinstance(analysis_error, PagerDutyTeamScopeError):
+            from ...core.pagerduty_client import PagerDutyTeamScopeError, PagerDutyDataCollectionError
+            if isinstance(analysis_error, (PagerDutyTeamScopeError, PagerDutyDataCollectionError)):
                 _persist_analysis_result(analysis_id, status="failed", error_message=error_message)
                 return
             if "Cannot access incidents endpoint" in error_message or "incidents:read" in error_message:
@@ -4076,6 +4115,8 @@ async def run_analysis_task(
                                     collection_args["team_ids"] = [pagerduty_team_id]
                                 raw_data = await client.collect_analysis_data(**collection_args)
                                 logger.info(f"BACKGROUND_TASK: Successfully collected raw data for analysis {analysis_ref}")
+                            except (PagerDutyTeamScopeError, PagerDutyDataCollectionError):
+                                raise
                             except Exception as client_error:
                                 logger.warning(f"BACKGROUND_TASK: Failed to collect raw data for analysis {analysis_ref}: {client_error}")
                         else:
@@ -4093,6 +4134,8 @@ async def run_analysis_task(
                                 logger.info(f"BACKGROUND_TASK: Successfully collected raw data using temporary client for analysis {analysis_ref}")
                             except Exception as temp_client_error:
                                 logger.warning(f"BACKGROUND_TASK: Failed to collect raw data using temporary client for analysis {analysis_ref}: {temp_client_error}")
+                except (PagerDutyTeamScopeError, PagerDutyDataCollectionError):
+                    raise
                 except Exception as client_access_error:
                     logger.error(f"BACKGROUND_TASK: Error accessing client for raw data collection in analysis {analysis_ref}: {client_access_error}")
 

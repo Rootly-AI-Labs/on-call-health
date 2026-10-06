@@ -41,6 +41,10 @@ class PagerDutyTeamScopeError(ValueError):
     """The selected team's roster cannot be safely used for an analysis."""
 
 
+class PagerDutyDataCollectionError(RuntimeError):
+    """A selected team's incident collection did not complete successfully."""
+
+
 class PagerDutyAPIClient:
     """Client for interacting with PagerDuty API."""
     
@@ -325,7 +329,7 @@ class PagerDutyAPIClient:
         Returns a list of user objects with at minimum id, email, name.
         Results are cached for 1 hour.
         """
-        cache_params = {"team_id": team_id, "include_users": True}
+        cache_params = {"team_id": team_id, "include_users": True, "roster_version": 2}
         cached = get_cached_api_response("pagerduty", f"team_members_{team_id}", self.api_token, cache_params)
         if cached is not None:
             logger.info(f"PD GET_TEAM_MEMBERS: Using cached data for team {team_id} ({len(cached)} members)")
@@ -354,9 +358,17 @@ class PagerDutyAPIClient:
                             raise PagerDutyTeamScopeError(
                                 "PagerDuty returned an invalid team member list."
                             )
-                        all_members.extend(
-                            m["user"] for m in members if m.get("user")
-                        )
+                        for member in members:
+                            user = member.get("user") if isinstance(member, dict) else None
+                            if (
+                                not isinstance(user, dict)
+                                or not isinstance(user.get("id"), str)
+                                or not user["id"].strip()
+                            ):
+                                raise PagerDutyTeamScopeError(
+                                    "PagerDuty returned an incomplete team member list."
+                                )
+                            all_members.append(user)
                         if not data.get("more", False):
                             break
                         if not members:
@@ -590,7 +602,7 @@ class PagerDutyAPIClient:
         limit: int = 1000,
         team_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
-        """Fetch incidents from PagerDuty within a date range."""
+        """Fetch incidents; selected-team collections must complete or raise."""
         days_back = (datetime.now(pytz.UTC) - since).days
         logger.info(f"PD GET_INCIDENTS: Starting fetch for {days_back} days (limit={limit})")
 
@@ -630,6 +642,11 @@ class PagerDutyAPIClient:
                         request_count += 1
                         
                         if response.status != 200:
+                            if team_ids:
+                                raise PagerDutyDataCollectionError(
+                                    f"Could not load the selected PagerDuty team's incidents "
+                                    f"(HTTP {response.status})."
+                                )
                             error_text = await response.text()
                             token_suffix = self.api_token[-4:] if len(self.api_token) > 4 else "***"
                             logger.error(f"PD GET_INCIDENTS: API ERROR - HTTP {response.status}")
@@ -641,7 +658,28 @@ class PagerDutyAPIClient:
                             break
                             
                         data = await response.json()
+                        if team_ids and (
+                            not isinstance(data, dict)
+                            or not isinstance(data.get("incidents"), list)
+                            or not isinstance(data.get("more"), bool)
+                        ):
+                            raise PagerDutyDataCollectionError(
+                                "PagerDuty returned an invalid incident page for the selected team."
+                            )
                         incidents = data.get("incidents", [])
+                        if team_ids and any(
+                            not isinstance(incident, dict)
+                            or not isinstance(incident.get("id"), str)
+                            or not incident["id"].strip()
+                            for incident in incidents
+                        ):
+                            raise PagerDutyDataCollectionError(
+                                "PagerDuty returned invalid incidents for the selected team."
+                            )
+                        if team_ids and data.get("more") and not incidents:
+                            raise PagerDutyDataCollectionError(
+                                "PagerDuty returned an incomplete incident page for the selected team."
+                            )
                         all_incidents.extend(incidents)
                         
                         # Check if we have more pages
@@ -651,6 +689,10 @@ class PagerDutyAPIClient:
                         offset += len(incidents)
 
                 if request_count >= max_requests:
+                    if team_ids and data.get("more") and len(all_incidents) < limit:
+                        raise PagerDutyDataCollectionError(
+                            "PagerDuty incident collection exceeded its request limit for the selected team."
+                        )
                     logger.warning(f"PD GET_INCIDENTS: Hit circuit breaker limit ({max_requests} requests)")
 
                 # Calculate assignment stats for final summary
@@ -669,7 +711,13 @@ class PagerDutyAPIClient:
                 
                 return all_incidents
                 
-        except asyncio.TimeoutError:
+        except PagerDutyDataCollectionError:
+            raise
+        except asyncio.TimeoutError as e:
+            if team_ids:
+                raise PagerDutyDataCollectionError(
+                    "PagerDuty incident collection timed out for the selected team."
+                ) from e
             incidents_collected = len(all_incidents) if 'all_incidents' in locals() else 0
             logger.error(f"🕐 PAGERDUTY TIMEOUT: Incident fetch exceeded timeout")
             logger.error(f"🕐 PAGERDUTY TIMEOUT: Collected {incidents_collected} incidents before timeout")
@@ -677,6 +725,10 @@ class PagerDutyAPIClient:
             logger.error(f"🕐 PAGERDUTY TIMEOUT: Requests made: {request_count if 'request_count' in locals() else 'unknown'}")
             return all_incidents if 'all_incidents' in locals() else []
         except Exception as e:
+            if team_ids:
+                raise PagerDutyDataCollectionError(
+                    "Could not complete incident collection for the selected PagerDuty team."
+                ) from e
             logger.error(f"Error fetching PagerDuty incidents: {e}")
             return all_incidents if 'all_incidents' in locals() else []
     

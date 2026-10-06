@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 from ..core.rootly_client import RootlyAPIClient
-from ..core.pagerduty_client import PagerDutyAPIClient, PagerDutyDataCollector, PagerDutyAnalyticsUnavailable, PagerDutyTeamScopeError
+from ..core.pagerduty_client import PagerDutyAPIClient, PagerDutyDataCollector, PagerDutyAnalyticsUnavailable, PagerDutyTeamScopeError, PagerDutyDataCollectionError
 from ..core.och_config import calculate_composite_och_score, calculate_personal_burnout, calculate_work_related_burnout, generate_och_score_reasoning, get_structured_och_factors, OCHConfig
 from ..core.alert_health_calculator import calculate_alert_health_score
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
@@ -1435,9 +1435,10 @@ class UnifiedBurnoutAnalyzer:
                 logger.warning(f"ANALYZER DATA WARNING: {days_back}-day analysis got users but no incidents - potential timeout or permission issue")
             
             return data
-        except PagerDutyTeamScopeError:
+        except (PagerDutyTeamScopeError, PagerDutyDataCollectionError):
             # Missing or unverifiable membership must fail the analysis instead
-            # of returning a successful, account-wide or empty report.
+            # of returning a successful, account-wide or empty report. Failed
+            # incident pages must likewise never become a completed report.
             raise
         except Exception as e:
             fetch_duration = (datetime.now() - fetch_start_time).total_seconds()

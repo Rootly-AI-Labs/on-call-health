@@ -4,7 +4,7 @@ This document tracks implementation and verification of automatic deletion after
 
 Branch: `feat/org-data-retention`
 
-Last updated: October 5, 2026
+Last updated: October 6, 2026
 
 Current status: **Steps 1 through 6 are implemented** with the user's approved result generation age rule and **one normal daily cleanup at 03:00 UTC**. Failed organizations receive separate targeted retries. The original backend suite passed **649 tests**, and subsequent mock-exclusion changes passed **441 related checks**. The current settings/dashboard UI passes **34 browser scenarios**, and TypeScript passes with the committed module-resolution configuration. The user enabled a **90-day policy for the local Retention Demo organization** at October 6, 03:21 UTC; its first cleanup is due October 7, 03:00 UTC. No application cleanup has run as of the read-only verification at 03:24 UTC, and destructive automated tests used only the disposable database. Step 7, full staging verification, remains.
 
@@ -108,6 +108,18 @@ The user approved fixes **1, 4-5, 7, 8 and 9** from the ranked review: demo refr
 Verification: **140 targeted backend checks passed**, including **51 new regressions** and existing admin, PagerDuty, normalization and retention collection/result tests. Provider calls and cache effects are mocked. Destructive tests use only the explicitly guarded disposable PostgreSQL database and roll back their rows/schemas. Independent code review found no material blocker. The unrelated local frontend TypeScript configuration edit remains excluded.
 
 The local backend was restarted successfully. Read-only health reports healthy with the retention scheduler running, and migration metadata confirms 053, 055 and the newly registered 056 are completed. No manual demo refresh or retention cleanup was run against application data.
+
+## October 6: PR #534 follow-up findings
+
+All six new findings were validated and the user authorized their fixes:
+
+- Auto-refresh preserves the existing result, its generation timestamp and error content until a replacement is stored. Known legacy generation dates are captured before resetting attempt status. Failed runs with no replacement cannot discard or renew the snapshot. Active report reads return only safe polling metadata, withholding the previous result, errors and surveys until the run becomes terminal.
+- Migration **057** adds `Analysis.error_generated_at`. New error writes use a canonical UTC content timestamp; status-only writes do not renew it, and new result payloads clear stale errors. Backfill uses only known failed-run completion dates. Error-only analyses now participate in preview, read restrictions and cleanup; undated error content stays stored but unavailable under enabled retention. Existing receipts for unchanged undated snapshots retain their fingerprints; replacing or dating error content invalidates approval.
+- PagerDuty membership rejects any incomplete entry rather than dropping it; cache versioning prevents reuse of old incomplete successes. Selected-team REST errors, malformed pages, stalled pagination and timeouts propagate as collection failures, including through fallback and recovery. Empty successful pages remain valid; unscoped REST compatibility is preserved.
+- Skipped retries recheck current saved failure eligibility and queue a targeted retry at least 15 minutes later, respecting later backoff and existing timers. Healthy, disabled, stale and shutdown cases do not requeue. No global polling was added.
+- Dashboard bootstrap/default/manual reads share selection ownership. Late success, HTTP 410 and cancellation from an older request cannot overwrite or clear a newer selection, its URL or caches.
+
+Verification: **776 distinct backend checks passed across the affected suites**, plus **6 dashboard browser scenarios**. TypeScript passed with committed node resolution; migration consistency and whitespace checks passed. Regression coverage includes actual scheduler-to-failure preservation, active polling without content, error cutoff/unknown-date handling, migration idempotence, incomplete PagerDuty collection, persistent lock/release retry recovery and held-response browser races. Provider calls are mocked and database mutations occur only in guarded disposable fixtures. Independent final review found no remaining material blocker. The local backend restarted healthy and migration 057 is recorded completed. No manual application cleanup or provider call was run.
 
 ## Implementation sequence
 
@@ -573,6 +585,7 @@ Inject a fixed clock into cleanup tests. Seed data around the cutoff rather than
 | October 6, 2026 UTC | Enabled-policy diagnosis and browser revalidation | Confirmed first daily run timing, window versus generation age and saved configuration preservation; removed client result-cache display shortcuts | Read-only preview 3 expired results/1 survey; expired server reads return410; TypeScript and 3 dashboard cases passed; no manual app cleanup |
 | October 6, 2026 UTC | Commit preparation | Reviewed final diff, corrected historical/manual instructions, and verified the current settings/dashboard UI | 34 browser scenarios passed (33 initially, 1 after synchronizing its refresh wait); TypeScript passed using committed node resolution; whitespace check passed; unrelated local tsconfig change excluded |
 | October 6, 2026 | Selected PR #530 fixes | Fixed demo refresh, PagerDuty team scoping, directory permission, OpenAI pagination and tracked table creation | 140 backend checks passed, including 51 new regressions; provider calls mocked and destructive tests isolated; ignored findings unchanged |
+| October 6, 2026 | PR #534 follow-up fixes | Preserved retained snapshots, aged error-only content, enforced complete PagerDuty collection, restored lock-deferred retries and guarded concurrent dashboard reads | 776 distinct backend checks and 6 browser cases passed; TypeScript/migration consistency passed; local migration057 completed |
 
 ## Next action
 

@@ -9,11 +9,11 @@ import asyncio
 import logging
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Literal
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.jobstores.base import JobLookupError
+from apscheduler.jobstores.base import ConflictingIdError, JobLookupError
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from redis.exceptions import RedisError
@@ -23,7 +23,8 @@ from ..models import Organization, SessionLocal
 from .data_retention import read_retention_policy
 from .retention_cleanup import RetentionScopeConflict, cleanup_organization_data
 from .retention_status import (
-    DAILY_CLEANUP_HOUR_UTC, DAILY_CLEANUP_MINUTE_UTC, ErrorCode, cleanup_due_at, policy_and_legacy_revision,
+    DAILY_CLEANUP_HOUR_UTC, DAILY_CLEANUP_MINUTE_UTC, RETRY_INTERVAL_MINUTES,
+    ErrorCode, cleanup_due_at, policy_and_legacy_revision,
     record_cleanup_failure,
 )
 
@@ -237,11 +238,14 @@ class RetentionScheduler:
         except JobLookupError:
             pass
 
-    def _schedule_retry(self, organization_id: int) -> None:
+    def _schedule_retry(self, organization_id: int, *, deferred: bool = False) -> None:
         """Read persisted, current-policy failure state before queuing a retry.
 
         The eventual callback rechecks everything under the organization lock.
         This read only describes a candidate; it never authorizes deletion.
+        A skipped claim can still belong to a current failed attempt. Give it
+        a future timer instead of spinning on an overdue timestamp, without
+        replacing a timer another worker has already arranged.
         """
         if self._stop_event.is_set():
             return
@@ -257,11 +261,17 @@ class RetentionScheduler:
                 return
             if self._stop_event.is_set():
                 return
+            # A slow metadata read must not consume the contention delay.
+            earliest = _utc(utc_now()) + timedelta(minutes=RETRY_INTERVAL_MINUTES) if deferred else now
             self.scheduler.add_job(
-                self._run_retry, trigger=DateTrigger(run_date=max(due_at, now), timezone=timezone.utc),
+                self._run_retry, trigger=DateTrigger(run_date=max(due_at, earliest), timezone=timezone.utc),
                 args=[organization_id], id=f"{RETRY_JOB_PREFIX}{organization_id}",
-                replace_existing=True, max_instances=1, misfire_grace_time=None,
+                replace_existing=not deferred, max_instances=1, misfire_grace_time=None,
             )
+        except ConflictingIdError:
+            # A lock deferral must not postpone or overwrite a concurrent retry.
+            if not deferred:
+                logger.error("Retention retry scheduling unavailable org=%s code=retention_retry_failed", organization_id)
         except Exception:
             logger.error("Retention retry scheduling unavailable org=%s code=retention_retry_failed", organization_id)
 
@@ -272,6 +282,10 @@ class RetentionScheduler:
         )
         if outcome == "failed":
             self._schedule_retry(organization_id)
+        elif outcome == "skipped":
+            # SKIP LOCKED also sees locks held by analysis reads/writes and
+            # settings requests. They do not arrange cleanup's next retry.
+            self._schedule_retry(organization_id, deferred=True)
         return outcome
 
     def _restore_retries(self) -> None:

@@ -37,7 +37,8 @@ export default function useDashboard() {
   const [analysisProgress, setAnalysisProgress] = useState(0)
   const [currentRunningAnalysisId, setCurrentRunningAnalysisId] = useState<number | null>(null)
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
-  const defaultSelectionInFlight = useRef(false)
+  const defaultSelectionInFlight = useRef<number | null>(null)
+  const analysisSelection = useRef({ generation: 0, analysisId: null as string | null })
   const [targetProgress, setTargetProgress] = useState(0)
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null)
   const [autoRefreshAnalysis, setAutoRefreshAnalysis] = useState<AnalysisResult | null>(null)
@@ -338,7 +339,18 @@ export default function useDashboard() {
 
   const isNumericId = (value: string) => /^[0-9]+$/.test(value)
 
-  const clearUnavailableAnalysis = () => {
+  const beginAnalysisSelection = (analysisId: string | null = null): number => {
+    const generation = analysisSelection.current.generation + 1
+    analysisSelection.current = { generation, analysisId }
+    return generation
+  }
+
+  const ownsAnalysisSelection = (generation: number): boolean =>
+    analysisSelection.current.generation === generation
+
+  const clearUnavailableAnalysis = (generation: number) => {
+    if (!ownsAnalysisSelection(generation)) return
+    analysisSelection.current.analysisId = null
     setCurrentAnalysis(null)
     setSelectedMember(null)
     setHistoricalTrends(null)
@@ -505,6 +517,7 @@ export default function useDashboard() {
     let isMounted = true
 
     const loadInitialData = async () => {
+      const selectionGeneration = beginAnalysisSelection()
       try {
         // Load list + auto-refresh + integrations in parallel.
         // Pass skipAutoSelect=true so loadPreviousAnalyses only populates the sidebar list
@@ -514,6 +527,7 @@ export default function useDashboard() {
           loadAutoRefreshAnalysis(),
           loadIntegrations(false, false)
         ])
+        if (!ownsAnalysisSelection(selectionGeneration)) return
 
         const urlParams = new URLSearchParams(window.location.search)
         const hasUrlAnalysis = !!urlParams.get('analysis')
@@ -532,7 +546,8 @@ export default function useDashboard() {
             const autoRefreshId = String(autoRefresh.id)
 
             if (autoRefresh.status === 'completed') {
-              const fullAnalysis = await fetchFullAnalysisById(autoRefreshId)
+              const fullAnalysis = await fetchFullAnalysisById(autoRefreshId, selectionGeneration)
+              if (!ownsAnalysisSelection(selectionGeneration)) return
               if (fullAnalysis) {
                 updateURLWithAnalysis(String(fullAnalysis.id))
                 didSelect = true
@@ -541,6 +556,7 @@ export default function useDashboard() {
 
             if (!didSelect && (autoRefresh.status === 'running' || autoRefresh.status === 'pending')) {
               // Persist running state so navigation restores correctly
+              analysisSelection.current.analysisId = autoRefreshId
               localStorage.setItem('running_analysis_id', autoRefresh.id.toString())
               localStorage.setItem('running_analysis_start', Date.now().toString())
               updateURLWithAnalysis(String(autoRefresh.id))
@@ -551,18 +567,16 @@ export default function useDashboard() {
 
           if (!didSelect && savedAnalyses[0]) {
             const id = String(savedAnalyses[0].id)
-            const fullAnalysis = await fetchFullAnalysisById(id)
+            const fullAnalysis = await fetchFullAnalysisById(id, selectionGeneration)
+            if (!ownsAnalysisSelection(selectionGeneration)) return
             if (fullAnalysis) {
               updateURLWithAnalysis(String(fullAnalysis.id))
               didSelect = true
             }
           }
         }
-
-        if (isMounted) {
-          setInitialDataLoaded(true)
-        }
       } catch (error) {
+      } finally {
         if (isMounted) {
           setInitialDataLoaded(true)
         }
@@ -614,6 +628,7 @@ export default function useDashboard() {
     // Cleanup event listeners and timeout
     return () => {
       isMounted = false
+      analysisSelection.current.generation += 1
       window.removeEventListener('focus', handlePageFocus)
       document.removeEventListener('visibilitychange', visibilityHandler)
       window.removeEventListener('storage', handleStorageChange)
@@ -754,6 +769,7 @@ export default function useDashboard() {
   }, [integrations, selectedIntegration])
 
   const loadPreviousAnalyses = async (append = false, silent = false, skipAutoSelect = false): Promise<AnalysisResult[]> => {
+    const selectionGeneration = analysisSelection.current.generation
     // CRITICAL: Set loading state FIRST before any async operations
     if (append) {
       setLoadingMoreAnalyses(true)
@@ -825,12 +841,14 @@ export default function useDashboard() {
           const urlParams = new URLSearchParams(window.location.search)
           const analysisId = urlParams.get('analysis')
 
-          if (!analysisId && data.analyses && data.analyses.length > 0) {
+          if (!analysisId && ownsAnalysisSelection(selectionGeneration)
+            && analysisSelection.current.analysisId === null
+            && data.analyses && data.analyses.length > 0) {
             const mostRecentAnalysis = data.analyses[0]
 
             // A saved summary cannot establish current retention eligibility.
             const analysisKey = mostRecentAnalysis.uuid || mostRecentAnalysis.id.toString()
-            await fetchFullAnalysisById(analysisKey)
+            await fetchFullAnalysisById(analysisKey, beginAnalysisSelection(analysisKey))
           }
         }
 
@@ -935,11 +953,14 @@ export default function useDashboard() {
     }
   }
 
-  const loadSpecificAnalysis = async (analysisId: string) => {
+  const loadSpecificAnalysis = async (
+    analysisId: string, selectionGeneration = beginAnalysisSelection(analysisId)
+  ) => {
+    if (!ownsAnalysisSelection(selectionGeneration)) return
     try {
       const authToken = checkAuthToken()
       if (!authToken) {
-        clearUnavailableAnalysis()
+        clearUnavailableAnalysis(selectionGeneration)
         return
       }
 
@@ -955,9 +976,11 @@ export default function useDashboard() {
           'Authorization': `Bearer ${authToken}`
         }
       })
+      if (!ownsAnalysisSelection(selectionGeneration)) return
 
       if (response.ok) {
         const analysis = await response.json()
+        if (!ownsAnalysisSelection(selectionGeneration)) return
         // Cache the analysis data
         const cacheKey = analysis.uuid || analysis.id.toString()
         setAnalysisCache(prev => new Map(prev.set(cacheKey, analysis)))
@@ -968,7 +991,7 @@ export default function useDashboard() {
         // Keep URL in numeric form for consistency and to avoid org-mismatch issues
         updateURLWithAnalysis(String(analysis.id))
       } else {
-        clearUnavailableAnalysis()
+        clearUnavailableAnalysis(selectionGeneration)
         if (response.status === 410) {
           updateURLWithAnalysis(null)
           toast.error("Analysis results are unavailable under your organization's data retention policy.")
@@ -979,6 +1002,7 @@ export default function useDashboard() {
         if (response.status === 404) {
           try {
             const errorData = await response.json()
+            if (!ownsAnalysisSelection(selectionGeneration)) return
             
             // Check if backend provided a suggested analysis ID
             const suggestionMatch = errorData.detail?.match(/Most recent analysis available: (.+)$/)
@@ -990,8 +1014,9 @@ export default function useDashboard() {
               
               // Auto-redirect to suggested analysis after a brief delay
               setTimeout(() => {
+                if (!ownsAnalysisSelection(selectionGeneration)) return
                 updateURLWithAnalysis(suggestedId)
-                loadSpecificAnalysis(suggestedId)
+                loadSpecificAnalysis(suggestedId, selectionGeneration)
                 setRedirectingToSuggested(false)
               }, 1000) // Reduced to 1 second since we're showing a loader
               
@@ -1000,23 +1025,28 @@ export default function useDashboard() {
           } catch (parseError) {
           }
         }
+        if (!ownsAnalysisSelection(selectionGeneration)) return
         
         // Only clear analysis state if we couldn't auto-redirect
         // Remove invalid analysis ID from URL
         updateURLWithAnalysis(null)
         // Fall back to default selection (auto-refresh -> saved -> empty)
-        selectDefaultAnalysis({ force: true })
+        selectDefaultAnalysis({ force: true, selectionGeneration })
       }
     } catch (error) {
-      clearUnavailableAnalysis()
+      clearUnavailableAnalysis(selectionGeneration)
     }
   }
 
-  const fetchFullAnalysisById = async (analysisId: string): Promise<AnalysisResult | null> => {
+  const fetchFullAnalysisById = async (
+    analysisId: string, selectionGeneration: number
+  ): Promise<AnalysisResult | null> => {
+    if (!ownsAnalysisSelection(selectionGeneration)) return null
+    analysisSelection.current.analysisId = analysisId
     try {
       const authToken = checkAuthToken()
       if (!authToken) {
-        clearUnavailableAnalysis()
+        clearUnavailableAnalysis(selectionGeneration)
         return null
       }
 
@@ -1030,42 +1060,51 @@ export default function useDashboard() {
           'Authorization': `Bearer ${authToken}`
         }
       })
+      if (!ownsAnalysisSelection(selectionGeneration)) return null
 
       if (response.ok) {
         const analysis = await response.json()
+        if (!ownsAnalysisSelection(selectionGeneration)) return null
         const cacheKey = analysis.uuid || analysis.id.toString()
         setAnalysisCache(prev => new Map(prev.set(cacheKey, analysis)))
         setCurrentAnalysis(analysis)
         return analysis
       }
-      clearUnavailableAnalysis()
+      clearUnavailableAnalysis(selectionGeneration)
     } catch (error) {
       // Non-critical: return null to allow fallback
-      clearUnavailableAnalysis()
+      clearUnavailableAnalysis(selectionGeneration)
     }
     return null
   }
 
-  const selectDefaultAnalysis = async (options: { force?: boolean } = {}) => {
-    if (defaultSelectionInFlight.current) return
+  const selectDefaultAnalysis = async (options: { force?: boolean; selectionGeneration?: number } = {}) => {
+    if (defaultSelectionInFlight.current !== null
+      && ownsAnalysisSelection(defaultSelectionInFlight.current)) return
     if (!options.force) {
       const urlParams = new URLSearchParams(window.location.search)
       if (urlParams.get('analysis')) return
     }
-    if (currentAnalysis) return
+    if (options.selectionGeneration === undefined
+      && (currentAnalysis || analysisSelection.current.analysisId !== null)) return
 
-    defaultSelectionInFlight.current = true
+    const selectionGeneration = options.selectionGeneration ?? beginAnalysisSelection()
+    if (!ownsAnalysisSelection(selectionGeneration)) return
+    defaultSelectionInFlight.current = selectionGeneration
     try {
       const autoRefresh = autoRefreshAnalysis ?? await loadAutoRefreshAnalysis()
+      if (!ownsAnalysisSelection(selectionGeneration)) return
       const savedAnalyses = previousAnalyses.length > 0
         ? previousAnalyses
         : await loadPreviousAnalyses(false, true, true)
+      if (!ownsAnalysisSelection(selectionGeneration)) return
 
       if (autoRefresh) {
         const autoRefreshId = String(autoRefresh.id)
 
         if (autoRefresh.status === 'completed') {
-          const fullAnalysis = await fetchFullAnalysisById(autoRefreshId)
+          const fullAnalysis = await fetchFullAnalysisById(autoRefreshId, selectionGeneration)
+          if (!ownsAnalysisSelection(selectionGeneration)) return
           if (fullAnalysis) {
             setRedirectingToSuggested(false)
             updateURLWithAnalysis(String(fullAnalysis.id))
@@ -1074,6 +1113,7 @@ export default function useDashboard() {
         }
 
         if (autoRefresh.status === 'running' || autoRefresh.status === 'pending') {
+          analysisSelection.current.analysisId = autoRefreshId
           localStorage.setItem('running_analysis_id', autoRefresh.id.toString())
           localStorage.setItem('running_analysis_start', Date.now().toString())
           setRedirectingToSuggested(false)
@@ -1085,7 +1125,8 @@ export default function useDashboard() {
 
       if (savedAnalyses[0]) {
         const id = String(savedAnalyses[0].id)
-        const fullAnalysis = await fetchFullAnalysisById(id)
+        const fullAnalysis = await fetchFullAnalysisById(id, selectionGeneration)
+        if (!ownsAnalysisSelection(selectionGeneration)) return
         if (fullAnalysis) {
           setRedirectingToSuggested(false)
           updateURLWithAnalysis(String(fullAnalysis.id))
@@ -1093,7 +1134,9 @@ export default function useDashboard() {
         }
       }
     } finally {
-      defaultSelectionInFlight.current = false
+      if (defaultSelectionInFlight.current === selectionGeneration) {
+        defaultSelectionInFlight.current = null
+      }
     }
   }
 
@@ -1203,6 +1246,7 @@ export default function useDashboard() {
 
         // Clear selection if this analysis was selected
         if (currentAnalysis?.id === analysisToDelete.id) {
+          beginAnalysisSelection()
           setCurrentAnalysis(null)
           updateURLWithAnalysis(null)
         }
