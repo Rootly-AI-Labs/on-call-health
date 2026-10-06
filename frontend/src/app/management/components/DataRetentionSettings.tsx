@@ -163,7 +163,7 @@ export function DataRetentionSettings() {
       setDialogOpen(false)
       setConfirmPolicy(false)
       setSuccess(result.enabled
-        ? "Retention policy saved. Cleanup uses these settings at the next daily run at 03:00 UTC, within 24 hours; no data was deleted by this save."
+        ? "Retention policy saved. Cleanup uses these settings at the next daily run at 03:00 UTC; no data was deleted by this save."
         : pendingLegacy ? "Retention disabled. The prior cleanup approval has been cancelled." : "Retention disabled.")
     } catch (failure) {
       if (controller.signal.aborted) return
@@ -185,7 +185,7 @@ export function DataRetentionSettings() {
     <div role="alert" aria-label="Existing data deletion warning" className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
       <p className="font-semibold">Permanent deletion of existing data</p>
       <p>{policy?.retention_days === null ? `Enabling ${days}-day retention` : `Shortening retention to ${days} days`} will permanently clear entire analysis results generated more than {days} days ago, including the imported activity, historical metrics, enrichments, and insights stored inside them, and delete survey responses submitted more than {days} days ago. This applies to existing data as well as future data.</p>
-      <p>Newer survey responses, analysis configuration, accounts, memberships, and integration settings are preserved. Deleted data cannot be restored by disabling retention or increasing the period.</p>
+      <p>Expired manually saved analyses are deleted, including their configuration and metadata. Newer survey responses, auto-refresh configuration, accounts, memberships, and integration settings are preserved. Deleted data cannot be restored by disabling retention or increasing the period.</p>
       <p>Expired analysis results and results with unknown generation dates become unavailable immediately when the policy is saved. Physical deletion happens during cleanup; saving does not run deletion. Results with unknown generation dates are preserved until successfully regenerated.{pendingLegacy && " Previously approved, unchanged results may still be cleared at cleanup."}</p>
     </div>
   ) : null
@@ -217,7 +217,7 @@ export function DataRetentionSettings() {
       {access === "error" && <div className="px-4 pb-4"><Button variant="outline" onClick={() => setReload((value) => value + 1)}>Refresh settings</Button></div>}
       <div id="data-retention-panel" hidden={!expanded} className="space-y-4 border-t border-neutral-200 p-4">
         {policy && (access === "admin" || access === "member") && <>
-          <p id="retention-days-help" className="text-xs text-neutral-500">Data retention, when enabled, automatically clears analysis results N days after generation and survey responses N days after submission.</p>
+          <p id="retention-days-help" className="text-xs text-neutral-500">Data retention, when enabled, deletes manually saved analyses N days after generation and survey responses N days after submission; auto-refresh results expire while their setup is kept.</p>
           {isAdmin ? <>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex items-start justify-between gap-4 rounded-md bg-neutral-50 p-3">
@@ -278,21 +278,16 @@ export function DataRetentionSettings() {
         </>}
 
         {preview && previewMatches && <div className="space-y-4 border-t border-neutral-200 pt-5" aria-label="Deletion preview">
-          <div><h3 className="font-semibold text-neutral-900">Deletion preview</h3><p className="mt-1 text-xs text-neutral-500">Evaluated {readableDate(preview.evaluated_at)}{preview.cutoff_at ? ` · Results generated or surveys submitted before ${readableDate(preview.cutoff_at)}` : " · Retention disabled: no expiry candidates"}</p></div>
-          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <h3 className="font-semibold text-neutral-900">Deletion preview</h3>
+          <dl className="grid grid-cols-2 gap-3">
             {[
               ["Analysis results to clear", preview.analyses.expired + preview.legacy_cleanup.analysis_candidates],
               ["Survey responses to delete", preview.survey_responses.expired],
-              ["Survey links to detach", preview.related_records.survey_links_to_clear],
             ].map(([label, count]) => <div key={label} className="rounded-md bg-neutral-50 p-3"><dt className="text-xs leading-5 text-neutral-600">{label}</dt><dd className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">{count}</dd></div>)}
           </dl>
-          {preview.legacy_cleanup.analysis_candidates > 0 && <p className="text-xs text-amber-900">Includes {preview.legacy_cleanup.analysis_candidates} unchanged results with unknown generation dates from an earlier cleanup approval.</p>}
-          <p className="text-sm text-neutral-600">Results with unknown generation dates: {preview.analyses.unverifiable} · Surveys with unknown submission dates: {preview.survey_responses.unverifiable} · Running or pending analyses deferred: {preview.analyses.deferred}.</p>
-          <p className="text-xs text-neutral-500">Retained: {preview.analyses.retained} analysis results and {preview.survey_responses.retained} surveys. Records with unknown dates are preserved{preview.legacy_cleanup.analysis_candidates > 0 ? ", except for the previously approved results above" : ""}. Changing any setting requires a new preview.</p>
-          {(preview.analyses.excluded ?? 0) > 0 && <p className="text-xs text-neutral-500">Demo analyses excluded: {preview.analyses.excluded}.</p>}
-          <p className="text-xs text-neutral-500">Counts can change before cleanup as data and the rolling cutoff change.</p>
-          {preview.warnings.length > 0 && <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-amber-900">{preview.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
-          <details className="rounded-md border border-neutral-200 p-3 text-sm"><summary className="cursor-pointer font-medium">Related records</summary><p className="mt-2 leading-relaxed text-neutral-600">Mappings to remove: {preview.related_records.analysis_mappings}; notifications to remove: {preview.related_records.analysis_notifications}; survey-period links to clear: {preview.related_records.survey_period_links_to_clear}; digest links to clear: {preview.related_records.digest_links_to_clear}; references requiring review: {preview.related_records.references_requiring_review}.</p></details>
+          {preview.enabled ? <p className="text-xs text-neutral-500">Newer reports and surveys are kept. Demo reports are excluded. {preview.legacy_cleanup.analysis_candidates > 0 ? "Previously approved undated results are included." : "Undated records are skipped."}</p> : <p className="text-xs text-neutral-500">These settings turn off automatic cleanup.</p>}
+          {preview.legacy_cleanup.analysis_candidates > 0 && <p className="text-xs text-amber-900">Includes {preview.legacy_cleanup.analysis_candidates} previously approved results.</p>}
+          {preview.related_records.references_requiring_review > 0 && <p role="alert" className="text-xs text-amber-900">Some linked records need review before cleanup can proceed.</p>}
           {preview.samples.length > 0 && <details className="rounded-md border border-neutral-200 p-3 text-sm"><summary className="cursor-pointer font-medium">Analysis samples ({preview.samples.length})</summary><div className="mt-3 max-h-72 overflow-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b"><th className="p-2">Analysis</th><th className="p-2">Generated</th><th className="p-2">Outcome</th><th className="p-2">Reason</th></tr></thead><tbody>{preview.samples.map((sample) => <tr key={sample.analysis_id} className="border-b last:border-0"><td className="whitespace-nowrap p-2 align-top">#{sample.analysis_id}{sample.is_saved ? " · Saved" : ""}{sample.is_auto_refresh ? " · Auto-refresh" : ""}</td><td className="p-2 align-top">{readableDate(sample.generation_at)}</td><td className="p-2 align-top">{sample.will_clear_as_legacy ? "Previously approved" : sample.disposition}</td><td className="p-2 align-top">{sample.reason}</td></tr>)}</tbody></table></div>{preview.samples_truncated && <p className="mt-2 text-xs text-neutral-500">Only the first 100 analyses are shown. Counts include all organization data.</p>}</details>}
         </div>}
       </div>

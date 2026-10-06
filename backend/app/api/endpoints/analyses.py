@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, R
 from pydantic import BaseModel
 from sqlalchemy import Text, cast, func, over
 from sqlalchemy.orm import Session, defer, load_only
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from ...models import get_db, User, Analysis, RootlyIntegration, GitHubIntegration, JiraIntegration, LinearIntegration, UserCorrelation
 from ...auth.dependencies import get_current_active_user, get_current_user_flexible
@@ -122,6 +122,7 @@ class AnalysisResponse(BaseModel):
     status: str
     created_at: datetime
     completed_at: Optional[datetime]
+    results_generated_at: Optional[datetime] = None
     time_range: int
     analysis_data: Optional[dict]
     config: Optional[dict]
@@ -445,6 +446,7 @@ async def run_burnout_analysis(
             status=analysis.status,
             created_at=analysis.created_at,
             completed_at=analysis.completed_at,
+            results_generated_at=getattr(analysis, "results_generated_at", None),
             time_range=analysis.time_range,
             analysis_data=None,
             config=analysis.config,
@@ -524,6 +526,7 @@ async def list_analyses(
         Analysis.status,
         Analysis.created_at,
         Analysis.completed_at,
+        Analysis.results_generated_at,
         Analysis.time_range,
         Analysis.config,
         Analysis.integration_name,
@@ -557,6 +560,7 @@ async def list_analyses(
                 status=row.status,
                 created_at=row.created_at,
                 completed_at=row.completed_at,
+                results_generated_at=getattr(row, "results_generated_at", None),
                 time_range=row.time_range or 30,
                 analysis_data=extract_analysis_summary(None),  # Don't access results - excluded
                 config=row.config,
@@ -597,6 +601,7 @@ async def get_auto_refresh_analysis(
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
+        results_generated_at=getattr(analysis, "results_generated_at", None),
         time_range=analysis.time_range or 30,
         analysis_data=extract_analysis_summary(None),
         config=analysis.config,
@@ -635,6 +640,7 @@ async def save_analysis(
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
+        results_generated_at=getattr(analysis, "results_generated_at", None),
         time_range=analysis.time_range or 30,
         analysis_data=extract_analysis_summary(None),
         config=analysis.config,
@@ -716,6 +722,7 @@ async def get_analysis_by_uuid(
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
+        results_generated_at=getattr(analysis, "results_generated_at", None),
         time_range=analysis.time_range or 30,
         analysis_data=analysis_data,
         config=analysis.config,
@@ -782,6 +789,7 @@ async def get_analysis(
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
+        results_generated_at=getattr(analysis, "results_generated_at", None),
         time_range=analysis.time_range or 30,
         analysis_data=analysis_data,
         config=analysis.config,
@@ -873,10 +881,22 @@ def _retention_refresh_status(db: Session, analysis: Analysis):
         integration_name=analysis.integration_name, platform=analysis.platform,
         status=analysis.status, created_at=analysis.created_at,
         completed_at=analysis.completed_at, time_range=analysis.time_range or 30,
+        results_generated_at=getattr(analysis, "results_generated_at", None),
         analysis_data={}, config=analysis.config,
         is_saved=analysis.is_saved, is_auto_refresh=analysis.is_auto_refresh,
         auto_refresh_interval=analysis.auto_refresh_interval,
     )
+
+
+def _refresh_retention_analysis(db: Session, analysis: Analysis, attribute_names: list[str]):
+    """Handle a saved row deleted by cleanup while a request was waiting."""
+    analysis_id = analysis.id
+    try:
+        db.refresh(analysis, attribute_names=attribute_names)
+    except InvalidRequestError:
+        if db.query(Analysis.id).filter(Analysis.id == analysis_id).scalar() is None:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        raise
 
 
 def _require_retained_result(db: Session, analysis: Analysis):
@@ -884,8 +904,9 @@ def _require_retained_result(db: Session, analysis: Analysis):
     cutoff = _retention_cutoff(db, analysis.organization_id, lock=True)
     if cutoff is None:
         return None
-    # Cleanup can clear a preserved auto-refresh row after it was first read.
-    db.refresh(analysis, attribute_names=[
+    # Cleanup can clear a recurring result or delete a manual saved row after
+    # it was first read, while this request waits for the organization lock.
+    _refresh_retention_analysis(db, analysis, attribute_names=[
         "results", "status", "config", "rootly_integration_id", "results_generated_at", "completed_at",
         "error_message", "error_generated_at",
     ])
@@ -904,7 +925,7 @@ def _require_retained_result(db: Session, analysis: Analysis):
 def _require_result_after_collection(db: Session, analysis: Analysis):
     """A provider response cannot revive a cleared or newly expired parent."""
     _retention_cutoff(db, analysis.organization_id, lock=True)
-    db.refresh(analysis, attribute_names=[
+    _refresh_retention_analysis(db, analysis, attribute_names=[
         "results", "status", "config", "results_generated_at", "completed_at",
         "error_message", "error_generated_at",
     ])
@@ -1182,6 +1203,7 @@ async def get_analysis_by_identifier(  # noqa: C901
         status=analysis.status,
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
+        results_generated_at=getattr(analysis, "results_generated_at", None),
         time_range=analysis.time_range or 30,
         analysis_data=analysis_data,
         config=analysis.config

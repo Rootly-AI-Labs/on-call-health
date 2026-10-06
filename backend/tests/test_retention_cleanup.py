@@ -266,15 +266,17 @@ def test_surveys_expire_independently_and_newer_links_are_detached(
     assert db.get(Analysis, ids["expired_analysis"]).results is None
 
 
+@pytest.mark.parametrize("manual_saved", [False, True])
 def test_expired_dependencies_removed_or_detached_without_breaking_recent_records(
-    db, enabled_policy, organizations, users, analysis_factory, survey_factory
+    db, enabled_policy, organizations, users, analysis_factory, survey_factory, manual_saved,
 ):
-    from app.models import IntegrationMapping, SurveyPeriod, UserCorrelation, UserNotification, WeeklyDigestLog
+    from app.models import Analysis, IntegrationMapping, SurveyPeriod, UserCorrelation, UserNotification, WeeklyDigestLog
 
-    expired = analysis_factory(coverage(OLD))
-    recent = analysis_factory(coverage(RECENT))
-    old_survey = survey_factory(OLD)
-    fresh_survey = survey_factory(RECENT)
+    expired = analysis_factory(coverage(OLD), is_saved=manual_saved)
+    recent = analysis_factory(coverage(RECENT), is_saved=manual_saved)
+    expired_analysis_id = expired.id
+    old_survey = survey_factory(OLD, analysis_id=expired.id)
+    fresh_survey = survey_factory(RECENT, analysis_id=recent.id)
     correlation = UserCorrelation(
         user_id=users[0].id, organization_id=organizations[0].id, email=users[0].email
     )
@@ -342,6 +344,10 @@ def test_expired_dependencies_removed_or_detached_without_breaking_recent_record
     assert result.survey_period_links_cleared == 1
     assert result.digest_links_cleared == 1
     db.expire_all()
+    if manual_saved:
+        assert db.get(Analysis, expired_analysis_id) is None
+    else:
+        assert db.get(Analysis, expired_analysis_id).results is None
     assert db.get(IntegrationMapping, ids[0]) is None
     assert db.get(IntegrationMapping, ids[1]).analysis_id == recent_analysis_id
     assert db.get(UserNotification, ids[2]) is None

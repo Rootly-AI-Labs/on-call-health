@@ -6,7 +6,7 @@ Branch: `feat/org-data-retention`
 
 Last updated: October 6, 2026
 
-Current status: **Steps 1 through 6 are implemented** with the user's approved result generation age rule and **one normal daily cleanup at 03:00 UTC**. Failed organizations receive separate targeted retries. The original backend suite passed **649 tests**, and subsequent mock-exclusion changes passed **441 related checks**. The current settings/dashboard UI passes **34 browser scenarios**, and TypeScript passes with the committed module-resolution configuration. The user enabled a **90-day policy for the local Retention Demo organization** at October 6, 03:21 UTC; its first cleanup is due October 7, 03:00 UTC. No application cleanup has run as of the read-only verification at 03:24 UTC, and destructive automated tests used only the disposable database. Step 7, full staging verification, remains.
+Current status: **Steps 1 through 6 are implemented** with result-generation age and daily cleanup at **03:00 UTC**, restored after local testing. The first local scheduled cleanup succeeded October 6 at 15:00 UTC, clearing three result payloads, deleting one old survey and detaching two newer/undated survey links. The user subsequently approved deleting expired manually saved analysis records entirely, including configuration and metadata; recurring auto-refresh setup remains. That local change passed **699 retention backend checks**, **31 settings browser scenarios** and TypeScript. A second temporary test run at 15:40 UTC fully deleted the three expired saved records. The restored UTC schedule passed **84 scheduler/status checks** and TypeScript. Step 7, full staging verification, remains.
 
 ## Agreed direction
 
@@ -18,7 +18,7 @@ Current status: **Steps 1 through 6 are implemented** with the user's approved r
 - Cover analysis results and historical metrics plus survey responses.
 - Determine analysis expiry from when its stored result was generated; survey responses use their own submission timestamp.
 - Keep retention disabled until an organization admin explicitly enables it.
-- Expire the entire stored result once its generation date is older than the rolling cutoff, including embedded activity, metrics, insights and enrichments. Preserve analysis configuration.
+- Expire the entire stored result once its generation date is older than the rolling cutoff, including embedded activity, metrics, insights and enrichments. Delete manually saved analysis records, including configuration and metadata; preserve recurring auto-refresh setup and unsaved analysis rows.
 - Preserve the requested historical analysis window. A report generated today may cover four months of source activity and remain available for N days after generation. Successfully generating its replacement starts a new lifetime; a failed attempt without a new result does not renew the old snapshot.
 - Retention does not disable enrichment inputs. Existing feature settings and provider permissions continue to control collection; unrelated baseline feature limitations remain.
 - Keep the settings simple: enable/disable, N days, preview, and one ordinary deletion confirmation. There is no Advanced cleanup option or new approval for deleting results with unknown dates.
@@ -27,6 +27,18 @@ Current status: **Steps 1 through 6 are implemented** with the user's approved r
 The analysis window and retention period are independent. Four months is only the current demo's example, not a limit: a six-month analysis retains its six months of available source data, and its complete result expires N days after generation. Retention adds no analysis-window cap; the app's existing supported date-range limits still apply. The management explanation now uses general N-day wording and explicitly says retention does not shorten the requested window.
 
 The company requested automatic deletion after N days. Manual deletion by date range and deletion of the organization itself are separate features.
+
+## October 6 approved change: delete expired manually saved records
+
+This supersedes the earlier decision to preserve every analysis configuration. A dated expired analysis with `is_saved: true` and `is_auto_refresh: false` is now deleted entirely in the cleanup transaction. Its saved/sidebar entry disappears on the next list refresh. Auto-refresh records retain their setup so future successful runs can generate replacement results; unsaved records retain the previous content-clearing behavior.
+
+Existing saved rows whose contents were already cleared by earlier cleanup are also removed when their canonical `results_generated_at` proves that they expired. Empty configurations without a canonical generation date are preserved; row creation or completion alone cannot prove a previously stored result existed. Error-only records retain their independent error-content age check, so a newer error does not cause an already-cleared row to expire prematurely.
+
+Surveys still use their own submission age: expired responses are deleted, and newer/undated responses survive with their analysis link cleared. Related mappings and notifications are deleted, digest history is detached, and old linked surveys are deleted before the saved parent to satisfy foreign keys. Ownership checks, cache eviction, locks, outcome recording and deletion remain atomic. Missing rows encountered by waiting analysis reads return 404 rather than a refresh error.
+
+Fresh, unknown-date, active and built-in demo analyses keep their existing protections. Prior snapshot-bound legacy approvals authorize clearing content only, so they do not delete unknown-date saved configurations. The settings description and deletion confirmation now explain full manual-record deletion and preserved auto-refresh setup. No migration or policy-setting change is required.
+
+Verification: **699 backend checks passed**, including 27 new saved-record cases and the existing dependency test expanded to cover full deletion. The guarded disposable database verifies foreign-key ordering, independent survey age, preserved recurring setup, generation cutoffs, already-cleared rows, unknown-date/active/demo/organization exclusions, error-only content, idempotence, rollback, saved-list removal and 404 reads after deletion. **31 settings browser scenarios** and TypeScript passed. The backend and frontend were restarted; local health and Management return successfully. A read-only local preview confirms the three previously cleared saved fixture rows are now expired deletion candidates. No additional cleanup was run against application data during this change; they will disappear after the next scheduled cleanup and dashboard refresh.
 
 ## October 5 approved change: retain each generated result for N days
 
@@ -121,7 +133,39 @@ All six new findings were validated and the user authorized their fixes:
 
 Verification: **776 distinct backend checks passed across the affected suites**, plus **6 dashboard browser scenarios**. TypeScript passed with committed node resolution; migration consistency and whitespace checks passed. Regression coverage includes actual scheduler-to-failure preservation, active polling without content, error cutoff/unknown-date handling, migration idempotence, incomplete PagerDuty collection, persistent lock/release retry recovery and held-response browser races. Provider calls are mocked and database mutations occur only in guarded disposable fixtures. Independent final review found no remaining material blocker. The local backend restarted healthy and migration 057 is recorded completed. No manual application cleanup or provider call was run.
 
+## October 6: preview detail simplification
+
+Removed the **Related records** disclosure and its mapping, notification, survey-period, digest and ownership-review counts from the management deletion preview at the user's request. Backend dependency checks and cleanup are unchanged.
+
+## October 6: compact deletion preview
+
+Simplified the management preview to two counts (analysis results and survey responses) and a short preservation note. Removed evaluation/cutoff timestamps, the detachment tile, raw retained/unknown/deferred counts, the excluded-demo count and generic explanation/warning lists. Optional analysis samples remain collapsed. Prior approval totals and actual ownership-review blockers still appear when applicable. This changes presentation only; survey detachment and all retention rules are unchanged.
+
+Verification: TypeScript and all **6 affected existing browser scenarios** passed, including simplified cards, prior approval counts, demo preservation, generation samples, confirmation and mobile overflow. The local frontend was restarted.
+
+## October 6: temporary local testing schedule
+
+Changed the local daily cleanup from 03:00 UTC to **11:00 a.m. America/Toronto** at the user's request. The scheduler and next-due calculation use the same timezone: 15:00 UTC during daylight time and 16:00 UTC during standard time. Failure retries and retention periods are unchanged. No separate one-time job or helper was scheduled. This temporary local change has not been committed or pushed.
+
+Verification: **90 scheduler/status checks**, including daylight-saving boundaries, and **2 existing browser timing/confirmation checks** passed; TypeScript passed. The restarted backend reports the next cleanup for organization 3 as October 6, 15:00 UTC / 11:00 Toronto, with its 60-day policy unchanged.
+
+The user subsequently moved the local daily time to **11:40 a.m. Toronto**, so cleanup can run again on October 6 after the earlier 11:00 run. The same daily CronTrigger now uses minute 40, and UI timing and test expectations match. Read-only verification at approximately 11:35 confirms the scheduler is running and organization 3 is due **October 6, 15:40 UTC**, with its 60-day policy unchanged. **91 scheduler/status checks** passed, including a regression confirming an earlier same-day success does not suppress the later slot; **2 affected browser checks** and TypeScript passed. The browser timing assertion was updated from 3:00 to 3:40 UTC before its successful rerun. No one-time job or status reset was needed.
+
+Actual scheduled verification: the October 6 **11:40 a.m. Toronto** run succeeded and fully deleted the three previously cleared saved fixtures (IDs 3, 5 and 7). Read-only database verification at 11:42 confirms five saved entries remain for the local owner: the fresh October 5 result (ID 4), unknown-date legacy result (ID 6), mock running/deferred result (ID 8), empty undated configuration (ID 9), and exempt built-in demo (ID 1). These match the user's screenshot; the displayed 130d/30d values describe source windows, not stored-result age. The current organization period is 60 days. At that verification, next cleanup was October 7 at 11:40 a.m. Toronto (15:40 UTC).
+
+Testing complete: at the user's request, restored the original **03:00 UTC daily schedule**, UTC slot calculations, associated backend tests, and displayed timing. Removed the temporary Eastern-time scheduling changes. Restarted both services and verified the live scheduler reports `daily_time_utc=03:00`; organization 3 is next due **October 7 at 03:00 UTC** (October 6 at 11 p.m. Toronto). Its 60-day policy and recorded successful test cleanup remain. **84 scheduler/status checks**, **2 affected browser checks** and TypeScript passed.
+
 ## Implementation sequence
+
+### October 6 sidebar date clarification
+
+Saved and automatic report entries now show the report name, **Covers N days**, and **Generated [date]** when a stored generation timestamp is available. Otherwise they show **Created [date]** without relabeling row creation or failed-run completion as generation. Dates include the year; hovering shows the exact local date/time and identifies an unknown generation date when the creation fallback is used. Full truncated report names are also available on hover.
+
+The expanded sidebar is slightly wider (240 to 288 pixels) and no longer shrinks under main-content pressure. Both report sections share the same metadata display. The analysis API exposes nullable `results_generated_at` in saved summaries and individual/automatic responses; the list query still avoids loading result content. Frontend types accept older responses without this field.
+
+The user subsequently chose simpler fixed labels: **Time range: N days** and **Created [date]**, for both saved and automatic entries. The displayed date now always comes from row creation, with the exact local time available on hover. This is a display change; retention still ages stored results by generation time. The wider sidebar and year-inclusive dates remain. Updated existing assertions and verified **6 dashboard browser scenarios** and TypeScript; the local frontend was restarted.
+
+Verification: **97 backend checks**, **6 existing dashboard browser scenarios**, and TypeScript passed. Existing list assertions verify generation is distinct from row creation and completion timestamps. Browser fixtures verify Generated/Created labels and automatic-report metadata; a targeted desktop/mobile rerun passed after restarting the frontend to load the updated sidebar accessibility label. Desktop and 390-pixel mobile renders were inspected. Both local services were restarted; health is healthy, the running API schema includes the generation timestamp, and Dashboard responds successfully.
 
 | Step | Work | Status | Verification before moving on |
 | --- | --- | --- | --- |
@@ -404,7 +448,7 @@ Retention starts **disabled**. The seven analysis fixtures and four surveys cove
 
 | Fixture | Expected outcome at 90 days |
 | --- | --- |
-| Three results generated 120 days ago, including a saved result | 3 whole analysis results expire; rows and configuration remain |
+| Three manually saved results generated 120 days ago | 3 analysis records expire and are deleted, including rows and configuration |
 | Fresh result containing four months of historical activity | 1 result retained, including its older source data |
 | Legacy result with unknown generation date | 1 reported as unknown; preserved by normal retention, with no advanced approval in the UI |
 | Mock running result | 1 deferred |
@@ -419,7 +463,7 @@ Retention starts **disabled**. The seven analysis fixtures and four surveys cove
 1. Click **Configure** on the compact **Data retention** row, turn on the draft switch if disabled, leave **90** days, and click **Preview deletion**. Before the first cleanup, expect **3 analysis results**, **1 survey response**, and **2 survey links**. Previewing changes no policy or data. If the saved policy is already enabled at 90 days, skip step 3; there is no policy change to save.
 2. Review the generated dates and unknown-date counts in the preview. The legacy result is preserved and becomes unavailable while retention is enabled; a successful rerun gives its replacement a reliable date. The unknown-age survey remains preserved. There is no Advanced cleanup option or extra confirmation.
 3. Click **Save retention policy**, review the confirmation, and save. Reload to verify the saved 90-day policy. Saving does not run cleanup during the request; the next normal daily run is at 03:00 UTC, normally within 24 hours while the backend is running.
-4. Wait for the daily run and click **Refresh settings** to inspect the saved outcome, or run the fixture-only cleanup command below to test immediately. The three expired payloads become empty, the old survey disappears, and two preserved survey links become null. The unknown-date result and survey remain stored. Saved entries remain in the sidebar with their configuration, even after result content is cleared. Repeat cleanup to verify it does not delete the preserved responses; its last-successful counts update to reflect the new no-op run.
+4. Wait for the daily run and click **Refresh settings** to inspect the saved outcome, or run the fixture-only cleanup command below to test immediately. The three expired manually saved records are deleted, the old survey disappears, and two preserved survey links become null. The unknown-date result and survey remain stored. Refresh the dashboard to confirm the expired entries disappear from the Saved panel. Repeat cleanup to verify it does not delete preserved responses; its last-successful counts update to reflect the new no-op run.
 
 ```powershell
 docker compose exec -T backend python scripts/retention_demo.py cleanup --local-compose
@@ -495,7 +539,8 @@ The user subsequently approved the explicit existing-data warning. Implemented i
 | How data age is measured | Analysis result generation age; independent survey submission age | Approved change implemented October 5 |
 | Existing organization default | Disabled until an admin explicitly enables retention | Confirmed by user |
 | Historical events within a report | Keep the complete requested historical window; expire the whole result N days after generation | Approved change implemented October 5 |
-| Saved and auto-refresh analyses | Saved results expire; preserve analysis rows/configuration, and refresh in place when retention is enabled | Implemented in step 4; awaiting user verification |
+| Manually saved analyses | Delete expired records, including configuration and metadata, so saved/sidebar entries disappear after refresh | Approved by user October 6; implemented |
+| Auto-refresh analyses | Clear expired results while preserving recurring setup; refresh in place when retention is enabled | Implemented; failed refreshes preserve retained snapshots |
 | Running analyses | Defer cleanup of active jobs; check the current policy before saving or returning any result | Implemented in step 4 |
 | Related metadata | Delete scoped mappings/notifications; detach newer surveys, survey periods and digest links; evict result caches | Implemented in step 4 |
 | Enrichment collection | Preserve existing integration behavior and requested windows; no retention-specific exclusions | Restored and tested October 5 |
@@ -520,7 +565,7 @@ Inject a fixed clock into cleanup tests. Seed data around the cutoff rather than
 | Time boundaries | Older data expires; newer data and exact-cutoff data remain under the proposed boundary |
 | Organization isolation | Only the target organization's eligible records are affected |
 | Dependencies | No broken references; newer linked records survive as designed |
-| Preserved configuration | Accounts, memberships, credentials, and future collection remain functional |
+| Preserved configuration | Auto-refresh setup, accounts, memberships, credentials, and future collection remain functional |
 | Saved and running data | Behavior matches the verified policy for saved, running, and auto-refresh analyses |
 | Generation age | Old result generations expire; fresh reports retain older source history; successful replacement renews age and failed attempts do not |
 | Preview consistency | Preview and deletion use the same eligibility logic, with cutoff and policy recorded |
@@ -586,7 +631,8 @@ Inject a fixed clock into cleanup tests. Seed data around the cutoff rather than
 | October 6, 2026 UTC | Commit preparation | Reviewed final diff, corrected historical/manual instructions, and verified the current settings/dashboard UI | 34 browser scenarios passed (33 initially, 1 after synchronizing its refresh wait); TypeScript passed using committed node resolution; whitespace check passed; unrelated local tsconfig change excluded |
 | October 6, 2026 | Selected PR #530 fixes | Fixed demo refresh, PagerDuty team scoping, directory permission, OpenAI pagination and tracked table creation | 140 backend checks passed, including 51 new regressions; provider calls mocked and destructive tests isolated; ignored findings unchanged |
 | October 6, 2026 | PR #534 follow-up fixes | Preserved retained snapshots, aged error-only content, enforced complete PagerDuty collection, restored lock-deferred retries and guarded concurrent dashboard reads | 776 distinct backend checks and 6 browser cases passed; TypeScript/migration consistency passed; local migration057 completed |
+| October 6, 2026 | Manual saved-record expiry | Delete expired manual saved rows and metadata; preserve recurring setup and independently aged surveys; cover previously cleared entries | 699 retention backend checks, 31 settings browser scenarios and TypeScript passed; live preview finds three prior cleared rows; next daily cleanup will remove them |
 
 ## Next action
 
-Next is **step 7: verify the complete automatic flow in staging** with a controlled organization and synthetic data before pilot activation. The user has enabled the local mock's 90-day policy; its first scheduled cleanup is October 7, 03:00 UTC. Review the outcome panel at `http://localhost:3000/management` after that scheduled run. Confirm separate policies for delivery/security history and backups before describing the feature as deletion of every organization record. Continue using normal chat for verification questions because the terminal question widget was inaccessible.
+Next is **step 7: verify the complete automatic flow in staging** with a controlled organization and synthetic data before pilot activation. The local 60-day policy's October 6, 11:40 a.m. Toronto test cleanup succeeded and deleted all three expired saved fixture records; read-only database and screenshot verification confirms their sidebar entries are gone. Its original UTC schedule has been restored; the next daily run is **October 7 at 03:00 UTC**. Review the outcome at `http://localhost:3000/management`. Delivery/security history and backups have separate retention scope. Continue using normal chat for verification questions because the terminal question widget was inaccessible.

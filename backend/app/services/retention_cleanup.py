@@ -19,7 +19,9 @@ from ..models import (
     UserBurnoutReport, UserNotification, WeeklyDigestLog,
 )
 from .data_retention import read_retention_policy
-from .retention_preview import _batches, _event_time, _related_counts, classify_analysis_result
+from .retention_preview import (
+    _batches, _event_time, _related_counts, classify_analysis_result, is_manually_saved_analysis,
+)
 from .retention_legacy import (
     finish_legacy_cleanup, fingerprint_analysis_result, pending_legacy_entries,
 )
@@ -110,12 +112,14 @@ def _lock_retention_dependencies(db, analysis_ids, response_ids):
 def cleanup_organization_data(
     db: Session, organization_id: int, *, now: datetime, invalidate_cache=None, completion_clock=None,
 ) -> RetentionCleanupResult:
-    """Apply the currently saved policy atomically, preserving configuration.
+    """Apply the saved policy atomically, deleting expired manual saved rows.
 
     Unknown-age analyses clear only under a snapshot-bound admin approval. Active
     unchanged approved snapshots remain pending. Unknown-age surveys remain.
     Built-in sample reports are excluded by the shared classifier, including
     from prior unknown-date approvals; deliberate retention test fixtures are not.
+    Auto-refresh and unsaved configurations survive result expiry. Prior legacy
+    approvals authorize content clearing only, not deletion of configuration.
     References with missing or different ownership abort the whole organization
     transaction. Cache eviction can precede a rollback, which is harmless; no
     successful outcome is reported before the database commit succeeds.
@@ -141,6 +145,7 @@ def cleanup_organization_data(
             return result
 
         expired_analysis_ids = []
+        expired_saved_analysis_ids = []
         legacy_analysis_ids = []
         pending_entries = pending_legacy_entries(organization)
         remaining_entries = []
@@ -151,6 +156,8 @@ def cleanup_organization_data(
             eligibility = classify_analysis_result(analysis, cutoff)
             if eligibility.disposition == "expired":
                 expired_analysis_ids.append(analysis.id)
+                if is_manually_saved_analysis(analysis):
+                    expired_saved_analysis_ids.append(analysis.id)
             elif eligibility.disposition == "unverifiable":
                 result.analyses_unverifiable += 1
             elif eligibility.disposition == "deferred":
@@ -224,6 +231,14 @@ def cleanup_organization_data(
             ).update({SurveyPeriod.response_id: None}, synchronize_session="fetch")
             result.survey_responses_deleted += db.query(UserBurnoutReport).filter(
                 UserBurnoutReport.organization_id == organization_id, UserBurnoutReport.id.in_(batch),
+            ).delete(synchronize_session="fetch")
+        # Old linked surveys must be deleted before their parent rows, while
+        # newer/undated surveys and digest history have already been detached.
+        # All writes, including full saved-record deletion, share one transaction.
+        for batch in _batches(expired_saved_analysis_ids):
+            db.query(Analysis).filter(
+                Analysis.organization_id == organization_id, Analysis.id.in_(batch),
+                Analysis.is_saved.is_(True), Analysis.is_auto_refresh.is_(False),
             ).delete(synchronize_session="fetch")
         finish_legacy_cleanup(
             organization, remaining_entries=remaining_entries,
