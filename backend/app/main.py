@@ -15,7 +15,7 @@ from .core.rate_limiting import limiter, custom_rate_limit_exceeded_handler
 from .middleware.security import security_middleware
 from .middleware.user_logging import user_logging_middleware
 from .middleware.logging_context import UserContextFilter
-from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, jira, linear, llm, mappings, manual_mappings, debug_mappings, migrate, admin, notifications, invitations, surveys, api_keys, digests
+from .api.endpoints import auth, rootly, analysis, analyses, pagerduty, github, slack, jira, linear, llm, mappings, manual_mappings, debug_mappings, admin, notifications, invitations, surveys, api_keys, digests, ai_usage
 
 # Configure logging based on environment variable
 LOG_LEVEL = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
@@ -105,8 +105,6 @@ def get_cors_origins() -> list[str]:
 
     # Production domains
     origins.extend([
-        "https://www.oncallburnout.com",
-        "https://oncallburnout.com",
         "https://oncallhealth.ai",
         "https://www.oncallhealth.ai",
         "https://testing.oncallhealth.ai",
@@ -151,8 +149,17 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check endpoint."""
-    return {"status": "healthy", "service": "on-call-health"}
+    """Health check endpoint.
+
+    Includes live connection-pool utilization so saturation can be spotted from
+    monitoring before it turns into "too many clients already" errors.
+    """
+    from app.models.base import get_pool_status
+    return {
+        "status": "healthy",
+        "service": "on-call-health",
+        "db_pool": get_pool_status(),
+    }
 
 @app.get('/favicon.ico', include_in_schema=False)
 async def favicon():
@@ -198,7 +205,6 @@ async def startup_event():
     finally:
         db.close()
 
-
     # Start auto-refresh analysis scheduler — one cron job per interval cadence
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
     from apscheduler.triggers.cron import CronTrigger
@@ -228,6 +234,21 @@ async def startup_event():
         print("Weekly digest scheduler disabled (WEEKLY_DIGEST_ENABLED=false)")
 
 
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Dispose the database engine on graceful shutdown.
+
+    Releases all pooled connections back to PostgreSQL promptly when the
+    container stops or is redeployed, instead of leaving them to linger
+    server-side until they time out. This shrinks the window during a deploy
+    where the old and new containers both hold full pools and can push the
+    shared server over its connection limit.
+    """
+    from app.models.base import engine
+    engine.dispose()
+    logger.info("Database engine disposed on shutdown")
+
+
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 app.include_router(rootly.router, prefix="/rootly", tags=["rootly"])
@@ -237,11 +258,11 @@ app.include_router(github.router, prefix="/integrations", tags=["github-integrat
 app.include_router(slack.router, prefix="/integrations", tags=["slack-integration"])
 app.include_router(jira.router, prefix="/integrations", tags=["jira-integration"])
 app.include_router(linear.router, prefix="/integrations", tags=["linear-integration"])
+app.include_router(ai_usage.router, prefix="/integrations", tags=["ai-usage-integration"])
 app.include_router(llm.router, tags=["llm-tokens"])
 app.include_router(mappings.router, prefix="/integrations", tags=["integration-mappings"])
 app.include_router(manual_mappings.router, prefix="/integrations", tags=["manual-mappings"])
 app.include_router(debug_mappings.router, prefix="/api", tags=["debug"])
-app.include_router(migrate.router, prefix="/api/migrate", tags=["migration"])
 app.include_router(admin.router, prefix="/api", tags=["admin"])
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 app.include_router(digests.router, prefix="/api", tags=["digests"])

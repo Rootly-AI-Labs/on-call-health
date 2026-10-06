@@ -40,6 +40,18 @@ def _tokens_match(stored_token: Optional[str], candidate_token: str) -> bool:
     except Exception:
         return False
 
+
+def _is_upstream_token_auth_error(message: str) -> bool:
+    """Detect expired/invalid upstream integration token failures."""
+    normalized = (message or "").lower()
+    return (
+        "api request failed: 401" in normalized
+        or "401 unauthorized" in normalized
+        or "unauthorized - check api token" in normalized
+        or ("token" in normalized and "expired" in normalized)
+        or ("token" in normalized and "invalid" in normalized)
+    )
+
 class RootlyTokenUpdate(BaseModel):
     token: str
 
@@ -1274,6 +1286,7 @@ async def sync_integration_users(
     
     Returns sync statistics showing how many users were created/updated.
     """
+    platform_label = "integration"
     try:
         from app.services.user_sync_service import UserSyncService
         import os
@@ -1286,6 +1299,7 @@ async def sync_integration_users(
 
             # Get beta token from environment
             if integration_id == "beta-rootly":
+                platform_label = "Rootly"
                 beta_token = os.getenv('ROOTLY_API_TOKEN')
                 if not beta_token:
                     raise HTTPException(
@@ -1306,23 +1320,16 @@ async def sync_integration_users(
                     })
                 platform = "rootly"
             else:  # beta-pagerduty
+                platform_label = "PagerDuty"
                 beta_token = os.getenv('PAGERDUTY_API_TOKEN')
                 if not beta_token:
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail="Beta PagerDuty token not configured"
                     )
-                # Fetch users directly from API
-                client = PagerDutyAPIClient(beta_token)
-                raw_users = await client.get_users(limit=10000)
-                users = []
-                for user in raw_users:
-                    users.append({
-                        "id": user.get("id"),
-                        "email": user.get("email"),
-                        "name": user.get("name"),
-                        "platform": "pagerduty"
-                    })
+                # Delegate to UserSyncService so team info is also fetched
+                sync_service_beta = UserSyncService(db)
+                users = await sync_service_beta._fetch_pagerduty_users(beta_token)
                 platform = "pagerduty"
 
             # Sync to user_correlations with organization_id
@@ -1353,6 +1360,12 @@ async def sync_integration_users(
                     f"{jira_stats['skipped']} skipped"
                 )
 
+            # After syncing, try to match OpenAI accounts by email
+            openai_stats = await sync_service._match_openai_users(current_user)
+            if openai_stats:
+                stats['openai_matched'] = openai_stats['matched']
+                stats['openai_skipped'] = openai_stats['skipped']
+
             # Build detailed message for beta integration (matching regular integration format)
             message_parts = [f"Successfully synced {stats['total']} users from beta integration"]
             if stats.get('github_matched'):
@@ -1381,6 +1394,18 @@ async def sync_integration_users(
 
         # Sync users from database integration
         sync_service = UserSyncService(db)
+        integration = db.query(RootlyIntegration).filter(
+            RootlyIntegration.id == numeric_id,
+            RootlyIntegration.user_id == current_user.id
+        ).first()
+
+        if not integration:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Integration {numeric_id} not found"
+            )
+
+        platform_label = "PagerDuty" if integration.platform == "pagerduty" else "Rootly"
 
         # Perform sync - GitHub matching is handled internally by _match_github_usernames()
         stats = await sync_service.sync_integration_users(
@@ -1391,9 +1416,6 @@ async def sync_integration_users(
         # Update last_synced_by and last_synced_at in separate transaction
         # This ensures metadata is only updated if sync completes successfully
         try:
-            integration = db.query(RootlyIntegration).filter(
-                RootlyIntegration.id == numeric_id
-            ).first()
             if integration:
                 integration.last_synced_by = current_user.id
                 integration.last_synced_at = datetime.now(timezone.utc)
@@ -1413,6 +1435,8 @@ async def sync_integration_users(
             message_parts.append(f"Jira: {stats['jira_matched']} users matched")
         if stats.get('jira_skipped'):
             message_parts.append(f"({stats['jira_skipped']} skipped)")
+        if stats.get('openai_matched'):
+            message_parts.append(f"OpenAI: {stats['openai_matched']} users matched")
 
         return {
             "success": True,
@@ -1423,11 +1447,81 @@ async def sync_integration_users(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error syncing integration users: {str(e)}")
+        detail = str(e)
+        if _is_upstream_token_auth_error(detail):
+            logger.warning(f"Sync failed due to expired or invalid {platform_label} token: {detail}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=(
+                    "The integration token is expired or invalid. Please reconnect it and try again."
+                    if platform_label == "integration"
+                    else f"The {platform_label} token is expired or invalid. Please reconnect {platform_label} and try again."
+                )
+            )
+
+        logger.error(f"Error syncing integration users: {detail}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to sync users: {str(e)}"
+            detail=f"Failed to sync users: {detail}"
         )
+
+@router.get("/integrations/{integration_id}/teams")
+async def get_integration_teams(
+    integration_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Return the list of PagerDuty teams for a given integration.
+    Used by the "Start Analysis" dialog to let users scope analysis to a specific team.
+    Only meaningful for PagerDuty integrations.
+    """
+    try:
+        from app.core.pagerduty_client import PagerDutyAPIClient
+
+        # Resolve integration and token
+        if integration_id == "beta-pagerduty":
+            import os as _os
+            api_token = _os.getenv("PAGERDUTY_API_TOKEN")
+            if not api_token:
+                raise HTTPException(status_code=500, detail="Beta PagerDuty token not configured")
+        else:
+            try:
+                numeric_id = int(integration_id)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid integration ID: {integration_id}")
+
+            integration = db.query(RootlyIntegration).filter(
+                RootlyIntegration.id == numeric_id,
+                RootlyIntegration.user_id == current_user.id
+            ).first()
+
+            if not integration:
+                raise HTTPException(status_code=404, detail="Integration not found")
+
+            if integration.platform != "pagerduty":
+                # Non-PagerDuty integrations don't have teams in this sense
+                return {"teams": []}
+
+            api_token = integration.api_token
+
+        client = PagerDutyAPIClient(api_token)
+        teams = await client.get_teams(limit=200)
+
+        return {
+            "teams": [
+                {"id": t.get("id"), "name": t.get("summary") or t.get("name", "")}
+                for t in teams
+                if t.get("id")
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching teams for integration {integration_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch teams: {str(e)}")
+
 
 @router.get("/integrations/{integration_id}/oncall-users")
 async def get_oncall_users(
@@ -1737,6 +1831,8 @@ async def get_synced_users(
                 platforms.append("jira")
             if corr.linear_user_id:
                 platforms.append("linear")
+            if corr.openai_user_id:
+                platforms.append("openai")
 
             # Check if user is currently on-call
             # SAFETY: Guard against NULL email to prevent crash
@@ -1769,10 +1865,12 @@ async def get_synced_users(
                 "slack_user_id": corr.slack_user_id,
                 "rootly_user_id": corr.rootly_user_id,  # Added for Rootly incident matching
                 "pagerduty_user_id": corr.pagerduty_user_id,  # Added for PagerDuty incident matching
+                "pagerduty_teams": corr.pagerduty_teams or [],  # Teams from PagerDuty sync
                 "jira_account_id": corr.jira_account_id,
                 "jira_email": corr.jira_email,
                 "linear_user_id": corr.linear_user_id,
                 "linear_email": corr.linear_email,
+                "openai_user_id": corr.openai_user_id,
                 "is_oncall": is_oncall,
                 "survey_count": survey_counts.get(corr.id, 0),
                 "selected_for_automated_surveys": selected_for_automated_surveys,
@@ -2531,4 +2629,76 @@ async def update_user_correlation_slack_mapping(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update Slack mapping: {str(e)}"
+        )
+
+
+@router.patch("/user-correlation/{correlation_id}/openai-mapping")
+async def update_user_correlation_openai_mapping(
+    correlation_id: int,
+    openai_user_id: str = "",
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually update OpenAI user mapping for a UserCorrelation.
+    The openai_user_id is the opaque ID returned by GET /v1/organization/members.
+    """
+    try:
+        from sqlalchemy import or_, and_
+
+        correlation = db.query(UserCorrelation).filter(
+            UserCorrelation.id == correlation_id,
+            or_(
+                UserCorrelation.user_id == current_user.id,
+                and_(
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.organization_id.isnot(None),
+                    UserCorrelation.organization_id == current_user.organization_id
+                )
+            )
+        ).first()
+
+        if not correlation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User correlation not found or doesn't belong to your organization"
+            )
+
+        openai_user_id = (openai_user_id or "").strip()
+
+        if openai_user_id == "":
+            correlation.openai_user_id = None
+            db.commit()
+            message = "OpenAI mapping cleared"
+        else:
+            # Remove this openai_user_id from any other correlation in the org
+            conflicting = db.query(UserCorrelation).filter(
+                UserCorrelation.id != correlation_id,
+                UserCorrelation.openai_user_id == openai_user_id,
+                UserCorrelation.organization_id == current_user.organization_id
+            ).all()
+            for c in conflicting:
+                c.openai_user_id = None
+            correlation.openai_user_id = openai_user_id
+            db.commit()
+            message = f"OpenAI user ID '{openai_user_id}' assigned"
+
+        return {
+            "success": True,
+            "message": message,
+            "correlation": {
+                "id": correlation.id,
+                "email": correlation.email,
+                "openai_user_id": correlation.openai_user_id,
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update OpenAI mapping: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update OpenAI mapping: {str(e)}"
         )

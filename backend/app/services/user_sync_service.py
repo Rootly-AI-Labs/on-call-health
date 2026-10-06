@@ -203,6 +203,21 @@ class UserSyncService:
                 stats['slack_skipped'] = 0
                 stats['slack_error'] = error_msg
 
+            # After syncing, try to match OpenAI accounts by email
+            try:
+                openai_stats = await self._match_openai_users(current_user)
+                if openai_stats:
+                    stats['openai_matched'] = openai_stats['matched']
+                    stats['openai_skipped'] = openai_stats['skipped']
+                    logger.info(
+                        f"OpenAI matching: {openai_stats['matched']} users matched, "
+                        f"{openai_stats['skipped']} skipped"
+                    )
+            except Exception as e:
+                logger.error(f"OpenAI matching failed: {e} - continuing")
+                stats['openai_matched'] = 0
+                stats['openai_skipped'] = 0
+
             return stats
 
         except Exception as e:
@@ -254,20 +269,69 @@ class UserSyncService:
         return users
 
     async def _fetch_pagerduty_users(self, api_token: str) -> List[Dict[str, Any]]:
-        """Fetch all users from PagerDuty API."""
+        """Fetch all users from PagerDuty API, enriched with team membership info."""
+        import asyncio as _asyncio
         client = PagerDutyAPIClient(api_token)
-        raw_users = await client.get_users(limit=10000)
 
-        # PagerDuty format (may need adjustment based on actual API response)
+        # Fetch users (with embedded teams) and top-level teams list in parallel.
+        # include_teams=True adds include[]=teams to the /users request so each user
+        # object already contains their team memberships.  We also fetch /teams
+        # separately to get richer name data and to have the full account team list.
+        raw_users, raw_teams = await _asyncio.gather(
+            client.get_users(limit=10000, include_teams=True),
+            client.get_teams(limit=200),
+        )
+
+        logger.info(
+            f"PD SYNC: Fetched {len(raw_users)} users and {len(raw_teams)} teams"
+        )
+
+        # Build team-members map: team_id → set of user IDs
+        # PagerDuty doesn't return members in /teams, so we use the `teams` array
+        # on each user object (GET /users includes a `teams` array when fetched with
+        # `include[]=teams`).  Fall back to an empty set if not present.
+        # NOTE: get_users already passes include[]=teams – check raw_users[0].
+        user_id_to_teams: Dict[str, List[Dict[str, str]]] = {}
+        for user in raw_users:
+            uid = user.get("id")
+            if not uid:
+                continue
+            user_teams = [
+                {"id": t.get("id"), "name": t.get("summary") or t.get("name", "")}
+                for t in user.get("teams", [])
+                if t.get("id")
+            ]
+            user_id_to_teams[str(uid)] = user_teams
+
+        # Build a quick lookup of all known teams by ID (from /teams response)
+        teams_by_id: Dict[str, Dict[str, str]] = {
+            t["id"]: {"id": t["id"], "name": t.get("summary") or t.get("name", "")}
+            for t in raw_teams
+            if t.get("id")
+        }
+
         users = []
         for user in raw_users:
+            uid = str(user.get("id", ""))
+            # Prefer teams embedded in the user object; enrich with /teams data if needed
+            user_teams = user_id_to_teams.get(uid, [])
+            # Enrich names from the teams endpoint (more reliable summary field)
+            enriched_teams = []
+            for t in user_teams:
+                tid = t.get("id")
+                if tid and tid in teams_by_id:
+                    enriched_teams.append(teams_by_id[tid])
+                else:
+                    enriched_teams.append(t)
+
             users.append({
                 "id": user.get("id"),
                 "email": user.get("email"),
                 "name": user.get("name"),
-                "timezone": user.get("time_zone"),  # User's configured timezone
-                "avatar_url": user.get("avatar_url"),  # Profile image URL
-                "platform": "pagerduty"
+                "timezone": user.get("time_zone"),
+                "avatar_url": user.get("avatar_url"),
+                "teams": enriched_teams,  # [{id, name}, ...]
+                "platform": "pagerduty",
             })
 
         return users
@@ -646,9 +710,19 @@ class UserSyncService:
                 correlation.rootly_email = user["email"]
                 updated = True
         elif platform == "pagerduty":
-            if not correlation.pagerduty_user_id or correlation.pagerduty_user_id != user["id"]:
-                correlation.pagerduty_user_id = user["id"]
+            if not correlation.pagerduty_user_id or correlation.pagerduty_user_id != user.get("id"):
+                correlation.pagerduty_user_id = user.get("id")
                 updated = True
+            # Store team membership info if provided
+            teams = user.get("teams")  # list of {id, name}
+            if teams is not None:
+                # Only update if actually changed (avoid spurious writes)
+                existing_teams = correlation.pagerduty_teams or []
+                new_ids = sorted(t.get("id", "") for t in teams)
+                old_ids = sorted(t.get("id", "") for t in existing_teams)
+                if new_ids != old_ids:
+                    correlation.pagerduty_teams = teams
+                    updated = True
 
         return 1 if updated else 0
 
@@ -1580,5 +1654,96 @@ class UserSyncService:
 
         except Exception as e:
             logger.error(f"Error in Linear matching: {e}", exc_info=True)
+            self.db.rollback()
+            return None
+
+    async def _match_openai_users(self, user: User) -> Optional[Dict[str, int]]:
+        """
+        Match synced users to OpenAI accounts by exact email.
+        Only runs when an AIUsageIntegration with openai_enabled exists.
+        """
+        try:
+            from app.models import AIUsageIntegration
+            from app.services.ai_usage_collector import fetch_openai_members
+            import base64
+            from cryptography.fernet import Fernet
+            from app.core.config import settings
+
+            # Find AI usage integration scoped to this user's org (or user)
+            if user.organization_id:
+                ai_int = self.db.query(AIUsageIntegration).filter(
+                    AIUsageIntegration.organization_id == user.organization_id,
+                    AIUsageIntegration.openai_enabled == True,
+                ).first()
+            else:
+                ai_int = self.db.query(AIUsageIntegration).filter(
+                    AIUsageIntegration.user_id == user.id,
+                    AIUsageIntegration.organization_id.is_(None),
+                    AIUsageIntegration.openai_enabled == True,
+                ).first()
+
+            if not ai_int:
+                logger.info("Skipping OpenAI matching - no active OpenAI integration")
+                return None
+
+            # Decrypt key
+            key = settings.JWT_SECRET_KEY.encode()
+            key = base64.urlsafe_b64encode(key[:32].ljust(32, b'\0'))
+            api_key = Fernet(key).decrypt(ai_int.openai_api_key.encode()).decode()
+
+            # Fetch OpenAI members: {user_id -> email}
+            uid_to_email = await fetch_openai_members(api_key)
+            if not uid_to_email:
+                logger.info("No OpenAI members returned")
+                return {"matched": 0, "skipped": 0}
+
+            email_to_uid = {email.lower(): uid for uid, email in uid_to_email.items()}
+
+            # Get correlations without OpenAI mapping yet
+            if user.organization_id:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.organization_id == user.organization_id,
+                    UserCorrelation.user_id.is_(None),
+                    UserCorrelation.openai_user_id.is_(None),
+                ).all()
+            else:
+                correlations = self.db.query(UserCorrelation).filter(
+                    UserCorrelation.user_id == user.id,
+                    UserCorrelation.openai_user_id.is_(None),
+                ).all()
+
+            matched = 0
+            skipped = 0
+            for corr in correlations:
+                if not corr.email:
+                    skipped += 1
+                    continue
+                uid = email_to_uid.get(corr.email.lower())
+                if uid:
+                    # Enforce uniqueness within scope
+                    conflict_filter = [
+                        UserCorrelation.id != corr.id,
+                        UserCorrelation.openai_user_id == uid,
+                    ]
+                    if user.organization_id:
+                        conflict_filter.append(UserCorrelation.organization_id == user.organization_id)
+                    else:
+                        conflict_filter.append(UserCorrelation.user_id == user.id)
+                    for c in self.db.query(UserCorrelation).filter(*conflict_filter).all():
+                        c.openai_user_id = None
+                    corr.openai_user_id = uid
+                    matched += 1
+                    logger.info(f"✅ OpenAI matched {corr.email} → {uid}")
+                else:
+                    skipped += 1
+
+            if matched > 0:
+                self.db.commit()
+                logger.info(f"✅ Completed {matched} OpenAI account matches")
+
+            return {"matched": matched, "skipped": skipped, "total": len(correlations)}
+
+        except Exception as e:
+            logger.error(f"Error in OpenAI matching: {e}", exc_info=True)
             self.db.rollback()
             return None

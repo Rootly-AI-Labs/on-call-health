@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
+import { Tooltip } from "@/components/ui/tooltip"
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ import {
   Search,
   Pencil,
   CheckCircle,
+  AlertCircle,
   Users,
   ArrowUpDown,
   ArrowUp,
@@ -51,6 +53,7 @@ import {
   fetchGithubUsers,
   fetchJiraUsers,
   fetchLinearUsers,
+  fetchOpenAIMembers,
   fetchSlackUsers,
   updateUserCorrelation,
 } from "./handlers/user-mapping-handlers"
@@ -69,6 +72,7 @@ interface SyncedUser {
   linear_user_id?: string
   linear_email?: string
   slack_user_id?: string
+  openai_user_id?: string
   on_call_status?: string
   is_oncall?: boolean
   role?: string
@@ -140,6 +144,7 @@ function TeamPageContent() {
   const [jiraUsers, setJiraUsers] = useState<any[]>([])
   const [linearUsers, setLinearUsers] = useState<any[]>([])
   const [slackUsers, setSlackUsers] = useState<any[]>([])
+  const [openaiMembers, setOpenaiMembers] = useState<{ id: string; email: string }[]>([])
   const [loadingIntegrationUsers, setLoadingIntegrationUsers] = useState(false)
   const [integrationSearchQuery, setIntegrationSearchQuery] = useState("")
 
@@ -149,6 +154,7 @@ function TeamPageContent() {
     stage: string
     details: string
     isLoading: boolean
+    error?: string
     results?: {
       created?: number
       updated?: number
@@ -158,8 +164,106 @@ function TeamPageContent() {
       linear_matched?: number
       slack_matched?: number
       slack_skipped?: number
+      openai_matched?: number
     }
   } | null>(null)
+
+  const getSelectedIntegrationLabel = () => {
+    const selectedIntegration = integrations.find((integration) => String(integration.id) === selectedOrganization)
+    if (selectedIntegration?.platform === "pagerduty") return "PagerDuty"
+    if (selectedIntegration?.platform === "rootly") return "Rootly"
+    return "integration"
+  }
+
+  const parseSyncErrorMessage = async (response: Response) => {
+    let detail = `Sync failed with status ${response.status}`
+    const contentType = response.headers.get("content-type") || ""
+
+    try {
+      if (contentType.includes("application/json")) {
+        const errorData = await response.json()
+        detail = errorData?.detail || errorData?.message || detail
+      } else {
+        const text = await response.text()
+        if (text) detail = text
+      }
+    } catch {
+      // Fall back to the default detail message when the error body can't be parsed.
+    }
+
+    const normalizedDetail = detail.toLowerCase()
+    const integrationLabel = getSelectedIntegrationLabel()
+
+    if (
+      normalizedDetail.includes("api request failed: 401") ||
+      normalizedDetail.includes("token is expired or invalid") ||
+      (normalizedDetail.includes("token") && normalizedDetail.includes("expired")) ||
+      (normalizedDetail.includes("token") && normalizedDetail.includes("invalid"))
+    ) {
+      return integrationLabel === "integration"
+        ? "The integration token is expired or invalid. Please reconnect it and try again."
+        : `The ${integrationLabel} token is expired or invalid. Please reconnect ${integrationLabel} and try again.`
+    }
+
+    if (
+      response.status === 401 &&
+      (
+        normalizedDetail.includes("could not validate credentials") ||
+        normalizedDetail.includes("not authenticated")
+      )
+    ) {
+      return "Session expired. Please log in again."
+    }
+
+    return detail
+  }
+
+  const selectedIntegration = selectedOrganization
+    ? integrations.find(i => i.id.toString() === selectedOrganization)
+    : null
+
+  const getTeamScopeLabel = (integration: Integration) => {
+    if (integration.platform !== "rootly") return null
+    return `Team: ${integration.team_name || "All users"}`
+  }
+
+  const getInvalidTokenTooltip = (integration: Integration) => (
+    integration.platform === "pagerduty"
+      ? "PagerDuty token expired or invalid. Reconnect PagerDuty to sync users."
+      : "Rootly token expired or invalid. Reconnect Rootly to sync users."
+  )
+
+  const isTokenAttentionError = useCallback((value?: string | null) => {
+    const normalized = (value || "").toLowerCase()
+    return (
+      normalized.includes("unauthorized") ||
+      normalized.includes("api request failed: 401") ||
+      normalized.includes("401 unauthorized") ||
+      (normalized.includes("token") && normalized.includes("expired")) ||
+      (normalized.includes("token") && normalized.includes("invalid"))
+    )
+  }, [])
+
+  const hasInvalidIntegrationToken = useCallback((integration?: Integration | null) => {
+    if (
+      integration &&
+      selectedIntegration &&
+      integration.id === selectedIntegration.id &&
+      syncProgress?.error &&
+      isTokenAttentionError(syncProgress.error)
+    ) {
+      return true
+    }
+
+    if (!integration?.permissions) return false
+
+    const combinedErrors = `${integration.permissions.users?.error ?? ""} ${integration.permissions.incidents?.error ?? ""}`
+    if (isTokenAttentionError(combinedErrors)) {
+      return true
+    }
+
+    return false
+  }, [isTokenAttentionError, selectedIntegration, syncProgress?.error])
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = () => {
@@ -281,6 +385,19 @@ function TeamPageContent() {
             // Continue checking other integrations if one fails
             console.debug(`Failed to check ${integrationType} status:`, error)
           }
+        }
+
+        // Check AI usage (OpenAI) status
+        try {
+          const aiResp = await fetch(`${API_BASE}/integrations/ai-usage/status`, {
+            headers: { Authorization: `Bearer ${authToken}` },
+          })
+          if (aiResp.ok) {
+            const aiData = await aiResp.json()
+            if (aiData.openai_enabled) connected.add('openai-usage')
+          }
+        } catch (error) {
+          console.debug('Failed to check AI usage status:', error)
         }
 
         setConnectedIntegrations(connected)
@@ -419,6 +536,9 @@ function TeamPageContent() {
       if (connectedIntegrations.has('slack') && (orgChanged || slackUsers.length === 0)) {
         promises.push(loadSlackUsersForMapping())
       }
+      if (connectedIntegrations.has('openai-usage') && (orgChanged || openaiMembers.length === 0)) {
+        promises.push(loadOpenAIMembersForMapping())
+      }
 
       if (promises.length > 0) {
         await Promise.all(promises)
@@ -447,6 +567,9 @@ function TeamPageContent() {
       }
       if (connectedIntegrations.has('slack') && slackUsers.length === 0) {
         promises.push(loadSlackUsersForMapping())
+      }
+      if (connectedIntegrations.has('openai-usage') && openaiMembers.length === 0) {
+        promises.push(loadOpenAIMembersForMapping())
       }
 
       if (promises.length > 0) {
@@ -515,6 +638,19 @@ function TeamPageContent() {
     }
   }
 
+  const loadOpenAIMembersForMapping = async () => {
+    setLoadingIntegrationUsers(true)
+    try {
+      const members = await fetchOpenAIMembers()
+      setOpenaiMembers(members || [])
+    } catch (error) {
+      console.error('Error loading OpenAI members:', error)
+      setOpenaiMembers([])
+    } finally {
+      setLoadingIntegrationUsers(false)
+    }
+  }
+
   const handleUserMapping = async (userId: number, integrationType: string, integrationUserId: string) => {
     try {
       // Build the updates object based on integration type
@@ -527,6 +663,8 @@ function TeamPageContent() {
         updates.linear_user_id = integrationUserId
       } else if (integrationType === 'slack') {
         updates.slack_user_id = integrationUserId
+      } else if (integrationType === 'openai') {
+        updates.openai_user_id = integrationUserId
       }
 
       const success = await updateUserCorrelation(userId, updates)
@@ -651,7 +789,7 @@ function TeamPageContent() {
 
       const authToken = localStorage.getItem("auth_token")
       if (!authToken) {
-        throw new Error("Not authenticated")
+        throw new Error("Please log in again to sync users.")
       }
 
       const response = await fetch(
@@ -663,7 +801,7 @@ function TeamPageContent() {
       )
 
       if (!response.ok) {
-        throw new Error("Sync failed")
+        throw new Error(await parseSyncErrorMessage(response))
       }
 
       const syncResults = await response.json()
@@ -695,28 +833,21 @@ function TeamPageContent() {
           linear_matched: syncResults.stats?.linear_matched,
           slack_matched: syncResults.stats?.slack_matched,
           slack_skipped: syncResults.stats?.slack_skipped,
+          openai_matched: syncResults.stats?.openai_matched,
         }
       })
 
       // Refresh the user list
       await fetchSyncedUsers(false, false, true)
     } catch (error) {
-      setSyncProgress({ stage: "Error", details: "Failed to sync. Please try again.", isLoading: false })
-      // Clean up any existing timeout before setting a new one
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current)
-      }
-      // Only set new timeout if component is still mounted
-      if (isMountedRef.current) {
-        syncTimeoutRef.current = setTimeout(() => {
-          // Check again before setting state to prevent memory leaks
-          if (isMountedRef.current) {
-            setShowSyncConfirmModal(false)
-            setSyncProgress(null)
-            syncTimeoutRef.current = null
-          }
-        }, 2000)
-      }
+      const errorMessage = error instanceof Error ? error.message : "Failed to sync users. Please try again."
+      setSyncProgress({
+        stage: "Sync Failed",
+        details: errorMessage,
+        error: errorMessage,
+        isLoading: false
+      })
+      toast.error(errorMessage)
     }
   }
 
@@ -823,15 +954,6 @@ function TeamPageContent() {
     }
   }
 
-  // Find the currently selected integration (used for context elsewhere on the page)
-  const selectedIntegration = selectedOrganization
-    ? integrations.find(i => i.id.toString() === selectedOrganization)
-    : null
-  const getTeamScopeLabel = (integration: Integration) => {
-    if (integration.platform !== "rootly") return null
-    return `Team: ${integration.team_name || "All users"}`
-  }
-
   // Check if any primary integration (Rootly or PagerDuty) exists
   // Since the integrations array only contains Rootly and PagerDuty entries, length > 0 is sufficient
   const hasPrimaryIntegration = integrations.length > 0
@@ -919,6 +1041,13 @@ function TeamPageContent() {
       integrations.push('slack')
     }
 
+    // Show OpenAI if user is mapped and OpenAI Usage is connected.
+    // We trust the persisted OpenAI mapping here, same as Slack, so the
+    // compact integrations cell stays consistent with the mapping popover.
+    if (user.openai_user_id && connectedIntegrations.has('openai-usage')) {
+      integrations.push('openai')
+    }
+
     return integrations
   }
 
@@ -962,6 +1091,13 @@ function TeamPageContent() {
     const slackUser = slackUsers.find(u => u.id === userId)
     // Never show raw ID - show "Unmapped" instead for privacy
     return slackUser?.name || slackUser?.email || 'Unmapped'
+  }
+
+  const getOpenAIEmail = (userId: string | null | undefined) => {
+    if (!userId) return 'Not mapped'
+    if (openaiMembers.length === 0) return 'Loading...'
+    const member = openaiMembers.find(m => m.id === userId)
+    return member?.email || 'Unmapped'
   }
 
   // Handle column header click for sorting
@@ -1087,6 +1223,13 @@ function TeamPageContent() {
                                     <div className="flex items-center gap-2 min-w-0">
                                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${selectedIntegration.platform === "rootly" ? "bg-purple-500" : "bg-green-500"}`}></span>
                                       <span className="truncate">{selectedIntegration.name || `Integration #${selectedIntegration.id}`}</span>
+                                      {hasInvalidIntegrationToken(selectedIntegration) && (
+                                        <Tooltip content={getInvalidTokenTooltip(selectedIntegration)}>
+                                          <span className="inline-flex flex-shrink-0" aria-label={getInvalidTokenTooltip(selectedIntegration)}>
+                                            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                                          </span>
+                                        </Tooltip>
+                                      )}
                                       {getTeamScopeLabel(selectedIntegration) && (
                                         <span className="ml-auto inline-flex max-w-[140px] items-center truncate rounded bg-purple-100 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 flex-shrink-0">
                                           {getTeamScopeLabel(selectedIntegration)}
@@ -1102,6 +1245,13 @@ function TeamPageContent() {
                                     <div className="flex items-center gap-2 min-w-0">
                                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${integration.platform === "rootly" ? "bg-purple-500" : "bg-green-500"}`}></span>
                                       <span className="truncate">{integration.name || `Integration #${integration.id}`}</span>
+                                      {hasInvalidIntegrationToken(integration) && (
+                                        <Tooltip content={getInvalidTokenTooltip(integration)}>
+                                          <span className="inline-flex flex-shrink-0" aria-label={getInvalidTokenTooltip(integration)}>
+                                            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                                          </span>
+                                        </Tooltip>
+                                      )}
                                       {getTeamScopeLabel(integration) && (
                                         <span className="ml-auto inline-flex max-w-[140px] items-center truncate rounded bg-purple-100 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 flex-shrink-0">
                                           {getTeamScopeLabel(integration)}
@@ -1318,6 +1468,9 @@ function TeamPageContent() {
                                         )}
                                         {integration === 'slack' && (
                                           <Image src="/images/slack-logo.png" alt="Slack" width={20} height={20} />
+                                        )}
+                                        {integration === 'openai' && (
+                                          <Image src="/images/openai-logo.svg" alt="OpenAI" width={20} height={20} />
                                         )}
                                       </div>
                                     ))
@@ -1662,6 +1815,87 @@ function TeamPageContent() {
                                             )}
                                           </div>
                                         )}
+
+                                        {/* OpenAI */}
+                                        {connectedIntegrations.has('openai-usage') && (
+                                          <div className="border border-neutral-200 rounded">
+                                            <button
+                                              onClick={() => setExpandedIntegration(expandedIntegration === 'openai' ? null : 'openai')}
+                                              className="w-full flex items-center justify-between p-2 hover:bg-neutral-50"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <Image src="/images/openai-logo.svg" alt="OpenAI" width={16} height={16} />
+                                                <div className="text-left">
+                                                  <div className="text-sm font-medium">OpenAI</div>
+                                                  <div className={`text-xs ${user.openai_user_id ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {user.openai_user_id ? getOpenAIEmail(user.openai_user_id) : 'Not mapped'}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <ChevronDown className={`w-4 h-4 transition-transform ${expandedIntegration === 'openai' ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {expandedIntegration === 'openai' && (
+                                              <div className="p-2 border-t border-neutral-200">
+                                                {/* Auto Map by email */}
+                                                {!user.openai_user_id && (() => {
+                                                  const emailMatch = openaiMembers.find(m => m.email.toLowerCase() === user.email.toLowerCase())
+                                                  return emailMatch ? (
+                                                    <button
+                                                      onClick={() => handleUserMapping(user.id, 'openai', emailMatch.id)}
+                                                      className="w-full text-left px-2 py-1 text-sm bg-purple-50 text-purple-700 rounded border border-purple-200 mb-2 flex items-center gap-1"
+                                                    >
+                                                      <CheckCircle className="w-3 h-3 shrink-0" />
+                                                      Auto Map: {emailMatch.email}
+                                                    </button>
+                                                  ) : null
+                                                })()}
+                                                <input
+                                                  type="text"
+                                                  placeholder="Search OpenAI members..."
+                                                  value={integrationSearchQuery}
+                                                  onChange={(e) => setIntegrationSearchQuery(e.target.value)}
+                                                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-md mb-2"
+                                                />
+                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                  {loadingIntegrationUsers ? (
+                                                    <div className="text-center py-2">
+                                                      <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      {user.openai_user_id && (
+                                                        <button
+                                                          onClick={() => handleUserMapping(user.id, 'openai', '')}
+                                                          className="w-full text-left px-2 py-1 text-sm hover:bg-red-50 text-red-600 rounded border-b border-neutral-200 mb-1"
+                                                        >
+                                                          Clear mapping
+                                                        </button>
+                                                      )}
+                                                      {openaiMembers.filter(m => m.email.toLowerCase().includes(integrationSearchQuery.toLowerCase())).length > 0 ? (
+                                                        openaiMembers
+                                                          .filter(m => m.email.toLowerCase().includes(integrationSearchQuery.toLowerCase()))
+                                                          .map((member) => (
+                                                            <button
+                                                              key={member.id}
+                                                              onClick={() => handleUserMapping(user.id, 'openai', member.id)}
+                                                              className={`w-full text-left px-2 py-1 text-sm hover:bg-neutral-50 rounded flex items-center justify-between ${user.openai_user_id === member.id ? 'bg-neutral-50' : ''}`}
+                                                            >
+                                                              <span>{member.email}</span>
+                                                              {user.openai_user_id === member.id && <CheckCircle className="w-3 h-3 text-green-600" />}
+                                                            </button>
+                                                          ))
+                                                      ) : (
+                                                        <p className="text-xs text-neutral-500 text-center py-2">
+                                                          {openaiMembers.length === 0 ? 'No OpenAI members loaded' : 'No members found'}
+                                                        </p>
+                                                      )}
+                                                    </>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                           ) : (
                             <p className="text-xs text-neutral-500 text-center py-2">No integrations connected</p>
@@ -1771,6 +2005,41 @@ function TeamPageContent() {
                     </div>
                   </div>
                 </>
+              ) : syncProgress.error ? (
+                <>
+                  <DialogHeader className="sr-only">
+                    <DialogTitle>Sync Failed</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-6 px-6">
+                    <div className="flex justify-center mb-4">
+                      <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                        <AlertCircle className="w-7 h-7 text-red-600" />
+                      </div>
+                    </div>
+
+                    <h2 className="text-xl font-semibold text-center mb-2">Sync Failed</h2>
+
+                    <p className="text-sm text-neutral-600 text-center mb-6">
+                      We couldn&apos;t sync users for this organization.
+                    </p>
+
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                      {syncProgress.error}
+                    </div>
+                  </div>
+
+                  <DialogFooter className="px-6 pb-6">
+                    <Button
+                      onClick={() => {
+                        setShowSyncConfirmModal(false)
+                        setSyncProgress(null)
+                      }}
+                      className="w-full bg-purple-700 hover:bg-purple-800"
+                    >
+                      Close
+                    </Button>
+                  </DialogFooter>
+                </>
               ) : (
                 <>
                   <DialogHeader className="sr-only">
@@ -1829,7 +2098,8 @@ function TeamPageContent() {
                         {(syncProgress.results.github_matched !== undefined ||
                           syncProgress.results.jira_matched !== undefined ||
                           syncProgress.results.linear_matched !== undefined ||
-                          syncProgress.results.slack_matched !== undefined) && (
+                          syncProgress.results.slack_matched !== undefined ||
+                          syncProgress.results.openai_matched !== undefined) && (
                           <div className="border rounded-lg p-4">
                             <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
                               Newly Mapped Integrations
@@ -1887,6 +2157,19 @@ function TeamPageContent() {
                                   </div>
                                   <span className="text-sm font-semibold text-neutral-900">
                                     {syncProgress.results.slack_matched}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* OpenAI */}
+                              {syncProgress.results.openai_matched !== undefined && (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Image src="/images/openai-logo.svg" alt="OpenAI" width={20} height={20} />
+                                    <span className="text-sm font-medium text-neutral-700">OpenAI</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-neutral-900">
+                                    {syncProgress.results.openai_matched}
                                   </span>
                                 </div>
                               )}
