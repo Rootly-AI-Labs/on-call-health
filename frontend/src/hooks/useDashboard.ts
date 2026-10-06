@@ -39,6 +39,7 @@ export default function useDashboard() {
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
   const defaultSelectionInFlight = useRef<number | null>(null)
   const analysisSelection = useRef({ generation: 0, analysisId: null as string | null })
+  const activePolling = useRef<{ analysisId: string; generation: number; cancel: () => void } | null>(null)
   const [targetProgress, setTargetProgress] = useState(0)
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null)
   const [autoRefreshAnalysis, setAutoRefreshAnalysis] = useState<AnalysisResult | null>(null)
@@ -198,6 +199,7 @@ export default function useDashboard() {
       toast.error("Error canceling analysis")
     } finally {
       // Reset all analysis state
+      activePolling.current?.cancel()
       clearRunningAnalysisState()
       setAnalysisProgress(0)
       setAnalysisStage("loading")
@@ -209,7 +211,7 @@ export default function useDashboard() {
     }
   }
 
-  const startPollingAnalysis = (analysisId: number | string, options: { showToast?: boolean } = {}) => {
+  const startPollingAnalysis = (analysisId: number | string, options: { showToast?: boolean; selectionGeneration?: number } = {}) => {
     const showToast = options.showToast ?? true
     const normalizedId = typeof analysisId === 'string' ? parseInt(analysisId, 10) : analysisId
 
@@ -217,6 +219,19 @@ export default function useDashboard() {
       console.error('Invalid analysis id for polling:', analysisId)
       return
     }
+
+    const pollId = String(normalizedId)
+    const selectionGeneration = options.selectionGeneration ?? beginAnalysisSelection(pollId)
+    if (!ownsAnalysisSelection(selectionGeneration)) return
+    if (activePolling.current?.analysisId === pollId
+      && activePolling.current.generation === selectionGeneration) return activePolling.current.cancel
+    activePolling.current?.cancel()
+    analysisSelection.current.analysisId = pollId
+    if (localStorage.getItem('running_analysis_id') !== pollId
+      || !localStorage.getItem('running_analysis_start')) {
+      localStorage.setItem('running_analysis_start', Date.now().toString())
+    }
+    localStorage.setItem('running_analysis_id', pollId)
 
     setAnalysisRunning(true)
     setCurrentRunningAnalysisId(normalizedId)
@@ -233,23 +248,43 @@ export default function useDashboard() {
     let errorCount = 0
     const maxErrors = 3
     let timeoutIdRef: NodeJS.Timeout | null = null
+    let cancelled = false
+    const cancelPolling = () => {
+      cancelled = true
+      if (timeoutIdRef) clearTimeout(timeoutIdRef)
+      if (activePolling.current?.cancel === cancelPolling) activePolling.current = null
+    }
+    activePolling.current = { analysisId: pollId, generation: selectionGeneration, cancel: cancelPolling }
+    const ownsPolling = () => !cancelled && ownsAnalysisSelection(selectionGeneration)
+    const selectFallback = () => {
+      if (!ownsPolling()) return
+      cancelPolling()
+      clearRunningAnalysisState()
+      const fallbackGeneration = beginAnalysisSelection()
+      clearUnavailableAnalysis(fallbackGeneration)
+      updateURLWithAnalysis(null)
+      void selectDefaultAnalysis({
+        force: true, selectionGeneration: fallbackGeneration, excludeAnalysisId: pollId,
+      })
+    }
 
     const pollAnalysis = async () => {
+      if (!ownsPolling()) return
       try {
         pollCount++
 
         // Stop polling after max attempts
         if (pollCount > maxPollAttempts) {
-          clearRunningAnalysisState()
           if (showToast) {
             toast.warning("Analysis is taking longer than expected. Please check back later.")
           }
-          selectDefaultAnalysis({ force: true })
+          selectFallback()
           return
         }
 
         const authToken = getValidToken()
         if (!authToken) {
+          cancelPolling()
           clearRunningAnalysisState()
           return
         }
@@ -264,11 +299,15 @@ export default function useDashboard() {
           })
           clearTimeout(timeoutId)
 
+          if (!ownsPolling()) return
+
           if (pollResponse.ok) {
             const analysisData = await pollResponse.json()
+            if (!ownsPolling()) return
             errorCount = 0 // Reset error count on success
 
             if (analysisData.status === 'completed') {
+              cancelPolling()
               clearRunningAnalysisState()
               setCurrentAnalysis(analysisData)
               updateURLWithAnalysis(String(analysisData.id))
@@ -282,6 +321,7 @@ export default function useDashboard() {
               // Continue polling
               timeoutIdRef = setTimeout(pollAnalysis, 5000)
             } else if (analysisData.status === 'failed') {
+              cancelPolling()
               clearRunningAnalysisState()
               if (showToast) {
                 toast.error("Analysis failed")
@@ -289,11 +329,10 @@ export default function useDashboard() {
             }
           } else if (pollResponse.status === 404) {
             // Analysis not found
-            clearRunningAnalysisState()
             if (showToast) {
               toast.error("Analysis no longer exists")
             }
-            selectDefaultAnalysis({ force: true })
+            selectFallback()
           } else {
             // Other HTTP errors - retry with backoff
             throw new Error(`HTTP ${pollResponse.status}`)
@@ -303,15 +342,15 @@ export default function useDashboard() {
           throw fetchError
         }
       } catch (error) {
+        if (!ownsPolling()) return
         console.error('Error polling restored analysis:', error)
         errorCount++
 
         if (errorCount >= maxErrors) {
-          clearRunningAnalysisState()
           if (showToast) {
             toast.error("Unable to check analysis status. Please refresh the page.")
           }
-          selectDefaultAnalysis({ force: true })
+          selectFallback()
         } else {
           // Retry with exponential backoff
           const backoffMs = 5000 * Math.pow(2, errorCount - 1)
@@ -323,11 +362,7 @@ export default function useDashboard() {
     pollAnalysis()
 
     // Cleanup on unmount
-    return () => {
-      if (timeoutIdRef) {
-        clearTimeout(timeoutIdRef)
-      }
-    }
+    return cancelPolling
   }
 
   // Helper to extract members from team_analysis (handles both array and object formats)
@@ -340,6 +375,10 @@ export default function useDashboard() {
   const isNumericId = (value: string) => /^[0-9]+$/.test(value)
 
   const beginAnalysisSelection = (analysisId: string | null = null): number => {
+    if (activePolling.current) {
+      activePolling.current.cancel()
+      clearRunningAnalysisState()
+    }
     const generation = analysisSelection.current.generation + 1
     analysisSelection.current = { generation, analysisId }
     return generation
@@ -560,7 +599,7 @@ export default function useDashboard() {
               localStorage.setItem('running_analysis_id', autoRefresh.id.toString())
               localStorage.setItem('running_analysis_start', Date.now().toString())
               updateURLWithAnalysis(String(autoRefresh.id))
-              startPollingAnalysis(autoRefresh.id, { showToast: false })
+              startPollingAnalysis(autoRefresh.id, { showToast: false, selectionGeneration })
               didSelect = true
             }
           }
@@ -628,6 +667,7 @@ export default function useDashboard() {
     // Cleanup event listeners and timeout
     return () => {
       isMounted = false
+      activePolling.current?.cancel()
       analysisSelection.current.generation += 1
       window.removeEventListener('focus', handlePageFocus)
       document.removeEventListener('visibilitychange', visibilityHandler)
@@ -954,7 +994,8 @@ export default function useDashboard() {
   }
 
   const loadSpecificAnalysis = async (
-    analysisId: string, selectionGeneration = beginAnalysisSelection(analysisId)
+    analysisId: string, selectionGeneration = activePolling.current?.analysisId === analysisId
+      ? activePolling.current.generation : beginAnalysisSelection(analysisId)
   ) => {
     if (!ownsAnalysisSelection(selectionGeneration)) return
     try {
@@ -981,6 +1022,7 @@ export default function useDashboard() {
       if (response.ok) {
         const analysis = await response.json()
         if (!ownsAnalysisSelection(selectionGeneration)) return
+        analysisSelection.current.analysisId = String(analysis.id)
         // Cache the analysis data
         const cacheKey = analysis.uuid || analysis.id.toString()
         setAnalysisCache(prev => new Map(prev.set(cacheKey, analysis)))
@@ -990,6 +1032,9 @@ export default function useDashboard() {
         setRedirectingToSuggested(false)
         // Keep URL in numeric form for consistency and to avoid org-mismatch issues
         updateURLWithAnalysis(String(analysis.id))
+        if (analysis.status === 'running' || analysis.status === 'pending') {
+          startPollingAnalysis(analysis.id, { showToast: false, selectionGeneration })
+        }
       } else {
         clearUnavailableAnalysis(selectionGeneration)
         if (response.status === 410) {
@@ -1078,7 +1123,7 @@ export default function useDashboard() {
     return null
   }
 
-  const selectDefaultAnalysis = async (options: { force?: boolean; selectionGeneration?: number } = {}) => {
+  const selectDefaultAnalysis = async (options: { force?: boolean; selectionGeneration?: number; excludeAnalysisId?: string } = {}) => {
     if (defaultSelectionInFlight.current !== null
       && ownsAnalysisSelection(defaultSelectionInFlight.current)) return
     if (!options.force) {
@@ -1099,7 +1144,8 @@ export default function useDashboard() {
         : await loadPreviousAnalyses(false, true, true)
       if (!ownsAnalysisSelection(selectionGeneration)) return
 
-      if (autoRefresh) {
+      if (autoRefresh && (!options.excludeAnalysisId
+        || (String(autoRefresh.id) !== options.excludeAnalysisId && autoRefresh.uuid !== options.excludeAnalysisId))) {
         const autoRefreshId = String(autoRefresh.id)
 
         if (autoRefresh.status === 'completed') {
@@ -1118,13 +1164,15 @@ export default function useDashboard() {
           localStorage.setItem('running_analysis_start', Date.now().toString())
           setRedirectingToSuggested(false)
           updateURLWithAnalysis(String(autoRefresh.id))
-          startPollingAnalysis(autoRefresh.id, { showToast: false })
+          startPollingAnalysis(autoRefresh.id, { showToast: false, selectionGeneration })
           return
         }
       }
 
-      if (savedAnalyses[0]) {
-        const id = String(savedAnalyses[0].id)
+      for (const savedAnalysis of savedAnalyses) {
+        const id = String(savedAnalysis.id)
+        if (options.excludeAnalysisId
+          && (id === options.excludeAnalysisId || savedAnalysis.uuid === options.excludeAnalysisId)) continue
         const fullAnalysis = await fetchFullAnalysisById(id, selectionGeneration)
         if (!ownsAnalysisSelection(selectionGeneration)) return
         if (fullAnalysis) {
