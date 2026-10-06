@@ -125,7 +125,6 @@ def cleanup_due_at(organization, *, now: datetime,
     if mode != "daily":
         raise ValueError("Unknown retention scheduling mode")
     slot = daily_cleanup_slot(now)
-    from .data_retention import read_retention_policy
     from .retention_legacy import read_legacy_authorization
     policy = read_retention_policy(organization)
     authorization = read_legacy_authorization(organization)

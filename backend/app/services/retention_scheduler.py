@@ -366,6 +366,3 @@ class RetentionScheduler:
         # responsive while guaranteeing the current cleanup has finished.
         await asyncio.shield(self._shutdown_task)
         logger.info("Retention scheduler stopped")
-
-
-retention_scheduler = RetentionScheduler()

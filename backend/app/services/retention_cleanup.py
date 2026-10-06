@@ -4,7 +4,7 @@ The caller supplies a dedicated session: this operation commits on success and
 rolls back on failure. Organization locks serialize policy changes, result writes,
 and cleanup. Unknown-age data is skipped unless an admin explicitly approved an
 unchanged analysis snapshot; survey age remains independent of that approval.
-No application endpoint invokes this service yet.
+Application endpoints configure and preview policy; only the scheduler runs cleanup.
 """
 import logging
 import os
@@ -20,12 +20,13 @@ from ..models import (
 )
 from .data_retention import read_retention_policy
 from .retention_preview import (
-    _batches, _event_time, _related_counts, classify_analysis_result, is_manually_saved_analysis,
+    _batches, _event_time, _related_counts, classify_analysis_result, delete_expired_analysis_row,
 )
 from .retention_legacy import (
     finish_legacy_cleanup, fingerprint_analysis_result, pending_legacy_entries,
 )
 from .retention_status import policy_and_legacy_revision, record_cleanup_success
+from .retention_metadata import cleanup_candidate_expression, metadata_query, metadata_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -69,17 +70,21 @@ def _invalidate_retention_caches(db: Session, organization_id: int, analysis_ids
     import redis
 
     client = redis.from_url(redis_url, socket_connect_timeout=5, socket_timeout=5)
-    client.ping()
-    batch = []
-    for (analysis_id,) in db.query(Analysis.id).filter(
-        Analysis.organization_id == organization_id
-    ).yield_per(100):
-        batch.append(f"analysis_data:{analysis_id}")
-        if len(batch) == 100:
+    try:
+        client.ping()
+        batch = []
+        # Deliberately evict the whole org, including previously cleared keys.
+        for (analysis_id,) in db.query(Analysis.id).filter(
+            Analysis.organization_id == organization_id
+        ).yield_per(100):
+            batch.append(f"analysis_data:{analysis_id}")
+            if len(batch) == 100:
+                client.delete(*batch)
+                batch = []
+        if batch:
             client.delete(*batch)
-            batch = []
-    if batch:
-        client.delete(*batch)
+    finally:
+        client.close()
 
 
 def _lock_retention_dependencies(db, analysis_ids, response_ids):
@@ -117,7 +122,8 @@ def cleanup_organization_data(
     unchanged approved snapshots remain pending. Unknown-age surveys remain.
     Built-in sample reports are excluded by the shared classifier, including
     from prior unknown-date approvals; deliberate retention test fixtures are not.
-    Auto-refresh and unsaved configurations survive result expiry. Prior legacy
+    Active auto-refresh and ordinary unsaved configurations survive result expiry.
+    Retired auto-refresh carriers expire completely with their results. Prior legacy
     approvals authorize content clearing only, not deletion of configuration.
     References with missing or different ownership abort the whole organization
     transaction. Cache eviction can precede a rollback, which is harmless; no
@@ -144,19 +150,21 @@ def cleanup_organization_data(
             return result
 
         expired_analysis_ids = []
-        expired_saved_analysis_ids = []
+        expired_record_ids = []
         legacy_analysis_ids = []
         pending_entries = pending_legacy_entries(organization)
         remaining_entries = []
         seen_approved_ids = set()
-        for analysis in db.query(Analysis).populate_existing().filter(
-            Analysis.organization_id == organization_id
-        ).order_by(Analysis.id).with_for_update().yield_per(1):
+        for row in metadata_query(db).filter(
+            Analysis.organization_id == organization_id,
+            cleanup_candidate_expression(cutoff, list(pending_entries)),
+        ).order_by(Analysis.id).with_for_update().yield_per(100):
+            analysis = metadata_snapshot(row)
             eligibility = classify_analysis_result(analysis, cutoff)
             if eligibility.disposition == "expired":
                 expired_analysis_ids.append(analysis.id)
-                if is_manually_saved_analysis(analysis):
-                    expired_saved_analysis_ids.append(analysis.id)
+                if delete_expired_analysis_row(analysis):
+                    expired_record_ids.append(analysis.id)
             elif eligibility.disposition == "unverifiable":
                 result.analyses_unverifiable += 1
             elif eligibility.disposition == "deferred":
@@ -166,7 +174,9 @@ def cleanup_organization_data(
             if approved_entry is None:
                 continue
             seen_approved_ids.add(analysis.id)
-            if fingerprint_analysis_result(analysis) != approved_entry.result_fingerprint:
+            # Only reviewed legacy snapshots need their full contents loaded.
+            legacy_record = db.query(Analysis).filter(Analysis.id == analysis.id).populate_existing().first()
+            if fingerprint_analysis_result(legacy_record) != approved_entry.result_fingerprint:
                 result.legacy_analyses_skipped += 1
             elif eligibility.disposition == "deferred":
                 remaining_entries.append(approved_entry)
@@ -180,9 +190,14 @@ def cleanup_organization_data(
         result.legacy_analyses_skipped += len(set(pending_entries) - seen_approved_ids)
 
         expired_response_ids = []
+        result.surveys_unverifiable = db.query(UserBurnoutReport.id).filter(
+            UserBurnoutReport.organization_id == organization_id,
+            UserBurnoutReport.submitted_at.is_(None),
+        ).count()
         for response_id, submitted_at in db.query(
             UserBurnoutReport.id, UserBurnoutReport.submitted_at
-        ).filter(UserBurnoutReport.organization_id == organization_id).with_for_update().yield_per(100):
+        ).filter(UserBurnoutReport.organization_id == organization_id,
+                 UserBurnoutReport.submitted_at < cutoff).with_for_update().yield_per(100):
             submitted = _event_time(submitted_at)
             if submitted is None:
                 result.surveys_unverifiable += 1
@@ -234,10 +249,10 @@ def cleanup_organization_data(
         # Old linked surveys must be deleted before their parent rows, while
         # newer/undated surveys and digest history have already been detached.
         # All writes, including full saved-record deletion, share one transaction.
-        for batch in _batches(expired_saved_analysis_ids):
+        for batch in _batches(expired_record_ids):
             db.query(Analysis).filter(
                 Analysis.organization_id == organization_id, Analysis.id.in_(batch),
-                Analysis.is_saved.is_(True), Analysis.is_auto_refresh.is_(False),
+                Analysis.is_auto_refresh.is_(False),
             ).delete(synchronize_session="fetch")
         finish_legacy_cleanup(
             organization, remaining_entries=remaining_entries,
