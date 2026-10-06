@@ -212,7 +212,8 @@ def cleanup_organization_data(
             ).update({WeeklyDigestLog.analysis_id: None}, synchronize_session="fetch")
             db.query(Analysis).filter(
                 Analysis.organization_id == organization_id, Analysis.id.in_(batch),
-            ).update({Analysis.results: None, Analysis.error_message: None}, synchronize_session="fetch")
+            ).update({Analysis.results: None, Analysis.error_message: None,
+                      Analysis.error_generated_at: None}, synchronize_session="fetch")
 
         result.analysis_results_expired = len(expired_analysis_ids)
         result.legacy_analysis_results_cleared = len(legacy_analysis_ids)

@@ -137,6 +137,7 @@ async def get_analysis_status(
             detail="Analysis not found"
         )
     
+    _require_retained_result(db, analysis)
     response = {
         "id": analysis.id,
         "status": analysis.status,
@@ -148,7 +149,6 @@ async def get_analysis_status(
     if analysis.error_message:
         response["error"] = analysis.error_message
     
-    _require_retained_result(db, analysis)
     if analysis.results:
         response["results_summary"] = {
             "total_users": len(analysis.results.get("team_analysis", [])),
@@ -315,18 +315,11 @@ async def run_analysis_task(analysis_id: int, integration_id: int, days_back: in
 
     except asyncio.TimeoutError:
         logger.error(f"Analysis {analysis_ref} timed out after 5 minutes")
-        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-        if analysis:
-            analysis.status = "failed"
-            analysis.error_message = "Analysis timed out after 5 minutes. This may be due to too much data or API rate limits."
-            db.commit()
+        _persist_analysis_result(analysis_id, status="failed", error_message=
+                                 "Analysis timed out after 5 minutes. This may be due to too much data or API rate limits.")
     except Exception as e:
         logger.error(f"Analysis {analysis_ref} failed: {str(e)}", exc_info=True)
-        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-        if analysis:
-            analysis.status = "failed"
-            analysis.error_message = str(e)
-            db.commit()
+        _persist_analysis_result(analysis_id, status="failed", error_message=str(e))
     finally:
         db.close()
 
@@ -609,11 +602,7 @@ async def _run_analysis_task_impl(db, analysis_id: int, integration_id: int, day
 
     except Exception as e:
         logger.error(f"Analysis {analysis_ref} failed: {str(e)}", exc_info=True)
-        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-        if analysis:
-            analysis.status = "failed"
-            analysis.error_message = str(e)
-            db.commit()
+        _persist_analysis_result(analysis_id, status="failed", error_message=str(e))
         raise
 
 async def run_github_only_analysis_task(analysis_id: int, days_back: int, team_emails: Optional[list], user_id: int):
@@ -693,11 +682,7 @@ async def run_github_only_analysis_task(analysis_id: int, days_back: int, team_e
     except Exception as e:
         logger.error(f"GitHub-only analysis {analysis_ref} failed: {str(e)}", exc_info=True)
         # Update analysis with error
-        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-        if analysis:
-            analysis.status = "failed"
-            analysis.error_message = str(e)
-            db.commit()
+        _persist_analysis_result(analysis_id, status="failed", error_message=str(e))
     
     finally:
         db.close()

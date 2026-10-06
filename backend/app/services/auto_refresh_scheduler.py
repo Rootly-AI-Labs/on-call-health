@@ -56,6 +56,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
     """
     from ..models import SessionLocal, Analysis, RootlyIntegration, User
     from ..api.endpoints.analyses import _retention_cutoff, run_analysis_task
+    from .retention_preview import result_generation_time
     from ..services.integration_validator import IntegrationValidator
     from ..services.notification_service import NotificationService
     from ..core.rootly_client import RootlyAPIClient
@@ -326,9 +327,12 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                         # replacing this row would risk deleting those surveys
                         # or failing the FK check after a fresh response arrives.
                         new_analysis = old_analysis
+                        # Preserve the snapshot until a replacement is written.
+                        # Capture a reliable legacy completion before resetting
+                        # attempt bookkeeping, so a failed run cannot lose it.
+                        if new_analysis.results and new_analysis.results_generated_at is None:
+                            new_analysis.results_generated_at = result_generation_time(new_analysis)
                         new_analysis.status = "pending"
-                        new_analysis.results = None
-                        new_analysis.error_message = None
                         new_analysis.created_at = now
                         new_analysis.completed_at = None
                         new_analysis.config = config

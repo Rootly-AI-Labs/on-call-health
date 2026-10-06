@@ -123,14 +123,20 @@ def fingerprint_analysis_result(analysis: Analysis) -> str:
     old snapshot, which must be deferred rather than treating it as a new result.
     Configuration is preserved and is not authorized for deletion.
     """
-    encoded = json.dumps({
+    payload = {
         "retention_basis": "analysis_generation_v2",
         "results": analysis.results,
         "error_message": analysis.error_message,
         "created_at": _version_time(analysis.created_at),
         "completed_at": _version_time(analysis.completed_at),
         "results_generated_at": _version_time(getattr(analysis, "results_generated_at", None)),
-    }, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    }
+    # Preserve existing receipts for unchanged snapshots with no error stamp.
+    # A newly dated/replaced error must invalidate approval of the old content.
+    error_at = getattr(analysis, "error_generated_at", None)
+    if error_at is not None:
+        payload["error_generated_at"] = _version_time(error_at)
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 

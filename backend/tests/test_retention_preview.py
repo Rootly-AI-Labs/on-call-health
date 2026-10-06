@@ -44,6 +44,9 @@ def retention_engine():
         connection.execute(text(
             "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS results_generated_at TIMESTAMPTZ"
         ))
+        connection.execute(text(
+            "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS error_generated_at TIMESTAMPTZ"
+        ))
     yield engine
     engine.dispose()
 

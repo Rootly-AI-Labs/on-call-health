@@ -1415,6 +1415,11 @@ class MigrationRunner:
                 "description": "Track analysis result generation separately from run completion for retention",
                 "sql_file": "2026_10_05_add_analysis_results_generated_at.sql"
             },
+            {
+                "name": "057_add_analysis_error_generated_at",
+                "description": "Track stored analysis error content age independently of status updates",
+                "sql_file": "2026_10_06_add_analysis_error_generated_at.sql"
+            },
         ]
 
         success_count = 0

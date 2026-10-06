@@ -9,6 +9,7 @@ import pytest
 from app.core.pagerduty_client import (
     PagerDutyAPIClient,
     PagerDutyAnalyticsUnavailable,
+    PagerDutyDataCollectionError,
     PagerDutyDataCollector,
     PagerDutyTeamScopeError,
 )
@@ -25,6 +26,7 @@ def response(status, body):
     result.__aenter__ = AsyncMock(return_value=result)
     result.__aexit__ = AsyncMock(return_value=False)
     result.json = AsyncMock(return_value=body)
+    result.text = AsyncMock(return_value="Mock provider failure")
     return result
 
 
@@ -112,6 +114,92 @@ def test_successful_member_pagination_keeps_complete_roster():
     assert cache.call_args.args[3] == [MEMBER, OUTSIDER]
 
 
+@pytest.mark.parametrize("invalid_member", [
+    {}, {"user": None}, {"user": {}}, {"user": "invalid"}, "invalid",
+    {"user": {"email": "missing-id@example.invalid"}},
+    {"user": {"id": None}}, {"user": {"id": ""}},
+    {"user": {"id": "  "}}, {"user": {"id": 42}},
+])
+def test_mixed_membership_page_rejects_every_missing_or_malformed_identity(invalid_member):
+    http = session([response(200, {
+        "members": [{"user": MEMBER}, invalid_member], "more": False,
+    })])
+    with (
+        patch("app.core.pagerduty_client.get_cached_api_response", return_value=None),
+        patch("app.core.pagerduty_client.set_cached_api_response") as cache,
+        patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=http),
+    ):
+        with pytest.raises(PagerDutyTeamScopeError, match="incomplete team member list"):
+            asyncio.run(PagerDutyAPIClient("fake").get_team_scoped_users("TEAM1", [MEMBER]))
+    cache.assert_not_called()
+
+
+@pytest.mark.parametrize("failure_page", [1, 2])
+def test_malformed_later_member_page_never_returns_previous_members(failure_page):
+    pages = [response(200, {"members": [{"user": MEMBER}], "more": True})] * (failure_page - 1)
+    pages.append(response(200, {"members": [{"role": "responder"}], "more": False}))
+    with (
+        patch("app.core.pagerduty_client.get_cached_api_response", return_value=None),
+        patch("app.core.pagerduty_client.set_cached_api_response") as cache,
+        patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=session(pages)),
+    ):
+        with pytest.raises(PagerDutyTeamScopeError):
+            asyncio.run(PagerDutyAPIClient("fake").get_team_members("TEAM1"))
+    cache.assert_not_called()
+
+
+@pytest.mark.parametrize("failure_page, status", [(1, 403), (2, 500)])
+def test_scoped_rest_http_failure_never_returns_empty_or_partial_incidents(failure_page, status):
+    pages = [response(200, {"incidents": [{"id": "INC1"}], "more": True})] * (failure_page - 1)
+    pages.append(response(status, {}))
+    http = session(pages)
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=http):
+        with pytest.raises(PagerDutyDataCollectionError, match=f"HTTP {status}"):
+            asyncio.run(PagerDutyAPIClient("fake").get_incidents(SINCE, team_ids=["TEAM1"]))
+    assert all(call.kwargs["params"]["team_ids[]"] == ["TEAM1"] for call in http.get.call_args_list)
+
+
+@pytest.mark.parametrize("failure_page", [1, 2])
+def test_scoped_rest_timeout_never_returns_empty_or_partial_incidents(failure_page):
+    pages = [response(200, {"incidents": [{"id": "INC1"}], "more": True})] * (failure_page - 1)
+    pages.append(asyncio.TimeoutError())
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=session(pages)):
+        with pytest.raises(PagerDutyDataCollectionError, match="timed out"):
+            asyncio.run(PagerDutyAPIClient("fake").get_incidents(SINCE, team_ids=["TEAM1"]))
+
+
+@pytest.mark.parametrize("body", [
+    None, [], {}, {"incidents": None, "more": False},
+    {"incidents": [], "more": "false"}, {"incidents": [], "more": True},
+    {"incidents": [None], "more": False}, {"incidents": [{}], "more": False},
+    {"incidents": [{"id": ""}], "more": False},
+])
+def test_scoped_rest_malformed_page_never_returns_partial_incidents(body):
+    http = session([
+        response(200, {"incidents": [{"id": "INC1"}], "more": True}),
+        response(200, body),
+    ])
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=http):
+        with pytest.raises(PagerDutyDataCollectionError):
+            asyncio.run(PagerDutyAPIClient("fake").get_incidents(SINCE, team_ids=["TEAM1"]))
+
+
+def test_scoped_rest_connection_error_never_becomes_an_empty_report():
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=session([OSError("Offline")])):
+        with pytest.raises(PagerDutyDataCollectionError, match="Could not complete"):
+            asyncio.run(PagerDutyAPIClient("fake").get_incidents(SINCE, team_ids=["TEAM1"]))
+
+
+@pytest.mark.parametrize("status", [403, 500])
+def test_unscoped_rest_keeps_previous_partial_collection_behavior(status):
+    http = session([
+        response(200, {"incidents": [{"id": "INC1"}], "more": True}),
+        response(status, {}),
+    ])
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=http):
+        assert asyncio.run(PagerDutyAPIClient("fake").get_incidents(SINCE)) == [{"id": "INC1"}]
+
+
 @pytest.mark.parametrize("members, users", [([], [MEMBER]), ([MEMBER], []), ([MEMBER], [OUTSIDER])])
 def test_empty_team_or_no_matching_synced_users_never_widens(members, users):
     client = PagerDutyAPIClient("fake")
@@ -172,6 +260,19 @@ def test_collector_rest_fallback_retains_team_filter_and_roster():
     assert [user["id"] for user in result["users"]] == ["MEMBER1"]
 
 
+@pytest.mark.parametrize("status", [403, 500])
+def test_collector_rest_fallback_propagates_collection_failure_without_normalizing(status):
+    collector = PagerDutyDataCollector("fake")
+    collector.client.get_team_members = AsyncMock(return_value=[MEMBER])
+    collector.client.get_analytics_incidents = AsyncMock(side_effect=PagerDutyAnalyticsUnavailable(402))
+    collector.client.get_incidents = AsyncMock(side_effect=PagerDutyDataCollectionError(f"HTTP {status}"))
+    collector._normalize_with_enhanced_assignment_extraction = MagicMock()
+    with pytest.raises(PagerDutyDataCollectionError, match=f"HTTP {status}"):
+        asyncio.run(collector.collect_all_data(7, team_ids=["TEAM1"]))
+    assert collector.client.get_incidents.await_args.kwargs["team_ids"] == ["TEAM1"]
+    collector._normalize_with_enhanced_assignment_extraction.assert_not_called()
+
+
 def analyzer(users):
     result = UnifiedBurnoutAnalyzer.__new__(UnifiedBurnoutAnalyzer)
     result.platform = "pagerduty"
@@ -216,6 +317,14 @@ def test_analyzer_membership_error_prevents_incident_collection():
         asyncio.run(instance._fetch_analysis_data(7))
     instance.client.get_analytics_incidents.assert_not_awaited()
     instance.client.get_incidents.assert_not_awaited()
+
+
+def test_analyzer_rest_fallback_propagates_collection_failure_instead_of_empty_success():
+    instance = analyzer([MEMBER])
+    instance.client.get_analytics_incidents.side_effect = PagerDutyAnalyticsUnavailable(402)
+    instance.client.get_incidents.side_effect = PagerDutyDataCollectionError("HTTP 403")
+    with pytest.raises(PagerDutyDataCollectionError, match="HTTP 403"):
+        asyncio.run(instance._fetch_analysis_data(7))
 
 
 def test_unscoped_analyzer_preserves_account_collection():
@@ -292,3 +401,24 @@ def test_background_analyzer_scope_error_does_not_attempt_partial_account_recove
     run_background(analyses)
     client.collect_analysis_data.assert_not_awaited()
     persist.assert_called_once_with(101, status="failed", error_message="Team changed")
+
+
+def test_background_collection_failure_marks_failed_without_recovery_or_results(monkeypatch):
+    analyses, client, service, create_service, persist = background_harness(monkeypatch, [MEMBER])
+    service.analyze_burnout.side_effect = PagerDutyDataCollectionError("HTTP 403")
+    run_background(analyses)
+    client.collect_analysis_data.assert_not_awaited()
+    persist.assert_called_once_with(101, status="failed", error_message="HTTP 403")
+
+
+@pytest.mark.parametrize("failure", [
+    PagerDutyDataCollectionError("HTTP 500"), PagerDutyTeamScopeError("Incomplete roster"),
+])
+def test_background_recovery_collection_failure_never_persists_partial_results(monkeypatch, failure):
+    analyses, client, service, create_service, persist = background_harness(monkeypatch, [MEMBER])
+    client.collect_analysis_data.side_effect = failure
+    run_background(analyses)
+    client.collect_analysis_data.assert_awaited_once_with(days_back=7, team_ids=["TEAM1"])
+    persist.assert_called_once()
+    assert persist.call_args.kwargs["status"] == "failed"
+    assert "results" not in persist.call_args.kwargs
