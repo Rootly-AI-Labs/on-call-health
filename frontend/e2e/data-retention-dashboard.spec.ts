@@ -49,6 +49,7 @@ type DashboardApi = {
   automaticFailure: string | null;
   automaticOutcomes: ReadOutcome[];
   allowAutomaticCancel: boolean;
+  allowAnalysisRun: boolean;
   holdRead: (id: string) => BlockedRead;
 };
 
@@ -64,6 +65,7 @@ const test = base.extend<{ api: DashboardApi }>({
       automaticStatus: 'completed', automaticOutcomes: [],
       automaticFailure: null,
       allowAutomaticCancel: false,
+      allowAnalysisRun: false,
       holdRead: id => {
         let markStarted!: () => void;
         let release!: (outcome: ReadOutcome) => void;
@@ -115,6 +117,10 @@ const test = base.extend<{ api: DashboardApi }>({
         return;
       }
       if (apiPath && request.method() !== 'GET') {
+        if (api.allowAnalysisRun && request.method() === 'POST' && url.pathname === '/analyses/run') {
+          await reply({ id: Number(AUTOMATIC_ID) });
+          return;
+        }
         if (api.allowAutomaticCancel && request.method() === 'DELETE'
           && url.pathname === `/analyses/${AUTOMATIC_ID}`) {
           await reply({ success: true });
@@ -176,11 +182,16 @@ const test = base.extend<{ api: DashboardApi }>({
           id: 61, name: 'Retention test integration', organization_name: 'Retention Test',
           total_users: 1, is_default: true, created_at: '2026-05-01T12:00:00Z',
           last_used_at: null, token_suffix: 'mock', platform: 'rootly',
+          permissions: { users: { access: true }, incidents: { access: true } },
         }] });
         return;
       }
       if (url.pathname === '/pagerduty/integrations') {
         await reply({ integrations: [] });
+        return;
+      }
+      if (url.pathname === '/analyses/validate-integrations') {
+        await reply({ all_valid: true });
         return;
       }
       if (url.pathname.startsWith('/integrations/')) {
@@ -231,6 +242,53 @@ async function expectUnavailableReport(page: Page) {
 }
 
 test.describe('Dashboard retention read enforcement', () => {
+  test('a newly started report stops polling on retention 410 and falls back', async ({ page, api }) => {
+    api.allowAnalysisRun = true;
+    api.automaticOutcomes = [410];
+    await openReport(page, FIRST_ID, FIRST_MEMBER);
+    await page.getByRole('button', { name: 'New Analysis', exact: true }).first().click();
+    await page.getByRole('dialog', { name: 'Start New Analysis' }).getByRole('button', { name: 'Start Analysis', exact: true }).click();
+    await expect(page.getByText("Analysis results are unavailable under your organization's data retention policy.", { exact: true })).toBeVisible();
+    await expect(page.getByText(FIRST_MEMBER, { exact: true })).toBeVisible();
+    expect(api.reads.filter(id => id === AUTOMATIC_ID)).toHaveLength(1);
+    expect(await page.evaluate(() => localStorage.getItem('running_analysis_id'))).toBeNull();
+  });
+
+  test('a late 410 from a newly started report cannot clear a newer saved selection', async ({ page, api }) => {
+    api.allowAnalysisRun = true;
+    api.allowAutomaticCancel = true;
+    await openReport(page, FIRST_ID, FIRST_MEMBER);
+    const held = api.holdRead(AUTOMATIC_ID);
+    try {
+      await page.getByRole('button', { name: 'New Analysis', exact: true }).first().click();
+      await page.getByRole('dialog', { name: 'Start New Analysis' }).getByRole('button', { name: 'Start Analysis', exact: true }).click();
+      await held.started;
+      await page.getByRole('button', { name: 'Cancel Analysis', exact: true }).click();
+      await savedReport(page, SECOND_LABEL).click();
+      await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
+      const response = page.waitForResponse(value => new URL(value.url()).pathname === `/analyses/${AUTOMATIC_ID}` && value.status() === 410);
+      held.release(410);
+      await (await response).finished();
+      await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`analysis=${SECOND_ID}(?:&|$)`));
+      await expect(page.getByText("Analysis results are unavailable under your organization's data retention policy.", { exact: true })).toHaveCount(0);
+    } finally { held.release('aborted'); }
+  });
+
+  for (const status of ['pending', 'running'] as const) {
+    test(`stops ${status} report polling immediately on retention 410`, async ({ page, api }) => {
+      api.hasAutomaticReport = true;
+      api.automaticStatus = status;
+      api.automaticOutcomes = [410];
+      await page.goto('/dashboard');
+      await expect(page.getByText(FIRST_MEMBER, { exact: true })).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText("Analysis results are unavailable under your organization's data retention policy.", { exact: true })).toBeVisible();
+      expect(api.reads.filter(id => id === AUTOMATIC_ID)).toHaveLength(1);
+      expect(await page.evaluate(() => localStorage.getItem('running_analysis_id'))).toBeNull();
+    });
+  }
+
   test('initial loading skips an unavailable newest saved report', async ({ page, api }) => {
     api.expired.add(FIRST_ID);
     await page.goto('/dashboard');
@@ -334,7 +392,7 @@ test.describe('Dashboard retention read enforcement', () => {
     }
   }
 
-  for (const [outcome, status] of [[404, 'completed'], [200, 'completed'], [200, 'failed']] as const) {
+  for (const [outcome, status] of [[410, 'completed'], [404, 'completed'], [200, 'completed'], [200, 'failed']] as const) {
     test(`late polling ${outcome}/${status} cannot replace a saved report selected after cancellation`, async ({ page, api }) => {
       api.hasAutomaticReport = true;
       api.automaticStatus = 'running';

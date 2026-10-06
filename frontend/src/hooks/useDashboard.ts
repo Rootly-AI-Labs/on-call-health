@@ -334,6 +334,9 @@ export default function useDashboard() {
                 toast.error("Analysis failed")
               }
             }
+          } else if (pollResponse.status === 410) {
+            toast.error("Analysis results are unavailable under your organization's data retention policy.")
+            selectFallback()
           } else if (pollResponse.status === 404) {
             // Analysis not found
             if (showToast) {
@@ -2036,6 +2039,7 @@ export default function useDashboard() {
       }
     }
 
+    const pollingSelectionGeneration = beginAnalysisSelection()
     setShowTimeRangeDialog(false)
     setTimeRange(selectedTimeRange)
     setAnalysisRunning(true)
@@ -2187,7 +2191,7 @@ export default function useDashboard() {
 
       // Refresh the analyses list to show the new running analysis in sidebar
       // Use silent mode - if this fails, it's not critical as polling will continue
-      await loadPreviousAnalyses(false, true)
+      await loadPreviousAnalyses(false, true, true)
 
       // Poll for analysis completion
       let pollRetryCount = 0
@@ -2245,6 +2249,18 @@ export default function useDashboard() {
 
           if (pollResponse.ok) {
             // Response is OK, continue to process
+          } else if (pollResponse.status === 410) {
+            if (!ownsAnalysisSelection(pollingSelectionGeneration)
+              || localStorage.getItem('running_analysis_id') !== String(analysis_id)) return
+            clearRunningAnalysisState()
+            toast.error("Analysis results are unavailable under your organization's data retention policy.")
+            const fallbackGeneration = beginAnalysisSelection()
+            clearUnavailableAnalysis(fallbackGeneration)
+            updateURLWithAnalysis(null)
+            void selectDefaultAnalysis({
+              force: true, selectionGeneration: fallbackGeneration, excludeAnalysisId: String(analysis_id),
+            })
+            return
           } else if (pollResponse.status === 404) {
             // Analysis was deleted during polling - stop immediately
             setAnalysisRunning(false)

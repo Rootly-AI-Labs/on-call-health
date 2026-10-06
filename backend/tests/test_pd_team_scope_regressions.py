@@ -473,6 +473,40 @@ def run_background(analyses):
     ))
 
 
+@pytest.mark.parametrize("sync_query_failed", [False, True])
+def test_empty_manual_pagerduty_mappings_use_only_verified_team_api_roster(monkeypatch, sync_query_failed):
+    from app import models
+
+    analyses, client, service, create_service, persist = background_harness(monkeypatch, [MEMBER])
+    record = MagicMock(id=101, status="pending", config={})
+    owner = MagicMock(id=7, organization_id=77, llm_token=None, llm_provider=None)
+    correlation = MagicMock(pagerduty_user_id=None, jira_account_id=None)
+    records = MagicMock()
+    records.filter.return_value = records
+    records.with_for_update.return_value = records
+    records.first.return_value = record
+    people = MagicMock()
+    people.filter.return_value = people
+    people.first.return_value = owner
+    mappings = MagicMock()
+    mappings.filter.return_value = mappings
+    mappings.all.side_effect = [RuntimeError("Sync query failed") if sync_query_failed else [], [correlation]]
+    session = models.SessionLocal()
+    session.query.side_effect = lambda entity, *args: (
+        mappings if entity is models.UserCorrelation else people if entity is models.User else records
+    )
+    asyncio.run(analyses.run_analysis_task(
+        analysis_id=101, analysis_uuid="scope-review", integration_id=61,
+        api_token="fake", platform="pagerduty", organization_name="Review",
+        time_range=7, include_weekends=True, user_id=7,
+        pagerduty_team_id="TEAM1", include_ai_usage=False,
+    ))
+    create_service.assert_called_once()
+    assert create_service.call_args.kwargs["synced_users"] == [MEMBER]
+    assert create_service.call_args.kwargs["pagerduty_team_id"] == "TEAM1"
+    client.get_team_members.assert_awaited_once_with("TEAM1")
+
+
 @pytest.mark.parametrize("unavailable", [False, True])
 def test_background_without_sync_rejects_empty_or_unavailable_team(monkeypatch, unavailable):
     analyses, client, service, create_service, persist = background_harness(monkeypatch, [])
