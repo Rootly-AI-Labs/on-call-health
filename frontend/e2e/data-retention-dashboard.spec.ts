@@ -45,7 +45,8 @@ type DashboardApi = {
   reads: string[];
   summariesIncludeResults: boolean;
   hasAutomaticReport: boolean;
-  automaticStatus: 'completed' | 'pending' | 'running';
+  automaticStatus: 'completed' | 'pending' | 'running' | 'failed';
+  automaticFailure: string | null;
   automaticOutcomes: ReadOutcome[];
   allowAutomaticCancel: boolean;
   holdRead: (id: string) => BlockedRead;
@@ -61,6 +62,7 @@ const test = base.extend<{ api: DashboardApi }>({
     const api: DashboardApi = {
       expired: new Set(), reads: [], summariesIncludeResults: false, hasAutomaticReport: false,
       automaticStatus: 'completed', automaticOutcomes: [],
+      automaticFailure: null,
       allowAutomaticCancel: false,
       holdRead: id => {
         let markStarted!: () => void;
@@ -105,7 +107,7 @@ const test = base.extend<{ api: DashboardApi }>({
           'access-control-allow-origin': origin,
           'access-control-allow-credentials': 'true',
           'access-control-allow-headers': 'authorization,content-type',
-          'access-control-allow-methods': 'GET,OPTIONS',
+          'access-control-allow-methods': 'GET,DELETE,OPTIONS',
         },
       });
       if (request.method() === 'OPTIONS') {
@@ -147,6 +149,7 @@ const test = base.extend<{ api: DashboardApi }>({
             const body = item.id === AUTOMATIC_ID ? {
               ...item, status: api.automaticStatus,
               analysis_data: api.automaticStatus === 'completed' ? automaticReport.analysis_data : {},
+              error_message: api.automaticStatus === 'failed' ? api.automaticFailure : undefined,
             } : item;
             if (outcome === 'aborted') await route.abort();
             else await reply(outcome === 200
@@ -275,8 +278,28 @@ test.describe('Dashboard retention read enforcement', () => {
     expect(await page.evaluate(() => localStorage.getItem('running_analysis_id'))).toBeNull();
   });
 
-  for (const outcome of [404, 200] as const) {
-    test(`late polling ${outcome} cannot replace a saved report selected after cancellation`, async ({ page, api }) => {
+  for (const status of ['pending', 'running'] as const) {
+    for (const detailedError of [true, false]) {
+      test(`shows failure after a ${status} report opened by URL fails (${detailedError ? 'specific error' : 'no error supplied'})`, async ({ page, api }) => {
+        api.hasAutomaticReport = true;
+        api.automaticStatus = status;
+        api.automaticFailure = detailedError ? 'A temporary provider outage stopped this analysis.' : null;
+        await page.goto(`/dashboard?analysis=${AUTOMATIC_ID}`);
+        await expect.poll(() => api.reads.filter(id => id === AUTOMATIC_ID).length).toBeGreaterThanOrEqual(2);
+        api.automaticStatus = 'failed';
+        await expect(page.getByText(api.automaticFailure || 'Analysis failed. Please try again.', { exact: true })).toBeVisible({ timeout: 12000 });
+        await expect(page.getByRole('heading', { name: 'Analysis Failed', exact: true })).toBeVisible();
+        await expect(savedReport(page, SECOND_LABEL)).toBeEnabled();
+        await expect(page.getByText('Refreshing', { exact: true })).toHaveCount(0);
+        await expect(page).toHaveURL(new RegExp(`analysis=${AUTOMATIC_ID}(?:&|$)`));
+        expect(await page.evaluate(() => localStorage.getItem('running_analysis_id'))).toBeNull();
+        expect(api.reads.filter(id => id === FIRST_ID)).toHaveLength(0);
+      });
+    }
+  }
+
+  for (const [outcome, status] of [[404, 'completed'], [200, 'completed'], [200, 'failed']] as const) {
+    test(`late polling ${outcome}/${status} cannot replace a saved report selected after cancellation`, async ({ page, api }) => {
       api.hasAutomaticReport = true;
       api.automaticStatus = 'running';
       api.allowAutomaticCancel = true;
@@ -290,7 +313,7 @@ test.describe('Dashboard retention read enforcement', () => {
         await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
         const late = page.waitForResponse(response => new URL(response.url()).pathname === `/analyses/${AUTOMATIC_ID}`
           && response.status() === outcome).then(response => response.finished());
-        api.automaticStatus = 'completed';
+        api.automaticStatus = status;
         held.release(outcome);
         await late;
         await page.evaluate(() => new Promise<void>(resolve => {
