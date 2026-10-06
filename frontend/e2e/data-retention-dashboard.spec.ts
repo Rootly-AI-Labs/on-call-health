@@ -20,7 +20,8 @@ function report(id: string, label: string, memberName: string): AnalysisResult {
   return {
     id, uuid: `00000000-0000-4000-8000-${id.padStart(12, '0')}`,
     integration_id: 61, integration_name: label, platform: 'rootly',
-    created_at: '2026-05-01T12:00:00Z', completed_at: '2026-05-01T12:01:00Z',
+    created_at: '2026-05-01T12:00:00Z', completed_at: '2026-10-06T12:01:00Z',
+    results_generated_at: id === SECOND_ID ? null : '2026-10-05T12:01:00Z',
     status: 'completed', time_range: 180, is_saved: true, is_auto_refresh: false,
     config: { include_github: false, include_slack: false },
     analysis_data: {
@@ -195,6 +196,9 @@ async function openReport(page: Page, id: string, memberName: string) {
   await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeVisible();
   await expect(savedReport(page, FIRST_LABEL)).toBeEnabled();
   await expect(savedReport(page, SECOND_LABEL)).toBeEnabled();
+  await expect(savedReport(page, FIRST_LABEL)).toContainText('Time range: 180 days');
+  await expect(savedReport(page, FIRST_LABEL)).toContainText('Created May 1, 2026');
+  await expect(savedReport(page, SECOND_LABEL)).toContainText('Created May 1, 2026');
 }
 
 async function expectUnavailableReport(page: Page) {
@@ -215,6 +219,9 @@ test.describe('Dashboard retention read enforcement', () => {
         await page.goto('/dashboard');
         await automaticRead.started;
         await expect(savedReport(page, SECOND_LABEL)).toBeEnabled();
+        const automaticEntry = savedReport(page, 'Retention automatic report');
+        await expect(automaticEntry).toContainText('Time range: 180 days');
+        await expect(automaticEntry).toContainText('Created May 1, 2026');
         await savedReport(page, SECOND_LABEL).click();
         await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
         await expect(page).toHaveURL(new RegExp(`analysis=${SECOND_ID}(?:&|$)`));
@@ -241,6 +248,19 @@ test.describe('Dashboard retention read enforcement', () => {
         await expect(page).toHaveURL(new RegExp(`analysis=${SECOND_ID}(?:&|$)`));
         expect(api.reads.filter(id => id === FIRST_ID)).toHaveLength(0);
         await expect(page.getByText("Analysis results are unavailable under your organization's data retention policy.", { exact: true })).toHaveCount(0);
+        if (outcome === 200) {
+          const sidebar = page.getByRole('complementary', { name: 'Analysis history' });
+          await sidebar.screenshot({ path: 'test-results/sidebar-dates-desktop.png' });
+          await page.setViewportSize({ width: 390, height: 844 });
+          await page.reload();
+          await expect(savedReport(page, SECOND_LABEL)).toBeVisible();
+          await expect(savedReport(page, FIRST_LABEL)).toContainText('Created May 1, 2026');
+          await expect(savedReport(page, SECOND_LABEL)).toContainText('Created May 1, 2026');
+          const bounds = await sidebar.boundingBox();
+          expect(bounds).not.toBeNull();
+          expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+          await sidebar.screenshot({ path: 'test-results/sidebar-dates-mobile.png' });
+        }
       } finally {
         automaticRead.release('aborted');
       }

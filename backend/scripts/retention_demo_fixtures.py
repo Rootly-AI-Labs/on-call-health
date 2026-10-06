@@ -147,7 +147,7 @@ def create_fixture_data(
         "recent": "Fresh four-month report; old source data retained",
         "mixed": "Old generated result with historical activity",
         "legacy": "Legacy result with unknown generation date",
-        "saved_old": "Saved old result; preserve configuration",
+        "saved_old": "Saved old result; delete expired record",
         "running": "Running result; cleanup deferred",
         "empty": "Empty completed result",
     }

@@ -72,6 +72,7 @@ function getSeverityBadgeClass(severity: string | undefined): string {
   }
 }
 import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
+import { AnalysisSidebarDetails } from "@/components/dashboard/AnalysisSidebarDetails"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
@@ -410,7 +411,9 @@ function DashboardContent() {
         {/* Unified Sidebar - Works on all screen sizes */}
         <div
           ref={sidebarRef}
-          className={`flex ${sidebarCollapsed ? "w-10 sm:w-12 md:w-16" : "w-60"} bg-neutral-900 text-white transition-all duration-300 flex-col overflow-hidden cursor-pointer md:cursor-default relative group md:relative`}
+          role="complementary"
+          aria-label="Analysis history"
+          className={`flex shrink-0 ${sidebarCollapsed ? "w-10 sm:w-12 md:w-16" : "w-72"} bg-neutral-900 text-white transition-all duration-300 flex-col overflow-hidden cursor-pointer md:cursor-default relative group md:relative`}
           style={
             mounted && !sidebarCollapsed && typeof window !== 'undefined' && window.innerWidth < 768
               ? { position: 'fixed', left: 0, top: 0, height: '100vh', zIndex: 50 }
@@ -467,9 +470,6 @@ function DashboardContent() {
                 Auto Analysis
               </p>
               {autoRefreshAnalysis ? (() => {
-                const arDate = new Date(autoRefreshAnalysis.created_at)
-                const arTimeStr = arDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
-                const arDateStr = arDate.toLocaleDateString([], { month: 'short', day: 'numeric' })
                 const arOrgName = sanitizeString((autoRefreshAnalysis as any).integration_name || 'Unknown')
                 const arPlatform = (autoRefreshAnalysis as any).platform
                 const arColor = getPlatformColor(arPlatform)
@@ -496,14 +496,10 @@ function DashboardContent() {
                             {arColor !== 'bg-neutral-1000' && (
                               <div className={`w-2.5 h-2.5 rounded-full ${arColor} flex-shrink-0`}></div>
                             )}
-                            <span className="font-medium truncate">{arOrgName}</span>
+                            <span className="font-medium truncate" title={arOrgName}>{arOrgName}</span>
                           </div>
-                          <span className="text-neutral-500 flex-shrink-0">{autoRefreshAnalysis.time_range || 30}d</span>
                         </div>
-                        <div className="flex justify-between items-center w-full text-neutral-500">
-                          <span>{arDateStr}</span>
-                          <span>{arTimeStr}</span>
-                        </div>
+                        <AnalysisSidebarDetails analysis={autoRefreshAnalysis} />
                         {isArRunning && (
                           <div className="mt-1 flex items-center gap-1 text-xs text-blue-400">
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
@@ -549,18 +545,6 @@ function DashboardContent() {
                 </div>
               ) : (
                 previousAnalyses.map((analysis) => {
-                  const analysisDate = new Date(analysis.created_at)
-                  const timeStr = analysisDate.toLocaleTimeString([], {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                  })
-                  const dateStr = analysisDate.toLocaleDateString([], {
-                    month: 'short',
-                    day: 'numeric',
-                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                  })
                   const rawName = (analysis as any).integration_name || 'Unknown Integration'
                   const organizationName = sanitizeString(rawName)
                   const analysisPlatform = (analysis as any).platform
@@ -587,17 +571,13 @@ function DashboardContent() {
                               {platformColor !== 'bg-neutral-1000' && (
                                 <div className={`w-2.5 h-2.5 rounded-full ${platformColor} flex-shrink-0`}></div>
                               )}
-                              <span className="font-medium truncate">{organizationName}</span>
+                              <span className="font-medium truncate" title={organizationName}>{organizationName}</span>
                             </div>
-                            <span className="text-neutral-500 flex-shrink-0">{analysis.time_range || 30}d</span>
                           {(analysis as any).config?.pagerduty_team_id && (
                             <span className="text-neutral-500 flex-shrink-0 text-[10px] bg-green-100 text-green-700 rounded px-1">team</span>
                           )}
                           </div>
-                          <div className="flex justify-between items-center w-full text-neutral-500">
-                            <span>{dateStr}</span>
-                            <span>{timeStr}</span>
-                          </div>
+                          <AnalysisSidebarDetails analysis={analysis} />
                         </div>
                       </Button>
                       <Button

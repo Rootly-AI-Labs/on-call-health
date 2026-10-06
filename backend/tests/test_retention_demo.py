@@ -528,7 +528,7 @@ def test_cleanup_applies_generation_age_and_preserves_newer_surveys_and_other_or
     demo.run_demo_cleanup(db)
     db.expire_all()
     for row_id in by_disposition["expired"]:
-        assert db.get(Analysis, row_id).results is None
+        assert db.get(Analysis, row_id) is None
     for row_id in by_disposition["retained"] + by_disposition["unverifiable"]:
         assert db.get(Analysis, row_id).results == payloads[row_id]
     assert all(db.get(UserBurnoutReport, row_id) is None for row_id in expired_surveys)

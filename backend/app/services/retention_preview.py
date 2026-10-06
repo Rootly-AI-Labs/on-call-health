@@ -165,6 +165,11 @@ def error_generation_time(analysis: Analysis) -> datetime | None:
     return value.astimezone(timezone.utc)
 
 
+def is_manually_saved_analysis(analysis: Analysis) -> bool:
+    """Manual saved reports expire completely; recurring setup must survive."""
+    return getattr(analysis, "is_saved", False) is True and getattr(analysis, "is_auto_refresh", False) is False
+
+
 def classify_analysis_result(analysis: Analysis, cutoff: datetime) -> AnalysisEligibility:
     """Expire a whole stored result by generation age, independent of its inputs."""
     if is_retention_exempt_demo(analysis):
@@ -180,6 +185,13 @@ def classify_analysis_result(analysis: Analysis, cutoff: datetime) -> AnalysisEl
             if error_at < cutoff:
                 return AnalysisEligibility("expired", error_at, "error_generated_before_cutoff")
             return AnalysisEligibility("retained", error_at, "within_error_retention_period")
+        # Earlier cleanup kept the row and its canonical snapshot timestamp.
+        # Remove that expired saved entry too, without assigning an age to
+        # configurations that never generated a result.
+        if is_manually_saved_analysis(analysis) and getattr(analysis, "results_generated_at", None) is not None:
+            generated = result_generation_time(analysis)
+            if generated is not None and generated < cutoff:
+                return AnalysisEligibility("expired", generated, "cleared_saved_result_before_cutoff")
         return AnalysisEligibility("empty", None, "no_result_data")
     generated = result_generation_time(analysis)
     if generated is None:
@@ -320,6 +332,8 @@ def build_retention_preview(
             RootlyIntegration, RootlyIntegration.id == Analysis.rootly_integration_id
         ).filter(
             Analysis.id.in_(batch),
+            or_(Analysis.is_saved.is_(False), Analysis.is_auto_refresh.is_(True),
+                Analysis.id.in_(legacy_analysis_ids)),
             RootlyIntegration.user_id == Analysis.user_id,
             RootlyIntegration.is_active.is_(True),
             func.length(func.trim(RootlyIntegration.api_token)) > 0,
@@ -328,6 +342,7 @@ def build_retention_preview(
     warnings = []
     if cutoff is not None:
         warnings.append("Entire expired results include imported activity, historical metrics, scores and insights. Regeneration starts a new retention period and can use the requested historical window.")
+        warnings.append("Expired manually saved analyses are deleted, including their configuration and metadata. Auto-refresh configuration is preserved.")
         if analysis_counts.regeneration_candidates:
             warnings.append("Regeneration candidates have an active integration configured; provider access and regeneration are not guaranteed.")
     if analysis_counts.unverifiable or survey_counts.unverifiable:

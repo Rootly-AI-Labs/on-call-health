@@ -224,7 +224,9 @@ def _assert_fixture_only(db, org, marker):
         raise ValueError("Unexpected organization membership. No demo data was changed.")
     expected_analyses = set(marker["analysis_ids"].values())
     rows = db.query(Analysis).filter(Analysis.organization_id == org.id).all()
-    if {row.id for row in rows} != expected_analyses or any(
+    # Retention may have deleted expired saved rows. Remaining rows must still
+    # be recognized fixtures, with unchanged ownership and no refresh jobs.
+    if not {row.id for row in rows}.issubset(expected_analyses) or any(
         row.user_id != marker["owner_user_id"] or (row.config or {}).get(MARKER_KEY) != marker["instance"]
         or row.is_auto_refresh for row in rows
     ):
