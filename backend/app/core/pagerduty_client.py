@@ -519,6 +519,7 @@ class PagerDutyAPIClient:
         all_incidents: List[Dict[str, Any]] = []
         cursor: Optional[str] = None
         page = 0
+        seen_cursors = set()
 
         try:
             timeout = aiohttp.ClientTimeout(total=60)
@@ -558,6 +559,10 @@ class PagerDutyAPIClient:
                             if response.status in (401, 402, 403):
                                 self._cache_analytics_entitlement(False, response.status)
                                 raise PagerDutyAnalyticsUnavailable(response.status, error_text[:200])
+                            if team_ids:
+                                raise PagerDutyDataCollectionError(
+                                    f"PagerDuty Analytics incident collection failed on page {page} (HTTP {response.status})"
+                                )
                             break
 
                         # First successful page confirms the token is entitled.
@@ -565,6 +570,9 @@ class PagerDutyAPIClient:
                             self._cache_analytics_entitlement(True)
 
                         data = await response.json()
+                        if team_ids and (not isinstance(data, dict) or not isinstance(data.get("data"), list)
+                                         or any(not isinstance(item, dict) for item in data["data"])):
+                            raise PagerDutyDataCollectionError("PagerDuty Analytics returned an incomplete incident page")
                         incidents = data.get("data", [])
                         all_incidents.extend(incidents)
 
@@ -574,6 +582,12 @@ class PagerDutyAPIClient:
                             or data.get("cursor_after")
                             or (data.get("response_metadata") or {}).get("cursors", {}).get("next")
                         )
+                        if team_ids and cursor:
+                            if not isinstance(cursor, str) or not incidents or cursor in seen_cursors:
+                                raise PagerDutyDataCollectionError("PagerDuty Analytics pagination did not advance")
+                            seen_cursors.add(cursor)
+                            if len(all_incidents) >= limit:
+                                raise PagerDutyDataCollectionError("PagerDuty Analytics incident limit reached before collection completed")
                         if not cursor or not incidents:
                             break  # last page
 
@@ -585,13 +599,19 @@ class PagerDutyAPIClient:
         except PagerDutyAnalyticsUnavailable:
             # Propagate so the caller can fall back to REST /incidents.
             raise
-        except asyncio.TimeoutError:
+        except PagerDutyDataCollectionError:
+            raise
+        except asyncio.TimeoutError as error:
+            if team_ids:
+                raise PagerDutyDataCollectionError("PagerDuty Analytics incident collection timed out") from error
             logger.error(
                 f"PD ANALYTICS: Timeout after {page} page(s), "
                 f"{len(all_incidents)} incidents collected"
             )
             return all_incidents
         except Exception as e:
+            if team_ids:
+                raise PagerDutyDataCollectionError("PagerDuty Analytics incident collection failed") from e
             logger.error(f"PD ANALYTICS: Failed to fetch incidents: {e}")
             return all_incidents
 

@@ -231,6 +231,42 @@ async function expectUnavailableReport(page: Page) {
 }
 
 test.describe('Dashboard retention read enforcement', () => {
+  test('initial loading skips an unavailable newest saved report', async ({ page, api }) => {
+    api.expired.add(FIRST_ID);
+    await page.goto('/dashboard');
+    await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`analysis=${SECOND_ID}(?:&|$)`));
+    expect(api.reads).toContain(FIRST_ID);
+    expect(api.reads).toContain(SECOND_ID);
+  });
+
+  test('initial loading leaves no stale report when all saved reports are unavailable', async ({ page, api }) => {
+    api.expired.add(FIRST_ID);
+    api.expired.add(SECOND_ID);
+    await page.goto('/dashboard');
+    await expect.poll(() => api.reads.includes(SECOND_ID)).toBe(true);
+    await expect(page.getByText(FIRST_MEMBER, { exact: true })).toHaveCount(0);
+    await expect(page.getByText(SECOND_MEMBER, { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Export', exact: true })).toHaveCount(0);
+  });
+
+  test('a delayed initial unavailable response cannot replace a newer manual selection', async ({ page, api }) => {
+    const firstRead = api.holdRead(FIRST_ID);
+    await page.goto('/dashboard');
+    await firstRead.started;
+    await savedReport(page, SECOND_LABEL).click();
+    await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
+    const secondReads = api.reads.filter(id => id === SECOND_ID).length;
+    const initialResponse = page.waitForResponse(response =>
+      new RegExp(`/analyses/(?:by-id/)?${FIRST_ID}$`).test(new URL(response.url()).pathname)
+      && response.status() === 410);
+    firstRead.release(410);
+    await (await initialResponse).finished();
+    await expect(page.getByText(SECOND_MEMBER, { exact: true })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`analysis=${SECOND_ID}(?:&|$)`));
+    expect(api.reads.filter(id => id === SECOND_ID)).toHaveLength(secondReads);
+  });
+
   test('opens an available saved report when running automatic polling returns 404', async ({ page, api }) => {
     api.hasAutomaticReport = true;
     api.automaticStatus = 'running';

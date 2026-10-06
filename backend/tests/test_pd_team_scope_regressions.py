@@ -38,6 +38,109 @@ def session(responses):
     return result
 
 
+def analytics_client():
+    client = PagerDutyAPIClient("fake")
+    client._analytics_unavailable_status = MagicMock(return_value=None)
+    client._cache_analytics_entitlement = MagicMock()
+    return client
+
+
+@pytest.mark.parametrize("failure", [429, 500, "timeout", "connection", "invalid_json"])
+def test_selected_team_analytics_failed_second_page_never_returns_partial_results(failure):
+    import aiohttp
+
+    second = response(failure, {}) if isinstance(failure, int) else {
+        "timeout": asyncio.TimeoutError(),
+        "connection": aiohttp.ClientConnectionError("Disconnected"),
+        "invalid_json": response(200, {}),
+    }[failure]
+    if failure == "invalid_json":
+        second.json.side_effect = ValueError("Malformed JSON")
+    http = session([])
+    http.post.side_effect = [response(200, {"data": [{"id": "INC1"}], "next_cursor": "next"}), second]
+    client = analytics_client()
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=http):
+        with pytest.raises(PagerDutyDataCollectionError):
+            asyncio.run(client.get_analytics_incidents(SINCE, team_ids=["TEAM1"]))
+    assert http.post.call_count == 2
+    first_payload, next_payload = [call.kwargs["json"] for call in http.post.call_args_list]
+    assert next_payload["cursor"] == "next"
+    assert first_payload["filters"] == next_payload["filters"]
+    assert next_payload["filters"]["team_ids"] == ["TEAM1"]
+
+
+@pytest.mark.parametrize("body", [None, {}, {"data": None}, {"data": [{}, None]}, {"data": [], "next_cursor": "next"}])
+def test_selected_team_analytics_rejects_incomplete_pages(body):
+    http = session([])
+    http.post.return_value = response(200, body)
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=http):
+        with pytest.raises(PagerDutyDataCollectionError):
+            asyncio.run(analytics_client().get_analytics_incidents(SINCE, team_ids=["TEAM1"]))
+
+
+@pytest.mark.parametrize("limit", [1, 1000])
+def test_selected_team_analytics_rejects_truncated_or_repeated_cursor_collection(limit):
+    http = session([])
+    http.post.side_effect = [
+        response(200, {"data": [{"id": "INC1"}], "next_cursor": "next"}),
+        response(200, {"data": [{"id": "INC2"}], "next_cursor": "next"}),
+    ]
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=http):
+        with pytest.raises(PagerDutyDataCollectionError, match="limit reached|did not advance"):
+            asyncio.run(analytics_client().get_analytics_incidents(SINCE, limit=limit, team_ids=["TEAM1"]))
+
+
+def test_selected_team_analytics_complete_pagination_preserves_filters():
+    http = session([])
+    http.post.side_effect = [
+        response(200, {"data": [{"id": "INC1"}], "next_cursor": "next"}),
+        response(200, {"data": [{"id": "INC2"}], "next_cursor": None}),
+    ]
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=http):
+        result = asyncio.run(analytics_client().get_analytics_incidents(SINCE, team_ids=["TEAM1"], time_zone="America/Toronto"))
+    assert [item["id"] for item in result] == ["INC1", "INC2"]
+    assert all(call.kwargs["json"]["time_zone"] == "America/Toronto" for call in http.post.call_args_list)
+
+
+def test_unscoped_analytics_preserves_existing_partial_collection_behavior():
+    http = session([])
+    http.post.side_effect = [
+        response(200, {"data": [{"id": "INC1"}], "next_cursor": "next"}), response(500, {}),
+    ]
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=http):
+        assert asyncio.run(analytics_client().get_analytics_incidents(SINCE)) == [{"id": "INC1"}]
+
+
+@pytest.mark.parametrize("status", [401, 402, 403])
+def test_selected_team_analytics_entitlement_failures_still_allow_rest_fallback(status):
+    http = session([])
+    http.post.return_value = response(status, {})
+    with patch("app.core.pagerduty_client.aiohttp.ClientSession", return_value=http):
+        with pytest.raises(PagerDutyAnalyticsUnavailable):
+            asyncio.run(analytics_client().get_analytics_incidents(SINCE, team_ids=["TEAM1"]))
+
+
+def test_analyzer_propagates_analytics_collection_failure_without_account_fallback():
+    instance = analyzer([MEMBER])
+    instance.client.get_analytics_incidents.side_effect = PagerDutyDataCollectionError("Failed second page")
+    with pytest.raises(PagerDutyDataCollectionError, match="Failed second page"):
+        asyncio.run(instance._fetch_analysis_data(7))
+    instance.client.get_incidents.assert_not_awaited()
+    instance.client.collect_analysis_data.assert_not_awaited()
+
+
+def test_collector_propagates_analytics_collection_failure_before_normalization():
+    collector = PagerDutyDataCollector("fake")
+    collector.client.get_team_members = AsyncMock(return_value=[MEMBER])
+    collector.client.get_analytics_incidents = AsyncMock(side_effect=PagerDutyDataCollectionError("Failed second page"))
+    collector.client.get_incidents = AsyncMock()
+    collector._normalize_with_enhanced_assignment_extraction = MagicMock()
+    with pytest.raises(PagerDutyDataCollectionError, match="Failed second page"):
+        asyncio.run(collector.collect_all_data(7, team_ids=["TEAM1"]))
+    collector.client.get_incidents.assert_not_awaited()
+    collector._normalize_with_enhanced_assignment_extraction.assert_not_called()
+
+
 @pytest.mark.parametrize("team_ids", [["TEAM1"], None])
 def test_rest_incidents_preserve_optional_team_filter_on_every_page(team_ids):
     http = session([

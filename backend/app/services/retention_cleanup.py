@@ -15,7 +15,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..models import (
-    Analysis, IntegrationMapping, Organization, SurveyPeriod, User,
+    Analysis, IntegrationMapping, Organization, SurveyPeriod,
     UserBurnoutReport, UserNotification, WeeklyDigestLog,
 )
 from .data_retention import read_retention_policy
@@ -87,18 +87,17 @@ def _lock_retention_dependencies(db, analysis_ids, response_ids):
 
     Parent row locks already prevent new foreign-key references. Explicit child
     locks also prevent organization IDs from changing between check and delete.
-    Digest ownership comes from its user, so lock that row as well.
+    Digest links follow the parent analysis's organization, independently of
+    the recipient's current membership.
     """
     for batch in _batches(analysis_ids):
         for model in (IntegrationMapping, UserNotification, UserBurnoutReport):
             query = db.query(model.id).filter(model.analysis_id.in_(batch)).order_by(model.id).with_for_update()
             for _ in query.yield_per(100):
                 pass
-        query = db.query(WeeklyDigestLog.id, User.id).join(
-            User, WeeklyDigestLog.user_id == User.id,
-        ).filter(WeeklyDigestLog.analysis_id.in_(batch)).order_by(
-            User.id, WeeklyDigestLog.id,
-        ).with_for_update(of=(WeeklyDigestLog, User))
+        query = db.query(WeeklyDigestLog.id).filter(
+            WeeklyDigestLog.analysis_id.in_(batch)
+        ).order_by(WeeklyDigestLog.id).with_for_update()
         for _ in query.yield_per(100):
             pass
     for batch in _batches(response_ids):
@@ -213,9 +212,9 @@ def cleanup_organization_data(
                 UserNotification.organization_id == organization_id,
                 UserNotification.analysis_id.in_(batch),
             ).delete(synchronize_session="fetch")
-            user_ids = db.query(User.id).filter(User.organization_id == organization_id)
+            scoped_analysis_ids = db.query(Analysis.id).filter(Analysis.organization_id == organization_id)
             result.digest_links_cleared += db.query(WeeklyDigestLog).filter(
-                WeeklyDigestLog.user_id.in_(user_ids), WeeklyDigestLog.analysis_id.in_(batch),
+                WeeklyDigestLog.analysis_id.in_(scoped_analysis_ids), WeeklyDigestLog.analysis_id.in_(batch),
             ).update({WeeklyDigestLog.analysis_id: None}, synchronize_session="fetch")
             db.query(Analysis).filter(
                 Analysis.organization_id == organization_id, Analysis.id.in_(batch),

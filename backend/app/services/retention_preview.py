@@ -14,7 +14,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ..models import (
-    Analysis, IntegrationMapping, Organization, RootlyIntegration, SurveyPeriod, User,
+    Analysis, IntegrationMapping, Organization, RootlyIntegration, SurveyPeriod,
     UserBurnoutReport, UserNotification, WeeklyDigestLog,
 )
 from .data_retention import RetentionDays, read_retention_policy
@@ -226,13 +226,10 @@ def _related_counts(db, org_id, analysis_ids, response_ids, cutoff):
         counts.references_requiring_review += surveys.filter(
             or_(UserBurnoutReport.organization_id.is_(None), UserBurnoutReport.organization_id != org_id)
         ).count()
-        digests = db.query(WeeklyDigestLog).join(User, WeeklyDigestLog.user_id == User.id).filter(
-            WeeklyDigestLog.analysis_id.in_(batch)
+        digests = db.query(WeeklyDigestLog).join(Analysis, WeeklyDigestLog.analysis_id == Analysis.id).filter(
+            Analysis.organization_id == org_id, WeeklyDigestLog.analysis_id.in_(batch)
         )
-        counts.digest_links_to_clear += digests.filter(User.organization_id == org_id).count()
-        counts.references_requiring_review += digests.filter(
-            or_(User.organization_id.is_(None), User.organization_id != org_id)
-        ).count()
+        counts.digest_links_to_clear += digests.count()
     for batch in _batches(response_ids):
         periods = db.query(SurveyPeriod).filter(SurveyPeriod.response_id.in_(batch))
         counts.survey_period_links_to_clear += periods.filter(SurveyPeriod.organization_id == org_id).count()

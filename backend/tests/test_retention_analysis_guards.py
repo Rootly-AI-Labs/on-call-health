@@ -141,6 +141,85 @@ def test_expired_parent_prevents_github_refetch_before_any_provider_calls(
 
 @pytest.mark.parametrize("endpoint", ["get_user_github_daily_commits", "get_analysis_github_commits_timeline"])
 @pytest.mark.parametrize("policy_enabled_before", [False, True])
+def test_github_collection_releases_organization_lock_and_rechecks_current_policy(
+    retention_engine, monkeypatch, endpoint, policy_enabled_before,
+):
+    """Independent sessions prove a settings write can finish during provider I/O.
+
+    Rows are committed only in the explicitly guarded disposable test database,
+    then removed in dependency order. The ordinary rollback fixture cannot prove
+    lock release because its outer transaction deliberately remains open.
+    """
+    from types import SimpleNamespace
+    from uuid import uuid4
+    from app import models
+    from app.api.endpoints import analyses, github
+    from app.services import github_collector
+
+    suffix = uuid4().hex
+    organization_id = user_id = None
+    try:
+        with Session(retention_engine) as setup:
+            organization = models.Organization(
+                name="GitHub retention lock regression", domain=f"lock-{suffix}.example.test",
+                slug=f"lock-{suffix}", status="active",
+                settings={"data_retention": {"retention_days": 90 if policy_enabled_before else None}},
+            )
+            setup.add(organization)
+            setup.flush()
+            organization_id = organization.id
+            user = models.User(email=f"lock-{suffix}@example.test", organization_id=organization_id, role="admin", status="active")
+            setup.add(user)
+            setup.flush()
+            user_id = user.id
+            payload = coverage(RECENT)
+            payload["team_analysis"] = {"members": [{
+                "user_email": "member@example.com", "github_activity": {"username": "member", "commits_count": 1},
+            }]}
+            analysis = models.Analysis(
+                user_id=user_id, organization_id=organization_id, status="completed",
+                created_at=NOW, time_range=120, results=payload, results_generated_at=NOW - timedelta(days=45),
+            )
+            setup.add_all([analysis, models.GitHubIntegration(user_id=user_id, github_username="member", github_token="fake")])
+            setup.flush()
+            analysis_id = analysis.id
+            setup.commit()
+
+        with Session(retention_engine) as reader:
+            async def collect(**kwargs):
+                assert not reader.in_transaction(), "Provider request still holds its DB transaction"
+                with Session(retention_engine) as writer:
+                    organization = writer.query(models.Organization).filter_by(id=organization_id).with_for_update(nowait=True).one()
+                    organization.settings = {"data_retention": {"retention_days": 30}}
+                    writer.commit()
+                return [{"date": RECENT.date().isoformat(), "commits": 5, "after_hours_commits": 0, "weekend_commits": 0}]
+
+            collector = MagicMock()
+            collector.fetch_daily_commit_data = AsyncMock(side_effect=collect)
+            monkeypatch.setattr(github_collector, "GitHubCollector", lambda: collector)
+            monkeypatch.setattr(github, "decrypt_token", lambda token: "fake")
+            kwargs = {"analysis_id": analysis_id, "current_user": SimpleNamespace(id=user_id, organization_id=organization_id), "db": reader}
+            if endpoint == "get_user_github_daily_commits":
+                kwargs["user_email"] = "member@example.com"
+            with pytest.raises(HTTPException) as exc:
+                asyncio.run(getattr(analyses, endpoint)(**kwargs))
+            assert exc.value.status_code == 410
+            collector.fetch_daily_commit_data.assert_awaited_once()
+    finally:
+        with Session(retention_engine) as teardown:
+            if user_id is not None:
+                teardown.query(models.GitHubIntegration).filter_by(user_id=user_id).delete(synchronize_session=False)
+            if organization_id is not None:
+                teardown.query(models.Analysis).filter_by(organization_id=organization_id).delete(synchronize_session=False)
+            if user_id is not None:
+                teardown.query(models.User).filter_by(id=user_id).delete(synchronize_session=False)
+            if organization_id is not None:
+                teardown.query(models.Organization).filter_by(id=organization_id).delete(synchronize_session=False)
+            teardown.commit()
+
+
+@pytest.mark.parametrize("endpoint", ["get_user_github_daily_commits", "get_analysis_github_commits_timeline"])
+@pytest.mark.parametrize("policy_enabled_before", [False, True])
 def test_github_old_source_payload_is_retained_for_fresh_parent_with_policy_change(
     db, users, organizations, analysis_factory, monkeypatch, endpoint,
     policy_enabled_before,
@@ -178,7 +257,7 @@ def test_github_old_source_payload_is_retained_for_fresh_parent_with_policy_chan
 
 
 @pytest.mark.parametrize("endpoint", ["get_user_github_daily_commits", "get_analysis_github_commits_timeline"])
-@pytest.mark.parametrize("change", ["enable_expired", "shorten_expired", "clear_result"])
+@pytest.mark.parametrize("change", ["enable_expired", "shorten_expired", "clear_result", "delete_analysis"])
 def test_github_response_cannot_revive_parent_expired_or_cleared_during_collection(
     db, users, organizations, analysis_factory, monkeypatch, endpoint, change,
 ):
@@ -199,6 +278,8 @@ def test_github_response_cannot_revive_parent_expired_or_cleared_during_collecti
         organizations[0].settings = {"data_retention": {"retention_days": 30}}
         if change == "clear_result":
             analysis.results = None
+        elif change == "delete_analysis":
+            db.delete(analysis)
         db.commit()
         return [{"date": RECENT.date().isoformat(), "commits": 5, "after_hours_commits": 0, "weekend_commits": 0}]
 
@@ -211,7 +292,7 @@ def test_github_response_cannot_revive_parent_expired_or_cleared_during_collecti
         kwargs["user_email"] = "member@example.com"
     with pytest.raises(HTTPException) as exc:
         asyncio.run(getattr(analyses, endpoint)(**kwargs))
-    assert exc.value.status_code == 410
+    assert exc.value.status_code == (404 if change == "delete_analysis" else 410)
     collector.fetch_daily_commit_data.assert_awaited_once()
 
 

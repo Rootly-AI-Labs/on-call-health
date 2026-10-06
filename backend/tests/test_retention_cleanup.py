@@ -492,15 +492,13 @@ def test_survey_with_unknown_age_is_preserved_and_detached_from_expired_analysis
     ("notification", "null"),
     ("survey", "other"),
     ("survey", "null"),
-    ("digest", "other"),
-    ("digest", "null"),
     ("survey_period", "other"),
 ])
 def test_conflicting_dependent_ownership_aborts_entire_organization(
     db, db_connection, enabled_policy, organizations, users,
     analysis_factory, survey_factory, dependency, ownership
 ):
-    from app.models import IntegrationMapping, SurveyPeriod, UserCorrelation, UserNotification, WeeklyDigestLog
+    from app.models import IntegrationMapping, SurveyPeriod, UserCorrelation, UserNotification
     from app.services.retention_cleanup import RetentionScopeConflict
 
     expired = analysis_factory(coverage(OLD))
@@ -523,10 +521,6 @@ def test_conflicting_dependent_ownership_aborts_entire_organization(
         ))
     elif dependency == "survey":
         survey_factory(RECENT, organization_id=owner_id, organization_index=1, analysis_id=expired.id)
-    elif dependency == "digest":
-        if ownership == "null":
-            users[1].organization_id = None
-        db.add(WeeklyDigestLog(user_id=users[1].id, analysis_id=expired.id, week_start_date=OLD.date()))
     elif dependency == "survey_period":
         correlation = UserCorrelation(
             user_id=users[1].id, organization_id=organizations[1].id, email=users[1].email
@@ -554,6 +548,36 @@ def test_conflicting_dependent_ownership_aborts_entire_organization(
 
     db.expire_all()
     assert snapshot(db_connection) == before
+
+
+@pytest.mark.parametrize("membership", ["removed", "moved"])
+def test_historical_digest_links_follow_analysis_org_after_recipient_leaves(
+    db, enabled_policy, organizations, users, analysis_factory, membership
+):
+    from app.models import Analysis, WeeklyDigestLog
+    from app.services.retention_preview import RetentionPreviewRequest, build_retention_preview
+
+    expired = analysis_factory(coverage(OLD), is_saved=True, is_auto_refresh=False)
+    unrelated = analysis_factory(coverage(OLD), organization_index=1)
+    expired_id, unrelated_id = expired.id, unrelated.id
+    recipient = users[0]
+    digest = WeeklyDigestLog(user_id=recipient.id, analysis_id=expired_id, week_start_date=OLD.date())
+    other_digest = WeeklyDigestLog(user_id=recipient.id, analysis_id=unrelated_id, week_start_date=NOW.date())
+    db.add_all([digest, other_digest])
+    recipient.organization_id = None if membership == "removed" else organizations[1].id
+    db.commit()
+    digest_id, other_digest_id = digest.id, other_digest.id
+
+    preview = build_retention_preview(db, enabled_policy, RetentionPreviewRequest(retention_days=90), now=NOW)
+    assert preview.related_records.digest_links_to_clear == 1
+    assert preview.related_records.references_requiring_review == 0
+    result = cleanup(db, enabled_policy)
+    assert result.digest_links_cleared == 1
+    db.expire_all()
+    assert db.get(Analysis, expired_id) is None
+    assert db.get(WeeklyDigestLog, digest_id).analysis_id is None
+    assert db.get(Analysis, unrelated_id).results == coverage(OLD)
+    assert db.get(WeeklyDigestLog, other_digest_id).analysis_id == unrelated_id
 
 
 def test_cache_invalidation_precedes_mutation(
