@@ -55,7 +55,8 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
     and re-run them.  Pass interval_filter=None to process all intervals.
     """
     from ..models import SessionLocal, Analysis, RootlyIntegration, User
-    from ..api.endpoints.analyses import _retention_cutoff, run_analysis_task
+    from ..api.endpoints.analyses import run_analysis_task
+    from .retention_access import organization_retention_cutoff
     from .retention_preview import result_generation_time
     from ..services.integration_validator import IntegrationValidator
     from ..services.notification_service import NotificationService
@@ -82,26 +83,34 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
 
         now = datetime.now(timezone.utc)
 
-        for analysis in candidates:
-            if analysis.status == "failed" and _retention_cutoff(db, analysis.organization_id) is None:
+        # Keep identities separately: rolling back one failed lookup expires
+        # ORM instances, including candidates removed by a concurrent deletion.
+        candidate_records = [(analysis.id, analysis) for analysis in candidates]
+        for analysis_id, analysis in candidate_records:
+            try:
+                if analysis.status == "failed" and organization_retention_cutoff(
+                    db, analysis.organization_id, now=now,
+                ) is None:
+                    continue
+                interval = _parse_interval(analysis.auto_refresh_interval)
+                completed_at = analysis.completed_at
+                # Ensure timezone-aware comparison
+                if completed_at.tzinfo is None:
+                    completed_at = completed_at.replace(tzinfo=timezone.utc)
+                if now >= completed_at + interval:
+                    due_analyses.append((analysis_id, analysis))
+            except Exception:
+                logger.warning("Could not check auto-refresh candidate %s; continuing tick", analysis_id, exc_info=True)
                 db.rollback()
-                continue
-            interval = _parse_interval(analysis.auto_refresh_interval)
-            completed_at = analysis.completed_at
-            # Ensure timezone-aware comparison
-            if completed_at.tzinfo is None:
-                completed_at = completed_at.replace(tzinfo=timezone.utc)
-            if now >= completed_at + interval:
-                due_analyses.append(analysis)
 
         logger.info(
             f"🔄 [AUTO_REFRESH_SCHEDULER] {len(candidates)} auto-refresh analyses found, "
             f"{len(due_analyses)} due for refresh"
         )
 
-        for old_analysis in due_analyses:
+        for analysis_id, old_analysis in due_analyses:
             try:
-                lock_key = f"auto_refresh:analysis:{old_analysis.id}"
+                lock_key = f"auto_refresh:analysis:{analysis_id}"
 
                 # Distributed lock prevents cross-instance duplication.
                 # Always take a DB row lock to ensure only one worker mutates the analysis.
@@ -115,10 +124,10 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                     # Cleanup and policy writes take the organization first.
                     # Hold its shared lock through validation/replacement so a
                     # concurrent policy change cannot select unsafe behavior.
-                    retention_enabled = _retention_cutoff(db, old_analysis.organization_id, lock=True) is not None
+                    retention_enabled = organization_retention_cutoff(db, old_analysis.organization_id, lock=True) is not None
                     locked_analysis = (
                         db.query(Analysis)
-                        .filter(Analysis.id == old_analysis.id)
+                        .filter(Analysis.id == analysis_id)
                         .with_for_update(skip_locked=True)
                         .execution_options(populate_existing=True)
                         .first()
@@ -126,7 +135,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
 
                     if not locked_analysis:
                         logger.info(
-                            f"🔄 [AUTO_REFRESH_SCHEDULER] Skipping analysis {old_analysis.id}: "
+                            f"🔄 [AUTO_REFRESH_SCHEDULER] Skipping analysis {analysis_id}: "
                             f"locked by another worker"
                         )
                         db.rollback()
@@ -390,7 +399,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
     
             except Exception as e:
                 logger.error(
-                    f"🔄 [AUTO_REFRESH_SCHEDULER] Failed to refresh analysis {old_analysis.id}: {e}",
+                    f"🔄 [AUTO_REFRESH_SCHEDULER] Failed to refresh analysis {analysis_id}: {e}",
                     exc_info=True,
                 )
                 db.rollback()

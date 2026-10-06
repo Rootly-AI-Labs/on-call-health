@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import Text, cast, func, over
+from sqlalchemy import Text, cast, func, or_, over
 from sqlalchemy.orm import Session, defer, load_only
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 
@@ -22,7 +22,7 @@ from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest
 from ...core.alert_health_calculator import calculate_alert_health_score
 from ...core.och_config import apply_alert_health_to_och, OCHConfig
 from ...services.survey_response_service import extract_analysis_member_emails, normalize_survey_email
-from ...services.data_retention import read_retention_policy
+from ...services.retention_access import RetentionOrganizationMissing, organization_retention_cutoff
 from ...services.retention_preview import classify_analysis_result, result_generation_time
 from ...utils.visual_logger import log_task_start, log_task_complete
 
@@ -853,17 +853,12 @@ _ANALYSIS_CACHE_TTL = 3600  # 1 hour — results are immutable once completed
 
 def _retention_cutoff(db: Session, organization_id: int | None, *, lock: bool = False):
     """Read the current policy; locks share cleanup's organization-first order."""
-    if organization_id is None:
-        return None
-    from ...models import Organization
-    query = db.query(Organization).filter(Organization.id == organization_id).populate_existing()
-    if lock:
-        query = query.with_for_update(read=True)
-    organization = query.first()
-    if organization is None:
-        raise HTTPException(status_code=410, detail="Analysis organization no longer exists")
-    days = read_retention_policy(organization).retention_days
-    return datetime.now(timezone.utc) - timedelta(days=days) if days is not None else None
+    try:
+        return organization_retention_cutoff(
+            db, organization_id, lock=lock, now=datetime.now(timezone.utc),
+        )
+    except RetentionOrganizationMissing as error:
+        raise HTTPException(status_code=410, detail=str(error)) from error
 
 
 def _retention_refresh_status(db: Session, analysis: Analysis):
@@ -903,6 +898,15 @@ def _require_retained_result(db: Session, analysis: Analysis):
     """Never serve expired or undated results, including before cleanup runs."""
     cutoff = _retention_cutoff(db, analysis.organization_id, lock=True)
     if cutoff is None:
+        # Disabling retention cannot restore a cleared snapshot. Read only
+        # presence/timestamp metadata here so Redis reads do not load full JSON.
+        snapshot = db.query(
+            Analysis.status, Analysis.results_generated_at, Analysis.error_message,
+            or_(Analysis.results.is_(None), cast(Analysis.results, Text) == "null"),
+        ).filter(Analysis.id == analysis.id).first()
+        if snapshot is None:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        _require_uncleared_snapshot(*snapshot)
         return None
     # Cleanup can clear a recurring result or delete a manual saved row after
     # it was first read, while this request waits for the organization lock.
@@ -910,6 +914,9 @@ def _require_retained_result(db: Session, analysis: Analysis):
         "results", "status", "config", "rootly_integration_id", "results_generated_at", "completed_at",
         "error_message", "error_generated_at",
     ])
+    _require_uncleared_snapshot(
+        analysis.status, analysis.results_generated_at, analysis.error_message, analysis.results is None,
+    )
     eligibility = classify_analysis_result(analysis, cutoff)
     if eligibility.disposition in ("expired", "unverifiable") or (
         eligibility.disposition == "deferred" and (analysis.results or analysis.error_message)
@@ -920,6 +927,16 @@ def _require_retained_result(db: Session, analysis: Analysis):
                     "message": "Analysis results are unavailable under the organization's data retention policy."},
         )
     return cutoff
+
+
+def _require_uncleared_snapshot(status: str, generated_at, error_message, result_missing: bool):
+    """Keep active runs, never-generated configs and error-only failures readable."""
+    if (result_missing and generated_at is not None
+            and status not in ("pending", "running") and (status != "failed" or not error_message)):
+        raise HTTPException(status_code=410, detail={
+            "code": "analysis_retention_unavailable", "reason": "result_cleared",
+            "message": "Analysis results were cleared. Run the analysis again to regenerate them.",
+        })
 
 
 def _require_result_after_collection(db: Session, analysis: Analysis):
@@ -3161,7 +3178,24 @@ def _persist_analysis_result(
         organization_id = result_db.query(Analysis.organization_id).filter(Analysis.id == analysis_id).scalar()
         # Serialize policy changes/cleanup and completion using their lock order:
         # organization, then analysis. Re-read policy after long API waits.
-        _retention_cutoff(result_db, organization_id, lock=True)
+        try:
+            organization_retention_cutoff(result_db, organization_id, lock=True)
+        except RetentionOrganizationMissing:
+            # A deletion race may have removed the analysis too. An orphaned
+            # legacy row must stop running, but cannot receive a new result.
+            analysis = result_db.query(Analysis).filter(Analysis.id == analysis_id).with_for_update().first()
+            if analysis is None:
+                return False
+            if analysis.results and analysis.results_generated_at is None:
+                analysis.results_generated_at = result_generation_time(analysis)
+            analysis.status = "failed"
+            analysis.error_message = "Analysis organization no longer exists."
+            analysis.error_generated_at = datetime.now(timezone.utc)
+            analysis.completed_at = analysis.error_generated_at
+            analysis.is_auto_refresh = False
+            result_db.commit()
+            logger.warning("Discarded result for analysis %s with missing organization", analysis_id)
+            return False
         analysis = result_db.query(Analysis).filter(Analysis.id == analysis_id).with_for_update().first()
         if not analysis:
             return False
@@ -3532,6 +3566,8 @@ async def run_analysis_task(
                         linear_mapped = [u for u in synced_users if u.get('linear_user_id')]
                         if linear_mapped:
                             logger.info(f"   ✅ {len(linear_mapped)} manual mappings have linear_user_id")
+                        if platform == "pagerduty" and not synced_users:
+                            synced_users = None
                     else:
                         logger.info(f"⚠️  FALLBACK: No manual mappings found - will fetch from API")
                         synced_users = None  # Fallback to API
@@ -3574,6 +3610,8 @@ async def run_analysis_task(
                             }
                             synced_users.append(user_data)
                         logger.info(f"✅ ERROR FALLBACK: Recovered {len(synced_users)} manual mappings")
+                        if platform == "pagerduty" and not synced_users:
+                            synced_users = None
                     else:
                         logger.warning(f"⚠️  ERROR FALLBACK: No manual mappings available - will fetch from API")
                         synced_users = None
