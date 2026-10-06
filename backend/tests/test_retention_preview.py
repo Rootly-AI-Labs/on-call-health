@@ -565,11 +565,13 @@ def test_cross_organization_linked_rows_require_review(client, db, organizations
     ])
     db.commit()
     result = preview(client)
-    assert result["related_records"]["references_requiring_review"] == 4
+    # Digest recipients may have left the analysis organization; its parent
+    # analysis, unlike mappings/notifications/surveys, establishes ownership.
+    assert result["related_records"]["references_requiring_review"] == 3
     assert result["related_records"]["analysis_mappings"] == 0
     assert result["related_records"]["analysis_notifications"] == 0
     assert result["related_records"]["survey_links_to_clear"] == 0
-    assert result["related_records"]["digest_links_to_clear"] == 0
+    assert result["related_records"]["digest_links_to_clear"] == 1
     assert result["warnings"]
 
 

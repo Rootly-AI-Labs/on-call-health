@@ -2220,6 +2220,10 @@ async def get_user_github_daily_commits(
         start_date = end_date - timedelta(days=analysis.time_range or 30)
     
     # Fetch daily commit data
+    analysis_organization_id = analysis.organization_id
+    # Release the organization claim and DB connection during provider I/O.
+    db.commit()
+
     daily_commits = await collector.fetch_daily_commit_data(
         username=github_username,
         start_date=start_date,
@@ -2229,6 +2233,13 @@ async def get_user_github_daily_commits(
 
     # A policy change or cleanup during the provider request can expire the
     # parent result. Historical source events remain valid within a fresh result.
+    # Commit expires ORM attributes; reload without dereferencing the old
+    # instance, which may have been deleted during provider collection.
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id, Analysis.organization_id == analysis_organization_id,
+    ).first()
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
     _require_result_after_collection(db, analysis)
     
     if daily_commits is None:
@@ -2427,8 +2438,19 @@ async def get_analysis_github_commits_timeline(
             tasks.append((member["username"], task))
     
     # Execute all tasks concurrently
+    analysis_organization_id = analysis.organization_id
+    # Release the organization claim and DB connection during provider I/O.
+    db.commit()
+
     results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
 
+    # Commit expires ORM attributes; reload without dereferencing the old
+    # instance, which may have been deleted during provider collection.
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id, Analysis.organization_id == analysis_organization_id,
+    ).first()
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
     _require_result_after_collection(db, analysis)
     
     # Process results

@@ -611,13 +611,15 @@ export default function useDashboard() {
             }
           }
 
-          if (!didSelect && savedAnalyses[0]) {
-            const id = String(savedAnalyses[0].id)
-            const fullAnalysis = await fetchFullAnalysisById(id, selectionGeneration)
-            if (!ownsAnalysisSelection(selectionGeneration)) return
-            if (fullAnalysis) {
-              updateURLWithAnalysis(String(fullAnalysis.id))
-              didSelect = true
+          if (!didSelect) {
+            for (const savedAnalysis of savedAnalyses) {
+              const fullAnalysis = await fetchFullAnalysisById(String(savedAnalysis.id), selectionGeneration)
+              if (!ownsAnalysisSelection(selectionGeneration)) return
+              if (fullAnalysis) {
+                updateURLWithAnalysis(String(fullAnalysis.id))
+                didSelect = true
+                break
+              }
             }
           }
         }

@@ -336,6 +336,89 @@ def failed_org():
     return organization
 
 
+def test_daily_lock_skip_gets_targeted_attempt_without_recorded_failure(scheduler, monkeypatch):
+    organization = policy_org()
+    clock = [NOW]
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: FakeSession(organization))
+    monkeypatch.setattr(scheduler, "utc_now", lambda: clock[0])
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    instance._after_daily_attempt(7, "skipped")
+    job_id = f"{scheduler.RETRY_JOB_PREFIX}7"
+    callback, options = instance.scheduler.jobs.pop(job_id)
+    assert options["trigger"].run_date == NOW + timedelta(minutes=15)
+    assert options["kwargs"] == {"mode": "daily"}
+    assert options["replace_existing"] is False
+
+    clock[0] = options["trigger"].run_date
+    attempts = []
+
+    def cleanup(session, organization_id, **kwargs):
+        attempts.append(organization_id)
+        session.commit()
+
+    monkeypatch.setattr(scheduler, "cleanup_organization_data", cleanup)
+    real_process = scheduler.process_organization_cleanup
+    monkeypatch.setattr(scheduler, "process_organization_cleanup", lambda organization_id, **kwargs: real_process(
+        organization_id, session_factory=lambda: FakeSession(organization), clock=lambda: clock[0], **kwargs,
+    ))
+    assert callback(*options["args"], **options["kwargs"]) == "succeeded"
+    assert attempts == [7]
+    assert not instance.scheduler.jobs
+
+
+@pytest.mark.parametrize("case", ["missing", "inactive", "disabled", "not_due", "already_cleaned"])
+def test_daily_skip_does_not_schedule_ineligible_organization(scheduler, monkeypatch, case):
+    organization = policy_org()
+    if case == "missing": organization = None
+    if case == "inactive": organization.status = "suspended"
+    if case == "disabled": organization.settings["data_retention"]["retention_days"] = None
+    if case == "not_due": organization.settings["data_retention"]["updated_at"] = NOW.isoformat()
+    if case == "already_cleaned":
+        organization.settings["data_retention_cleanup"] = {
+            "state": "succeeded", "last_success_started_at": NOW.isoformat(), "last_success_at": NOW.isoformat(),
+        }
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: FakeSession(organization))
+    monkeypatch.setattr(scheduler, "utc_now", lambda: NOW)
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    instance._after_daily_attempt(7, "skipped")
+    assert not instance.scheduler.jobs
+
+
+def test_deferred_daily_attempt_rechecks_policy_and_requeues_continuing_lock(scheduler, monkeypatch):
+    organization = policy_org()
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: FakeSession(organization))
+    monkeypatch.setattr(scheduler, "utc_now", lambda: NOW)
+    real_process = scheduler.process_organization_cleanup
+    monkeypatch.setattr(scheduler, "process_organization_cleanup", lambda organization_id, **kwargs: real_process(
+        organization_id, session_factory=lambda: FakeSession(None), clock=lambda: NOW, **kwargs,
+    ))
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    assert instance._run_retry(7, mode="daily") == "skipped"
+    _, options = instance.scheduler.jobs[f"{scheduler.RETRY_JOB_PREFIX}7"]
+    assert options["trigger"].run_date == NOW + timedelta(minutes=15)
+    assert options["kwargs"] == {"mode": "daily"}
+    instance.scheduler.jobs.clear()
+    organization.settings["data_retention"]["retention_days"] = None
+    assert instance._run_retry(7, mode="daily") == "skipped"
+    assert not instance.scheduler.jobs
+
+
+def test_daily_deferral_preserves_existing_failure_retry(scheduler, monkeypatch):
+    organization = failed_org()
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: FakeSession(organization))
+    monkeypatch.setattr(scheduler, "utc_now", lambda: NOW + timedelta(minutes=15))
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    instance._schedule_retry(7)
+    job_id = f"{scheduler.RETRY_JOB_PREFIX}7"
+    existing = instance.scheduler.jobs[job_id]
+    instance._after_daily_attempt(7, "skipped")
+    assert instance.scheduler.jobs[job_id] is existing
+
+
 def test_failed_organization_gets_targeted_future_date_trigger(scheduler, monkeypatch):
     organization = failed_org()
     monkeypatch.setattr(scheduler, "SessionLocal", lambda: FakeSession(organization))

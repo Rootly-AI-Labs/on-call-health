@@ -221,7 +221,7 @@ class RetentionScheduler:
         self._shutdown_task: asyncio.Task | None = None
 
     def _run_poll(self) -> RetentionPollResult:
-        """One daily sweep; failed attempts arrange only their own retry."""
+        """One daily sweep; failures and lock skips arrange targeted follow-ups."""
         return process_due_retention_cleanups(
             stop_event=self._stop_event, on_outcome=self._after_daily_attempt,
         )
@@ -231,6 +231,8 @@ class RetentionScheduler:
             self._schedule_retry(organization_id)
         elif outcome == "succeeded":
             self._remove_retry(organization_id)
+        elif outcome == "skipped":
+            self._schedule_retry(organization_id, deferred=True, mode="daily")
 
     def _remove_retry(self, organization_id: int) -> None:
         try:
@@ -238,12 +240,12 @@ class RetentionScheduler:
         except JobLookupError:
             pass
 
-    def _schedule_retry(self, organization_id: int, *, deferred: bool = False) -> None:
-        """Read persisted, current-policy failure state before queuing a retry.
+    def _schedule_retry(self, organization_id: int, *, deferred: bool = False, mode: AttemptMode = "retry") -> None:
+        """Recheck persisted eligibility before queuing a targeted follow-up.
 
         The eventual callback rechecks everything under the organization lock.
         This read only describes a candidate; it never authorizes deletion.
-        A skipped claim can still belong to a current failed attempt. Give it
+        A skipped claim may be due daily work or a current failed attempt. Give it
         a future timer instead of spinning on an overdue timestamp, without
         replacing a timer another worker has already arranged.
         """
@@ -255,7 +257,11 @@ class RetentionScheduler:
                 organization = db.query(Organization).filter(
                     Organization.id == organization_id, Organization.status == "active",
                 ).one_or_none()
-                due_at = cleanup_due_at(organization, now=now, mode="retry") if organization else None
+                due_at = cleanup_due_at(organization, now=now, mode=mode) if organization else None
+            if mode == "daily" and (due_at is None or due_at > now):
+                # A skipped daily claim may be disabled, already cleaned or
+                # waiting for tomorrow's slot. Preserve any genuine retry timer.
+                return
             if due_at is None:
                 self._remove_retry(organization_id)
                 return
@@ -266,6 +272,7 @@ class RetentionScheduler:
             self.scheduler.add_job(
                 self._run_retry, trigger=DateTrigger(run_date=max(due_at, earliest), timezone=timezone.utc),
                 args=[organization_id], id=f"{RETRY_JOB_PREFIX}{organization_id}",
+                **({"kwargs": {"mode": "daily"}} if mode == "daily" else {}),
                 replace_existing=not deferred, max_instances=1, misfire_grace_time=None,
             )
         except ConflictingIdError:
@@ -275,17 +282,19 @@ class RetentionScheduler:
         except Exception:
             logger.error("Retention retry scheduling unavailable org=%s code=retention_retry_failed", organization_id)
 
-    def _run_retry(self, organization_id: int) -> Outcome:
-        """Retry only this failed organization, without a global periodic poll."""
+    def _run_retry(self, organization_id: int, *, mode: AttemptMode = "retry") -> Outcome:
+        """Recheck one failed or lock-deferred organization without global polling."""
         outcome = process_organization_cleanup(
-            organization_id, stop_event=self._stop_event, mode="retry",
+            organization_id, stop_event=self._stop_event, mode=mode,
         )
         if outcome == "failed":
             self._schedule_retry(organization_id)
         elif outcome == "skipped":
             # SKIP LOCKED also sees locks held by analysis reads/writes and
             # settings requests. They do not arrange cleanup's next retry.
-            self._schedule_retry(organization_id, deferred=True)
+            self._schedule_retry(organization_id, deferred=True, **({"mode": mode} if mode == "daily" else {}))
+        elif outcome == "succeeded":
+            self._remove_retry(organization_id)
         return outcome
 
     def _restore_retries(self) -> None:
