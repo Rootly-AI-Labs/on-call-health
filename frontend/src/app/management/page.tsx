@@ -1967,7 +1967,7 @@ function TeamPageContent() {
               )}
               </div>
           )}
-          <div className="mt-6">
+          <div className="mt-6" hidden={viewMode !== 'organization'}>
             <DataRetentionSettings />
           </div>
             </div>  {/* Close max-w-4xl mx-auto */}

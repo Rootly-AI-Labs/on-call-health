@@ -5,7 +5,6 @@ import { AlertCircle, CheckCircle, ChevronDown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
@@ -44,7 +43,6 @@ export function DataRetentionSettings() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [confirmPolicy, setConfirmPolicy] = useState(false)
   const sessionToken = useRef<string | null>(null)
   const actionController = useRef<AbortController | null>(null)
 
@@ -104,13 +102,22 @@ export function DataRetentionSettings() {
   const needsPolicyConfirmation = days !== null && policy !== null && (
     policy.retention_days === null || days < policy.retention_days
   )
-  const canSave = isAdmin && !busy && !invalidDays && (!enabled || previewMatches) && policyChanged
+  const canReview = isAdmin && !busy && !invalidDays && policyChanged
+  const canSave = canReview && (!enabled || previewMatches)
 
   function invalidatePreview() {
     setPreview(null)
     setError(null)
     setSuccess(null)
-    setConfirmPolicy(false)
+  }
+
+  function closeDialog() {
+    if (busy === "save") return
+    actionController.current?.abort()
+    actionController.current = null
+    setBusy(null)
+    setPreview(null)
+    setDialogOpen(false)
   }
 
   async function verifiedTokenForAction(signal: AbortSignal) {
@@ -131,12 +138,12 @@ export function DataRetentionSettings() {
   }
 
   async function requestPreview() {
-    if (!isAdmin || invalidDays || busy) return
+    if (!canReview || !enabled) return
     setBusy("preview")
     setError(null)
     setSuccess(null)
     setPreview(null)
-    setConfirmPolicy(false)
+    setDialogOpen(true)
     const controller = new AbortController()
     actionController.current = controller
     try {
@@ -148,14 +155,15 @@ export function DataRetentionSettings() {
       setPreview(result)
     } catch (failure) {
       if (controller.signal.aborted) return
+      setDialogOpen(false)
       setError(messageFrom(failure))
     } finally {
       if (!controller.signal.aborted) setBusy(null)
     }
   }
 
-  async function savePolicy() {
-    if (!canSave || (needsPolicyConfirmation && !confirmPolicy)) return
+  async function savePolicy(confirmedDeletion = false) {
+    if (!canSave || (needsPolicyConfirmation && !confirmedDeletion)) return
     setBusy("save")
     setError(null)
     const controller = new AbortController()
@@ -164,7 +172,7 @@ export function DataRetentionSettings() {
       const result = await updateOrganizationRetention(await verifiedTokenForAction(controller.signal), {
         retention_days: days,
         expected_policy_version: policy!.policy_version,
-        ...(needsPolicyConfirmation ? { confirm_deletion: confirmPolicy } : {}),
+        ...(needsPolicyConfirmation ? { confirm_deletion: confirmedDeletion } : {}),
       }, controller.signal)
       if (controller.signal.aborted) return
       if (result.organization_id !== policy?.organization_id) throw new Error("Your organization changed. Refresh settings to verify the saved policy.")
@@ -174,17 +182,15 @@ export function DataRetentionSettings() {
       setDaysInput(String(result.retention_days ?? 90))
       setPreview(null)
       setDialogOpen(false)
-      setConfirmPolicy(false)
       setSuccess(result.enabled
         ? "Retention policy saved. Cleanup uses these settings at the next daily run at 03:00 UTC; no data was deleted by this save."
         : pendingLegacy ? "Retention disabled. The prior cleanup approval has been cancelled." : "Retention disabled.")
     } catch (failure) {
       if (controller.signal.aborted) return
       setError(messageFrom(failure))
-      // Discard the previous preview and consent after a failed or ambiguous save.
+      // Discard the previous preview after a failed or ambiguous save.
       setPreview(null)
       setDialogOpen(false)
-      setConfirmPolicy(false)
       if (failure instanceof RetentionApiError && (failure.status === 401 || failure.status === 403)) setAccess("error")
     } finally {
       if (!controller.signal.aborted) setBusy(null)
@@ -194,12 +200,11 @@ export function DataRetentionSettings() {
   const cleanup = policy?.cleanup_status
   const cleanupState = cleanup?.state === "never" ? "Not run yet" : cleanup?.state === "succeeded" ? "Succeeded" : cleanup?.state === "failed" ? "Failed" : "Skipped"
   const unsavedChanges = policyChanged
+  const dayUnit = days === 1 ? "day" : "days"
   const deletionWarning = needsPolicyConfirmation && !invalidDays ? (
-    <div role="alert" aria-label="Existing data deletion warning" className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
-      <p className="font-semibold">Permanent deletion of existing data</p>
-      <p>{policy?.retention_days === null ? `Enabling ${days}-day retention` : `Shortening retention to ${days} days`} will permanently clear entire analysis results generated more than {days} days ago, including the imported activity, historical metrics, enrichments, and insights stored inside them, and delete survey responses submitted more than {days} days ago. This applies to existing data as well as future data.</p>
-      <p>Expired manually saved analyses are deleted, including their configuration and metadata. Newer survey responses, auto-refresh configuration, accounts, memberships, and integration settings are preserved. Deleted data cannot be restored by disabling retention or increasing the period.</p>
-      <p>Expired analysis results and results with unknown generation dates become unavailable immediately when the policy is saved. Physical deletion happens during cleanup; saving does not run deletion. Results with unknown generation dates are preserved until successfully regenerated.{pendingLegacy && " Previously approved, unchanged results may still be cleared at cleanup."}</p>
+    <div role="alert" aria-label="Existing data deletion warning" className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
+      <p className="font-semibold">Deletion is permanent</p>
+      <p>{policy?.retention_days === null ? "Enabling" : "Shortening"} retention permanently clears existing results generated and surveys submitted more than {days} {dayUnit} ago during cleanup.</p>
     </div>
   ) : null
 
@@ -216,7 +221,7 @@ export function DataRetentionSettings() {
           {policy && <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${policy.enabled ? "bg-purple-100 text-purple-800" : "bg-neutral-100 text-neutral-600"}`}>
             {policy.enabled ? "Enabled" : "Disabled"}
           </span>}
-          {unsavedChanges && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">Unsaved changes</span>}
+          {unsavedChanges && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">Unsaved</span>}
           {cleanup?.state === "failed" && <span role="status" className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">{policy?.enabled ? "Cleanup needs attention" : "Last cleanup failed"}</span>}
           {pendingLegacy && <span role="status" className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">Prior cleanup approval pending</span>}
           <Button variant="ghost" size="sm" aria-label={expanded ? "Close data retention settings" : isAdmin ? "Configure data retention settings" : "View settings for data retention"} aria-expanded={expanded} aria-controls="data-retention-panel" disabled={!policy || Boolean(busy)} onClick={() => setExpanded((value) => !value)}>
@@ -243,14 +248,11 @@ export function DataRetentionSettings() {
               </div>
             </div>
             {invalidDays && <p id="retention-days-error" className="text-xs text-red-700">Enter a whole number from 1 to 3650.</p>}
-            {needsPolicyConfirmation && !invalidDays && <p role="alert" aria-label="Existing data deletion warning" className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-xs leading-relaxed text-amber-950"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{policy.retention_days === null ? "Enabling" : "Shortening"} retention permanently clears existing results generated and surveys submitted more than {days} days ago during cleanup.</p>}
             {pendingLegacy && <p role="status" className="rounded-md bg-amber-50 p-3 text-xs leading-relaxed text-amber-950">An earlier approval to clear {policy.legacy_cleanup.pending_count} results with unknown generation dates is still pending. These unchanged results may be cleared at cleanup. Turn retention off and save to cancel the remaining approval.</p>}
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => void requestPreview()} disabled={Boolean(busy) || invalidDays}>{busy === "preview" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Preview deletion</Button>
-              <Button className="bg-purple-700 text-white hover:bg-purple-800" disabled={!canSave} onClick={() => {
-                setConfirmPolicy(false)
+              <Button className="bg-purple-700 text-white hover:bg-purple-800" disabled={!canReview} onClick={() => {
                 if (!enabled) { void savePolicy(); return }
-                setDialogOpen(true)
+                void requestPreview()
               }}>Save retention policy</Button>
               <Button variant="ghost" disabled={Boolean(busy)} onClick={() => { setSuccess(null); setReload((value) => value + 1) }}>Refresh settings</Button>
             </div>
@@ -274,29 +276,32 @@ export function DataRetentionSettings() {
           </details>}
         </>}
 
-        {preview && previewMatches && <div className="space-y-4 border-t border-neutral-200 pt-5" aria-label="Deletion preview">
-          <h3 className="font-semibold text-neutral-900">Deletion preview</h3>
-          <dl className="grid grid-cols-2 gap-3">
-            {[
-              ["Analysis results to clear", preview.analyses.expired + preview.legacy_cleanup.analysis_candidates],
-              ["Survey responses to delete", preview.survey_responses.expired],
-            ].map(([label, count]) => <div key={label} className="rounded-md bg-neutral-50 p-3"><dt className="text-xs leading-5 text-neutral-600">{label}</dt><dd className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">{count}</dd></div>)}
-          </dl>
-          {preview.enabled ? <p className="text-xs text-neutral-500">Newer reports and surveys are kept. Demo reports are excluded. {preview.legacy_cleanup.analysis_candidates > 0 ? "Previously approved undated results are included." : "Undated records are skipped."}</p> : <p className="text-xs text-neutral-500">These settings turn off automatic cleanup.</p>}
-          {preview.legacy_cleanup.analysis_candidates > 0 && <p className="text-xs text-amber-900">Includes {preview.legacy_cleanup.analysis_candidates} previously approved results.</p>}
-          {preview.related_records.references_requiring_review > 0 && <p role="alert" className="text-xs text-amber-900">Some linked records need review before cleanup can proceed.</p>}
-        </div>}
       </div>
-      <Dialog open={dialogOpen} onOpenChange={(open) => { if (busy !== "save") setDialogOpen(open) }}>
-        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
-          <DialogHeader><DialogTitle>Confirm retention policy</DialogTitle><DialogDescription>{enabled ? `Keep each analysis result for ${days} days after successful generation, and each survey response for ${days} days after submission.` : "Disable organization data retention."}</DialogDescription></DialogHeader>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeDialog() }}>
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Confirm retention policy</DialogTitle>
+            <DialogDescription>{enabled ? <>
+              <span className="block">Analysis results: {days} {dayUnit} after generation.</span>
+              <span className="block">Surveys: {days} {dayUnit} after submission.</span>
+            </> : "Disable organization data retention."}</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 text-sm">
-            {deletionWarning || <p>Saving configures future cleanup. It does not delete data immediately. Deleted data cannot be restored by increasing the period or disabling retention.</p>}
-            {enabled && preview && <p aria-label="Cleanup preview summary" className="rounded-md bg-neutral-50 p-3">This preview identifies {preview.analyses.expired + preview.legacy_cleanup.analysis_candidates} analysis results to clear and {preview.survey_responses.expired} old survey responses to delete.{preview.legacy_cleanup.analysis_candidates > 0 && ` The analysis count includes ${preview.legacy_cleanup.analysis_candidates} unchanged results from an earlier cleanup approval.`} Counts can change before cleanup.</p>}
+            {busy === "preview" && <p role="status" className="flex items-center gap-2 text-neutral-500"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Loading deletion preview…</p>}
+            {preview && previewMatches && <div aria-label="Deletion preview" className="space-y-2">
+              <dl className="grid grid-cols-2 gap-3">
+                {[
+                  ["Analysis results to clear", preview.analyses.expired + preview.legacy_cleanup.analysis_candidates],
+                  ["Survey responses to delete", preview.survey_responses.expired],
+                ].map(([label, count]) => <div key={label} className="rounded-md bg-neutral-50 p-3"><dt className="text-xs leading-5 text-neutral-600">{label}</dt><dd className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">{count}</dd></div>)}
+              </dl>
+              {preview.legacy_cleanup.analysis_candidates > 0 && <p className="text-xs text-amber-900">Includes {preview.legacy_cleanup.analysis_candidates} previously approved results.</p>}
+              {preview.related_records.references_requiring_review > 0 && <p role="alert" className="text-xs text-amber-900">Some linked records need review before cleanup can proceed.</p>}
+            </div>}
+            {deletionWarning || <p>Saving schedules cleanup; it does not delete data immediately. Deletion is permanent.</p>}
             {!enabled && pendingLegacy && <p className="rounded-md bg-amber-50 p-3 text-amber-900">Disabling retention will cancel the {policy?.legacy_cleanup.pending_count} remaining entries in the prior cleanup approval.</p>}
-            {needsPolicyConfirmation && <div className="flex items-start gap-3"><Checkbox id="confirm-retention-policy" checked={confirmPolicy} disabled={Boolean(busy)} onCheckedChange={(value) => setConfirmPolicy(value === true)} /><label htmlFor="confirm-retention-policy" className="leading-5">I understand this policy can permanently delete existing analysis results and old survey responses.</label></div>}
           </div>
-          <DialogFooter><Button variant="outline" disabled={Boolean(busy)} onClick={() => setDialogOpen(false)}>Cancel</Button><Button className="bg-purple-700 text-white hover:bg-purple-800" disabled={!canSave || (needsPolicyConfirmation && !confirmPolicy)} onClick={() => void savePolicy()}>{busy === "save" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirm and save</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" disabled={busy === "save"} onClick={closeDialog}>Cancel</Button><Button className="bg-purple-700 text-white hover:bg-purple-800" disabled={!canSave} onClick={() => void savePolicy(true)}>{busy === "save" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirm and save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </section>
