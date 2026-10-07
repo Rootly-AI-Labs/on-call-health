@@ -130,7 +130,7 @@ export interface RetentionPreviewResponse {
 }
 
 const PREVIEW_ERROR_MESSAGES: Record<string, string> = {
-  retention_policy_changed: "Your organization or retention policy changed. Refresh settings and review a new preview.",
+  retention_policy_changed: "Your organization or retention policy changed. Reload the page before saving again.",
 }
 
 export class RetentionApiError extends Error {
