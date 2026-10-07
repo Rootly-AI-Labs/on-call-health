@@ -42,6 +42,7 @@ import {
 } from "lucide-react"
 import { API_BASE, type Integration } from "@/app/integrations/types"
 import { UserMappingDrawer } from "./components/UserMappingDrawer"
+import { DataRetentionSettings } from "./components/DataRetentionSettings"
 import { OrganizationManagementDialog } from "@/app/integrations/dialogs/OrganizationManagementDialog"
 import * as OrganizationHandlers from "@/app/integrations/handlers/organization-handlers"
 import {
@@ -1966,6 +1967,9 @@ function TeamPageContent() {
               )}
               </div>
           )}
+          <div className="mt-6" hidden={viewMode !== 'organization'}>
+            <DataRetentionSettings />
+          </div>
             </div>  {/* Close max-w-4xl mx-auto */}
           </div>  {/* Close p-6 lg:p-8 */}
         </div>  {/* Close h-full overflow-y-auto */}

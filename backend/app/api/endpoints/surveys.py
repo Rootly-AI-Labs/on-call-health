@@ -2,7 +2,7 @@
 Survey scheduling and preferences API endpoints.
 """
 import logging
-from datetime import time, datetime, timedelta
+from datetime import time, datetime, timedelta, timezone
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
@@ -614,19 +614,43 @@ def get_user_survey_results(
         raise HTTPException(status_code=404, detail="User not found")
 
     # Verify same organization
-    if current_user.organization_id != target_user.organization_id:
+    if current_user.organization_id != target_user.organization_id or (
+        current_user.organization_id is None and current_user.id != target_user.id
+    ):
         raise HTTPException(
             status_code=403,
             detail="Cannot view survey results from different organization."
         )
 
     # Get survey results from the last N days
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=days)
 
-    results = db.query(UserBurnoutReport).filter(
+    retention_enabled = False
+    if current_user.organization_id is not None:
+        from ...models import Organization
+        from ...services.data_retention import read_retention_policy
+
+        # Keep policy updates/cleanup from racing this response, using their
+        # organization-first lock order and refreshing any cached ORM settings.
+        organization = db.query(Organization).populate_existing().filter(
+            Organization.id == current_user.organization_id,
+        ).with_for_update(read=True).first()
+        if organization is None:
+            raise HTTPException(status_code=404, detail="Organization not found")
+        retention_days = read_retention_policy(organization).retention_days
+        if retention_days is not None:
+            retention_enabled = True
+            since = max(since, now - timedelta(days=retention_days))
+
+    query = db.query(UserBurnoutReport).filter(
         UserBurnoutReport.user_id == user_id,
-        UserBurnoutReport.submitted_at >= since
-    ).order_by(UserBurnoutReport.submitted_at.desc()).all()
+        UserBurnoutReport.organization_id == current_user.organization_id,
+        UserBurnoutReport.submitted_at >= since,
+    )
+    if retention_enabled:
+        query = query.filter(UserBurnoutReport.submitted_at <= now)
+    results = query.order_by(UserBurnoutReport.submitted_at.desc()).all()
 
     return {
         "user_id": user_id,

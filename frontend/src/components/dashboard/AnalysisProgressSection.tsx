@@ -101,9 +101,11 @@ export function AnalysisProgressSection({
               ? 'API Permission Error'
               : currentAnalysis.error_message?.includes('timed out')
                 ? 'Analysis Timed Out'
-                : hasNoIncidentsInPeriod && hasNoIncidentsInPeriod()
-                  ? 'No Incidents in Time Period'
-                  : 'Analysis Failed'}
+                : currentAnalysis.error_message
+                  ? 'Analysis Failed'
+                  : hasNoIncidentsInPeriod && hasNoIncidentsInPeriod()
+                    ? 'No Incidents in Time Period'
+                    : 'Analysis Failed'}
           </h3>
           <p className="text-red-700 mb-4">
             {currentAnalysis.error_message

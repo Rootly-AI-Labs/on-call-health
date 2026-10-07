@@ -45,6 +45,7 @@ backend/.env
 !README.md
 !frontend/README.md
 !DATABASE_MIGRATION_COMPARISON.md
+!docs/data-retention-implementation.md
 
 # Word documents
 *.docx

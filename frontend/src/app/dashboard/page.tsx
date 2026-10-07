@@ -72,6 +72,7 @@ function getSeverityBadgeClass(severity: string | undefined): string {
   }
 }
 import { TeamHealthOverview } from "@/components/dashboard/TeamHealthOverview"
+import { AnalysisSidebarDetails } from "@/components/dashboard/AnalysisSidebarDetails"
 import { AnalysisProgressSection } from "@/components/dashboard/AnalysisProgressSection"
 import { TeamMembersList } from "@/components/dashboard/TeamMembersList"
 import { ObjectiveDataCard } from "@/components/dashboard/ObjectiveDataCard"
@@ -130,7 +131,6 @@ function AlertsCardsRow({ currentAnalysis }: { currentAnalysis: any }) {
 
 function DashboardContent() {
   const {
-  API_BASE,
   router,
   searchParams,
 
@@ -175,10 +175,6 @@ function DashboardContent() {
   totalAnalysesCount,
   historicalTrends,
   analysisMappings,
-
-  // caches
-  analysisCache,
-  setAnalysisCache,
 
   // members
   members,
@@ -278,11 +274,7 @@ function DashboardContent() {
   setDeleteDialogOpen,
   deletingAnalysis,
   analysisToDelete,
-  setAnalysisToDelete,
-
-  // direct setters
-  setCurrentAnalysis,
-  setRedirectingToSuggested
+  setAnalysisToDelete
   } = useDashboard()
 
   // Helper function to safely sanitize untrusted strings to prevent XSS
@@ -419,7 +411,9 @@ function DashboardContent() {
         {/* Unified Sidebar - Works on all screen sizes */}
         <div
           ref={sidebarRef}
-          className={`flex ${sidebarCollapsed ? "w-10 sm:w-12 md:w-16" : "w-60"} bg-neutral-900 text-white transition-all duration-300 flex-col overflow-hidden cursor-pointer md:cursor-default relative group md:relative`}
+          role="complementary"
+          aria-label="Analysis history"
+          className={`flex shrink-0 ${sidebarCollapsed ? "w-10 sm:w-12 md:w-16" : "w-72"} bg-neutral-900 text-white transition-all duration-300 flex-col overflow-hidden cursor-pointer md:cursor-default relative group md:relative`}
           style={
             mounted && !sidebarCollapsed && typeof window !== 'undefined' && window.innerWidth < 768
               ? { position: 'fixed', left: 0, top: 0, height: '100vh', zIndex: 50 }
@@ -476,9 +470,6 @@ function DashboardContent() {
                 Auto Analysis
               </p>
               {autoRefreshAnalysis ? (() => {
-                const arDate = new Date(autoRefreshAnalysis.created_at)
-                const arTimeStr = arDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
-                const arDateStr = arDate.toLocaleDateString([], { month: 'short', day: 'numeric' })
                 const arOrgName = sanitizeString((autoRefreshAnalysis as any).integration_name || 'Unknown')
                 const arPlatform = (autoRefreshAnalysis as any).platform
                 const arColor = getPlatformColor(arPlatform)
@@ -493,17 +484,7 @@ function DashboardContent() {
                       onClick={async () => {
                         setLoadingAnalysisId(autoRefreshAnalysis.id)
                         try {
-                          const authToken = localStorage.getItem('auth_token')
-                          if (!authToken) return
-                          const resp = await fetch(`${API_BASE}/analyses/${autoRefreshAnalysis.id}`, {
-                            headers: { 'Authorization': `Bearer ${authToken}` }
-                          })
-                          if (resp.ok) {
-                            const full = await resp.json()
-                            setCurrentAnalysis(full)
-                            setRedirectingToSuggested(false)
-                            updateURLWithAnalysis(String(full.id))
-                          }
+                          await loadSpecificAnalysis(String(autoRefreshAnalysis.id))
                         } finally {
                           setLoadingAnalysisId(null)
                         }
@@ -515,14 +496,10 @@ function DashboardContent() {
                             {arColor !== 'bg-neutral-1000' && (
                               <div className={`w-2.5 h-2.5 rounded-full ${arColor} flex-shrink-0`}></div>
                             )}
-                            <span className="font-medium truncate">{arOrgName}</span>
+                            <span className="font-medium truncate" title={arOrgName}>{arOrgName}</span>
                           </div>
-                          <span className="text-neutral-500 flex-shrink-0">{autoRefreshAnalysis.time_range || 30}d</span>
                         </div>
-                        <div className="flex justify-between items-center w-full text-neutral-500">
-                          <span>{arDateStr}</span>
-                          <span>{arTimeStr}</span>
-                        </div>
+                        <AnalysisSidebarDetails analysis={autoRefreshAnalysis} />
                         {isArRunning && (
                           <div className="mt-1 flex items-center gap-1 text-xs text-blue-400">
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
@@ -568,18 +545,6 @@ function DashboardContent() {
                 </div>
               ) : (
                 previousAnalyses.map((analysis) => {
-                  const analysisDate = new Date(analysis.created_at)
-                  const timeStr = analysisDate.toLocaleTimeString([], {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                  })
-                  const dateStr = analysisDate.toLocaleDateString([], {
-                    month: 'short',
-                    day: 'numeric',
-                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                  })
                   const rawName = (analysis as any).integration_name || 'Unknown Integration'
                   const organizationName = sanitizeString(rawName)
                   const analysisPlatform = (analysis as any).platform
@@ -593,49 +558,9 @@ function DashboardContent() {
                         className={`w-full justify-start text-neutral-500 hover:text-white hover:bg-neutral-800 py-2 h-auto ${isSelected ? 'bg-neutral-800 text-white' : ''} ${loadingAnalysisId === analysis.id ? 'bg-neutral-700 text-white' : ''} ${analysisRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={async () => {
                           setLoadingAnalysisId(analysis.id)
-                          const analysisKey = analysis.uuid || analysis.id.toString()
-                          const teamAnalysis = analysis.analysis_data?.team_analysis
-                          const members = Array.isArray(teamAnalysis) ? teamAnalysis : (teamAnalysis as any)?.members
-                          const cachedAnalysis = analysisCache.get(analysisKey)
-                          const cachedTeamAnalysis = cachedAnalysis?.analysis_data?.team_analysis
-                          const cachedMembers = Array.isArray(cachedTeamAnalysis) ? cachedTeamAnalysis : (cachedTeamAnalysis as any)?.members
-                          const hasCachedAnalysisData = cachedAnalysis?.analysis_data
-                          const hasCachedMembers = Array.isArray(cachedMembers) && cachedMembers.length > 0
-
-                          if (hasCachedAnalysisData && hasCachedMembers) {
-                            setCurrentAnalysis(cachedAnalysis)
-                            setRedirectingToSuggested(false)
-                            updateURLWithAnalysis(String(cachedAnalysis.id))
-                            setLoadingAnalysisId(null)
-                            return
-                          }
-
-                          if (!analysis.analysis_data || !members || !Array.isArray(members) || members.length === 0) {
-                            try {
-                              const authToken = localStorage.getItem('auth_token')
-                              if (!authToken) { setLoadingAnalysisId(null); return }
-                              const response = await fetch(`${API_BASE}/analyses/${analysis.id}`, {
-                                headers: { 'Authorization': `Bearer ${authToken}` }
-                              })
-                              if (response.ok) {
-                                const fullAnalysis = await response.json()
-                                setAnalysisCache(prev => new Map(prev.set(analysisKey, fullAnalysis)))
-                                setCurrentAnalysis(fullAnalysis)
-                                setRedirectingToSuggested(false)
-                                updateURLWithAnalysis(String(fullAnalysis.id))
-                              } else {
-                                setRedirectingToSuggested(false)
-                              }
-                            } catch (error) {
-                              setRedirectingToSuggested(false)
-                            } finally {
-                              setLoadingAnalysisId(null)
-                            }
-                          } else {
-                            setAnalysisCache(prev => new Map(prev.set(analysisKey, analysis)))
-                            setCurrentAnalysis(analysis)
-                            setRedirectingToSuggested(false)
-                            updateURLWithAnalysis(String(analysis.id))
+                          try {
+                            await loadSpecificAnalysis(String(analysis.id))
+                          } finally {
                             setLoadingAnalysisId(null)
                           }
                         }}
@@ -646,17 +571,13 @@ function DashboardContent() {
                               {platformColor !== 'bg-neutral-1000' && (
                                 <div className={`w-2.5 h-2.5 rounded-full ${platformColor} flex-shrink-0`}></div>
                               )}
-                              <span className="font-medium truncate">{organizationName}</span>
+                              <span className="font-medium truncate" title={organizationName}>{organizationName}</span>
                             </div>
-                            <span className="text-neutral-500 flex-shrink-0">{analysis.time_range || 30}d</span>
                           {(analysis as any).config?.pagerduty_team_id && (
                             <span className="text-neutral-500 flex-shrink-0 text-[10px] bg-green-100 text-green-700 rounded px-1">team</span>
                           )}
                           </div>
-                          <div className="flex justify-between items-center w-full text-neutral-500">
-                            <span>{dateStr}</span>
-                            <span>{timeStr}</span>
-                          </div>
+                          <AnalysisSidebarDetails analysis={analysis} />
                         </div>
                       </Button>
                       <Button
@@ -1296,11 +1217,10 @@ function DashboardContent() {
               {!redirectingToSuggested && (
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Button 
-                    onClick={() => {
+                    onClick={async () => {
                       updateURLWithAnalysis(null)
                       if (previousAnalyses.length > 0) {
-                        setCurrentAnalysis(previousAnalyses[0])
-                        updateURLWithAnalysis(String(previousAnalyses[0].id))
+                        await loadSpecificAnalysis(String(previousAnalyses[0].id))
                       }
                     }}
                     className="bg-red-600 hover:bg-red-700"

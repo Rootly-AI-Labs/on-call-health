@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 from ..core.rootly_client import RootlyAPIClient
-from ..core.pagerduty_client import PagerDutyAPIClient, PagerDutyDataCollector, PagerDutyAnalyticsUnavailable
+from ..core.pagerduty_client import PagerDutyAPIClient, PagerDutyDataCollector, PagerDutyAnalyticsUnavailable, PagerDutyTeamScopeError, PagerDutyDataCollectionError
 from ..core.och_config import calculate_composite_och_score, calculate_personal_burnout, calculate_work_related_burnout, generate_och_score_reasoning, get_structured_och_factors, OCHConfig
 from ..core.alert_health_calculator import calculate_alert_health_score
 from .ai_burnout_analyzer import get_ai_burnout_analyzer
@@ -230,7 +230,7 @@ class UnifiedBurnoutAnalyzer:
         time_range_days: int = 30,
         include_weekends: bool = True,
         user_id: Optional[int] = None,
-        analysis_id: Optional[int] = None
+        analysis_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Analyze burnout for the team based on incident data.
@@ -1187,6 +1187,11 @@ class UnifiedBurnoutAnalyzer:
         logger.info(f"ANALYZER DATA FETCH: Starting data collection for {days_back}-day analysis")
 
         try:
+            if self.platform == "pagerduty" and self.pagerduty_team_id:
+                self.synced_users = await self.client.get_team_scoped_users(
+                    self.pagerduty_team_id, self.synced_users
+                )
+
             # If synced users provided, use them for user list but fetch fresh data for timezones
             if self.synced_users:
                 logger.info(f"TEAM SYNC OPTIMIZATION: Using {len(self.synced_users)} pre-synced users, fetching incidents + fresh timezones")
@@ -1222,6 +1227,7 @@ class UnifiedBurnoutAnalyzer:
                             until=until,
                             limit=5000,
                             team_ids=pd_team_ids,
+                            complete_window=True,
                         )
                         normalized_data = collector._normalize_analytics_incidents(
                             analytics_incidents,
@@ -1234,15 +1240,13 @@ class UnifiedBurnoutAnalyzer:
                         )
                     except PagerDutyAnalyticsUnavailable as e:
                         # Account/token can't use the Analytics API — fall back to REST
-                        # /incidents (available on all plans). Note team scoping is not
-                        # applied on the REST fallback; the synced_users set already
-                        # limits attribution to team members, so scoping still holds.
+                        # /incidents (available on all plans), retaining the team filter.
                         logger.warning(
                             f"TEAM SYNC: Analytics API unavailable ({e}); "
                             f"falling back to REST /incidents endpoint"
                         )
                         raw_incidents = await self.client.get_incidents(
-                            since=since, until=until, limit=5000
+                            since=since, until=until, limit=5000, team_ids=pd_team_ids, complete_window=True,
                         )
                         normalized_data = collector._normalize_with_enhanced_assignment_extraction(
                             raw_incidents,
@@ -1432,6 +1436,11 @@ class UnifiedBurnoutAnalyzer:
                 logger.warning(f"ANALYZER DATA WARNING: {days_back}-day analysis got users but no incidents - potential timeout or permission issue")
             
             return data
+        except (PagerDutyTeamScopeError, PagerDutyDataCollectionError):
+            # Missing or unverifiable membership must fail the analysis instead
+            # of returning a successful, account-wide or empty report. Failed
+            # incident pages must likewise never become a completed report.
+            raise
         except Exception as e:
             fetch_duration = (datetime.now() - fetch_start_time).total_seconds()
             logger.error(f"ANALYZER DATA FETCH: FAILED after {fetch_duration:.2f}s for {days_back}-day analysis")
