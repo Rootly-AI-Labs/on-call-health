@@ -78,7 +78,7 @@ async def fetch_openai_usage(
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            while url:
+            while True:
                 for attempt in range(2):
                     resp = await client.get(url, headers=headers, params=params)
                     if resp.status_code != 503 or attempt == 1:
@@ -102,8 +102,9 @@ async def fetch_openai_usage(
                         usage[day_str]["requests"] += result.get("num_model_requests", 0) or 0
 
                 next_page = data.get("next_page")
-                url = f"https://api.openai.com/v1/organization/usage/completions?cursor={next_page}" if next_page else None
-                params = {}  # params only needed on first request
+                if not next_page:
+                    break
+                params = {**params, "page": next_page}
     except Exception as e:
         logger.error(f"[AI_USAGE] OpenAI fetch error: {e}")
 
@@ -184,7 +185,7 @@ async def fetch_openai_usage_per_user(
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            while url:
+            while True:
                 for attempt in range(2):
                     resp = await client.get(url, headers=headers, params=params)
                     if resp.status_code != 503 or attempt == 1:
@@ -214,8 +215,9 @@ async def fetch_openai_usage_per_user(
                         per_user[email][day_str]["requests"] += result.get("num_model_requests", 0) or 0
 
                 next_page = data.get("next_page")
-                url = f"https://api.openai.com/v1/organization/usage/completions?cursor={next_page}" if next_page else None
-                params = {}
+                if not next_page:
+                    break
+                params = {**params, "page": next_page}
     except Exception as e:
         logger.error(f"[AI_USAGE] OpenAI per-user fetch error: {e}")
 

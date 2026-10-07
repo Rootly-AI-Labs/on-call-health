@@ -284,6 +284,9 @@ async def get_openai_members(
     db: Session = Depends(get_db),
 ):
     """Return list of OpenAI org members: [{id, email}]"""
+    if current_user.organization_id and not current_user.can_manage_users(current_user.organization_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only organization admins can view OpenAI members")
+
     from ...services.ai_usage_collector import fetch_openai_members
     integration = _get_integration(current_user, db)
     if not integration or not integration.has_openai:

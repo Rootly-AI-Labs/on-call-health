@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Cache TTL for PagerDuty data (1 hour - users/services rarely change)
 PAGERDUTY_CACHE_TTL_SECONDS = 3600
+REST_PAGINATION_CEILING = 10000
 
 # Cache TTL for the Analytics API entitlement verdict per token. Entitlement
 # (plan/add-on) changes very rarely, so we cache the answer for longer to avoid
@@ -35,6 +36,14 @@ class PagerDutyAnalyticsUnavailable(Exception):
         self.status = status
         self.message = message
         super().__init__(f"Analytics API unavailable (HTTP {status}): {message}")
+
+
+class PagerDutyTeamScopeError(ValueError):
+    """The selected team's roster cannot be safely used for an analysis."""
+
+
+class PagerDutyDataCollectionError(RuntimeError):
+    """Incident collection did not complete successfully."""
 
 
 class PagerDutyAPIClient:
@@ -321,7 +330,7 @@ class PagerDutyAPIClient:
         Returns a list of user objects with at minimum id, email, name.
         Results are cached for 1 hour.
         """
-        cache_params = {"team_id": team_id}
+        cache_params = {"team_id": team_id, "include_users": True, "roster_version": 2}
         cached = get_cached_api_response("pagerduty", f"team_members_{team_id}", self.api_token, cache_params)
         if cached is not None:
             logger.info(f"PD GET_TEAM_MEMBERS: Using cached data for team {team_id} ({len(cached)} members)")
@@ -336,23 +345,37 @@ class PagerDutyAPIClient:
                     async with session.get(
                         f"{self.base_url}/teams/{team_id}/members",
                         headers=self.headers,
-                        params={"limit": 100, "offset": offset},
+                        params={"limit": 100, "offset": offset, "include[]": "users"},
                     ) as response:
-                        if response.status == 404:
-                            logger.warning(f"PD GET_TEAM_MEMBERS: Team {team_id} not found")
-                            break
                         if response.status != 200:
-                            error_text = await response.text()
-                            logger.error(f"PD GET_TEAM_MEMBERS: HTTP {response.status}: {error_text[:200]}")
-                            break
+                            raise PagerDutyTeamScopeError(
+                                f"Could not load the selected PagerDuty team's members "
+                                f"(HTTP {response.status})."
+                            )
                         data = await response.json()
                         # Response: {"members": [{"user": {...}, "role": "manager"}, ...]}
-                        members = data.get("members", [])
-                        all_members.extend(
-                            m["user"] for m in members if m.get("user")
-                        )
+                        members = data.get("members")
+                        if not isinstance(members, list):
+                            raise PagerDutyTeamScopeError(
+                                "PagerDuty returned an invalid team member list."
+                            )
+                        for member in members:
+                            user = member.get("user") if isinstance(member, dict) else None
+                            if (
+                                not isinstance(user, dict)
+                                or not isinstance(user.get("id"), str)
+                                or not user["id"].strip()
+                            ):
+                                raise PagerDutyTeamScopeError(
+                                    "PagerDuty returned an incomplete team member list."
+                                )
+                            all_members.append(user)
                         if not data.get("more", False):
                             break
+                        if not members:
+                            raise PagerDutyTeamScopeError(
+                                "PagerDuty returned an incomplete team member list."
+                            )
                         offset += len(members)
 
             logger.info(f"PD GET_TEAM_MEMBERS: Team {team_id} has {len(all_members)} members")
@@ -360,10 +383,56 @@ class PagerDutyAPIClient:
                 "pagerduty", f"team_members_{team_id}", self.api_token,
                 all_members, PAGERDUTY_CACHE_TTL_SECONDS, cache_params
             )
+        except PagerDutyTeamScopeError:
+            raise
         except Exception as e:
             logger.error(f"PD GET_TEAM_MEMBERS: Error fetching members for team {team_id}: {e}")
+            raise PagerDutyTeamScopeError(
+                "Could not load the selected PagerDuty team's members."
+            ) from e
 
         return all_members
+
+    async def get_team_scoped_users(
+        self, team_id: str, users: Optional[List[Dict[str, Any]]] = None
+    ) -> List[Dict[str, Any]]:
+        """Validate a selected team and restrict its roster without widening scope.
+
+        When no synced roster exists, use the verified team members directly.
+        An explicitly empty or nonmatching synced roster must not fall back to
+        all account users.
+        """
+        team_members = await self.get_team_members(team_id)
+        if not isinstance(team_members, list) or any(
+            not isinstance(member, dict) for member in team_members
+        ):
+            raise PagerDutyTeamScopeError("PagerDuty returned an invalid team member list.")
+        team_ids = {str(member["id"]) for member in team_members if member.get("id")}
+        team_emails = {
+            str(member["email"]).lower() for member in team_members if member.get("email")
+        }
+        if not team_ids and not team_emails:
+            raise PagerDutyTeamScopeError(
+                "The selected PagerDuty team has no eligible members."
+            )
+        if users is None:
+            if any(not member.get("email") for member in team_members):
+                raise PagerDutyTeamScopeError(
+                    "Could not load full profiles for the selected PagerDuty team's members."
+                )
+            users = team_members
+        if not isinstance(users, list) or any(not isinstance(user, dict) for user in users):
+            raise PagerDutyTeamScopeError("The synced PagerDuty user list is invalid.")
+        scoped_users = [
+            user for user in users
+            if str(user.get("pagerduty_user_id") or user.get("id") or "") in team_ids
+            or str(user.get("email") or "").lower() in team_emails
+        ]
+        if not scoped_users:
+            raise PagerDutyTeamScopeError(
+                "No eligible synced users match the selected PagerDuty team."
+            )
+        return scoped_users
 
     def _analytics_unavailable_status(self) -> Optional[int]:
         """Return the cached HTTP status (401/402/403) if we've already determined
@@ -392,6 +461,7 @@ class PagerDutyAPIClient:
         limit: int = 1000,
         time_zone: str = "Etc/UTC",
         team_ids: Optional[List[str]] = None,
+        complete_window: bool = False,
     ) -> List[Dict[str, Any]]:
         """Fetch incidents from the PagerDuty Analytics API (/analytics/raw/incidents).
 
@@ -451,11 +521,13 @@ class PagerDutyAPIClient:
         all_incidents: List[Dict[str, Any]] = []
         cursor: Optional[str] = None
         page = 0
+        seen_cursors = set()
+        complete_window = complete_window or bool(team_ids)
 
         try:
             timeout = aiohttp.ClientTimeout(total=60)
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                while len(all_incidents) < limit:
+                while complete_window or len(all_incidents) < limit:
                     page += 1
                     filters: Dict[str, Any] = {
                         "created_at_start": since_str,
@@ -466,7 +538,7 @@ class PagerDutyAPIClient:
 
                     payload: Dict[str, Any] = {
                         "filters": filters,
-                        "limit": min(1000, limit - len(all_incidents)),
+                        "limit": 1000 if complete_window else min(1000, limit - len(all_incidents)),
                         "order": "desc",
                         "order_by": "created_at",
                         "time_zone": time_zone,
@@ -490,6 +562,10 @@ class PagerDutyAPIClient:
                             if response.status in (401, 402, 403):
                                 self._cache_analytics_entitlement(False, response.status)
                                 raise PagerDutyAnalyticsUnavailable(response.status, error_text[:200])
+                            if complete_window:
+                                raise PagerDutyDataCollectionError(
+                                    f"PagerDuty Analytics incident collection failed on page {page} (HTTP {response.status})"
+                                )
                             break
 
                         # First successful page confirms the token is entitled.
@@ -497,6 +573,9 @@ class PagerDutyAPIClient:
                             self._cache_analytics_entitlement(True)
 
                         data = await response.json()
+                        if complete_window and (not isinstance(data, dict) or not isinstance(data.get("data"), list)
+                                         or any(not isinstance(item, dict) for item in data["data"])):
+                            raise PagerDutyDataCollectionError("PagerDuty Analytics returned an incomplete incident page")
                         incidents = data.get("data", [])
                         all_incidents.extend(incidents)
 
@@ -506,6 +585,10 @@ class PagerDutyAPIClient:
                             or data.get("cursor_after")
                             or (data.get("response_metadata") or {}).get("cursors", {}).get("next")
                         )
+                        if complete_window and cursor:
+                            if not isinstance(cursor, str) or not incidents or cursor in seen_cursors:
+                                raise PagerDutyDataCollectionError("PagerDuty Analytics pagination did not advance")
+                            seen_cursors.add(cursor)
                         if not cursor or not incidents:
                             break  # last page
 
@@ -517,13 +600,19 @@ class PagerDutyAPIClient:
         except PagerDutyAnalyticsUnavailable:
             # Propagate so the caller can fall back to REST /incidents.
             raise
-        except asyncio.TimeoutError:
+        except PagerDutyDataCollectionError:
+            raise
+        except asyncio.TimeoutError as error:
+            if complete_window:
+                raise PagerDutyDataCollectionError("PagerDuty Analytics incident collection timed out") from error
             logger.error(
                 f"PD ANALYTICS: Timeout after {page} page(s), "
                 f"{len(all_incidents)} incidents collected"
             )
             return all_incidents
         except Exception as e:
+            if complete_window:
+                raise PagerDutyDataCollectionError("PagerDuty Analytics incident collection failed") from e
             logger.error(f"PD ANALYTICS: Failed to fetch incidents: {e}")
             return all_incidents
 
@@ -531,11 +620,16 @@ class PagerDutyAPIClient:
         self,
         since: datetime,
         until: Optional[datetime] = None,
-        limit: int = 1000
+        limit: int = 1000,
+        team_ids: Optional[List[str]] = None,
+        complete_window: bool = False,
     ) -> List[Dict[str, Any]]:
-        """Fetch incidents from PagerDuty within a date range."""
+        """Fetch incidents; selected-team collections must complete or raise."""
         days_back = (datetime.now(pytz.UTC) - since).days
         logger.info(f"PD GET_INCIDENTS: Starting fetch for {days_back} days (limit={limit})")
+
+        if complete_window or team_ids:
+            return await self._get_complete_incidents(since, until or datetime.now(pytz.UTC), team_ids)
 
         try:
             if until is None:
@@ -552,20 +646,21 @@ class PagerDutyAPIClient:
                 request_count = 0
                 
                 while len(all_incidents) < limit and request_count < max_requests:
+                    params = {
+                        "since": since_str,
+                        "until": until_str,
+                        "limit": min(100, limit - len(all_incidents)),
+                        "offset": offset,
+                        "include[]": ["users", "services", "teams", "escalation_policies", "priorities"],
+                        "statuses[]": ["triggered", "acknowledged", "resolved"],
+                    }
                     # Add timeout to prevent hanging
                     timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout per request
                     async with session.get(
                         f"{self.base_url}/incidents",
                         headers=self.headers,
                         timeout=timeout,
-                        params={
-                            "since": since_str,
-                            "until": until_str,
-                            "limit": min(100, limit - len(all_incidents)),
-                            "offset": offset,
-                            "include[]": ["users", "services", "teams", "escalation_policies", "priorities"],
-                            "statuses[]": ["triggered", "acknowledged", "resolved"]
-                        }
+                        params=params,
                     ) as response:
                         request_count += 1
                         
@@ -609,7 +704,9 @@ class PagerDutyAPIClient:
                 
                 return all_incidents
                 
-        except asyncio.TimeoutError:
+        except PagerDutyDataCollectionError:
+            raise
+        except asyncio.TimeoutError as e:
             incidents_collected = len(all_incidents) if 'all_incidents' in locals() else 0
             logger.error(f"🕐 PAGERDUTY TIMEOUT: Incident fetch exceeded timeout")
             logger.error(f"🕐 PAGERDUTY TIMEOUT: Collected {incidents_collected} incidents before timeout")
@@ -620,6 +717,75 @@ class PagerDutyAPIClient:
             logger.error(f"Error fetching PagerDuty incidents: {e}")
             return all_incidents if 'all_incidents' in locals() else []
     
+    async def _get_complete_incidents(self, since, until, team_ids):
+        """Complete REST windows without crossing PagerDuty's 10,000 offset ceiling.
+
+        REST date ranges are limited to six months. Start with 90-day windows,
+        bisect dense windows, and deduplicate inclusive boundary records by ID.
+        A failed or non-advancing page never becomes a completed analysis.
+        """
+        since = since.astimezone(pytz.UTC).replace(microsecond=0)
+        until = until.astimezone(pytz.UTC).replace(microsecond=0)
+        windows = []
+        cursor = since
+        while cursor < until:
+            end = min(cursor + timedelta(days=90), until)
+            windows.append((cursor, end))
+            cursor = end
+        windows.reverse()
+        collected = {}
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+                while windows:
+                    start, end = windows.pop()
+                    offset = 0
+                    window_records = {}
+                    while True:
+                        params = {
+                            "since": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            "until": end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            "time_zone": "UTC", "limit": min(100, REST_PAGINATION_CEILING - offset),
+                            "offset": offset, "sort_by": "created_at:asc",
+                            "include[]": ["users", "services", "teams", "escalation_policies", "priorities"],
+                            "statuses[]": ["triggered", "acknowledged", "resolved"],
+                        }
+                        if team_ids:
+                            params["team_ids[]"] = team_ids
+                        async with session.get(f"{self.base_url}/incidents", headers=self.headers, params=params) as response:
+                            if response.status != 200:
+                                raise PagerDutyDataCollectionError(f"PagerDuty incident collection failed (HTTP {response.status}).")
+                            data = await response.json()
+                        if (not isinstance(data, dict) or not isinstance(data.get("incidents"), list)
+                                or not isinstance(data.get("more"), bool)):
+                            raise PagerDutyDataCollectionError("PagerDuty returned an invalid incident page.")
+                        incidents = data["incidents"]
+                        if any(not isinstance(item, dict) or not isinstance(item.get("id"), str)
+                               or not item["id"].strip() for item in incidents):
+                            raise PagerDutyDataCollectionError("PagerDuty returned invalid incident identities.")
+                        advances = any(item["id"] not in window_records for item in incidents)
+                        if data["more"] and (not incidents or not advances):
+                            raise PagerDutyDataCollectionError("PagerDuty incident pagination did not advance.")
+                        window_records.update((item["id"], item) for item in incidents)
+                        if not data["more"]:
+                            collected.update(window_records)
+                            break
+                        offset += len(incidents)
+                        if offset >= REST_PAGINATION_CEILING:
+                            midpoint = (start + (end - start) / 2).replace(microsecond=0)
+                            if midpoint <= start or midpoint >= end:
+                                raise PagerDutyDataCollectionError("PagerDuty incident density exceeds the REST pagination ceiling for a one-second window.")
+                            # Discard the capped parent page set and fetch both
+                            # halves completely before adding their results.
+                            windows.extend([(midpoint, end), (start, midpoint)])
+                            break
+            return list(collected.values())
+        except PagerDutyDataCollectionError:
+            raise
+        except asyncio.TimeoutError as error:
+            raise PagerDutyDataCollectionError("PagerDuty incident collection timed out.") from error
+        except Exception as error:
+            raise PagerDutyDataCollectionError("Could not complete PagerDuty incident collection.") from error
+
     async def check_permissions(self) -> Dict[str, Any]:
         """
         Check API token permissions for PagerDuty endpoints.
@@ -916,10 +1082,14 @@ class PagerDutyDataCollector:
 
         logger.info(f"PAGERDUTY COLLECTION: Date range {since.isoformat()} to {until.isoformat()}")
 
-        # Only users are needed here: incident scoping is handled by the Analytics
-        # `team_ids` filter (or the synced-user set), so we no longer fetch the full
-        # teams list — it was an unused API call.
-        users = await self.client.get_users(limit=1000)
+        if team_ids:
+            users_by_id = {}
+            for team_id in team_ids:
+                for user in await self.client.get_team_scoped_users(team_id):
+                    users_by_id[user.get("id") or user.get("email")] = user
+            users = list(users_by_id.values())
+        else:
+            users = await self.client.get_users(limit=1000)
 
         # When no explicit team scope is requested, do NOT expand to the full
         # team list: passing team_ids=None returns every incident (including
@@ -937,6 +1107,7 @@ class PagerDutyDataCollector:
                 since=since,
                 until=until,
                 team_ids=scoped_team_ids,
+                complete_window=True,
             )
 
             logger.info(
@@ -964,11 +1135,10 @@ class PagerDutyDataCollector:
             # assignment-extraction normalization so the analysis still works.
             logger.warning(
                 f"PAGERDUTY COLLECTION: Analytics API unavailable ({e}); "
-                f"falling back to REST /incidents endpoint. Team scoping is not "
-                f"applied on the REST fallback."
+                f"falling back to REST /incidents endpoint with the same team scope."
             )
             analytics_incidents = await self.client.get_incidents(
-                since=since, until=until, limit=5000
+                since=since, until=until, limit=5000, team_ids=scoped_team_ids, complete_window=True,
             )
             normalized_data = self._normalize_with_enhanced_assignment_extraction(
                 analytics_incidents, users
