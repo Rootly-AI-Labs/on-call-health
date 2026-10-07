@@ -697,3 +697,9 @@ Verification: **863 backend checks passed**, including 21 new cases for complete
 Browser verification: **25 dashboard regression scenarios** and the settings disable/cancel-prior-approval scenario passed with isolated API responses. TypeScript passed using the committed module-resolution configuration.
 
 This is local verification of staging code, not a run against a deployed staging service. Deployed staging verification with an authenticated controlled organization remains required before pilot activation. No cleanup was manually invoked against application or deployed data.
+
+### October 7: commit remaining UI simplifications
+
+The retention card now uses the approved short description, omits redundant preview counts, cleanup history, refresh controls and save-success banners, and keeps the permanent-deletion warning with the daily 03:00 UTC schedule. Closing settings discards unsaved changes and restores the saved policy. Enabling/shortening still requires confirmation and internal preview validation; disabling saves directly. Admin, session and organization checks remain in place.
+
+Verification: **31 isolated retention-settings browser scenarios**, TypeScript and whitespace checks passed. The UI, reload guidance and updated browser scenarios are committed together; backend retention behavior is unchanged.
