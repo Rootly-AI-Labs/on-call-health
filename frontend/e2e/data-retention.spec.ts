@@ -268,14 +268,9 @@ const saveButton = (page: Page) => page.getByRole('button', { name: 'Save retent
 const confirmDialog = (page: Page) => page.getByRole('dialog', { name: 'Confirm retention policy' });
 const deletionWarning = (page: Page) => page.getByRole('alert', { name: 'Existing data deletion warning' });
 const confirmSave = (page: Page) => page.getByRole('button', { name: 'Confirm and save', exact: true });
-const cleanupPanel = (page: Page) => page.locator('[aria-label="Automatic cleanup status"]');
 
 const retentionToggle = (page: Page) => page.locator('button[aria-controls="data-retention-panel"]');
 
-async function openDisclosure(page: Page, name: string) {
-  const summary = page.locator('summary').filter({ hasText: name }).first();
-  if (await summary.count() && await summary.locator('..').getAttribute('open') === null) await summary.click();
-}
 
 async function expandRetention(page: Page) {
   await expect(retentionToggle(page)).toBeVisible();
@@ -287,8 +282,6 @@ async function expandRetention(page: Page) {
   if (await retentionToggle(page).isDisabled()) return;
   if (await retentionToggle(page).getAttribute('aria-expanded') !== 'true') await retentionToggle(page).click();
   await expect(page.locator('#data-retention-panel')).toBeVisible();
-  // Scenarios reveal cleanup outcomes; product defaults remain compact.
-  await openDisclosure(page, 'Cleanup history');
 }
 
 async function openManagement(page: Page) {
@@ -299,7 +292,6 @@ async function openManagement(page: Page) {
 async function openReview(page: Page) {
   await saveButton(page).click();
   await expect(confirmDialog(page)).toBeVisible();
-  await expect(confirmDialog(page).getByLabel('Deletion preview')).toBeVisible();
   await expect(confirmSave(page)).toBeEnabled();
 }
 
@@ -342,7 +334,7 @@ test.describe('Organization data retention with isolated API responses', () => {
     });
   }
 
-  test('keyboard expansion preserves unsaved drafts without changing the saved policy', async ({ page, api }) => {
+  test('closing settings discards drafts while tab switches preserve an open draft', async ({ page, api }) => {
     await page.goto('/management');
     await expect(retentionToggle(page)).toBeEnabled();
     await retentionToggle(page).focus();
@@ -350,13 +342,20 @@ test.describe('Organization data retention with isolated API responses', () => {
     await expect(retentionToggle(page)).toHaveAttribute('aria-expanded', 'true');
     await enable(page).check();
     await days(page).fill('30');
+    await expect(page.getByText('Unsaved', { exact: true })).toBeVisible();
     await retentionToggle(page).click();
     await expect(page.getByText('Disabled', { exact: true })).toBeVisible();
-    await expect(page.getByText('Unsaved', { exact: true })).toBeVisible();
+    await expect(page.getByText('Unsaved', { exact: true })).toHaveCount(0);
     await expect(page.locator('#data-retention-panel')).not.toBeVisible();
     await retentionToggle(page).focus();
     await page.keyboard.press('Space');
-    await expect(days(page)).toHaveValue('30');
+    await expect(enable(page)).not.toBeChecked();
+    await expect(days(page)).toHaveValue('90');
+    await expect(days(page)).toBeDisabled();
+    await expect(saveButton(page)).toBeDisabled();
+    expect(api.previews).toHaveLength(0);
+    await enable(page).check();
+    await days(page).fill('30');
     await expect(saveButton(page)).toBeEnabled();
     await page.getByRole('button', { name: 'Team Roles', exact: true }).click();
     await expect(page.getByRole('region', { name: 'Data retention' })).toHaveCount(0);
@@ -382,32 +381,34 @@ test.describe('Organization data retention with isolated API responses', () => {
     });
   }
 
-  test('Save opens the deletion preview only in the confirmation popup', async ({ page, api }) => {
+  test('settings and confirmation omit redundant text, counts, history and refresh controls', async ({ page, api }) => {
     await openManagement(page);
-    await expect(page.locator('summary').filter({ hasText: 'Advanced cleanup' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Refresh settings', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Preview deletion', exact: true })).toHaveCount(0);
-    await expect(page.getByLabel('Deletion preview')).toHaveCount(0);
+    await expect(page.getByText(/Off by default/)).toHaveCount(0);
+    await expect(page.locator('summary').filter({ hasText: 'Cleanup history' })).toHaveCount(0);
+    await expect(page.getByLabel('Automatic cleanup status')).toHaveCount(0);
+    await expect(page.locator('#retention-enabled-help')).toHaveText('Applies to everyone in this organization.');
     await enableAndReview(page);
-    const preview = confirmDialog(page).getByLabel('Deletion preview');
-    await expect(preview.getByRole('term')).toHaveText(['Analysis results to clear', 'Survey responses to delete']);
-    await expect(preview.getByRole('definition')).toHaveText(['1', '1']);
-    await expect(page.locator('#data-retention-panel').getByLabel('Deletion preview')).toHaveCount(0);
-    await expect(preview).not.toContainText('Newer reports and surveys are kept');
-    const previewBounds = await preview.boundingBox();
-    const warningBounds = await confirmDialog(page).getByRole('alert', { name: 'Existing data deletion warning' }).boundingBox();
-    expect(previewBounds!.y + previewBounds!.height).toBeLessThanOrEqual(warningBounds!.y);
-    await expect(confirmDialog(page).getByRole('checkbox')).toHaveCount(0);
+    const dialog = confirmDialog(page);
+    await expect(dialog.getByRole('term')).toHaveCount(0);
+    await expect(dialog.getByRole('definition')).toHaveCount(0);
+    await expect(dialog.getByLabel('Deletion preview')).toHaveCount(0);
+    await expect(dialog).not.toContainText('Analysis results:');
+    await expect(dialog).not.toContainText('Surveys:');
+    await expect(dialog.getByRole('alert', { name: 'Existing data deletion warning' })).toContainText('Cleanup runs daily at 03:00 UTC.');
+    await expect(dialog.getByRole('checkbox')).toHaveCount(0);
     expect(api.previews).toEqual([{ retention_days: 90 }]);
     expect(api.writes).toHaveLength(0);
     await confirmSave(page).click();
-    await expect(confirmDialog(page)).not.toBeVisible();
+    await expect(dialog).not.toBeVisible();
     expect(api.writes).toEqual([{
       retention_days: 90, expected_policy_version: 'a'.repeat(64), confirm_deletion: true,
     }]);
-    expect(api.policy.legacy_cleanup.state).toBe('none');
+    await expect(page.getByText(/Retention policy saved\./)).toHaveCount(0);
   });
 
-  test('an existing prior approval is visible and included in preview totals without new consent fields', async ({ page, api }) => {
+  test('prior approval remains visible without creating new cleanup authorization', async ({ page, api }) => {
     api.policy = policy(90);
     api.policy.legacy_cleanup = {
       state: 'pending', requested_count: 2, pending_count: 2, cleared_count: 0,
@@ -417,9 +418,6 @@ test.describe('Organization data retention with isolated API responses', () => {
     await expect(page.getByText('Prior cleanup approval pending', { exact: true })).toBeVisible();
     await days(page).fill('120');
     await openReview(page);
-    const preview = page.getByLabel('Deletion preview');
-    await expect(preview.getByText('Analysis results to clear', { exact: true }).locator('..').getByRole('definition')).toHaveText('3');
-    await expect(preview).toContainText('Includes 2 previously approved results.');
     await expect(confirmDialog(page).getByLabel('Cleanup preview summary')).toHaveCount(0);
     await expect(confirmDialog(page).getByRole('checkbox')).toHaveCount(0);
     await confirmSave(page).click();
@@ -438,161 +436,84 @@ test.describe('Organization data retention with isolated API responses', () => {
     await expect(days(page)).toBeDisabled();
     await expect(page.getByText('Prior cleanup approval pending', { exact: true })).toHaveCount(0);
     await expect(deletionWarning(page)).toHaveCount(0);
-    const description = page.locator('#retention-days-help');
-    const descriptionText = 'Data retention, when enabled, deletes manually saved analyses N days after generation and survey responses N days after submission; auto-refresh results expire while their setup is kept.';
-    await expect(description).toHaveText(descriptionText);
-    await expect(page.getByText(descriptionText, { exact: true })).toHaveCount(1);
-    expect(await description.evaluate(element => ['retention-enabled', 'retention-days'].every(id => {
-      const control = document.getElementById(id);
-      return control !== null && Boolean(element.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING);
-    }))).toBe(true);
+    await expect(page.locator('#retention-days-help')).toHaveCount(0);
     await expect(page.getByText('Automatic cleanup is off for this organization.', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Preview deletion before saving; previewing does not save settings or delete data.', { exact: true })).toHaveCount(0);
-    await expect(cleanupPanel(page)).toContainText('Automatic cleanup status: Not run yet');
-    await expect(cleanupPanel(page).getByText('Last successful cleanup', { exact: true }).locator('..').getByRole('definition')).toHaveText('Never');
     await enable(page).check();
     await expect(page.getByRole('region', { name: 'Data retention' }).getByText('Disabled', { exact: true })).toBeVisible();
     expect(api.policy.enabled).toBe(false);
     expect(api.writes).toHaveLength(0);
   });
 
-  test('preview keeps demo reports out of the simplified deletion counts', async ({ page, api }) => {
-    api.excludedDemoAnalyses = 2;
-    await openManagement(page);
-    await enableAndReview(page);
-    const preview = page.getByLabel('Deletion preview');
-    await expect(preview).not.toContainText('Demo analyses excluded:');
-    await expect(preview.getByText('Analysis results to clear', { exact: true }).locator('..').getByRole('definition')).toHaveText('1');
-    await expect(confirmDialog(page).getByLabel('Cleanup preview summary')).toHaveCount(0);
-    expect(api.previews).toEqual([{ retention_days: 90 }]);
-    expect(api.writes).toHaveLength(0);
-  });
 
-  test('shows only the last successful cleanup and three counts in one compact row', async ({ page, api }, testInfo) => {
+
+  test('successful cleanup metadata stays out of the settings panel', async ({ page, api }) => {
     api.policy = policy(90);
-    const counts = {
-      ...cleanupStatus().counts, analysis_results_expired: 3,
-      legacy_analysis_results_cleared: 2, survey_responses_deleted: 1,
-      survey_links_cleared: 2, survey_period_links_cleared: 1,
-      digest_links_cleared: 2, mappings_deleted: 4, notifications_deleted: 5,
-      analyses_unverifiable: 1, analyses_deferred: 2,
-      legacy_analyses_skipped: 1, legacy_analyses_deferred: 1,
-      surveys_unverifiable: 1,
-    };
     api.policy.cleanup_status = cleanupStatus({
-      state: 'succeeded', last_attempt_at: '2026-10-04T12:00:00Z',
-      last_finished_at: '2026-10-04T12:01:00Z', last_success_at: '2026-10-04T12:01:00Z',
-      next_cleanup_due_at: '2026-10-05T03:00:00Z', counts,
+      state: 'succeeded', last_success_at: '2026-10-06T15:40:00Z',
+      counts: { ...cleanupStatus().counts, analysis_results_expired: 3 },
     });
-    api.policy.legacy_cleanup = {
-      state: 'completed', requested_count: 3, pending_count: 0,
-      cleared_count: 2, skipped_count: 1, cancelled_count: 0,
-      approved_at: '2026-10-03T12:00:00Z', finished_at: '2026-10-04T12:01:00Z',
-    };
     await openManagement(page);
-    const panel = cleanupPanel(page);
-    await expect(panel).toContainText('Automatic cleanup status: Succeeded');
-    await expect(panel.getByText('Analyses cleared', { exact: true }).locator('..').getByRole('definition')).toHaveText('5');
-    await expect(panel.getByText('Legacy results cleared', { exact: true })).toHaveCount(0);
-    await expect(panel.getByText('Surveys deleted', { exact: true }).locator('..').getByRole('definition')).toHaveText('1');
-    await expect(panel.getByText('Survey links detached', { exact: true }).locator('..').getByRole('definition')).toHaveText('2');
-    await expect(panel.getByText('Last successful cleanup', { exact: true }).locator('..')).toContainText('UTC');
-    await expect(panel.getByRole('term')).toHaveText(['Last successful cleanup', 'Analyses cleared', 'Surveys deleted', 'Survey links detached']);
-    await expect(panel).not.toContainText('Last attempt');
-    await expect(panel).not.toContainText('Next cleanup due');
-    await expect(panel).not.toContainText('Cleanup runs daily');
-    await expect(panel).not.toContainText('Counts below');
-    await expect(panel).not.toContainText('Related cleanup outcomes');
-    await expect(panel).not.toContainText('Policy last changed');
-    await expect(page.getByRole('heading', { name: /Legacy cleanup status/ })).toHaveCount(0);
-    await panel.screenshot({ path: testInfo.outputPath('retention-cleanup-status-desktop.png'), animations: 'disabled' });
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expect(panel.getByRole('heading', { name: 'Automatic cleanup status: Succeeded', exact: true })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await panel.screenshot({ path: testInfo.outputPath('retention-cleanup-status-mobile.png'), animations: 'disabled' });
+    const card = page.getByRole('region', { name: 'Data retention' });
+    await expect(card).not.toContainText('Cleanup history');
+    await expect(card).not.toContainText('Last successful cleanup');
+    await expect(card).not.toContainText('Analyses cleared');
+    await expect(card.getByRole('definition')).toHaveCount(0);
     expect(api.previews).toHaveLength(0);
     expect(api.writes).toHaveLength(0);
   });
 
-  test('reports failure while preserving the last successful cleanup and its counts', async ({ page, api }) => {
+  test('cleanup failures still show attention without restoring history', async ({ page, api }) => {
     api.policy = policy(90);
     api.policy.cleanup_status = cleanupStatus({
-      state: 'failed', last_attempt_at: '2026-10-05T12:00:00Z',
-      last_finished_at: '2026-10-05T12:01:00Z', last_success_at: '2026-10-04T12:01:00Z',
-      next_retry_at: '2026-10-05T12:31:00Z', next_cleanup_due_at: '2026-10-05T12:31:00Z',
-      consecutive_failures: 2, error_code: 'cleanup_failed',
-      message: 'Cleanup could not finish. Please contact an organization administrator if failures continue.',
-      counts: { ...cleanupStatus().counts, analysis_results_expired: 3, survey_responses_deleted: 1 },
+      state: 'failed', counts: { ...cleanupStatus().counts, analysis_results_expired: 3 },
     });
     await openManagement(page);
-    const panel = cleanupPanel(page);
-    await expect(panel).toContainText('Automatic cleanup status: Failed');
-    await expect(panel.getByRole('alert')).toHaveText(api.policy.cleanup_status.message!);
-    await expect(panel.getByText('Last successful cleanup', { exact: true }).locator('..')).toContainText('Oct 4, 2026');
-    await expect(panel.getByText('Next retry eligible', { exact: true })).toHaveCount(0);
-    await expect(panel.getByRole('term')).toHaveCount(4);
-    await expect(panel.getByText('Analyses cleared', { exact: true }).locator('..').getByRole('definition')).toHaveText('3');
-    await expect(panel).not.toContainText('cleanup_failed');
+    await expect(page.getByText('Cleanup needs attention', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Automatic cleanup status')).toHaveCount(0);
+    expect(api.policy.cleanup_status.counts.analysis_results_expired).toBe(3);
     expect(api.writes).toHaveLength(0);
   });
 
-  test('members can refresh cleanup outcomes without gaining admin controls', async ({ page, api }) => {
+  test('members can reload saved settings without gaining admin controls', async ({ page, api }) => {
     api.identity.role = 'member';
     api.policy = policy(90);
-    api.policy.cleanup_status = cleanupStatus({
-      state: 'skipped', message: 'Cleanup was skipped because the policy changed before the run.',
-      last_attempt_at: '2026-10-05T12:00:00Z', last_finished_at: '2026-10-05T12:00:01Z',
-      next_cleanup_due_at: '2026-10-06T03:00:00Z',
-    });
     await openManagement(page);
-    await expect(cleanupPanel(page)).toContainText('Automatic cleanup status: Skipped');
-    await expect(cleanupPanel(page).getByText('Last successful cleanup', { exact: true }).locator('..').getByRole('definition')).toHaveText('Never');
+    await expect(page.getByText('Retention period: 90 days')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Refresh settings', exact: true })).toHaveCount(0);
     const reads = api.reads;
-    api.policy.cleanup_status = cleanupStatus({
-      state: 'succeeded', last_attempt_at: '2026-10-05T12:15:00Z',
-      last_finished_at: '2026-10-05T12:16:00Z', last_success_at: '2026-10-05T12:16:00Z',
-      next_cleanup_due_at: '2026-10-06T03:00:00Z',
-      counts: { ...cleanupStatus().counts, analysis_results_expired: 2 },
-    });
-    await page.getByRole('button', { name: 'Refresh settings', exact: true }).click();
-    await expect(cleanupPanel(page)).toContainText('Automatic cleanup status: Succeeded');
-    await expect(cleanupPanel(page).getByText('Analyses cleared', { exact: true }).locator('..').getByRole('definition')).toHaveText('2');
+    api.policy = policy(120);
+    await page.reload();
+    await expandRetention(page);
+    await expect(page.getByText('Retention period: 120 days')).toBeVisible();
     await expect(enable(page)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Preview deletion', exact: true })).toHaveCount(0);
     await expect(saveButton(page)).toHaveCount(0);
     expect(api.reads).toBeGreaterThan(reads);
     expect(api.previews).toHaveLength(0);
     expect(api.writes).toHaveLength(0);
   });
 
-  test('disabled retention preserves historical outcomes but does not advertise a scheduled retry', async ({ page, api }) => {
-    api.policy.cleanup_status = cleanupStatus({
-      state: 'failed', last_attempt_at: '2026-10-05T12:00:00Z',
-      last_finished_at: '2026-10-05T12:01:00Z', consecutive_failures: 1,
-      message: 'Cleanup could not finish.',
-    });
+  test('disabled retention shows no cleanup history or retry schedule', async ({ page, api }) => {
+    api.policy.cleanup_status = cleanupStatus({ state: 'failed', consecutive_failures: 1 });
     await openManagement(page);
-    await expect(cleanupPanel(page)).toContainText('Automatic cleanup status: Failed');
-    await expect(cleanupPanel(page).getByRole('term')).toHaveCount(4);
-    await expect(cleanupPanel(page)).not.toContainText('Next retry eligible');
+    await expect(page.getByText('Last cleanup failed', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Automatic cleanup status')).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Data retention' }).getByText('Disabled', { exact: true })).toBeVisible();
     expect(api.policy.enabled).toBe(false);
     expect(api.writes).toHaveLength(0);
   });
 
-  test('shows the generation-age helper without analysis sample details in the preview', async ({ page, api }) => {
+  test('omits explanatory copy and analysis sample details from retention settings', async ({ page, api }) => {
     api.policy = policy(90);
     await openManagement(page);
     const retention = page.getByRole('region', { name: 'Data retention' });
-    await expect(days(page)).toHaveAttribute('aria-describedby', 'retention-days-help');
-    await expect(page.locator('#retention-days-help')).toHaveText('Data retention, when enabled, deletes manually saved analyses N days after generation and survey responses N days after submission; auto-refresh results expire while their setup is kept.');
+    await expect(days(page)).not.toHaveAttribute('aria-describedby');
+    await expect(page.locator('#retention-days-help')).toHaveCount(0);
     await expect(retention).not.toContainText('omitted until they support retention');
     await days(page).fill('120');
     await openReview(page);
-    const preview = page.getByLabel('Deletion preview');
-    await expect(preview.getByRole('term')).toHaveText(['Analysis results to clear', 'Survey responses to delete']);
-    await expect(preview.getByText(/Analysis samples/)).toHaveCount(0);
-    await expect(preview.getByRole('table')).toHaveCount(0);
+    await expect(confirmDialog(page).getByLabel('Deletion preview')).toHaveCount(0);
+    await expect(confirmDialog(page).getByRole('table')).toHaveCount(0);
     expect(api.writes).toHaveLength(0);
   });
 
@@ -626,14 +547,13 @@ test.describe('Organization data retention with isolated API responses', () => {
     await enable(page).check();
     for (const invalid of ['', '0', '1.5', '3651']) {
       await days(page).fill(invalid);
-      await expect(days(page)).toHaveAttribute('aria-describedby', 'retention-days-help retention-days-error');
+      await expect(days(page)).toHaveAttribute('aria-describedby', 'retention-days-error');
       await expect(page.locator('#retention-days-error')).toHaveText('Enter a whole number from 1 to 3650.');
-      await expect(page.locator('#retention-days-help')).toContainText('Data retention, when enabled, deletes manually saved analyses N days after generation');
       await expect(saveButton(page)).toBeDisabled();
       await expect(deletionWarning(page)).toHaveCount(0);
     }
     await days(page).fill('3650');
-    await expect(days(page)).toHaveAttribute('aria-describedby', 'retention-days-help');
+    await expect(days(page)).not.toHaveAttribute('aria-describedby');
     await expect(page.locator('#retention-days-error')).toHaveCount(0);
     await expect(saveButton(page)).toBeEnabled();
     expect(api.previews).toHaveLength(0);
@@ -652,9 +572,8 @@ test.describe('Organization data retention with isolated API responses', () => {
     expect(api.writes).toHaveLength(0);
     await expect(confirmDialog(page)).toBeVisible();
     const dialogWarning = confirmDialog(page).getByRole('alert', { name: 'Existing data deletion warning' });
-    await expect(confirmDialog(page).getByText('Analysis results: 10 days after generation.', { exact: true })).toBeVisible();
-    await expect(confirmDialog(page).getByText('Surveys: 10 days after submission.', { exact: true })).toBeVisible();
     await expect(dialogWarning).toContainText('Deletion is permanent');
+    await expect(dialogWarning).toContainText('Cleanup runs daily at 03:00 UTC.');
     await expect(dialogWarning).toContainText('Enabling retention permanently clears existing results generated and surveys submitted more than 10 days ago during cleanup.');
     await expect(confirmDialog(page)).not.toContainText('Existing data is included.');
     await expect(confirmDialog(page).getByLabel('Cleanup preview summary')).toHaveCount(0);
@@ -666,7 +585,8 @@ test.describe('Organization data retention with isolated API responses', () => {
     await confirmSave(page).click();
     await expect(confirmDialog(page)).not.toBeVisible();
     expect(api.writes).toHaveLength(1);
-    await expect(page.getByRole('status').filter({ hasText: 'Retention policy saved.' })).toContainText('next daily run at 03:00 UTC');
+    await expect(page.getByText('Retention policy saved.', { exact: false })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Data retention' }).getByText('Enabled', { exact: true })).toBeVisible();
     expect(api.writes[0]).toMatchObject({ retention_days: 10, confirm_deletion: true });
     expect(api.writes[0].expected_policy_version).toBe('a'.repeat(64));
     expect(api.writes[0].clear_unverifiable_analyses).not.toBe(true);
@@ -683,8 +603,6 @@ test.describe('Organization data retention with isolated API responses', () => {
     await days(page).fill('30');
     await expect(deletionWarning(page)).toHaveCount(0);
     await openReview(page);
-    await expect(confirmDialog(page).getByText('Analysis results: 30 days after generation.', { exact: true })).toBeVisible();
-    await expect(confirmDialog(page).getByText('Surveys: 30 days after submission.', { exact: true })).toBeVisible();
     await expect(confirmDialog(page).getByRole('alert', { name: 'Existing data deletion warning' })).toContainText('Deletion is permanent');
     await expect(confirmDialog(page).getByRole('alert', { name: 'Existing data deletion warning' })).toContainText('Shortening retention permanently clears existing results generated and surveys submitted more than 30 days ago during cleanup.');
     await expect(confirmSave(page)).toBeEnabled();
@@ -730,7 +648,7 @@ test.describe('Organization data retention with isolated API responses', () => {
     await days(page).fill('30');
     await expect(saveButton(page)).toBeEnabled();
     await openReview(page);
-    await expect(confirmDialog(page)).toContainText('Analysis results: 30 days after generation.');
+    await expect(confirmDialog(page)).toContainText('more than 30 days ago during cleanup.');
     expect(api.previews).toEqual([{ retention_days: 90 }, { retention_days: 30 }]);
     await cancelReview(page);
     await enable(page).uncheck();
@@ -746,11 +664,12 @@ test.describe('Organization data retention with isolated API responses', () => {
     await days(page).fill('30');
     await openReview(page);
     await confirmSave(page).click();
-    await expect(page.getByRole('alert').filter({ hasText: /policy changed.*new preview/i })).toBeVisible();
+    await expect(page.getByRole('alert').filter({ hasText: /policy changed.*reload the page/i })).toBeVisible();
     await expect(confirmDialog(page)).not.toBeVisible();
     expect(api.writes).toHaveLength(1);
     api.saveError = null;
-    await page.getByRole('button', { name: 'Refresh settings', exact: true }).click();
+    await page.reload();
+    await expandRetention(page);
     await expect(days(page)).toHaveValue('90');
     await days(page).fill('30');
     await openReview(page);
@@ -774,7 +693,8 @@ test.describe('Organization data retention with isolated API responses', () => {
     await enable(page).uncheck();
     await expect(saveButton(page)).toBeEnabled();
     await saveButton(page).click();
-    await expect(page.getByRole('status').filter({ hasText: /prior cleanup approval has been cancelled/i })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Data retention' }).getByText('Disabled', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Retention disabled\./)).toHaveCount(0);
     await expect(confirmDialog(page)).not.toBeVisible();
     expect(api.previews).toHaveLength(0);
     expect(api.writes).toEqual([{
@@ -813,7 +733,7 @@ test.describe('Organization data retention with isolated API responses', () => {
     await enableAndReview(page);
     await page.evaluate(() => localStorage.setItem('auth_token', 'another-mocked-session'));
     await confirmSave(page).click();
-    await expect(page.getByText('Your session changed. Refresh settings before continuing.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Your session changed. Reload the page before continuing.', { exact: true })).toBeVisible();
     await expect(confirmDialog(page)).not.toBeVisible();
     expect(api.writes).toHaveLength(0);
   });
@@ -853,29 +773,24 @@ test.describe('Organization data retention with isolated API responses', () => {
     expect(api.writes).toHaveLength(0);
   });
 
-  test('refresh discards unsaved edits and loads the current cleanup status', async ({ page, api }) => {
+  test('page reload discards unsaved edits and loads the current policy', async ({ page, api }) => {
     api.policy = policy(90);
     await openManagement(page);
     await days(page).fill('30');
     api.policy = policy(120);
-    api.policy.cleanup_status = cleanupStatus({
-      state: 'succeeded', last_attempt_at: '2026-10-05T12:00:00Z',
-      last_finished_at: '2026-10-05T12:01:00Z', last_success_at: '2026-10-05T12:01:00Z',
-      counts: { ...cleanupStatus().counts, analysis_results_expired: 2 },
-    });
-    await page.getByRole('button', { name: 'Refresh settings', exact: true }).click();
+    await page.reload();
+    await expandRetention(page);
     await expect(days(page)).toHaveValue('120');
-    await expect(cleanupPanel(page)).toContainText('Automatic cleanup status: Succeeded');
     await expect(saveButton(page)).toBeDisabled();
+    await expect(page.getByText('Unsaved', { exact: true })).toHaveCount(0);
     expect(api.writes).toHaveLength(0);
   });
 
-  test('mobile preview in the confirmation popup fits without horizontal page overflow', async ({ page, api }, testInfo) => {
+  test('minimal mobile confirmation fits without horizontal page overflow', async ({ page, api }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openManagement(page);
     await enableAndReview(page);
-    await expect(confirmDialog(page).getByLabel('Deletion preview')).toBeVisible();
-    await expect(confirmDialog(page).getByRole('checkbox')).toHaveCount(0);
+      await expect(confirmDialog(page).getByRole('checkbox')).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('retention-mobile-confirmation.png'), animations: 'disabled' });
     await expect(confirmSave(page)).toBeEnabled();
     await expect(confirmDialog(page).getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
@@ -890,7 +805,7 @@ test.describe('Organization data retention with isolated API responses', () => {
     api.pauseNextIdentity = new Promise<void>(resolve => { release = resolve; });
     try {
       await saveButton(page).click();
-      await expect(confirmDialog(page).getByRole('status')).toContainText('Loading deletion preview');
+      await expect(confirmDialog(page).getByRole('status')).toContainText('Preparing confirmation');
       await expect(confirmSave(page)).toBeDisabled();
       await cancelReview(page);
       await expect(saveButton(page)).toBeEnabled();
