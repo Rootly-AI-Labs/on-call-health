@@ -78,6 +78,12 @@ LOCK_TIMEOUT_MS = _int_env("DB_LOCK_TIMEOUT_MS", 30000)            # 30 seconds 
 # is the actual connection-leak hazard we need to guard against.
 IDLE_IN_TX_TIMEOUT_MS = _int_env("DB_IDLE_IN_TRANSACTION_TIMEOUT_MS", 60000)      # 60 seconds
 
+# Transaction-mode connection poolers (such as PgBouncer-based endpoints) reject
+# `-c` startup options. Set DB_STARTUP_OPTIONS=false there and apply the same
+# three timeouts once per database instead, for example:
+#   ALTER DATABASE <name> SET statement_timeout = '60s';
+DB_STARTUP_OPTIONS = os.getenv("DB_STARTUP_OPTIONS", "true").lower() == "true"
+
 # Tag every connection so it is identifiable in pg_stat_activity. This is what
 # lets you run, during an incident:
 #   SELECT application_name, count(*) FROM pg_stat_activity GROUP BY 1 ORDER BY 2 DESC;
@@ -85,6 +91,17 @@ IDLE_IN_TX_TIMEOUT_MS = _int_env("DB_IDLE_IN_TRANSACTION_TIMEOUT_MS", 60000)    
 APP_NAME = os.getenv("DB_APPLICATION_NAME", "oncall-health-backend")
 
 # Create PostgreSQL engine with bounded pool limits and query timeouts
+def build_connect_args() -> dict:
+    connect_args = {"application_name": APP_NAME}
+    if DB_STARTUP_OPTIONS:
+        connect_args["options"] = (
+            f"-c statement_timeout={STATEMENT_TIMEOUT_MS} "
+            f"-c lock_timeout={LOCK_TIMEOUT_MS} "
+            f"-c idle_in_transaction_session_timeout={IDLE_IN_TX_TIMEOUT_MS}"
+        )
+    return connect_args
+
+
 engine = create_engine(
     DATABASE_URL,
     pool_size=POOL_SIZE,
@@ -97,14 +114,7 @@ engine = create_engine(
                             # keeps the number of actually-open connections low under
                             # bursty load instead of holding the full pool open
     echo_pool=os.getenv("DB_ECHO_POOL", "").lower() in ("1", "true", "yes"),  # set DB_ECHO_POOL=true for verbose pool debugging
-    connect_args={
-        "application_name": APP_NAME,
-        "options": (
-            f"-c statement_timeout={STATEMENT_TIMEOUT_MS} "
-            f"-c lock_timeout={LOCK_TIMEOUT_MS} "
-            f"-c idle_in_transaction_session_timeout={IDLE_IN_TX_TIMEOUT_MS}"
-        ),
-    },
+    connect_args=build_connect_args(),
 )
 
 logger.info(
