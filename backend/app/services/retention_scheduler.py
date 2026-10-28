@@ -43,6 +43,7 @@ class RetentionPollResult:
     succeeded: int = 0
     failed: int = 0
     skipped: int = 0
+    poll_failed: bool = False
 
 
 def utc_now() -> datetime:
@@ -174,6 +175,7 @@ def process_due_retention_cleanups(
                 ).order_by(Organization.id).limit(PAGE_SIZE).all()]
         except Exception:
             logger.error("Retention poll unavailable code=retention_poll_failed")
+            result.poll_failed = True
             return result
         if not ids:
             return result
@@ -221,6 +223,7 @@ def process_failed_retention_retries(
                 ids = _failed_cleanup_ids(db, cursor)
         except Exception:
             logger.error("Retention retry poll unavailable code=retention_retry_poll_failed")
+            result.poll_failed = True
             return result
         if not ids:
             return result
