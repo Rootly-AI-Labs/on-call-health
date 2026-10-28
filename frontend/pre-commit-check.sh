@@ -27,27 +27,18 @@ else
     echo -e "${GREEN}✅ TypeScript type check passed${NC}"
 fi
 
-# Run ESLint
-echo "🔍 Running ESLint..."
+# Run oxlint
+echo "🔍 Running oxlint..."
 npm run lint
 LINT_EXIT_CODE=$?
 
 if [ $LINT_EXIT_CODE -ne 0 ]; then
-    # Check if there are actual errors (not just warnings)
-    npm run lint 2>&1 | grep -E "Error:" > /dev/null
-    HAS_ERRORS=$?
-    
-    if [ $HAS_ERRORS -eq 0 ]; then
-        echo -e "${RED}❌ ESLint found errors!${NC}"
-        echo "Please fix the ESLint errors before committing."
-        echo "Tip: Run 'npm run lint' to see all issues."
-        exit 1
-    else
-        echo -e "${YELLOW}⚠️  ESLint found only warnings${NC}"
-        echo "Consider fixing the warnings, but they won't block your commit."
-    fi
+    echo -e "${RED}❌ oxlint found errors!${NC}"
+    echo "Please fix the lint errors before committing."
+    echo "Tip: Run 'npm run lint' to see all issues."
+    exit 1
 else
-    echo -e "${GREEN}✅ ESLint check passed${NC}"
+    echo -e "${GREEN}✅ oxlint check passed${NC}"
 fi
 
 echo -e "${GREEN}✨ All pre-commit checks passed!${NC}"

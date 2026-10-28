@@ -87,6 +87,7 @@ import GitHubAllMetricsPopup from "@/components/dashboard/GitHubAllMetricsPopup"
 import RiskFactorsAllPopup from "@/components/dashboard/RiskFactorsAllPopup"
 import { DeleteAnalysisDialog } from "@/components/dashboard/dialogs/DeleteAnalysisDialog"
 import Image from "next/image"
+import Link from "next/link"
 import { format, formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
 import useDashboard from "@/hooks/useDashboard"
@@ -772,12 +773,12 @@ function DashboardContent() {
                         New Analysis →
                       </button>
                     ) : (
-                      <a
+                      <Link
                         href="/integrations"
                         className="px-6 py-2.5 bg-white text-orange-600 font-semibold rounded-lg hover:bg-orange-50 transition-colors shadow-md"
                       >
                         Connect Integrations →
-                      </a>
+                      </Link>
                     )}
                   </div>
                 </div>
@@ -798,12 +799,12 @@ function DashboardContent() {
                         </p>
                       </div>
                     </div>
-                    <a
+                    <Link
                       href="/management"
                       className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       Sync Members →
-                    </a>
+                    </Link>
                   </div>
                 </div>
               )}
@@ -1660,7 +1661,7 @@ function DashboardContent() {
                                 if (!githubIntegration) {
                                   toast.error(
                                     <span>
-                                      GitHub not connected - please connect on <a href="/integrations" className="underline font-medium hover:text-red-800">integrations page</a>
+                                      GitHub not connected - please connect on <Link href="/integrations" className="underline font-medium hover:text-red-800">integrations page</Link>
                                     </span>
                                   )
                                 } else {
@@ -1739,7 +1740,7 @@ function DashboardContent() {
                                 if (!jiraIntegration) {
                                   toast.error(
                                     <span>
-                                      Jira not connected - please connect on <a href="/integrations" className="underline font-medium hover:text-red-800">integrations page</a>
+                                      Jira not connected - please connect on <Link href="/integrations" className="underline font-medium hover:text-red-800">integrations page</Link>
                                     </span>
                                   )
                                 } else {
@@ -1950,7 +1951,7 @@ function DashboardContent() {
                           // Disable future dates and dates older than 1 year
                           return date > today || date < oneYearAgo
                         }}
-                        initialFocus
+                        autoFocus
                       />
                     </PopoverContent>
                   </Popover>

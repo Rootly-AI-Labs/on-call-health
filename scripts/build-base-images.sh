@@ -1,6 +1,6 @@
 #!/bin/bash
-# Build and push base Docker images with pre-installed dependencies
-# Run this script when dependencies change (requirements.txt or package.json)
+# Build and push the frontend base Docker image with pre-installed dependencies
+# Run this script when frontend dependencies change (package.json)
 #
 # Usage:
 #   ./build-base-images.sh          # Build only (local platform)
@@ -12,7 +12,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 REPO="rootlyio/on-call-health"
-BACKEND_IMAGE="$REPO:backend-base"
 FRONTEND_IMAGE="$REPO:frontend-base"
 PLATFORMS="linux/amd64,linux/arm64"
 
@@ -45,20 +44,11 @@ setup_buildx() {
     fi
 }
 
-echo "Building base Docker images..."
+echo "Building frontend base Docker image..."
 
 if [[ "$PUSH" == true ]]; then
     check_docker_login
     setup_buildx
-
-    # Build and push backend base image (multi-platform)
-    echo "Building and pushing backend base image for $PLATFORMS..."
-    docker buildx build \
-        --platform "$PLATFORMS" \
-        -f "$PROJECT_ROOT/backend/Dockerfile.base" \
-        -t "$BACKEND_IMAGE" \
-        --push \
-        "$PROJECT_ROOT/backend"
 
     # Build and push frontend base image (multi-platform)
     echo "Building and pushing frontend base image for $PLATFORMS..."
@@ -70,17 +60,10 @@ if [[ "$PUSH" == true ]]; then
         "$PROJECT_ROOT/frontend"
 
     echo ""
-    echo "Multi-platform images pushed successfully!"
-    echo "  - $BACKEND_IMAGE ($PLATFORMS)"
+    echo "Multi-platform image pushed successfully!"
     echo "  - $FRONTEND_IMAGE ($PLATFORMS)"
 else
     # Build for local platform only
-    echo "Building backend base image (local platform)..."
-    docker build \
-        -f "$PROJECT_ROOT/backend/Dockerfile.base" \
-        -t "$BACKEND_IMAGE" \
-        "$PROJECT_ROOT/backend"
-
     echo "Building frontend base image (local platform)..."
     docker build \
         -f "$PROJECT_ROOT/frontend/Dockerfile.base" \
@@ -88,8 +71,7 @@ else
         "$PROJECT_ROOT/frontend"
 
     echo ""
-    echo "Base images built successfully (local platform only)!"
-    echo "  - $BACKEND_IMAGE"
+    echo "Base image built successfully (local platform only)!"
     echo "  - $FRONTEND_IMAGE"
     echo ""
     echo "To build multi-platform and push to Docker Hub, run:"

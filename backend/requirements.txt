@@ -3,9 +3,9 @@ fastapi[all]
 uvicorn[standard]
 
 # Database
-sqlalchemy>=2.0,<2.1
+sqlalchemy>=2.1.5,<2.2
 alembic
-psycopg2-binary
+psycopg[binary]
 
 # Authentication & OAuth
 authlib
@@ -21,7 +21,7 @@ aiohttp
 certifi>=2026.10.19  # CVE-2026-111943: drops compromised eMudhra intermediates
 
 # Resilience patterns for HTTP client
-tenacity>=9.1.4
+tenacity>=9.2.1
 aiobreaker>=1.2.0
 
 # Rate limiting and security
@@ -54,3 +54,5 @@ newrelic
 
 # Development
 pytest
+pytest-asyncio>=1.4.1
+pytest-timeout>=2.4.0

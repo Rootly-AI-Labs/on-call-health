@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from backend.app.services.survey_recipient_service import (
+from app.services.survey_recipient_service import (
     get_saved_recipient_ids_for_org,
     save_survey_recipient_ids_for_org,
 )

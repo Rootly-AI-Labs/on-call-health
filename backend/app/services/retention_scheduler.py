@@ -43,6 +43,7 @@ class RetentionPollResult:
     succeeded: int = 0
     failed: int = 0
     skipped: int = 0
+    poll_failed: bool = False
 
 
 def utc_now() -> datetime:
@@ -174,6 +175,7 @@ def process_due_retention_cleanups(
                 ).order_by(Organization.id).limit(PAGE_SIZE).all()]
         except Exception:
             logger.error("Retention poll unavailable code=retention_poll_failed")
+            result.poll_failed = True
             return result
         if not ids:
             return result
@@ -193,6 +195,45 @@ def process_due_retention_cleanups(
                 except Exception:
                     logger.error("Retention outcome scheduling unavailable org=%s code=retention_retry_failed",
                                  organization_id)
+
+
+def _failed_cleanup_ids(db, cursor: int) -> list[int]:
+    return [row[0] for row in db.query(Organization.id).filter(
+        Organization.id > cursor,
+        Organization.status == "active",
+        Organization.settings["data_retention"]["retention_days"].as_string().isnot(None),
+        Organization.settings["data_retention_cleanup"]["state"].as_string() == "failed",
+    ).order_by(Organization.id).limit(PAGE_SIZE).all()]
+
+
+def process_failed_retention_retries(
+    *, session_factory=SessionLocal, clock: Callable[[], datetime] = utc_now,
+) -> RetentionPollResult:
+    """Retry organizations whose last cleanup failed, once their retry is due.
+
+    Each attempt rechecks eligibility and the retry interval under the
+    organization claim, so an external trigger may call this on any cadence.
+    """
+    _utc(clock())
+    result = RetentionPollResult()
+    cursor = 0
+    while True:
+        try:
+            with session_factory() as db:
+                ids = _failed_cleanup_ids(db, cursor)
+        except Exception:
+            logger.error("Retention retry poll unavailable code=retention_retry_poll_failed")
+            result.poll_failed = True
+            return result
+        if not ids:
+            return result
+        cursor = ids[-1]
+        for organization_id in ids:
+            result.candidates += 1
+            outcome = process_organization_cleanup(
+                organization_id, session_factory=session_factory, clock=clock, mode="retry",
+            )
+            setattr(result, outcome, getattr(result, outcome) + 1)
 
 
 async def run_due_retention_cleanups(
@@ -218,6 +259,7 @@ class RetentionScheduler:
         self._started = False
         self._has_started = False
         self._stop_event = threading.Event()
+        self._timers_lock = threading.Lock()
         self._shutdown_task: asyncio.Task | None = None
 
     def _run_poll(self) -> RetentionPollResult:
@@ -235,10 +277,13 @@ class RetentionScheduler:
             self._schedule_retry(organization_id, deferred=True, mode="daily")
 
     def _remove_retry(self, organization_id: int) -> None:
-        try:
-            self.scheduler.remove_job(f"{RETRY_JOB_PREFIX}{organization_id}")
-        except JobLookupError:
-            pass
+        with self._timers_lock:
+            if self._stop_event.is_set():
+                return
+            try:
+                self.scheduler.remove_job(f"{RETRY_JOB_PREFIX}{organization_id}")
+            except JobLookupError:
+                pass
 
     def _schedule_retry(self, organization_id: int, *, deferred: bool = False, mode: AttemptMode = "retry") -> None:
         """Recheck persisted eligibility before queuing a targeted follow-up.
@@ -265,16 +310,17 @@ class RetentionScheduler:
             if due_at is None:
                 self._remove_retry(organization_id)
                 return
-            if self._stop_event.is_set():
-                return
             # A slow metadata read must not consume the contention delay.
             earliest = _utc(utc_now()) + timedelta(minutes=RETRY_INTERVAL_MINUTES) if deferred else now
-            self.scheduler.add_job(
-                self._run_retry, trigger=DateTrigger(run_date=max(due_at, earliest), timezone=timezone.utc),
-                args=[organization_id], id=f"{RETRY_JOB_PREFIX}{organization_id}",
-                **({"kwargs": {"mode": "daily"}} if mode == "daily" else {}),
-                replace_existing=not deferred, max_instances=1, misfire_grace_time=None,
-            )
+            with self._timers_lock:
+                if self._stop_event.is_set():
+                    return
+                self.scheduler.add_job(
+                    self._run_retry, trigger=DateTrigger(run_date=max(due_at, earliest), timezone=timezone.utc),
+                    args=[organization_id], id=f"{RETRY_JOB_PREFIX}{organization_id}",
+                    **({"kwargs": {"mode": "daily"}} if mode == "daily" else {}),
+                    replace_existing=not deferred, max_instances=1, misfire_grace_time=None,
+                )
         except ConflictingIdError:
             # A lock deferral must not postpone or overwrite a concurrent retry.
             if not deferred:
@@ -303,12 +349,7 @@ class RetentionScheduler:
         while not self._stop_event.is_set():
             try:
                 with SessionLocal() as db:
-                    ids = [row[0] for row in db.query(Organization.id).filter(
-                        Organization.id > cursor,
-                        Organization.status == "active",
-                        Organization.settings["data_retention"]["retention_days"].as_string().isnot(None),
-                        Organization.settings["data_retention_cleanup"]["state"].as_string() == "failed",
-                    ).order_by(Organization.id).limit(PAGE_SIZE).all()]
+                    ids = _failed_cleanup_ids(db, cursor)
             except Exception:
                 logger.error("Retention retry recovery unavailable code=retention_retry_recovery_failed")
                 return
@@ -353,6 +394,13 @@ class RetentionScheduler:
         logger.info("Retention scheduler started; daily_time_utc=%02d:%02d",
                     DAILY_CLEANUP_HOUR_UTC, DAILY_CLEANUP_MINUTE_UTC)
 
+    def _shutdown_scheduler(self) -> None:
+        # APScheduler holds its job store lock while joining running jobs, so a
+        # job changing a timer after this point would never finish.
+        with self._timers_lock:
+            pass
+        self.scheduler.shutdown(wait=True)
+
     async def stop(self) -> None:
         if self._shutdown_task is not None and not self._shutdown_task.done():
             await asyncio.shield(self._shutdown_task)
@@ -361,7 +409,7 @@ class RetentionScheduler:
             return
         self._started = False
         self._stop_event.set()
-        self._shutdown_task = asyncio.create_task(asyncio.to_thread(self.scheduler.shutdown, wait=True))
+        self._shutdown_task = asyncio.create_task(asyncio.to_thread(self._shutdown_scheduler))
         # Joining the background executor off-loop leaves other shutdown work
         # responsive while guaranteeing the current cleanup has finished.
         await asyncio.shield(self._shutdown_task)

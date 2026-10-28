@@ -45,6 +45,45 @@ jobs:
       - name: Test FastAPI app imports
         run: docker run --rm -e DATABASE_URL=postgresql://test:test@localhost/test -e JWT_SECRET_KEY=test-key-for-ci -e ENCRYPTION_KEY=test-encryption-key-for-ci backend-test python -c "from app.main import app; print('FastAPI app loaded successfully')"
 
+  backend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: och_retention_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d och_retention_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build backend Docker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./backend
+          tags: backend-test
+          load: true
+          cache-from: type=gha,scope=backend-test
+          cache-to: type=gha,mode=max,scope=backend-test
+
+      - name: Run backend tests
+        run: >-
+          docker run --rm --network host
+          -e DATABASE_URL=postgresql://test:test@localhost/test
+          -e JWT_SECRET_KEY=test-key-for-ci
+          -e ENCRYPTION_KEY=test-encryption-key-for-ci
+          -e RETENTION_TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/och_retention_test
+          backend-test python -m pytest tests -q -p no:cacheprovider
+
   docker-compose:
     runs-on: ubuntu-latest
     steps:

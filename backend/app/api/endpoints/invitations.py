@@ -248,7 +248,8 @@ async def list_organization_members(
         ).filter(
             User.organization_id == current_user.organization_id,
             User.organization_id.isnot(None)
-        ).distinct().order_by(User.name.asc()).all()
+        ).distinct().all()
+        members.sort(key=lambda member: (member.name is None, (member.name or "").casefold()))
 
         member_list = []
         for member in members:

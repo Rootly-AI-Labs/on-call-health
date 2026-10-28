@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import localFont from "next/font/local"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Link2, Brain, Target, Loader2, Flame } from "lucide-react";
@@ -573,7 +574,7 @@ export default function LandingPage() {
                 />
               </div>
               <div className="mt-8 text-sm text-slate-300">
-                © Rootly {new Date().getFullYear()}. Licensed under <a href="https://github.com/Rootly-AI-Labs/On-Call-Health/blob/main/LICENSE" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Apache 2.0</a> · <a href="/disclaimer" className="hover:text-white transition-colors">Disclaimer</a>
+                © Rootly {new Date().getFullYear()}. Licensed under <a href="https://github.com/Rootly-AI-Labs/On-Call-Health/blob/main/LICENSE" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Apache 2.0</a> · <Link href="/disclaimer" className="hover:text-white transition-colors">Disclaimer</Link>
               </div>
             </div>
 

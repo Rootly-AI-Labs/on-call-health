@@ -995,7 +995,8 @@ async def get_organization_members(
         User.organization_id == current_user.organization_id,
         User.organization_id.isnot(None),
         User.status == 'active'
-    ).distinct().order_by(User.name).all()
+    ).distinct().all()
+    users.sort(key=lambda user: (user.name is None, (user.name or "").casefold()))
 
     # Get pending invitations for the organization
     # SECURITY: Explicitly check IS NOT NULL to prevent NULL == NULL matching

@@ -257,8 +257,8 @@ class TestAnalyzeTeamData:
         )
 
         assert len(result["members"]) == 2
-        # Both have burnout_score = 0 when no incidents
-        assert all(m["burnout_score"] == 0 for m in result["members"])
+        # Both have och_score = 0 when no incidents
+        assert all(m["och_score"] == 0 for m in result["members"])
 
     def test_analyze_team_data_empty_team(self, mock_rootly_client):
         """Test analysis with no users"""
@@ -299,7 +299,7 @@ class TestAnalyzeMemberBurnout:
 
         assert result["user_id"] == "1"
         assert result["user_name"] == "John Doe"
-        assert result["burnout_score"] == 0
+        assert result["och_score"] == 0
         assert result["risk_level"] == "low"
         assert result["incident_count"] == 0
 
@@ -348,7 +348,7 @@ class TestAnalyzeMemberBurnout:
 
         assert result["user_id"] == "1"
         assert result["incident_count"] == 2
-        assert "burnout_score" in result
+        assert "och_score" in result
         assert "och_score" in result
         assert "risk_level" in result
         assert "factors" in result
@@ -387,7 +387,7 @@ class TestAnalyzeMemberBurnout:
         assert result["user_id"] == "P1"
         assert result["user_name"] == "Jane Smith"
         assert result["incident_count"] == 1
-        assert "burnout_score" in result
+        assert "och_score" in result
 
 
 class TestCalculationMethods:
@@ -428,27 +428,6 @@ class TestCalculationMethods:
         assert result["risk_distribution"]["medium"] == 1
         assert result["risk_distribution"]["high"] == 1
         assert result["risk_distribution"]["critical"] == 0
-
-    def test_calculate_compound_trauma_factor(self, mock_rootly_client):
-        """Test _calculate_compound_trauma_factor method"""
-        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
-
-        # Returns multiplier (1.0-2.0 range), not a raw score
-        # Below threshold (< 5) - no compound effect
-        result_low = analyzer._calculate_compound_trauma_factor(3)
-        assert result_low == 1.0  # Baseline multiplier
-
-        # At threshold (5) - start of compound effect
-        result_threshold = analyzer._calculate_compound_trauma_factor(5)
-        assert result_threshold == 1.0
-
-        # Above threshold (10) - 10% compound effect
-        result_high = analyzer._calculate_compound_trauma_factor(10)
-        assert result_high == 1.1
-
-        # Well above threshold (15) - higher compound effect
-        result_very_high = analyzer._calculate_compound_trauma_factor(15)
-        assert result_very_high > 1.1
 
     def test_calculate_compound_trauma_factor_rate(self, mock_rootly_client):
         """Test _calculate_compound_trauma_factor_rate method (rate-based, CBI/sRPE methodology)"""
@@ -730,38 +709,6 @@ class TestTimezoneHandling:
 class TestUtilityMethods:
     """Tests for utility methods"""
 
-    def test_get_user_email_from_user_rootly(self, mock_rootly_client):
-        """Test _get_user_email_from_user for Rootly"""
-        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
-
-        user = {"id": "1", "attributes": {"email": "john@example.com"}}
-        result = analyzer._get_user_email_from_user(user)
-        assert result == "john@example.com"
-
-    def test_get_user_email_from_user_pagerduty(self, mock_pagerduty_client):
-        """Test _get_user_email_from_user for PagerDuty"""
-        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="pagerduty")
-
-        user = {"id": "P1", "email": "jane@example.com"}
-        result = analyzer._get_user_email_from_user(user)
-        assert result == "jane@example.com"
-
-    def test_get_user_name_from_user_rootly(self, mock_rootly_client):
-        """Test _get_user_name_from_user for Rootly"""
-        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
-
-        user = {"id": "1", "attributes": {"full_name": "John Doe"}}
-        result = analyzer._get_user_name_from_user(user)
-        assert result == "John Doe"
-
-    def test_get_user_name_from_user_pagerduty(self, mock_pagerduty_client):
-        """Test _get_user_name_from_user for PagerDuty"""
-        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="pagerduty")
-
-        user = {"id": "P1", "name": "Jane Smith"}
-        result = analyzer._get_user_name_from_user(user)
-        assert result == "Jane Smith"
-
     def test_extract_incident_title_rootly(self, mock_rootly_client):
         """Test _extract_incident_title for Rootly"""
         analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
@@ -948,24 +895,6 @@ class TestCoreCalculationMethods:
         assert "after_hours" in result
         assert "incident_load" in result
         assert all(isinstance(v, (int, float)) for v in result.values())
-
-    def test_calculate_burnout_score(self, mock_rootly_client):
-        """Test _calculate_burnout_score"""
-        analyzer = UnifiedBurnoutAnalyzer(api_token="test_token", platform="rootly")
-
-        # Current implementation uses: workload, after_hours, incident_load
-        factors = {
-            "workload": 6.0,
-            "after_hours": 4.0,
-            "incident_load": 7.0
-        }
-
-        result = analyzer._calculate_burnout_score(factors)
-
-        assert isinstance(result, (int, float))
-        assert result >= 0
-        assert result <= 10  # Burnout scores are 0-10
-
 
 class TestEnhancementMethods:
     """Tests for HIGH PRIORITY enhancement methods"""

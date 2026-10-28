@@ -1,8 +1,8 @@
 """
 Tests for name-based GitHub matching fallback in GitHubCollector._correlate_email_to_github().
 
-Verifies that when synced members and manual mappings both fail,
-the collector falls back to EnhancedGitHubMatcher.match_name_to_github().
+Verifies that only synced members and manual mappings are used, and that
+the collector no longer falls back to EnhancedGitHubMatcher name matching.
 """
 
 import pytest
@@ -17,14 +17,11 @@ def collector():
 
 
 @pytest.mark.asyncio
-async def test_name_fallback_finds_match(collector):
-    """Name fallback should return a match when synced/manual lookups fail."""
+async def test_unmapped_member_is_not_matched_by_name(collector):
+    """Without a synced member or manual mapping, no name-based match is attempted."""
     with patch.object(collector, '_check_synced_members', new_callable=AsyncMock, return_value=None), \
          patch.object(collector, '_check_manual_mappings', new_callable=AsyncMock, return_value=None), \
          patch('app.services.enhanced_github_matcher.EnhancedGitHubMatcher') as MockMatcher:
-
-        instance = MockMatcher.return_value
-        instance.match_name_to_github = AsyncMock(return_value='spencercheng')
 
         result = await collector._correlate_email_to_github(
             email='spencer@example.com',
@@ -33,9 +30,8 @@ async def test_name_fallback_finds_match(collector):
             full_name='Spencer Cheng',
         )
 
-        assert result == 'spencercheng'
-        MockMatcher.assert_called_once_with('ghp_test123', collector.organizations)
-        instance.match_name_to_github.assert_awaited_once_with('Spencer Cheng', fallback_email='spencer@example.com')
+        assert result is None
+        MockMatcher.assert_not_called()
 
 
 @pytest.mark.asyncio

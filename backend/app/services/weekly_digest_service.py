@@ -899,10 +899,11 @@ async def _log_digest_countdown() -> None:
     )
 
 
-async def check_and_send_weekly_digests() -> None:
+async def check_and_send_weekly_digests() -> bool:
+    """Return False when the check itself failed; per-user send failures are logged only."""
     if not settings.WEEKLY_DIGEST_ENABLED:
         logger.debug("Weekly digest scheduler disabled (WEEKLY_DIGEST_ENABLED=false)")
-        return
+        return True
 
     db = SessionLocal()
     try:
@@ -1054,8 +1055,10 @@ async def check_and_send_weekly_digests() -> None:
 
     except Exception as e:
         logger.error(f"Weekly digest scheduler error: {e}", exc_info=True)
+        return False
     finally:
         db.close()
+    return True
 
 
 class WeeklyDigestScheduler:

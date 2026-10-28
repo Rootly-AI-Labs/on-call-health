@@ -29,34 +29,38 @@ for attempt in range(max_attempts):
         time.sleep(2)
 "
 
-# Run database migrations using centralized migration runner
-echo "🔄 Running database migrations..."
-echo "📂 Current directory: $(pwd)"
+if [ "$(echo "${RUN_MIGRATIONS_ON_STARTUP:-true}" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
+    # Run database migrations using centralized migration runner
+    echo "🔄 Running database migrations..."
+    echo "📂 Current directory: $(pwd)"
 
-if python migrations/migration_runner.py; then
-    echo "✅ All migrations completed successfully!"
-else
-    echo "⚠️  Some migrations failed - check logs above for details"
-    echo "   Continuing startup anyway..."
-fi
+    if python migrations/migration_runner.py; then
+        echo "✅ All migrations completed successfully!"
+    else
+        echo "⚠️  Some migrations failed - check logs above for details"
+        echo "   Continuing startup anyway..."
+    fi
 
-# Run survey message update migration (optional, non-critical)
-echo "🔄 Updating survey messages..."
-if python update_survey_messages.py; then
-    echo "✅ Survey messages updated successfully!"
-else
-    echo "⚠️  Survey message update failed, but continuing startup..."
-fi
+    # Run survey message update migration (optional, non-critical)
+    echo "🔄 Updating survey messages..."
+    if python update_survey_messages.py; then
+        echo "✅ Survey messages updated successfully!"
+    else
+        echo "⚠️  Survey message update failed, but continuing startup..."
+    fi
 
-# Create tables (safe - won't recreate existing tables)
-echo "🏗️  Ensuring all database tables exist..."
-python -c "
+    # Create tables (safe - won't recreate existing tables)
+    echo "🏗️  Ensuring all database tables exist..."
+    python -c "
 import sys
 sys.path.insert(0, 'app')
 from app.models import create_tables
 create_tables()
 print('✅ Database tables verified')
 "
+else
+    echo "⏭️  Startup migrations disabled (RUN_MIGRATIONS_ON_STARTUP=false)"
+fi
 
 echo "🎉 Pre-deployment setup completed successfully!"
 echo "🚀 Starting FastAPI application..."

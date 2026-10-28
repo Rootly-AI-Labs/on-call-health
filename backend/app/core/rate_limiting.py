@@ -14,8 +14,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Redis database for rate limiting (separate from main app data)
-RATE_LIMIT_REDIS_DB = 1
+# Redis database for rate limiting (separate from main app data). Hosted Redis
+# services that only offer database 0 set RATE_LIMIT_REDIS_DB=0; limiter keys
+# carry their own prefix, so they do not collide with app keys there.
+RATE_LIMIT_REDIS_DB = int(os.getenv("RATE_LIMIT_REDIS_DB", "1"))
 
 # Rate limiting configuration
 RATE_LIMITS = {

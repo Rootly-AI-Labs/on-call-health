@@ -30,8 +30,8 @@ class Settings:
 
     # Frontend URL for survey links
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    # Backend API URL (used for email links like unsubscribe)
-    API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:8000")
+    # Public backend URL (used for OAuth callbacks that land on the API)
+    BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
     
     # OAuth - Google
     GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
@@ -73,6 +73,17 @@ class Settings:
     # Rootly API
     ROOTLY_API_BASE_URL: str = os.getenv("ROOTLY_API_BASE_URL", "https://api.rootly.com")
 
+    # Startup work. Hosts that run migrations at deploy time and trigger
+    # scheduled jobs externally set these to false.
+    RUN_MIGRATIONS_ON_STARTUP: bool = os.getenv("RUN_MIGRATIONS_ON_STARTUP", "true").lower() == "true"
+    RUN_SCHEDULERS: bool = os.getenv("RUN_SCHEDULERS", "true").lower() == "true"
+    # Bearer token for /internal/cron/* triggers. Cron endpoints refuse every
+    # request while it is unset.
+    CRON_SECRET: Optional[str] = os.getenv("CRON_SECRET")
+    # "inline" runs analyses in the request process; "queue" saves them as
+    # pending for /internal/cron/analyses to run.
+    ANALYSIS_EXECUTION: str = os.getenv("ANALYSIS_EXECUTION", "inline").lower()
+
     # Weekly digest emails
     WEEKLY_DIGEST_ENABLED: bool = os.getenv("WEEKLY_DIGEST_ENABLED", "false").lower() == "true"
 
@@ -82,8 +93,6 @@ class Settings:
     RESEND_FROM_EMAIL: Optional[str] = os.getenv("RESEND_FROM_EMAIL")
     RESEND_FROM_NAME: str = os.getenv("RESEND_FROM_NAME", "On-Call Health")
     UNSUBSCRIBE_FEEDBACK_EMAIL: Optional[str] = os.getenv("UNSUBSCRIBE_FEEDBACK_EMAIL")
-    #todo
-    # API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:8000")
 
     # Working Hours Configuration
     # These define what is considered "business hours" for burnout analysis

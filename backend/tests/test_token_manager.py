@@ -18,7 +18,7 @@ class TestTokenManager(TestCase):
 
     def _run_async(self, coro):
         """Helper to run async tests."""
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     # OAuth token tests
 
