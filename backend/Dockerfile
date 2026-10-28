@@ -1,14 +1,41 @@
-# Use pre-built base image with dependencies from Docker Hub
-ARG BASE_IMAGE=rootlyio/on-call-health:backend-base
-FROM ${BASE_IMAGE}
+# Stage 1: Build stage with compilation tools
+FROM python:3.14.8-slim-bookworm AS builder
 
 WORKDIR /app
 
-# Copy requirements first for layer caching
-COPY requirements.txt .
+# Install build dependencies (only needed for compilation)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install any new dependencies not in base image
+# Create virtual environment for cleaner copying
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Python dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Stage 2: Runtime stage (minimal, no build tools)
+FROM python:3.14.8-slim-bookworm AS runtime
+
+WORKDIR /app
+
+# Install only runtime dependencies (no build tools)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Set Python to run unbuffered
+ENV PYTHONUNBUFFERED=1
 
 # Copy application code
 COPY . .
