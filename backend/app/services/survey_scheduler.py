@@ -11,6 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, or_
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 import pytz
 
 from ..models.survey_schedule import SurveySchedule, UserSurveyPreference
@@ -20,6 +21,7 @@ from ..models.slack_integration import SlackIntegration
 from ..models.slack_workspace_mapping import SlackWorkspaceMapping
 from ..models.user_burnout_report import UserBurnoutReport
 from ..models.survey_period import SurveyPeriod
+from ..models.survey_dispatch_claim import SurveyDispatchClaim
 from ..models import SessionLocal
 from ..core.distributed_lock import with_distributed_lock
 from .slack_dm_sender import SlackDMSender
@@ -52,9 +54,19 @@ class SurveyDispatchResult:
     failed: int = 0
 
 
-def _fires_between(trigger: CronTrigger, start: datetime, end: datetime) -> bool:
-    fire_time = trigger.get_next_fire_time(None, start)
-    return fire_time is not None and fire_time <= end
+SURVEY_DISPATCH_CLAIM_RETENTION = timedelta(days=7)
+
+
+def _claim_occurrence(db: Session, organization_id: int, kind: str, fire_time: datetime) -> bool:
+    """Record one job occurrence; False when another call already claimed it."""
+    claimed_id = db.execute(
+        pg_insert(SurveyDispatchClaim)
+        .values(organization_id=organization_id, job_kind=kind, fire_time=fire_time)
+        .on_conflict_do_nothing(index_elements=["organization_id", "job_kind", "fire_time"])
+        .returning(SurveyDispatchClaim.id)
+    ).scalar()
+    db.commit()
+    return claimed_id is not None
 
 
 class SurveyScheduler:
@@ -346,26 +358,27 @@ class SurveyScheduler:
         """
         return f"survey_delivery:org:{organization_id}"
 
-    async def _run_survey_job(self, organization_id: int, is_reminder: bool = False):
+    async def _run_survey_job(self, organization_id: int, is_reminder: bool = False) -> bool:
         """Open a fresh DB session for each scheduled survey job execution."""
         db = SessionLocal()
         try:
-            await self._send_organization_surveys(organization_id, db, is_reminder)
+            return await self._send_organization_surveys(organization_id, db, is_reminder)
         finally:
             db.close()
 
-    async def _run_follow_up_job(self, organization_id: int):
+    async def _run_follow_up_job(self, organization_id: int) -> bool:
         """Open a fresh DB session for each scheduled follow-up job execution."""
         db = SessionLocal()
         try:
-            await self._send_follow_up_reminders(organization_id, db)
+            return await self._send_follow_up_reminders(organization_id, db)
         finally:
             db.close()
 
-    async def _send_follow_up_reminders(self, organization_id: int, db: Session):
+    async def _send_follow_up_reminders(self, organization_id: int, db: Session) -> bool:
         """
         Send follow-up reminders to users with pending survey periods.
         Includes idempotency checks to prevent duplicate sends on the same day.
+        Returns False when any delivery failed or the run was aborted.
         """
         try:
             logger.debug(f"Starting follow-up reminder delivery for organization {organization_id}")
@@ -381,16 +394,13 @@ class SurveyScheduler:
                         f"Skipping follow-up reminders for org {organization_id} - "
                         "could not acquire delivery lock"
                     )
-                    return
-
+                    return False
                 schedule = self._get_enabled_schedule(db, organization_id, "follow-up reminders")
                 if not schedule:
-                    return
-
+                    return True
                 if not schedule.follow_up_reminders_enabled:
                     logger.debug(f"Follow-up reminders disabled for org {organization_id}")
-                    return
-
+                    return True
                 org_timezone = schedule.timezone or 'UTC'
                 today = self._get_org_date(org_timezone)
 
@@ -402,13 +412,11 @@ class SurveyScheduler:
 
                 if not feature_config or not feature_config.survey_enabled:
                     logger.debug(f"Survey feature not enabled for org {organization_id}")
-                    return
-
+                    return True
                 slack_token = get_slack_token_for_organization(db, organization_id)
                 if not slack_token:
                     logger.warning(f"No Slack OAuth token available for org {organization_id}")
-                    return
-
+                    return True
                 # Get all pending periods within their date range
                 pending_periods = db.query(SurveyPeriod).filter(
                     SurveyPeriod.organization_id == organization_id,
@@ -550,10 +558,12 @@ class SurveyScheduler:
                     f"{skipped_already_sent} skipped (already sent today), "
                     f"{skipped_completed} already completed, {failed_count} failed"
                 )
+                return failed_count == 0
 
         except Exception as e:
             logger.error(f"Error in follow-up reminder delivery for org {organization_id}: {str(e)}")
             db.rollback()
+            return False
 
     def schedule_organization_surveys(self, db: Session):
         """
@@ -648,50 +658,70 @@ class SurveyScheduler:
             )
             logger.debug(f"Scheduled {kind} for org {schedule.organization_id}: {trigger}")
 
+    def _enabled_schedules(self, db: Session) -> List[SurveySchedule]:
+        return db.query(SurveySchedule).filter(SurveySchedule.enabled == True).all()
+
     async def dispatch_due_jobs(
         self,
         now: Optional[datetime] = None,
         window: timedelta = SURVEY_DISPATCH_WINDOW,
     ) -> SurveyDispatchResult:
         """
-        Run every survey job whose fire time falls within the last `window`.
+        Run every survey job occurrence whose fire time fell within the last `window`.
 
         Called from an external trigger every minute instead of in-process cron
         jobs. Schedules are read fresh on each call, so edits apply right away.
-        A job may run several times inside its window; delivery skips anyone
-        already contacted or who responded that day, so repeats send nothing
-        new while a late trigger still delivers.
+        Each occurrence is claimed in the database before it runs, so it runs
+        once even when calls overlap or the window spans midnight, and a late
+        trigger still runs it. A failed occurrence is reported, not retried,
+        because same-day reminders keep no per-recipient delivery marker.
         """
         now = now or datetime.now(timezone.utc)
         window_start = now - window
+        result = SurveyDispatchResult()
+        due_jobs = []
         db = SessionLocal()
         try:
-            schedules = db.query(SurveySchedule).filter(SurveySchedule.enabled == True).all()
-            due_jobs = [
-                (schedule.organization_id, kind)
-                for schedule in schedules
-                for kind, trigger in self._schedule_triggers(schedule)
-                if _fires_between(trigger, window_start, now)
-            ]
+            schedules = self._enabled_schedules(db)
+            result.schedules = len(schedules)
+            for schedule in schedules:
+                try:
+                    for kind, trigger in self._schedule_triggers(schedule):
+                        fire_time = trigger.get_next_fire_time(None, window_start)
+                        if fire_time is not None and fire_time <= now:
+                            due_jobs.append((schedule.organization_id, kind, fire_time))
+                except Exception:
+                    result.failed += 1
+                    logger.exception(f"Invalid survey schedule {schedule.id} for org {schedule.organization_id}")
+
+            claimed_jobs = [job for job in due_jobs if _claim_occurrence(db, *job)]
+            db.query(SurveyDispatchClaim).filter(
+                SurveyDispatchClaim.claimed_at < now - SURVEY_DISPATCH_CLAIM_RETENTION
+            ).delete(synchronize_session=False)
+            db.commit()
         finally:
             db.close()
 
-        result = SurveyDispatchResult(schedules=len(schedules))
-        for organization_id, kind in due_jobs:
+        for organization_id, kind, fire_time in claimed_jobs:
             try:
                 if kind == SURVEY_JOB_FOLLOW_UP:
-                    await self._run_follow_up_job(organization_id)
+                    delivered = await self._run_follow_up_job(organization_id)
                 else:
-                    await self._run_survey_job(organization_id, kind == SURVEY_JOB_REMINDER)
-                result.ran += 1
+                    delivered = await self._run_survey_job(organization_id, kind == SURVEY_JOB_REMINDER)
             except Exception:
+                delivered = False
+                logger.exception(f"Survey {kind} job for {fire_time.isoformat()} crashed for org {organization_id}")
+            if delivered:
+                result.ran += 1
+            else:
                 result.failed += 1
-                logger.exception(f"Survey {kind} job failed for org {organization_id}")
+                logger.error(f"Survey {kind} job for {fire_time.isoformat()} did not deliver cleanly for org {organization_id}")
         return result
 
-    async def _send_organization_surveys(self, organization_id: int, db: Session, is_reminder: bool = False):
+    async def _send_organization_surveys(self, organization_id: int, db: Session, is_reminder: bool = False) -> bool:
         """
         Send surveys to all opted-in users in an organization.
+        Returns False when any delivery failed or the run was aborted.
 
         Args:
             organization_id: ID of the organization
@@ -713,12 +743,10 @@ class SurveyScheduler:
                         f"Skipping {message_type} delivery for org {organization_id} - "
                         "could not acquire delivery lock"
                     )
-                    return
-
+                    return False
                 schedule = self._get_enabled_schedule(db, organization_id, message_type)
                 if not schedule:
-                    return
-
+                    return True
                 org_timezone = schedule.timezone
 
                 # Expire any overdue periods before processing
@@ -732,15 +760,13 @@ class SurveyScheduler:
                     logger.info(
                         f"Survey feature not enabled for org {organization_id}, skipping {message_type} delivery"
                     )
-                    return
-
+                    return True
                 # Get Slack OAuth token for this organization
                 slack_token = get_slack_token_for_organization(db, organization_id)
 
                 if not slack_token:
                     logger.warning(f"No Slack OAuth token available for org {organization_id}")
-                    return
-
+                    return True
                 # Get all users in organization who should receive surveys
                 users = self._get_survey_recipients(organization_id, db, is_reminder)
 
@@ -892,10 +918,12 @@ class SurveyScheduler:
                             logger.error(f"Failed to create delivery notification: {str(e)}")
 
                 db.commit()
+                return failed_count == 0
 
         except Exception as e:
             logger.error(f"Error in daily survey delivery for org {organization_id}: {str(e)}")
             db.rollback()
+            return False
 
     def _get_survey_recipients(self, organization_id: int, db: Session, is_reminder: bool = False, apply_saved_recipients: bool = True) -> List[Dict]:
         """
