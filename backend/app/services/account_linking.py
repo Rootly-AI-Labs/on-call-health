@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from ..models import User, OAuthProvider, UserEmail, Organization, OrganizationInvitation
 from ..auth.oauth import github_oauth, google_oauth
+from ..core.token_encryption import encrypt_optional_token
 
 logger = logging.getLogger(__name__)
 
@@ -169,8 +170,8 @@ class AccountLinkingService:
             user_id=user.id,
             provider=provider,
             provider_user_id=provider_user_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
+            access_token=encrypt_optional_token(access_token),
+            refresh_token=encrypt_optional_token(refresh_token),
             is_primary=True
         )
         self.db.add(oauth_provider)
@@ -211,8 +212,8 @@ class AccountLinkingService:
                 user_id=user.id,
                 provider=provider,
                 provider_user_id=provider_user_id,
-                access_token=access_token,
-                refresh_token=refresh_token,
+                access_token=encrypt_optional_token(access_token),
+                refresh_token=encrypt_optional_token(refresh_token),
                 is_primary=True
             )
             self.db.add(oauth_provider)
@@ -252,8 +253,8 @@ class AccountLinkingService:
             if existing_oauth.user_id == user.id:
                 # Already linked to this user - just update tokens
                 logger.info(f"✅ Updating existing {provider} OAuth link for user {user.id}")
-                existing_oauth.access_token = access_token
-                existing_oauth.refresh_token = refresh_token
+                existing_oauth.access_token = encrypt_optional_token(access_token)
+                existing_oauth.refresh_token = encrypt_optional_token(refresh_token)
                 existing_oauth.updated_at = datetime.now()
             else:
                 # Linked to a DIFFERENT user - unlink and relink to current user
@@ -262,8 +263,8 @@ class AccountLinkingService:
 
                 # Update the OAuth record to point to new user
                 existing_oauth.user_id = user.id
-                existing_oauth.access_token = access_token
-                existing_oauth.refresh_token = refresh_token
+                existing_oauth.access_token = encrypt_optional_token(access_token)
+                existing_oauth.refresh_token = encrypt_optional_token(refresh_token)
                 existing_oauth.updated_at = datetime.now()
         else:
             # No existing link - create new one
@@ -273,8 +274,8 @@ class AccountLinkingService:
                 user_id=user.id,
                 provider=provider,
                 provider_user_id=provider_user_id,
-                access_token=access_token,
-                refresh_token=refresh_token,
+                access_token=encrypt_optional_token(access_token),
+                refresh_token=encrypt_optional_token(refresh_token),
                 is_primary=is_primary
             )
             self.db.add(oauth_provider)

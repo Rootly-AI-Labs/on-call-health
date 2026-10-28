@@ -19,7 +19,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  Github,
   Loader2,
   CheckCircle,
   AlertCircle,
@@ -33,6 +32,8 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react"
+import { siGithub } from "simple-icons"
+import { BrandIcon } from "@/components/ui/brand-icon"
 
 interface GitHubIntegration {
   id: number
@@ -145,7 +146,7 @@ export function GitHubIntegrationCard({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-neutral-900 rounded-lg flex items-center justify-center">
-                <Github className="w-6 h-6 text-white" />
+                <BrandIcon icon={siGithub} className="w-6 h-6 text-white" />
               </div>
               <div>
                 <CardTitle className="text-lg">GitHub</CardTitle>
@@ -167,7 +168,7 @@ export function GitHubIntegrationCard({
           {/* Integration Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div className="flex items-center space-x-2">
-              <Github className="w-4 h-4 text-neutral-500" />
+              <BrandIcon icon={siGithub} className="w-4 h-4 text-neutral-500" />
               <div>
                 <div className="font-medium">Username</div>
                 <div className="text-neutral-700">{integration.github_username}</div>
@@ -236,7 +237,7 @@ export function GitHubIntegrationCard({
                   return (
                     <Badge 
                       key={permission} 
-                      variant={isRequired ? "default" : "outline"} 
+                      variant={isRequired ? "default" : "outline"}
                       className={`text-xs ${isRequired ? 'bg-green-100 text-green-700 border-green-200' : ''}`}
                     >
                       {permission}
@@ -252,7 +253,7 @@ export function GitHubIntegrationCard({
               )}
             </div>
             <div className="mt-1 text-xs text-neutral-500">
-              Required for auto-mapping: <code className="bg-neutral-200 px-1 rounded">read:user</code>, <code className="bg-neutral-200 px-1 rounded">read:org</code>, <code className="bg-neutral-200 px-1 rounded">repo</code>
+              Required for auto-mapping: <code className="bg-neutral-200 px-1 rounded-sm">read:user</code>, <code className="bg-neutral-200 px-1 rounded-sm">read:org</code>, <code className="bg-neutral-200 px-1 rounded-sm">repo</code>
             </div>
           </div>
 
@@ -300,7 +301,7 @@ export function GitHubIntegrationCard({
       <CardHeader>
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-neutral-900 rounded-lg flex items-center justify-center">
-            <Github className="w-6 h-6 text-white" />
+            <BrandIcon icon={siGithub} className="w-6 h-6 text-white" />
           </div>
           <div>
             <CardTitle className="text-lg">GitHub</CardTitle>
@@ -321,7 +322,7 @@ export function GitHubIntegrationCard({
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <Github className="w-4 h-4 mr-2" />
+                <BrandIcon icon={siGithub} className="w-4 h-4 mr-2" />
               )}
               Connect with GitHub
             </Button>
