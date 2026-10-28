@@ -1420,6 +1420,11 @@ class MigrationRunner:
                 "description": "Track stored analysis error content age independently of status updates",
                 "sql_file": "2026_10_06_add_analysis_error_generated_at.sql"
             },
+            {
+                "name": "058_clear_plaintext_oauth_provider_tokens",
+                "description": "Clear OAuth provider tokens stored before encryption at rest",
+                "sql_file": "2026_10_28_clear_plaintext_oauth_provider_tokens.sql"
+            },
         ]
 
         success_count = 0
