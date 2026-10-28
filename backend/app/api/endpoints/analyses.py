@@ -3428,10 +3428,10 @@ async def run_analysis_task(
         if enable_ai and user_id:
             user = db.query(User).filter(User.id == user_id).first()
 
-            # Check if Railway system token is available for AI analysis
+            # Check if a system token is available from the environment for AI analysis
             system_api_key = os.getenv('ANTHROPIC_API_KEY')
 
-            # Use AI if user requested it AND Railway token is available (or user has their own token)
+            # Use AI if user requested it AND the system token is available (or user has their own token)
             if system_api_key or (user and user.llm_token and user.llm_provider):
                 use_ai_analyzer = True
 

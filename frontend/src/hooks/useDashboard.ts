@@ -928,7 +928,7 @@ export default function useDashboard() {
         return []
       }
     } catch (error) {
-      // Check if this is a network connectivity issue (expected during Railway startup)
+      // Check if this is a network connectivity issue (expected during backend cold starts)
       const isNetworkError = error instanceof Error && (
         error.message.includes('fetch') ||
         error.message.includes('network') ||
@@ -2115,7 +2115,7 @@ export default function useDashboard() {
         include_jira: jiraIntegration ? includeJira : false,
         include_linear: linearIntegration ? includeLinear : false,
         include_ai_usage: aiUsageConnected ? includeAIUsage : false,
-        enable_ai: enableAI,  // User can toggle, uses Railway token when enabled
+        enable_ai: enableAI,  // User can toggle, uses the system token when enabled
         auto_refresh_enabled: autoRefreshEnabled,
         auto_refresh_interval: autoRefreshEnabled ? autoRefreshInterval : null,
       }

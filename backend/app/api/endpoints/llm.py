@@ -39,7 +39,7 @@ def decrypt_token(encrypted_token: str) -> str:
 class LLMTokenRequest(BaseModel):
     token: str = ""
     provider: str = "anthropic"  # 'anthropic', 'openai', etc.
-    use_system_token: bool = False  # If True, use Railway system token instead
+    use_system_token: bool = False  # If True, use the system token from the environment instead
     switch_to_custom: bool = False  # If True, switch to stored custom token
 
 class LLMTokenResponse(BaseModel):

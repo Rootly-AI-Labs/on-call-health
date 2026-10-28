@@ -1883,8 +1883,6 @@ class UnifiedBurnoutAnalyzer:
         # Calculate confidence intervals and data quality
         confidence = self._calculate_confidence_intervals(metrics, incidents, github_data, slack_data, jira_data, user_tz)
         
-        # OCH DEBUG LOGGING - Removed to reduce Railway log noise
-        
         # Calculate overall health score using three-factor methodology (equal weighting)
         health_score = (dimensions["personal_burnout"] * 0.333 +
                         dimensions["work_related_burnout"] * 0.333 +

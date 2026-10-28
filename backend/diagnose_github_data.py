@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 GitHub Data Diagnostic Script
-Diagnose GitHub data issues across environments (localhost, Railway dev/prod, etc.)
+Diagnose GitHub data issues across environments (localhost, deployed dev/prod, etc.)
 
 Usage:
   # Default localhost (interactive email prompt)
@@ -261,7 +261,7 @@ except Exception as e:
     print(f"   3. Check credentials and permissions")
     print(f"   4. Ensure network connectivity (firewall, VPN, etc.)")
     if args.deployed:
-        print(f"   5. For Railway/deployed: verify DATABASE_URL environment variable is correct")
+        print(f"   5. For deployed: verify DATABASE_URL environment variable is correct")
     else:
         print(f"   5. For localhost: ensure PostgreSQL is running on port 5432")
     sys.exit(1)

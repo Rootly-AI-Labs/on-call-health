@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     if success:
         print("🎉 All migrations completed successfully!")
-        print("✅ Your Railway dev environment should now work correctly")
+        print("✅ Your database schema is now up to date")
     else:
         print("❌ Some migrations failed - check the logs above")
         print("💡 You may need to run this again or check database permissions")

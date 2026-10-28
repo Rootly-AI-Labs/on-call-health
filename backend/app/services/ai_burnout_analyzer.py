@@ -1394,7 +1394,7 @@ def get_ai_burnout_analyzer(api_key: Optional[str] = None, provider: Optional[st
         effective_api_key = api_key
         effective_provider = provider
     else:
-        # No custom token - use system token from Railway environment
+        # No custom token - use system token from the environment
         effective_api_key = os.getenv('ANTHROPIC_API_KEY')
         effective_provider = 'anthropic'
 
