@@ -4,7 +4,7 @@ This directory contains the database migration system for the Rootly Burnout Det
 
 ## How It Works
 
-1. **Automatic Migrations**: Migrations run automatically on every Railway deployment
+1. **Automatic Migrations**: Migrations run in the Vercel build step on every deployment
 2. **Migration Tracking**: Each migration is tracked in a `migrations` table to prevent re-running
 3. **Safe Execution**: Migrations use `IF NOT EXISTS` clauses to avoid errors on re-runs
 4. **Ordered Execution**: Migrations run in numerical order (001, 002, 003, etc.)
@@ -55,9 +55,10 @@ To run migrations manually (useful for immediate fixes):
 python run_migrations.py
 ```
 
-Or on Railway:
+Against a deployed database, get that environment's `DATABASE_URL_UNPOOLED` from `vercel env pull` and pass it as `DATABASE_URL`:
+
 ```bash
-railway run python run_migrations.py
+DATABASE_URL="$DATABASE_URL_UNPOOLED" python run_migrations.py
 ```
 
 ## Migration Status
@@ -82,11 +83,9 @@ runner.close()
 
 ## Deployment Flow
 
-1. **Railway Deployment Starts**
-2. **Database Connection** - Waits up to 60 seconds for DB
-3. **Migration System** - Creates migrations table if needed
-4. **Run Migrations** - Applies all pending migrations in order
-5. **Table Creation** - Ensures all app tables exist
-6. **Start Application** - Launches FastAPI server
+1. **Vercel Build Starts**
+2. **Table Creation** - Ensures all app tables exist
+3. **Run Migrations** - Applies all pending migrations in order; a failure fails the build
+4. **Deploy** - The new deployment only goes live after migrations succeed
 
-The entire process is logged so you can see what happened in the Railway deployment logs.
+The migration output is in the Vercel build logs.
