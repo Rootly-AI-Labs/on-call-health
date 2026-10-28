@@ -627,6 +627,17 @@ def test_shutdown_prevents_retry_registration_or_recovery(scheduler, monkeypatch
     instance._restore_retries()
 
 
+def test_shutdown_leaves_retry_timers_to_the_stopping_scheduler(scheduler):
+    # APScheduler holds its job store lock while joining running jobs.
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    instance._stop_event.set()
+
+    instance._after_daily_attempt(7, "succeeded")
+
+    assert instance.scheduler.removed == []
+
+
 def test_retry_registration_error_is_sanitized(scheduler, monkeypatch, caplog):
     def broken_factory():
         raise RuntimeError("PRIVATE DATABASE URL")
