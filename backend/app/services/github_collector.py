@@ -1,6 +1,7 @@
 """
 GitHub data collector for web app burnout analysis.
 """
+import tempfile
 import logging
 import random
 from datetime import datetime, timedelta, timezone
@@ -19,7 +20,7 @@ class GitHubCollector:
     """Collects GitHub activity data for burnout analysis."""
     
     def __init__(self):
-        self.cache_dir = Path('.github_cache')
+        self.cache_dir = Path(tempfile.gettempdir()) / '.github_cache'
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Business hours configuration

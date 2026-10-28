@@ -2,6 +2,7 @@
 Slack data collector for web app burnout analysis.
 """
 
+import tempfile
 import json
 import logging
 import asyncio
@@ -20,7 +21,7 @@ class SlackCollector:
     """Collects Slack communication data for burnout analysis."""
     
     def __init__(self):
-        self.cache_dir = Path('.slack_cache')
+        self.cache_dir = Path(tempfile.gettempdir()) / '.slack_cache'
         self.cache_dir.mkdir(exist_ok=True)
         
         # Business hours configuration
