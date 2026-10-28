@@ -55,6 +55,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None) -> bo
     """
     Cron job: find auto-refresh analyses matching `interval_filter` that are due
     and re-run them.  Pass interval_filter=None to process all intervals.
+    Returns False when the check or any refresh attempt failed unexpectedly.
     """
     from ..models import SessionLocal, Analysis, RootlyIntegration, User
     from ..api.endpoints.analyses import run_analysis_task
@@ -70,6 +71,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None) -> bo
 
     db = SessionLocal()
     due_analyses = []
+    failures = 0
 
     try:
         # Fetch completed auto-refresh analyses, optionally scoped to one interval
@@ -104,6 +106,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None) -> bo
             except Exception:
                 logger.warning("Could not check auto-refresh candidate %s; continuing tick", analysis_id, exc_info=True)
                 db.rollback()
+                failures += 1
 
         logger.info(
             f"🔄 [AUTO_REFRESH_SCHEDULER] {len(candidates)} auto-refresh analyses found, "
@@ -411,10 +414,11 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None) -> bo
                     exc_info=True,
                 )
                 db.rollback()
+                failures += 1
 
     except Exception as e:
         logger.error(f"🔄 [AUTO_REFRESH_SCHEDULER] Unexpected error: {e}", exc_info=True)
         return False
     finally:
         db.close()
-    return True
+    return failures == 0

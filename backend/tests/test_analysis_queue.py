@@ -151,6 +151,10 @@ def test_reaper_fails_only_stale_claims(session_factory, integration):
     assert failed == 2
     assert read(session_factory, stale_running)[0] == read(session_factory, stale_pending)[0] == "failed"
     assert read(session_factory, stale_running)[2] == analysis_queue.STALE_ERROR_MESSAGE
+    from app.models import Analysis
+
+    with session_factory() as db:
+        assert db.query(Analysis.completed_at).filter(Analysis.id == stale_running).scalar() == NOW
     assert [read(session_factory, analysis_id)[0] for analysis_id in (fresh, finished, inline)] == ["running", "completed", "running"]
 
 

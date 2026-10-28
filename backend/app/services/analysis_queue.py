@@ -63,7 +63,7 @@ def claim_next_queued_analysis(db: Session, now: datetime) -> Optional[int]:
 def fail_stale_queued_analyses(db: Session, now: datetime) -> int:
     stale_ids = db.execute(text("""
         UPDATE analyses
-        SET status = 'failed', error_message = :message, error_generated_at = :now
+        SET status = 'failed', error_message = :message, error_generated_at = :now, completed_at = :now
         WHERE status IN ('pending', 'running')
           AND config::jsonb ->> 'queued' = 'true'
           AND (config::jsonb ->> 'queue_claimed_at')::timestamptz < :cutoff

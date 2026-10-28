@@ -134,6 +134,64 @@ def test_queue_execution_queues_the_refresh_instead_of_starting_it(
     assert "queue_claimed_at" not in record.config
 
 
+def test_reaped_queued_refresh_is_picked_up_again(
+    db, users, enabled_policy, analysis_factory, monkeypatch,
+):
+    from app.models import RootlyIntegration
+    from app.core import rootly_client
+    from app.services import analysis_queue, auto_refresh_scheduler
+
+    integration = RootlyIntegration(user_id=users[0].id, name="Disposable reaped refresh",
+                                    api_token="fake-test-token", platform="rootly", is_active=True)
+    db.add(integration)
+    db.commit()
+    reaped_at = NOW - timedelta(days=2)
+    record = analysis_factory(coverage(RECENT, team_health={"score": 42}), rootly_integration_id=integration.id,
+                              completed_at=None, results_generated_at=NOW - timedelta(days=3),
+                              is_auto_refresh=True, auto_refresh_interval="24h",
+                              config={"queued": True, "queue_claimed_at": (reaped_at - timedelta(hours=1)).isoformat()})
+    db.execute(text("UPDATE analyses SET status = 'running' WHERE id = :id"), {"id": record.id})
+    db.commit()
+
+    assert analysis_queue.fail_stale_queued_analyses(db, reaped_at) == 1
+    db.refresh(record)
+    assert record.status == "failed"
+    assert record.completed_at == reaped_at
+
+    primary = MagicMock()
+    primary.check_permissions = AsyncMock(return_value={"incidents": {"access": True}})
+    monkeypatch.setattr(rootly_client, "RootlyAPIClient", lambda *args, **kwargs: primary)
+
+    @asynccontextmanager
+    async def acquired_lock(*args, **kwargs):
+        yield True
+
+    monkeypatch.setattr(auto_refresh_scheduler, "with_distributed_lock", acquired_lock)
+    monkeypatch.setattr(auto_refresh_scheduler.settings, "ANALYSIS_EXECUTION", "queue")
+
+    assert asyncio.run(auto_refresh_scheduler.check_and_run_auto_refresh_analyses())
+    db.refresh(record)
+    assert record.status == "pending"
+    assert record.config["queued"] is True
+    assert "queue_claimed_at" not in record.config
+
+
+def test_auto_refresh_reports_failure_when_a_candidate_check_raises(
+    db, users, enabled_policy, analysis_factory, monkeypatch,
+):
+    from app.services import auto_refresh_scheduler
+
+    analysis_factory(coverage(RECENT), completed_at=NOW - timedelta(days=2), results_generated_at=NOW - timedelta(days=2),
+                     is_auto_refresh=True, auto_refresh_interval="24h", config={})
+
+    def broken_interval(value):
+        raise ValueError("broken interval")
+
+    monkeypatch.setattr(auto_refresh_scheduler, "_parse_interval", broken_interval)
+
+    assert asyncio.run(auto_refresh_scheduler.check_and_run_auto_refresh_analyses()) is False
+
+
 @pytest.mark.parametrize("error_at", [OLD, CUTOFF, RECENT, None])
 def test_error_only_content_uses_its_own_age_for_preview_reads_and_cleanup(
     db, users, enabled_policy, analysis_factory, error_at,
