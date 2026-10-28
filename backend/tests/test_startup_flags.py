@@ -29,7 +29,11 @@ def test_startup_runs_only_enabled_work(monkeypatch, run_migrations, run_schedul
 
 def test_startup_work_is_enabled_by_default():
     env = {key: value for key, value in os.environ.items() if key not in ("RUN_MIGRATIONS_ON_STARTUP", "RUN_SCHEDULERS")}
-    script = "from app.core.config import settings; print(settings.RUN_MIGRATIONS_ON_STARTUP, settings.RUN_SCHEDULERS)"
+    script = (
+        "import dotenv; dotenv.load_dotenv = lambda *args, **kwargs: False; "
+        "from app.core.config import settings; "
+        "print(settings.RUN_MIGRATIONS_ON_STARTUP, settings.RUN_SCHEDULERS)"
+    )
 
     result = subprocess.run([sys.executable, "-c", script], env=env, cwd=BACKEND_DIR, capture_output=True, text=True, check=True)
 
