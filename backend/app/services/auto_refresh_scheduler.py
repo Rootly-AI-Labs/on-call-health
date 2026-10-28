@@ -116,7 +116,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                 # Always take a DB row lock to ensure only one worker mutates the analysis.
                 async with with_distributed_lock(lock_key, ttl_seconds=600, timeout_seconds=2) as lock_acquired:
                     try:
-                        db.execute(text("SET LOCAL lock_timeout = :lock_timeout"), {"lock_timeout": "5s"})
+                        db.execute(text("SELECT set_config('lock_timeout', :lock_timeout, true)"), {"lock_timeout": "5s"})
                     except Exception:
                         # Non-critical: lock_timeout not supported on all DBs
                         pass

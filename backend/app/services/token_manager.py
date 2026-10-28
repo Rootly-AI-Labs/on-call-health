@@ -225,7 +225,7 @@ class TokenManager:
         try:
             with self.db.begin_nested():
                 self.db.execute(
-                    text("SET LOCAL lock_timeout = :lock_timeout"),
+                    text("SELECT set_config('lock_timeout', :lock_timeout, true)"),
                     {"lock_timeout": f"{lock_timeout_seconds}s"},
                 )
 
