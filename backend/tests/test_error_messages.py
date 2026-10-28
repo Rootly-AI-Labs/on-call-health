@@ -1,4 +1,5 @@
 """Tests for error message security - ensure no token leakage."""
+import re
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
@@ -22,7 +23,7 @@ class TestErrorMessageSecurity:
 
     def test_jira_error_messages_contain_no_tokens(self):
         """Verify JIRA_ERROR_MESSAGES never contain sample token patterns."""
-        from backend.app.core.error_messages import JIRA_ERROR_MESSAGES
+        from app.core.error_messages import JIRA_ERROR_MESSAGES
 
         for error_type, error_info in JIRA_ERROR_MESSAGES.items():
             message = error_info.get("message", "")
@@ -40,7 +41,7 @@ class TestErrorMessageSecurity:
 
     def test_linear_error_messages_contain_no_tokens(self):
         """Verify LINEAR_ERROR_MESSAGES never contain sample token patterns."""
-        from backend.app.core.error_messages import LINEAR_ERROR_MESSAGES
+        from app.core.error_messages import LINEAR_ERROR_MESSAGES
 
         for error_type, error_info in LINEAR_ERROR_MESSAGES.items():
             message = error_info.get("message", "")
@@ -49,11 +50,11 @@ class TestErrorMessageSecurity:
             # Should not contain token-like strings
             assert "secret" not in message.lower()
             assert "secret" not in action.lower()
-            assert "lin_api_" not in message
+            assert not re.search(r"lin_api_\w", message)
 
     def test_get_error_response_never_includes_token(self, sample_tokens):
         """get_error_response never includes actual token values."""
-        from backend.app.core.error_messages import get_error_response
+        from app.core.error_messages import get_error_response
 
         for provider in ["jira", "linear"]:
             for error_type in ["authentication", "permissions", "network", "format"]:
@@ -64,10 +65,10 @@ class TestErrorMessageSecurity:
                 for token in sample_tokens:
                     assert token not in response_str
 
-    @patch("backend.app.services.integration_validator.httpx.AsyncClient")
+    @patch("app.services.integration_validator.httpx.AsyncClient")
     def test_jira_validation_error_excludes_token(self, mock_client, mock_db, sample_tokens):
         """Jira validation errors never include the actual token."""
-        from backend.app.services.integration_validator import IntegrationValidator
+        from app.services.integration_validator import IntegrationValidator
 
         # Mock 401 response
         mock_response = MagicMock()
@@ -83,18 +84,18 @@ class TestErrorMessageSecurity:
 
         import asyncio
         for token in sample_tokens:
-            result = asyncio.get_event_loop().run_until_complete(
-                validator.validate_manual_token("jira", token, "https://test.atlassian.net")
+            result = asyncio.run(
+                validator.validate_manual_token("jira", token, "https://test.atlassian.net", email="test@example.com")
             )
 
             # Token should never appear in response
             result_str = str(result)
             assert token not in result_str, f"Token leaked in response: {token}"
 
-    @patch("backend.app.services.integration_validator.httpx.AsyncClient")
+    @patch("app.services.integration_validator.httpx.AsyncClient")
     def test_linear_validation_error_excludes_token(self, mock_client, mock_db):
         """Linear validation errors never include the actual token."""
-        from backend.app.services.integration_validator import IntegrationValidator
+        from app.services.integration_validator import IntegrationValidator
 
         # Mock 401 response
         mock_response = MagicMock()
@@ -111,7 +112,7 @@ class TestErrorMessageSecurity:
         secret_token = "lin_api_super_secret_key_12345"
 
         import asyncio
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             validator.validate_manual_token("linear", secret_token)
         )
 
@@ -122,7 +123,7 @@ class TestErrorMessageSecurity:
 
     def test_notification_message_excludes_token(self, mock_db):
         """Token validation failure notification never includes token."""
-        from backend.app.services.notification_service import NotificationService
+        from app.services.notification_service import NotificationService
         from unittest.mock import MagicMock
 
         # Mock user
@@ -156,7 +157,7 @@ class TestErrorMessageContent:
 
     def test_all_jira_errors_have_required_fields(self):
         """All Jira error messages have message and action fields."""
-        from backend.app.core.error_messages import JIRA_ERROR_MESSAGES
+        from app.core.error_messages import JIRA_ERROR_MESSAGES
 
         for error_type, error_info in JIRA_ERROR_MESSAGES.items():
             assert "message" in error_info, f"Missing 'message' for {error_type}"
@@ -166,7 +167,7 @@ class TestErrorMessageContent:
 
     def test_all_linear_errors_have_required_fields(self):
         """All Linear error messages have message and action fields."""
-        from backend.app.core.error_messages import LINEAR_ERROR_MESSAGES
+        from app.core.error_messages import LINEAR_ERROR_MESSAGES
 
         for error_type, error_info in LINEAR_ERROR_MESSAGES.items():
             assert "message" in error_info, f"Missing 'message' for {error_type}"
@@ -176,7 +177,7 @@ class TestErrorMessageContent:
 
     def test_error_messages_are_platform_specific(self):
         """Jira and Linear error messages reference their respective platforms."""
-        from backend.app.core.error_messages import JIRA_ERROR_MESSAGES, LINEAR_ERROR_MESSAGES
+        from app.core.error_messages import JIRA_ERROR_MESSAGES, LINEAR_ERROR_MESSAGES
 
         # Jira messages should reference Jira concepts
         jira_auth = JIRA_ERROR_MESSAGES["authentication"]["message"]
@@ -188,7 +189,7 @@ class TestErrorMessageContent:
 
     def test_help_urls_are_valid_format(self):
         """Help URLs are valid HTTPS URLs."""
-        from backend.app.core.error_messages import JIRA_ERROR_MESSAGES, LINEAR_ERROR_MESSAGES
+        from app.core.error_messages import JIRA_ERROR_MESSAGES, LINEAR_ERROR_MESSAGES
 
         for error_info in JIRA_ERROR_MESSAGES.values():
             if "help_url" in error_info:

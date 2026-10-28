@@ -121,6 +121,7 @@ class TestAvatarUrlExtraction:
         with patch('app.services.user_sync_service.PagerDutyAPIClient') as mock_client:
             client_instance = mock_client.return_value
             client_instance.get_users = AsyncMock(return_value=mock_pagerduty_response)
+            client_instance.get_teams = AsyncMock(return_value=[])
 
             users = asyncio.run(user_sync_service._fetch_pagerduty_users("test_token"))
 
@@ -144,6 +145,7 @@ class TestAvatarUrlExtraction:
         with patch('app.services.user_sync_service.PagerDutyAPIClient') as mock_client:
             client_instance = mock_client.return_value
             client_instance.get_users = AsyncMock(return_value=mock_pagerduty_response)
+            client_instance.get_teams = AsyncMock(return_value=[])
 
             users = asyncio.run(user_sync_service._fetch_pagerduty_users("test_token"))
 

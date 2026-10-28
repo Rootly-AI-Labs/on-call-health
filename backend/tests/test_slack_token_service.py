@@ -12,7 +12,7 @@ from app.services.slack_token_service import SlackTokenService
 class TestSlackTokenService(unittest.TestCase):
     def _build_query(self, result):
         query = MagicMock()
-        query.filter.return_value.first.return_value = result
+        query.filter.return_value.order_by.return_value.first.return_value = result
         return query
 
     def _build_query_with_all(self, results):
@@ -38,7 +38,7 @@ class TestSlackTokenService(unittest.TestCase):
 
         db.query.side_effect = [
             self._build_query(workspace_mapping),
-            self._build_query(slack_integration),
+            self._build_query_with_all([slack_integration]),
         ]
 
         service = SlackTokenService(db)
@@ -100,7 +100,7 @@ class TestSlackTokenService(unittest.TestCase):
 
         db.query.side_effect = [
             self._build_query(workspace_mapping),
-            self._build_query(slack_integration),
+            self._build_query_with_all([slack_integration]),
         ]
 
         service = SlackTokenService(db)

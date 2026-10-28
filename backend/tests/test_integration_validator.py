@@ -220,6 +220,9 @@ class TestIntegrationValidator(unittest.TestCase):
         mock_integration = Mock(spec=JiraIntegration)
         mock_integration.access_token = "encrypted_token"
         mock_integration.jira_cloud_id = "test-cloud-id"
+        mock_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(hours=12)
+        mock_integration.refresh_token = None
+        mock_integration.token_source = "oauth"
         self.mock_db.query().filter().first.return_value = mock_integration
         mock_decrypt.return_value = "valid_token"
 
@@ -239,6 +242,9 @@ class TestIntegrationValidator(unittest.TestCase):
         mock_integration = Mock(spec=JiraIntegration)
         mock_integration.access_token = "encrypted_token"
         mock_integration.jira_cloud_id = "test-cloud-id"
+        mock_integration.token_expires_at = datetime.now(dt_timezone.utc) + timedelta(hours=12)
+        mock_integration.refresh_token = None
+        mock_integration.token_source = "oauth"
         self.mock_db.query().filter().first.return_value = mock_integration
         mock_decrypt.return_value = "expired_token"
 

@@ -54,3 +54,4 @@ newrelic
 
 # Development
 pytest
+pytest-asyncio>=1.4.1
