@@ -36,9 +36,6 @@ const getApiBase = () => {
   if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  if (typeof window !== 'undefined' && window.location.hostname.includes('railway.app')) {
-    return 'https://rootly-burnout-detector-web-development.up.railway.app';
-  }
   return 'http://localhost:8000';
 };
 
