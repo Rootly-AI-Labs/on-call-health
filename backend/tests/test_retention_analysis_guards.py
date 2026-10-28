@@ -518,8 +518,8 @@ def test_retention_background_task_keeps_full_window_enrichments_alerts_and_ai_u
     from app import models
     from app.api.endpoints import analyses, github, jira, rootly
     from app.core import rootly_client
+    from app.core.token_encryption import encrypt_token
     from app.services import ai_usage_collector
-    from cryptography import fernet
 
     owner = users[0]
     integration = models.RootlyIntegration(user_id=owner.id, name="test", api_token="fake", platform="rootly", is_active=True)
@@ -529,7 +529,7 @@ def test_retention_background_task_keeps_full_window_enrichments_alerts_and_ai_u
         models.JiraIntegration(user_id=owner.id, access_token="encrypted-test", jira_cloud_id="test", jira_site_url="https://test.invalid"),
         models.LinearIntegration(user_id=owner.id, access_token="linear-test", workspace_id="test"),
         models.AIUsageIntegration(user_id=owner.id, organization_id=owner.organization_id,
-                                  openai_api_key="encrypted-test", openai_enabled=True),
+                                  openai_api_key=encrypt_token("ai-test"), openai_enabled=True),
     ])
     db.commit()
     analysis = analysis_factory(None, status="pending", time_range=120,
@@ -539,7 +539,6 @@ def test_retention_background_task_keeps_full_window_enrichments_alerts_and_ai_u
     monkeypatch.setattr(jira, "decrypt_token", lambda token: "jira-test")
     monkeypatch.setattr(analyses.SlackTokenService, "get_oauth_token_for_user", lambda self, user: "slack-test")
     monkeypatch.setattr(rootly, "get_synced_users", AsyncMock(return_value={"users": []}))
-    monkeypatch.setattr(fernet, "Fernet", lambda key: MagicMock(decrypt=lambda token: b"ai-test"))
     provider = MagicMock()
     provider.get_alerts_count = AsyncMock(return_value={"total_count": 4, "filtered_count": 4})
     monkeypatch.setattr(rootly_client, "RootlyAPIClient", lambda *args, **kwargs: provider)
