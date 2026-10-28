@@ -18,7 +18,7 @@ def run_python(script: str, **env_overrides) -> str:
     """
     env = {**os.environ, **env_overrides}
     env = {key: value for key, value in env.items() if value is not None}
-    prelude = "import dotenv; dotenv.load_dotenv = lambda *args, **kwargs: False; "
+    prelude = "import dotenv; dotenv.load_dotenv = lambda *args, **kwargs: False\n"
     result = subprocess.run([sys.executable, "-c", prelude + script], env=env, cwd=BACKEND_DIR,
                             capture_output=True, text=True, check=True)
     return result.stdout.strip()
@@ -53,7 +53,13 @@ def test_startup_options_flag_reads_env(value, expected):
     ("0", "redis://cache.example:6379/0"),
 ])
 def test_rate_limit_redis_database_is_configurable(db, expected):
-    script = "from app.core.rate_limiting import get_redis_storage_uri; print(get_redis_storage_uri())"
+    # Importing rate_limiting probes Redis; keep the child offline.
+    script = (
+        "import redis\n"
+        "def offline(*args, **kwargs):\n    raise ConnectionError('offline')\n"
+        "redis.from_url = offline\n"
+        "from app.core.rate_limiting import get_redis_storage_uri; print(get_redis_storage_uri())"
+    )
 
     assert run_python(script, REDIS_URL="redis://cache.example:6379/5", RATE_LIMIT_REDIS_DB=db) == expected
 
