@@ -1950,7 +1950,7 @@ function DashboardContent() {
                           // Disable future dates and dates older than 1 year
                           return date > today || date < oneYearAgo
                         }}
-                        initialFocus
+                        autoFocus
                       />
                     </PopoverContent>
                   </Popover>
