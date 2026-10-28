@@ -8,7 +8,6 @@ from typing import Dict, Any
 import secrets
 import json
 import logging
-import os
 import urllib.parse
 import hmac
 import hashlib
@@ -266,22 +265,7 @@ async def slack_oauth_callback(
         async with httpx.AsyncClient() as client:
             # Construct the same redirect_uri that was used in the OAuth request
             frontend_url = settings.FRONTEND_URL or "http://localhost:3000"
-            backend_base = settings.DATABASE_URL.replace("postgresql://", "https://").split("@")[1].split("/")[0] if settings.DATABASE_URL else "localhost:8000"
-
-            # Get backend URL from environment variable (preferred) or construct it
-            backend_url = os.getenv("BACKEND_URL")
-
-            if not backend_url:
-                # Fallback: detect environment from DATABASE_URL
-                if "railway" in str(settings.DATABASE_URL):
-                    if "production" in str(settings.DATABASE_URL):
-                        backend_url = "https://rootly-burnout-detector-web-production.up.railway.app"
-                    else:
-                        backend_url = "https://rootly-burnout-detector-web-development.up.railway.app"
-                else:
-                    # Local development
-                    backend_url = "http://localhost:8000"
-
+            backend_url = settings.BACKEND_URL
             redirect_uri = f"{backend_url}/integrations/slack/oauth/callback"
 
             # Enhanced debugging for OAuth configuration
