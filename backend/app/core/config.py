@@ -77,6 +77,9 @@ class Settings:
     # scheduled jobs externally set these to false.
     RUN_MIGRATIONS_ON_STARTUP: bool = os.getenv("RUN_MIGRATIONS_ON_STARTUP", "true").lower() == "true"
     RUN_SCHEDULERS: bool = os.getenv("RUN_SCHEDULERS", "true").lower() == "true"
+    # Bearer token for /internal/cron/* triggers. Cron endpoints refuse every
+    # request while it is unset.
+    CRON_SECRET: Optional[str] = os.getenv("CRON_SECRET")
 
     # Weekly digest emails
     WEEKLY_DIGEST_ENABLED: bool = os.getenv("WEEKLY_DIGEST_ENABLED", "false").lower() == "true"

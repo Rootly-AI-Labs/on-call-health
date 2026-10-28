@@ -43,6 +43,7 @@ class RetentionPollResult:
     succeeded: int = 0
     failed: int = 0
     skipped: int = 0
+    poll_failed: bool = False
 
 
 def utc_now() -> datetime:
@@ -174,6 +175,7 @@ def process_due_retention_cleanups(
                 ).order_by(Organization.id).limit(PAGE_SIZE).all()]
         except Exception:
             logger.error("Retention poll unavailable code=retention_poll_failed")
+            result.poll_failed = True
             return result
         if not ids:
             return result
@@ -193,6 +195,45 @@ def process_due_retention_cleanups(
                 except Exception:
                     logger.error("Retention outcome scheduling unavailable org=%s code=retention_retry_failed",
                                  organization_id)
+
+
+def _failed_cleanup_ids(db, cursor: int) -> list[int]:
+    return [row[0] for row in db.query(Organization.id).filter(
+        Organization.id > cursor,
+        Organization.status == "active",
+        Organization.settings["data_retention"]["retention_days"].as_string().isnot(None),
+        Organization.settings["data_retention_cleanup"]["state"].as_string() == "failed",
+    ).order_by(Organization.id).limit(PAGE_SIZE).all()]
+
+
+def process_failed_retention_retries(
+    *, session_factory=SessionLocal, clock: Callable[[], datetime] = utc_now,
+) -> RetentionPollResult:
+    """Retry organizations whose last cleanup failed, once their retry is due.
+
+    Each attempt rechecks eligibility and the retry interval under the
+    organization claim, so an external trigger may call this on any cadence.
+    """
+    _utc(clock())
+    result = RetentionPollResult()
+    cursor = 0
+    while True:
+        try:
+            with session_factory() as db:
+                ids = _failed_cleanup_ids(db, cursor)
+        except Exception:
+            logger.error("Retention retry poll unavailable code=retention_retry_poll_failed")
+            result.poll_failed = True
+            return result
+        if not ids:
+            return result
+        cursor = ids[-1]
+        for organization_id in ids:
+            result.candidates += 1
+            outcome = process_organization_cleanup(
+                organization_id, session_factory=session_factory, clock=clock, mode="retry",
+            )
+            setattr(result, outcome, getattr(result, outcome) + 1)
 
 
 async def run_due_retention_cleanups(
@@ -303,12 +344,7 @@ class RetentionScheduler:
         while not self._stop_event.is_set():
             try:
                 with SessionLocal() as db:
-                    ids = [row[0] for row in db.query(Organization.id).filter(
-                        Organization.id > cursor,
-                        Organization.status == "active",
-                        Organization.settings["data_retention"]["retention_days"].as_string().isnot(None),
-                        Organization.settings["data_retention_cleanup"]["state"].as_string() == "failed",
-                    ).order_by(Organization.id).limit(PAGE_SIZE).all()]
+                    ids = _failed_cleanup_ids(db, cursor)
             except Exception:
                 logger.error("Retention retry recovery unavailable code=retention_retry_recovery_failed")
                 return

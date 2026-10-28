@@ -1671,7 +1671,7 @@ async def get_synced_users(
 
         # Get all correlations, then filter in Python
         # This is simpler and works across all database types
-        correlations = query.order_by(UserCorrelation.name).all()
+        correlations = sorted(query.all(), key=lambda correlation: (correlation.name is None, (correlation.name or "").casefold()))
 
         # Filter by integration_id if provided (check if value is in JSON array)
         if integration_id:
