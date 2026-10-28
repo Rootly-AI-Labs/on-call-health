@@ -18,6 +18,8 @@ from ...models import get_db, User, Analysis, RootlyIntegration, GitHubIntegrati
 from ...auth.dependencies import get_current_active_user, get_current_user_flexible
 from ...services.unified_burnout_analyzer import UnifiedBurnoutAnalyzer
 from ...services.slack_token_service import SlackTokenService
+from ...services.analysis_queue import mark_queued
+from ...core.config import settings
 from ...core.rate_limiting import analysis_rate_limit, general_rate_limit
 from ...core.input_validation import AnalysisRequest as ValidatedAnalysisRequest, AnalysisFilterRequest
 from ...core.alert_health_calculator import calculate_alert_health_score
@@ -390,6 +392,10 @@ async def run_burnout_analysis(
                 "pagerduty_team_id": getattr(request, 'pagerduty_team_id', None),
             }
         )
+        if settings.ANALYSIS_EXECUTION == "queue":
+            analysis.config = mark_queued(
+                analysis.config, enable_ai=request.enable_ai, include_ai_usage=request.include_ai_usage,
+            )
         db.add(analysis)
         db.commit()
         db.refresh(analysis)
@@ -412,30 +418,33 @@ async def run_burnout_analysis(
         
         # Start analysis in background
         logger.info(f"ENDPOINT: About to add background task for analysis {analysis.id}")
-        try:
-            background_tasks.add_task(
-                run_analysis_task,
-                analysis_id=analysis.id,
-                analysis_uuid=analysis.uuid,
-                integration_id=integration.id,
-                api_token=integration.api_token,
-                platform=integration.platform,
-                organization_name=integration.organization_name,
-                time_range=request.time_range,
-                include_weekends=request.include_weekends,
-                include_github=request.include_github,
-                include_slack=request.include_slack,
-                include_jira=request.include_jira,
-                include_linear=request.include_linear,
-                user_id=current_user.id,
-                enable_ai=request.enable_ai,
-                pagerduty_team_id=getattr(request, 'pagerduty_team_id', None),
-                include_ai_usage=request.include_ai_usage
-            )
-            logger.info(f"ENDPOINT: Successfully added background task for analysis {analysis.id}")
-        except Exception as e:
-            logger.error(f"ENDPOINT: Failed to add background task for analysis {analysis.id}: {e}")
-            raise
+        if settings.ANALYSIS_EXECUTION == "queue":
+            logger.info(f"ENDPOINT: Queued analysis {analysis.id} for the analysis worker")
+        else:
+            try:
+                background_tasks.add_task(
+                    run_analysis_task,
+                    analysis_id=analysis.id,
+                    analysis_uuid=analysis.uuid,
+                    integration_id=integration.id,
+                    api_token=integration.api_token,
+                    platform=integration.platform,
+                    organization_name=integration.organization_name,
+                    time_range=request.time_range,
+                    include_weekends=request.include_weekends,
+                    include_github=request.include_github,
+                    include_slack=request.include_slack,
+                    include_jira=request.include_jira,
+                    include_linear=request.include_linear,
+                    user_id=current_user.id,
+                    enable_ai=request.enable_ai,
+                    pagerduty_team_id=getattr(request, 'pagerduty_team_id', None),
+                    include_ai_usage=request.include_ai_usage
+                )
+                logger.info(f"ENDPOINT: Successfully added background task for analysis {analysis.id}")
+            except Exception as e:
+                logger.error(f"ENDPOINT: Failed to add background task for analysis {analysis.id}: {e}")
+                raise
         
         return AnalysisResponse(
             id=analysis.id,
