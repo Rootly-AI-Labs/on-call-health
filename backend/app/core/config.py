@@ -80,6 +80,9 @@ class Settings:
     # Bearer token for /internal/cron/* triggers. Cron endpoints refuse every
     # request while it is unset.
     CRON_SECRET: Optional[str] = os.getenv("CRON_SECRET")
+    # "inline" runs analyses in the request process; "queue" saves them as
+    # pending for /internal/cron/analyses to run.
+    ANALYSIS_EXECUTION: str = os.getenv("ANALYSIS_EXECUTION", "inline").lower()
 
     # Weekly digest emails
     WEEKLY_DIGEST_ENABLED: bool = os.getenv("WEEKLY_DIGEST_ENABLED", "false").lower() == "true"

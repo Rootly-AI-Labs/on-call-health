@@ -8,6 +8,11 @@ and delivery skips anyone already contacted that day. Trigger weekly digests
 every 30 minutes: they only send during Monday's 10:00-10:59 hour in each
 user's timezone and do not catch up after that window. Duplicate digest sends
 are blocked unless WEEKLY_DIGEST_FORCE_SEND is enabled.
+
+The analysis and auto-refresh triggers only run work when ANALYSIS_EXECUTION is
+"queue". Trigger analyses every minute; each call fails stale claims and runs at
+most one queued analysis, so calls may overlap while long analyses finish.
+Trigger auto-refresh hourly; it queues analyses whose interval has elapsed.
 """
 import asyncio
 import logging
@@ -18,6 +23,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from ...core.config import settings
+from ...services.analysis_queue import run_next_queued_analysis
+from ...services.auto_refresh_scheduler import check_and_run_auto_refresh_analyses
 from ...services.retention_scheduler import (
     process_due_retention_cleanups,
     process_failed_retention_retries,
@@ -69,3 +76,25 @@ async def run_surveys():
     if result.failed:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content=body)
     return body
+
+
+def _queue_disabled() -> JSONResponse:
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": "ANALYSIS_EXECUTION is not queue"})
+
+
+@router.get("/analyses")
+async def run_queued_analysis():
+    if settings.ANALYSIS_EXECUTION != "queue":
+        return _queue_disabled()
+    result = await run_next_queued_analysis()
+    logger.info("Analysis cron %s", asdict(result))
+    return asdict(result)
+
+
+@router.get("/auto-refresh")
+async def run_auto_refresh():
+    if settings.ANALYSIS_EXECUTION != "queue":
+        return _queue_disabled()
+    if not await check_and_run_auto_refresh_analyses():
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"detail": "Auto-refresh check failed"})
+    return {"checked": True}

@@ -12,7 +12,9 @@ from datetime import datetime, timedelta, timezone
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import text
 
+from ..core.config import settings
 from ..core.distributed_lock import with_distributed_lock
+from .analysis_queue import mark_queued
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,7 @@ def _parse_interval(interval_str: str) -> timedelta:
         return timedelta(days=1)
 
 
-async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
+async def check_and_run_auto_refresh_analyses(interval_filter: str = None) -> bool:
     """
     Cron job: find auto-refresh analyses matching `interval_filter` that are due
     and re-run them.  Pass interval_filter=None to process all intervals.
@@ -328,6 +330,9 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                     config["include_jira"] = include_jira
                     config["include_linear"] = include_linear
                     config["include_slack"] = include_slack
+                    if settings.ANALYSIS_EXECUTION == "queue":
+                        # Auto-refresh runs without AI narratives, as the inline task below does.
+                        config = mark_queued(config, enable_ai=False, include_ai_usage=True)
     
                     # Create new analysis record with same params
                     if retention_enabled:
@@ -377,6 +382,9 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
                         f"(user={user_label}, interval={old_analysis.auto_refresh_interval})"
                     )
     
+                    if settings.ANALYSIS_EXECUTION == "queue":
+                        continue
+
                     # Fire the background task
                     asyncio.create_task(
                         run_analysis_task(
@@ -406,5 +414,7 @@ async def check_and_run_auto_refresh_analyses(interval_filter: str = None):
 
     except Exception as e:
         logger.error(f"🔄 [AUTO_REFRESH_SCHEDULER] Unexpected error: {e}", exc_info=True)
+        return False
     finally:
         db.close()
+    return True

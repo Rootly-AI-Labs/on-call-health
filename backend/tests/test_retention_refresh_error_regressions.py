@@ -97,6 +97,43 @@ def test_actual_scheduler_then_failed_refresh_preserves_previous_snapshot(
         _require_retained_result(db, record)
 
 
+def test_queue_execution_queues_the_refresh_instead_of_starting_it(
+    db, users, enabled_policy, analysis_factory, monkeypatch,
+):
+    from app.models import RootlyIntegration
+    from app.core import rootly_client
+    from app.services import auto_refresh_scheduler
+
+    integration = RootlyIntegration(user_id=users[0].id, name="Disposable queued refresh",
+                                    api_token="fake-test-token", platform="rootly", is_active=True)
+    db.add(integration)
+    db.commit()
+    record = analysis_factory(coverage(RECENT, team_health={"score": 42}), rootly_integration_id=integration.id,
+                              completed_at=NOW - timedelta(days=2), results_generated_at=NOW - timedelta(days=2),
+                              is_auto_refresh=True, auto_refresh_interval="24h",
+                              config={"queued": True, "queue_claimed_at": (NOW - timedelta(days=2)).isoformat()})
+    primary = MagicMock()
+    primary.check_permissions = AsyncMock(return_value={"incidents": {"access": True}})
+    monkeypatch.setattr(rootly_client, "RootlyAPIClient", lambda *args, **kwargs: primary)
+
+    @asynccontextmanager
+    async def acquired_lock(*args, **kwargs):
+        yield True
+
+    monkeypatch.setattr(auto_refresh_scheduler, "with_distributed_lock", acquired_lock)
+    monkeypatch.setattr(auto_refresh_scheduler.settings, "ANALYSIS_EXECUTION", "queue")
+    dispatched = []
+    monkeypatch.setattr(auto_refresh_scheduler.asyncio, "create_task", lambda coroutine: dispatched.append(coroutine.close()))
+
+    assert asyncio.run(auto_refresh_scheduler.check_and_run_auto_refresh_analyses())
+    db.refresh(record)
+    assert dispatched == []
+    assert record.status == "pending"
+    assert record.config["queued"] is True
+    assert record.config["enable_ai"] is False
+    assert "queue_claimed_at" not in record.config
+
+
 @pytest.mark.parametrize("error_at", [OLD, CUTOFF, RECENT, None])
 def test_error_only_content_uses_its_own_age_for_preview_reads_and_cleanup(
     db, users, enabled_policy, analysis_factory, error_at,
