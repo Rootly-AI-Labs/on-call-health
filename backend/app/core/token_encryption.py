@@ -2,7 +2,7 @@
 import base64
 from typing import Optional
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import Text
 from sqlalchemy.types import TypeDecorator
 
@@ -30,10 +30,6 @@ def encrypt_optional_token(token: Optional[str]) -> Optional[str]:
     return encrypt_token(token)
 
 
-def is_encrypted_token(value: str) -> bool:
-    return value.startswith(FERNET_TOKEN_PREFIX)
-
-
 class EncryptedText(TypeDecorator):
     """Text column encrypted at rest. Values written before encryption are read as stored."""
 
@@ -41,11 +37,12 @@ class EncryptedText(TypeDecorator):
     cache_ok = True
 
     def process_bind_param(self, value, dialect):
-        if value is None or is_encrypted_token(value):
-            return value
-        return encrypt_token(value)
+        return encrypt_optional_token(value)
 
     def process_result_value(self, value, dialect):
-        if value is None or not is_encrypted_token(value):
+        if value is None or not value.startswith(FERNET_TOKEN_PREFIX):
             return value
-        return decrypt_token(value)
+        try:
+            return decrypt_token(value)
+        except InvalidToken:
+            return value

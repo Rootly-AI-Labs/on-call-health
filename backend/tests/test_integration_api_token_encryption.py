@@ -9,6 +9,7 @@ from app.core.token_encryption import EncryptedText, decrypt_token, encrypt_toke
 from app.models import RootlyIntegration
 
 API_TOKEN = "rootly_test-api-token"
+PREFIX_SHAPED_TOKEN = "gAAAAAnot-a-fernet-token"
 
 
 def _table_with_encrypted_column():
@@ -51,12 +52,29 @@ def test_legacy_plaintext_token_is_read_unchanged():
         assert conn.execute(select(table.c.api_token)).scalar_one() == API_TOKEN
 
 
-def test_already_encrypted_value_is_not_encrypted_twice():
+def test_prefix_shaped_plaintext_token_is_encrypted_and_read_back():
     engine, table = _table_with_encrypted_column()
     with engine.begin() as conn:
-        conn.execute(table.insert().values(id=1, api_token=encrypt_token(API_TOKEN)))
+        conn.execute(table.insert().values(id=1, api_token=PREFIX_SHAPED_TOKEN))
 
-        assert decrypt_token(_raw_value(conn)) == API_TOKEN
+        assert decrypt_token(_raw_value(conn)) == PREFIX_SHAPED_TOKEN
+        assert conn.execute(select(table.c.api_token)).scalar_one() == PREFIX_SHAPED_TOKEN
+
+
+def test_legacy_prefix_shaped_plaintext_token_is_read_unchanged():
+    engine, table = _table_with_encrypted_column()
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO integrations (id, api_token) VALUES (1, :token)"), {"token": PREFIX_SHAPED_TOKEN})
+
+        assert conn.execute(select(table.c.api_token)).scalar_one() == PREFIX_SHAPED_TOKEN
+
+
+def test_ciphertext_written_outside_the_column_type_is_decrypted():
+    engine, table = _table_with_encrypted_column()
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO integrations (id, api_token) VALUES (1, :token)"), {"token": encrypt_token(API_TOKEN)})
+
+        assert conn.execute(select(table.c.api_token)).scalar_one() == API_TOKEN
 
 
 def test_null_token_stays_null():
