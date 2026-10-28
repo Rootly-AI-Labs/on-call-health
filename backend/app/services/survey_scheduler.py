@@ -57,16 +57,31 @@ class SurveyDispatchResult:
 SURVEY_DISPATCH_CLAIM_RETENTION = timedelta(days=7)
 
 
-def _claim_occurrence(db: Session, organization_id: int, kind: str, fire_time: datetime) -> bool:
+def _claim_occurrence(organization_id: int, kind: str, fire_time: datetime) -> bool:
     """Record one job occurrence; False when another call already claimed it."""
-    claimed_id = db.execute(
-        pg_insert(SurveyDispatchClaim)
-        .values(organization_id=organization_id, job_kind=kind, fire_time=fire_time)
-        .on_conflict_do_nothing(index_elements=["organization_id", "job_kind", "fire_time"])
-        .returning(SurveyDispatchClaim.id)
-    ).scalar()
-    db.commit()
-    return claimed_id is not None
+    db = SessionLocal()
+    try:
+        claimed_id = db.execute(
+            pg_insert(SurveyDispatchClaim)
+            .values(organization_id=organization_id, job_kind=kind, fire_time=fire_time)
+            .on_conflict_do_nothing(index_elements=["organization_id", "job_kind", "fire_time"])
+            .returning(SurveyDispatchClaim.id)
+        ).scalar()
+        db.commit()
+        return claimed_id is not None
+    finally:
+        db.close()
+
+
+def _prune_claims(older_than: datetime) -> None:
+    db = SessionLocal()
+    try:
+        db.query(SurveyDispatchClaim).filter(
+            SurveyDispatchClaim.claimed_at < older_than
+        ).delete(synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
 
 
 class SurveyScheduler:
@@ -671,9 +686,10 @@ class SurveyScheduler:
 
         Called from an external trigger every minute instead of in-process cron
         jobs. Schedules are read fresh on each call, so edits apply right away.
-        Each occurrence is claimed in the database before it runs, so it runs
-        once even when calls overlap or the window spans midnight, and a late
-        trigger still runs it. A failed occurrence is reported, not retried,
+        Each occurrence is claimed in the database right before it runs, so it
+        runs once even when calls overlap or the window spans midnight, and a
+        late trigger still runs it. An occurrence whose claim fails stays
+        unclaimed for the next poll. A failed occurrence is reported, not retried,
         because same-day reminders keep no per-recipient delivery marker.
         """
         now = now or datetime.now(timezone.utc)
@@ -693,16 +709,18 @@ class SurveyScheduler:
                 except Exception:
                     result.failed += 1
                     logger.exception(f"Invalid survey schedule {schedule.id} for org {schedule.organization_id}")
-
-            claimed_jobs = [job for job in due_jobs if _claim_occurrence(db, *job)]
-            db.query(SurveyDispatchClaim).filter(
-                SurveyDispatchClaim.claimed_at < now - SURVEY_DISPATCH_CLAIM_RETENTION
-            ).delete(synchronize_session=False)
-            db.commit()
         finally:
             db.close()
 
-        for organization_id, kind, fire_time in claimed_jobs:
+        for organization_id, kind, fire_time in due_jobs:
+            try:
+                if not _claim_occurrence(organization_id, kind, fire_time):
+                    continue
+            except Exception:
+                # Unclaimed, so the next poll inside the window tries it again.
+                result.failed += 1
+                logger.exception(f"Could not claim survey {kind} job for org {organization_id}")
+                continue
             try:
                 if kind == SURVEY_JOB_FOLLOW_UP:
                     delivered = await self._run_follow_up_job(organization_id)
@@ -716,6 +734,11 @@ class SurveyScheduler:
             else:
                 result.failed += 1
                 logger.error(f"Survey {kind} job for {fire_time.isoformat()} did not deliver cleanly for org {organization_id}")
+
+        try:
+            _prune_claims(now - SURVEY_DISPATCH_CLAIM_RETENTION)
+        except Exception:
+            logger.exception("Could not prune old survey dispatch claims")
         return result
 
     async def _send_organization_surveys(self, organization_id: int, db: Session, is_reminder: bool = False) -> bool:

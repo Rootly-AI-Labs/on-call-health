@@ -258,6 +258,35 @@ def test_old_claims_are_pruned(dispatcher, db_connection, organization_ids):
         assert db.query(SurveyDispatchClaim).filter(SurveyDispatchClaim.organization_id == organization_ids[0]).count() == 0
 
 
+def test_failed_claim_leaves_occurrence_for_the_next_poll(dispatcher, organization_ids):
+    schedules = [schedule(organization_id=organization_id) for organization_id in organization_ids]
+    real_claim = scheduler_module._claim_occurrence
+    calls = {"count": 0}
+
+    def flaky_claim(*args):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("database blip")
+        return real_claim(*args)
+
+    with patch.object(scheduler_module, "_claim_occurrence", side_effect=flaky_claim):
+        first = dispatch(dispatcher, schedules, local(WEDNESDAY, 9, 1))
+    second = dispatch(dispatcher, schedules, local(WEDNESDAY, 9, 2))
+
+    assert first == SurveyDispatchResult(schedules=2, ran=1, failed=1)
+    assert second == SurveyDispatchResult(schedules=2, ran=1, failed=0)
+    assert sorted(call.args[0] for call in dispatcher._run_survey_job.await_args_list) == sorted(organization_ids)
+
+
+def test_prune_failure_does_not_affect_delivery(dispatcher, organization_ids):
+    schedules = [schedule(organization_id=organization_ids[0])]
+
+    with patch.object(scheduler_module, "_prune_claims", side_effect=RuntimeError("database blip")):
+        result = dispatch(dispatcher, schedules, local(WEDNESDAY, 9, 1))
+
+    assert result == SurveyDispatchResult(schedules=1, ran=1, failed=0)
+
+
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(cron.settings, "CRON_SECRET", "test-cron-secret")
