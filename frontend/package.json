@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "oxlint",
     "type-check": "tsc --noEmit",
     "check": "npm run type-check && npm run lint",
     "test:e2e": "playwright test",
@@ -59,12 +59,13 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@next/eslint-plugin-next": "^16.4.1",
     "@playwright/test": "^1.64.1",
     "@types/d3-shape": "^3.2.0",
     "dotenv": "^18.0.8",
-    "eslint": "^10.13.0",
-    "eslint-config-next": "^16.4.2",
-    "husky": "^9.1.7"
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "husky": "^9.1.7",
+    "oxlint": "^1.90.0"
   },
   "overrides": {
     "@humanfs/node@^0.16.6": "0.16.8",
