@@ -55,7 +55,11 @@ To run migrations manually (useful for immediate fixes):
 python run_migrations.py
 ```
 
-Against a deployed database, run it locally with that environment's `DATABASE_URL_UNPOOLED` (from `vercel env pull`).
+Against a deployed database, get that environment's `DATABASE_URL_UNPOOLED` from `vercel env pull` and pass it as `DATABASE_URL`:
+
+```bash
+DATABASE_URL="$DATABASE_URL_UNPOOLED" python run_migrations.py
+```
 
 ## Migration Status
 
