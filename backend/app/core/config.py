@@ -73,6 +73,11 @@ class Settings:
     # Rootly API
     ROOTLY_API_BASE_URL: str = os.getenv("ROOTLY_API_BASE_URL", "https://api.rootly.com")
 
+    # Startup work. Hosts that run migrations at deploy time and trigger
+    # scheduled jobs externally set these to false.
+    RUN_MIGRATIONS_ON_STARTUP: bool = os.getenv("RUN_MIGRATIONS_ON_STARTUP", "true").lower() == "true"
+    RUN_SCHEDULERS: bool = os.getenv("RUN_SCHEDULERS", "true").lower() == "true"
+
     # Weekly digest emails
     WEEKLY_DIGEST_ENABLED: bool = os.getenv("WEEKLY_DIGEST_ENABLED", "false").lower() == "true"
 

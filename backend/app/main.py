@@ -177,6 +177,18 @@ async def startup_event():
         if user_context_filter not in handler.filters:
             handler.addFilter(user_context_filter)
 
+    if settings.RUN_MIGRATIONS_ON_STARTUP:
+        run_startup_migrations()
+    else:
+        print("Startup migrations disabled (RUN_MIGRATIONS_ON_STARTUP=false)")
+
+    if settings.RUN_SCHEDULERS:
+        start_schedulers()
+    else:
+        print("In-process schedulers disabled (RUN_SCHEDULERS=false)")
+
+
+def run_startup_migrations():
     create_tables()
 
     # Run database migrations
@@ -191,6 +203,8 @@ async def startup_event():
     except Exception as e:
         print(f"⚠️  Migration runner failed: {e}")
 
+
+def start_schedulers():
     # Daily retention is independent of report refresh and survey delivery.
     # The job rechecks each current policy and takes a database claim per org.
     from app.services.retention_scheduler import RetentionScheduler
