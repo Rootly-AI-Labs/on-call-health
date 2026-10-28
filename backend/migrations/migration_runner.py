@@ -1425,6 +1425,11 @@ class MigrationRunner:
                 "description": "Clear OAuth provider tokens stored before encryption at rest",
                 "sql_file": "2026_10_28_clear_plaintext_oauth_provider_tokens.sql"
             },
+            {
+                "name": "059_create_survey_dispatch_claims",
+                "description": "Record each scheduled survey job occurrence so polled dispatch runs it once",
+                "sql_file": "2026_10_28_create_survey_dispatch_claims.sql"
+            },
         ]
 
         success_count = 0
