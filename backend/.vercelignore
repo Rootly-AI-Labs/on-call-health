@@ -8,8 +8,5 @@ __pycache__/
 .env.*
 Dockerfile
 .dockerignore
-start.sh
-start_worker.sh
-newrelic.ini
 digest_preview.html
 diagnose_github_data.py

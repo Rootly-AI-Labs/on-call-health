@@ -4,7 +4,7 @@ This document outlines the OAuth redirect URIs that need to be configured in eac
 
 ## Environment Variables
 
-Ensure these are set in your Railway backend environment:
+Ensure these are set in the backend Vercel project (`on-call-health-api`):
 
 ```env
 GOOGLE_REDIRECT_URI=https://api.oncallhealth.ai/auth/google/callback
@@ -106,21 +106,6 @@ After updating all OAuth providers:
 - [ ] Linear integration connects successfully
 - [ ] No CORS errors in browser console
 - [ ] All callbacks redirect to correct domain
-
-## Rollback Plan
-
-If issues occur, revert environment variables to use Railway domain:
-
-```env
-# Backend
-GOOGLE_REDIRECT_URI=https://rootly-burnout-detector-web-production.up.railway.app/auth/google/callback
-GITHUB_REDIRECT_URI=https://rootly-burnout-detector-web-production.up.railway.app/auth/github/callback
-
-# Frontend
-NEXT_PUBLIC_API_URL=https://rootly-burnout-detector-web-production.up.railway.app
-```
-
-And re-add Railway URLs to OAuth provider consoles.
 
 ## Notes
 
