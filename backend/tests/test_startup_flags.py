@@ -38,3 +38,13 @@ def test_startup_work_is_enabled_by_default():
     result = subprocess.run([sys.executable, "-c", script], env=env, cwd=BACKEND_DIR, capture_output=True, text=True, check=True)
 
     assert result.stdout.split() == ["True", "True"]
+
+
+def test_health_reports_whether_schedulers_are_enabled(monkeypatch):
+    monkeypatch.setattr(main.settings, "RUN_SCHEDULERS", False)
+
+    with patch("app.models.base.get_pool_status", return_value={}):
+        body = asyncio.run(main.health())
+
+    assert body["schedulers_enabled"] is False
+    assert body["retention_scheduler_running"] is False

@@ -161,6 +161,7 @@ async def health():
         "status": "healthy",
         "service": "on-call-health",
         "db_pool": get_pool_status(),
+        "schedulers_enabled": settings.RUN_SCHEDULERS,
         "retention_scheduler_running": bool(retention_scheduler and retention_scheduler.scheduler.running),
     }
 
