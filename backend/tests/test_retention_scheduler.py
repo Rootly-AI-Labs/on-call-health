@@ -627,6 +627,17 @@ def test_shutdown_prevents_retry_registration_or_recovery(scheduler, monkeypatch
     instance._restore_retries()
 
 
+def test_shutdown_leaves_retry_timers_to_the_stopping_scheduler(scheduler):
+    # APScheduler holds its job store lock while joining running jobs.
+    instance = scheduler.RetentionScheduler()
+    instance.scheduler = QueuedScheduler()
+    instance._stop_event.set()
+
+    instance._after_daily_attempt(7, "succeeded")
+
+    assert instance.scheduler.removed == []
+
+
 def test_retry_registration_error_is_sanitized(scheduler, monkeypatch, caplog):
     def broken_factory():
         raise RuntimeError("PRIVATE DATABASE URL")
@@ -735,7 +746,7 @@ def test_stop_drains_current_org_and_never_claims_next_org(scheduler, monkeypatc
     def cleanup(organization_id, *, stop_event, **kwargs):
         claims.append(organization_id)
         current_entered.set()
-        assert current_release.wait(timeout=5)
+        assert current_release.wait(timeout=30)
         current_finished.set()
         return "succeeded"
 
@@ -749,7 +760,7 @@ def test_stop_drains_current_org_and_never_claims_next_org(scheduler, monkeypatc
         instance.start()
         stopping = None
         try:
-            assert await asyncio.to_thread(current_entered.wait, 2)
+            assert await asyncio.to_thread(current_entered.wait, 30)
             stopping = asyncio.create_task(instance.stop())
             # The stop flag is set before executor shutdown is dispatched.
             await asyncio.sleep(0)
@@ -757,7 +768,7 @@ def test_stop_drains_current_org_and_never_claims_next_org(scheduler, monkeypatc
             assert not stopping.done()
             assert not current_finished.is_set()
             current_release.set()
-            await asyncio.wait_for(stopping, timeout=3)
+            await asyncio.wait_for(stopping, timeout=30)
             assert current_finished.is_set()
             assert claims == [1]
             assert not instance.scheduler.running

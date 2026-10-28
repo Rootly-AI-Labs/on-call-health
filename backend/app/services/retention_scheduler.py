@@ -259,6 +259,7 @@ class RetentionScheduler:
         self._started = False
         self._has_started = False
         self._stop_event = threading.Event()
+        self._timers_lock = threading.Lock()
         self._shutdown_task: asyncio.Task | None = None
 
     def _run_poll(self) -> RetentionPollResult:
@@ -276,10 +277,13 @@ class RetentionScheduler:
             self._schedule_retry(organization_id, deferred=True, mode="daily")
 
     def _remove_retry(self, organization_id: int) -> None:
-        try:
-            self.scheduler.remove_job(f"{RETRY_JOB_PREFIX}{organization_id}")
-        except JobLookupError:
-            pass
+        with self._timers_lock:
+            if self._stop_event.is_set():
+                return
+            try:
+                self.scheduler.remove_job(f"{RETRY_JOB_PREFIX}{organization_id}")
+            except JobLookupError:
+                pass
 
     def _schedule_retry(self, organization_id: int, *, deferred: bool = False, mode: AttemptMode = "retry") -> None:
         """Recheck persisted eligibility before queuing a targeted follow-up.
@@ -306,16 +310,17 @@ class RetentionScheduler:
             if due_at is None:
                 self._remove_retry(organization_id)
                 return
-            if self._stop_event.is_set():
-                return
             # A slow metadata read must not consume the contention delay.
             earliest = _utc(utc_now()) + timedelta(minutes=RETRY_INTERVAL_MINUTES) if deferred else now
-            self.scheduler.add_job(
-                self._run_retry, trigger=DateTrigger(run_date=max(due_at, earliest), timezone=timezone.utc),
-                args=[organization_id], id=f"{RETRY_JOB_PREFIX}{organization_id}",
-                **({"kwargs": {"mode": "daily"}} if mode == "daily" else {}),
-                replace_existing=not deferred, max_instances=1, misfire_grace_time=None,
-            )
+            with self._timers_lock:
+                if self._stop_event.is_set():
+                    return
+                self.scheduler.add_job(
+                    self._run_retry, trigger=DateTrigger(run_date=max(due_at, earliest), timezone=timezone.utc),
+                    args=[organization_id], id=f"{RETRY_JOB_PREFIX}{organization_id}",
+                    **({"kwargs": {"mode": "daily"}} if mode == "daily" else {}),
+                    replace_existing=not deferred, max_instances=1, misfire_grace_time=None,
+                )
         except ConflictingIdError:
             # A lock deferral must not postpone or overwrite a concurrent retry.
             if not deferred:
@@ -389,6 +394,13 @@ class RetentionScheduler:
         logger.info("Retention scheduler started; daily_time_utc=%02d:%02d",
                     DAILY_CLEANUP_HOUR_UTC, DAILY_CLEANUP_MINUTE_UTC)
 
+    def _shutdown_scheduler(self) -> None:
+        # APScheduler holds its job store lock while joining running jobs, so a
+        # job changing a timer after this point would never finish.
+        with self._timers_lock:
+            pass
+        self.scheduler.shutdown(wait=True)
+
     async def stop(self) -> None:
         if self._shutdown_task is not None and not self._shutdown_task.done():
             await asyncio.shield(self._shutdown_task)
@@ -397,7 +409,7 @@ class RetentionScheduler:
             return
         self._started = False
         self._stop_event.set()
-        self._shutdown_task = asyncio.create_task(asyncio.to_thread(self.scheduler.shutdown, wait=True))
+        self._shutdown_task = asyncio.create_task(asyncio.to_thread(self._shutdown_scheduler))
         # Joining the background executor off-loop leaves other shutdown work
         # responsive while guaranteeing the current cleanup has finished.
         await asyncio.shield(self._shutdown_task)
