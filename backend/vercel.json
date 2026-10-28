@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "python run_migrations.py && python -c \"from app.models import create_tables; create_tables()\"",
+  "functions": {
+    "app/main.py": {
+      "maxDuration": 1800
+    }
+  },
+  "crons": [
+    { "path": "/internal/cron/surveys", "schedule": "* * * * *" },
+    { "path": "/internal/cron/analyses", "schedule": "* * * * *" },
+    { "path": "/internal/cron/retention", "schedule": "*/15 * * * *" },
+    { "path": "/internal/cron/weekly-digest", "schedule": "*/30 * * * *" },
+    { "path": "/internal/cron/auto-refresh", "schedule": "0 * * * *" }
+  ]
+}
