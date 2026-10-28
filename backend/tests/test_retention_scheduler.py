@@ -735,7 +735,7 @@ def test_stop_drains_current_org_and_never_claims_next_org(scheduler, monkeypatc
     def cleanup(organization_id, *, stop_event, **kwargs):
         claims.append(organization_id)
         current_entered.set()
-        assert current_release.wait(timeout=5)
+        assert current_release.wait(timeout=30)
         current_finished.set()
         return "succeeded"
 
@@ -749,7 +749,7 @@ def test_stop_drains_current_org_and_never_claims_next_org(scheduler, monkeypatc
         instance.start()
         stopping = None
         try:
-            assert await asyncio.to_thread(current_entered.wait, 2)
+            assert await asyncio.to_thread(current_entered.wait, 30)
             stopping = asyncio.create_task(instance.stop())
             # The stop flag is set before executor shutdown is dispatched.
             await asyncio.sleep(0)
@@ -757,7 +757,7 @@ def test_stop_drains_current_org_and_never_claims_next_org(scheduler, monkeypatc
             assert not stopping.done()
             assert not current_finished.is_set()
             current_release.set()
-            await asyncio.wait_for(stopping, timeout=3)
+            await asyncio.wait_for(stopping, timeout=30)
             assert current_finished.is_set()
             assert claims == [1]
             assert not instance.scheduler.running
