@@ -27,7 +27,7 @@ from datetime import datetime
 
 def get_database_url():
     """Get database URL from environment or use default."""
-    return os.getenv('DATABASE_URL', 'postgresql://postgres:password@localhost:5432/railway')
+    return os.getenv('DATABASE_URL', 'postgresql://postgres:password@localhost:5432/burnout_detector')
 
 def cleanup_duplicates(dry_run=True, organization_id=None):
     """

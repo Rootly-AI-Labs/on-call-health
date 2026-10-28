@@ -48,7 +48,7 @@ def _int_env(name: str, default: int) -> int:
 # admin dashboard and ad-hoc psql sessions under a typical 100-connection cap.
 #
 # Every value is environment-overridable so the pool can be retuned for a given
-# Railway/Postgres plan WITHOUT a code deploy. Defaults are deliberately
+# Postgres plan WITHOUT a code deploy. Defaults are deliberately
 # conservative (previously these were a hard-coded 30 + 20 = 50 per process,
 # which alone could exhaust the shared server).
 POOL_SIZE = _int_env("DB_POOL_SIZE", 10)          # persistent connections kept warm
@@ -60,8 +60,8 @@ POOL_RECYCLE = _int_env("DB_POOL_RECYCLE", 1800)  # recycle connections older th
 STATEMENT_TIMEOUT_MS = _int_env("DB_STATEMENT_TIMEOUT_MS", 60000)  # 60 seconds default
 LOCK_TIMEOUT_MS = _int_env("DB_LOCK_TIMEOUT_MS", 30000)            # 30 seconds default
 
-# Idle-transaction reaper (in milliseconds). Railway Postgres has no idle
-# timeout and its TCP proxy keeps orphaned backends ESTABLISHED, so a connection
+# Idle-transaction reaper (in milliseconds). Without a server-side idle
+# timeout, orphaned backends can stay ESTABLISHED indefinitely, so a connection
 # left idle-in-transaction (e.g. a leaked/stranded session that opened a
 # transaction but never committed) would otherwise live forever and count
 # against the shared max_connections budget until the server is fully locked out

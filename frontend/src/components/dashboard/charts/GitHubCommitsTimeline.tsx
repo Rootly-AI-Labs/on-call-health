@@ -67,7 +67,7 @@ export function GitHubCommitsTimeline({ analysisId, totalCommits, weekendPercent
           setError(result.message || 'Failed to fetch timeline data')
         }
       } catch (err) {
-        // Network errors are expected during Railway startup - don't log
+        // Network errors are expected during backend cold starts - don't log
         setError('Unable to load timeline data')
       } finally {
         setLoading(false)

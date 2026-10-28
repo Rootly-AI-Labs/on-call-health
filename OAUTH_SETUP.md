@@ -31,7 +31,6 @@ NEXT_PUBLIC_API_BASE_URL=https://api.oncallhealth.ai
 2. Click on your OAuth 2.0 Client ID
 3. Update **Authorized redirect URIs**:
    - Add: `https://api.oncallhealth.ai/auth/google/callback`
-   - Remove old: `https://rootly-burnout-detector-web-production.up.railway.app/auth/google/callback`
 4. Update **Authorized JavaScript origins**:
    - Add: `https://oncallhealth.ai`
    - Add: `https://api.oncallhealth.ai`
@@ -63,7 +62,6 @@ NEXT_PUBLIC_API_BASE_URL=https://api.oncallhealth.ai
 2. Go to **OAuth & Permissions** in the sidebar
 3. Under **Redirect URLs**:
    - Add: `https://api.oncallhealth.ai/auth/slack/callback`
-   - Remove old Railway URL
 4. Click **Save URLs**
 
 **App Settings (branding):**

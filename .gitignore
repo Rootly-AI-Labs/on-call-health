@@ -87,9 +87,6 @@ frontend/dist/
 *.sqlite
 *.sqlite3
 
-# Railway
-.railway/
-
 # Vercel
 .vercel
 
@@ -99,7 +96,6 @@ backend/test_*.py
 backend/audit_*.py
 backend/investigate_*.py
 backend/query_*.py
-backend/railway_*.py
 backend/fix_*.py
 backend/migrate_*.py
 backend/promote_*.py

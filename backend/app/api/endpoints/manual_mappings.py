@@ -557,7 +557,7 @@ async def run_github_mapping(
         import asyncio
         
         # Set a timeout for the entire operation to prevent server timeouts
-        timeout_seconds = 45  # Railway/server timeout is usually 60s
+        timeout_seconds = 45  # Server request timeout is usually 60s
         
         # Get GitHub integration - check personal first, then beta token
         github_integration = db.query(GitHubIntegration).filter(

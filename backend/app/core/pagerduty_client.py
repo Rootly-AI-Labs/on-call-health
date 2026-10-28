@@ -1145,7 +1145,6 @@ class PagerDutyDataCollector:
             )
             data_source = "pagerduty_rest_fallback"
         
-        # 🎯 RAILWAY DEBUG: Post-normalization validation
         normalized_incidents = normalized_data.get("incidents", [])
         if normalized_incidents:
             sample_normalized = normalized_incidents[0]

@@ -259,7 +259,7 @@ async def google_callback(
 
         logger.info(f"🔐 Storing OAuth code for user {user.id}: {auth_code[:10]}...")
 
-        # Store JWT in database (works across multiple Railway instances)
+        # Store JWT in database (works across multiple server instances)
         store_oauth_code(db, auth_code, jwt_token, user.id, "google")
 
         logger.info(f"✅ OAuth code stored successfully")
@@ -389,7 +389,7 @@ async def github_callback(
 
         logger.info(f"🔐 Storing OAuth code for user {user.id}: {auth_code[:10]}...")
 
-        # Store JWT in database (works across multiple Railway instances)
+        # Store JWT in database (works across multiple server instances)
         store_oauth_code(db, auth_code, jwt_token, user.id, "github")
 
         logger.info(f"✅ OAuth code stored successfully")
