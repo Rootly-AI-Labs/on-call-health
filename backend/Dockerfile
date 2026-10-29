@@ -1,5 +1,5 @@
 # Stage 1: Build stage with compilation tools
-FROM python:3.14.8-slim-bookworm AS builder
+FROM python:3.15.0-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime stage (minimal, no build tools)
-FROM python:3.14.8-slim-bookworm AS runtime
+FROM python:3.15.0-slim-bookworm AS runtime
 
 WORKDIR /app
 
